@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class SeasonAnalyzerTest {
+class SeasonScannerTest {
 
     @Mock
     private SeasonRepository seasonRepository;
@@ -27,7 +27,7 @@ class SeasonAnalyzerTest {
     private BasicFileAttributes basicFileAttributes;
 
     @InjectMocks
-    SeasonAnalyzer subject;
+    SeasonScanner subject;
 
     @Test
     void analyzable() {

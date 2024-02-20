@@ -17,15 +17,13 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
     private final DiskEntity diskEntity;
 
     ArrayDeque<BaseEntity> analyzeStack = new ArrayDeque<>();
-//    Optional<TVShow> inShow;
-//    Optional<Season> inSeason;
 
-    private final ShowAnalyzer showAnalyzer;
-    private final SeasonAnalyzer seasonAnalyzer;
-    private final EpisodeAnalyzer episodeAnalyzer;
-    private final ImageAnalyzer imageAnalyzer;
+    private final ShowScanner showAnalyzer;
+    private final SeasonScanner seasonAnalyzer;
+    private final EpisodeScanner episodeAnalyzer;
+    private final ImageScanner imageAnalyzer;
 
-    public AnalyzerSimpleFileVisitor(DiskEntity diskEntity, ShowAnalyzer showAnalyzer, SeasonAnalyzer seasonAnalyzer, EpisodeAnalyzer episodeAnalyzer, ImageAnalyzer imageAnalyzer) {
+    public AnalyzerSimpleFileVisitor(DiskEntity diskEntity, ShowScanner showAnalyzer, SeasonScanner seasonAnalyzer, EpisodeScanner episodeAnalyzer, ImageScanner imageAnalyzer) {
         this.diskEntity = diskEntity;
         this.showAnalyzer = showAnalyzer;
         this.seasonAnalyzer = seasonAnalyzer;
@@ -47,10 +45,10 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
     }
 
     private FileVisitResult analyzeDir(Path dir, BasicFileAttributes attrs) {
-        for (Analyzer analyzer : List.of(showAnalyzer, seasonAnalyzer)) {
-            if (analyzer.analyzable(dir, attrs, analyzeStack)) {
-                log.debug("Scanning dir: {}, with scanner: {}", dir, analyzer);
-                analyzeStack.push(analyzer.analyze(diskEntity, dir, attrs, analyzeStack).orElseThrow());
+        for (Scanner scanner : List.of(showAnalyzer, seasonAnalyzer)) {
+            if (scanner.analyzable(dir, attrs, analyzeStack)) {
+                log.debug("Scanning dir: {}, with scanner: {}", dir, scanner);
+                analyzeStack.push(scanner.analyze(diskEntity, dir, attrs, analyzeStack).orElseThrow());
                 return FileVisitResult.CONTINUE;
             }
         }
@@ -67,10 +65,10 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
 
     @Override
     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-        for (Analyzer analyzer : List.of(episodeAnalyzer, imageAnalyzer)) {
-            if (analyzer.analyzable(file, attrs, analyzeStack)) {
-                log.debug("Scanning file: {}, with scanner: {}", file, analyzer);
-                analyzer.analyze(diskEntity, file, attrs, analyzeStack);
+        for (Scanner scanner : List.of(episodeAnalyzer, imageAnalyzer)) {
+            if (scanner.analyzable(file, attrs, analyzeStack)) {
+                log.debug("Scanning file: {}, with scanner: {}", file, scanner);
+                scanner.analyze(diskEntity, file, attrs, analyzeStack);
             }
         }
         return FileVisitResult.CONTINUE;

@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 
 @Component
 @Slf4j
-public class SeasonAnalyzer implements Analyzer {
+public class SeasonScanner implements Scanner {
     final static String REGEX = "season\\s+(\\d{1,4})";
 
     @Autowired

@@ -7,6 +7,7 @@ import jakarta.persistence.Id;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 import java.util.UUID;
 
@@ -14,6 +15,7 @@ import java.util.UUID;
 //@RequiredArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PACKAGE)
 @Data
+@SuperBuilder
 public class BaseEntity {
 
     @Id

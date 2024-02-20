@@ -1,20 +1,23 @@
 package app.ister.server.scanner;
 
-import app.ister.server.entitiy.DiskEntity;
-import app.ister.server.entitiy.EpisodeEntity;
-import app.ister.server.entitiy.MediaFileEntity;
-import app.ister.server.entitiy.MediaFileStreamEntity;
+import app.ister.server.entitiy.*;
+import app.ister.server.enums.ImageType;
+import app.ister.server.repository.ImageRepository;
 import app.ister.server.repository.MediaFileRepository;
 import app.ister.server.repository.MediaFileStreamRepository;
 import com.github.kokorin.jaffree.LogLevel;
+import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
+import com.github.kokorin.jaffree.ffmpeg.UrlInput;
+import com.github.kokorin.jaffree.ffmpeg.UrlOutput;
 import com.github.kokorin.jaffree.ffprobe.FFprobe;
 import com.github.kokorin.jaffree.ffprobe.FFprobeResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.Paths;
 import java.util.Optional;
 
 @Component
@@ -25,18 +28,46 @@ public class MediaFileAnalyzer {
     private MediaFileRepository mediaFileRepository;
     @Autowired
     private MediaFileStreamRepository mediaFileStreamRepository;
+    @Autowired
+    private ImageRepository imageRepository;
 
-    public void checkMediaFile(DiskEntity diskEntity, EpisodeEntity isEpisode, Path file, BasicFileAttributes attrs) {
-        Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDiskEntityAndEpisodeEntityAndPath(diskEntity, isEpisode, file.toString());
+    @Value("${app.ister.server.ffmpeg-dir}")
+    private String dirOfFFmpeg;
+
+    public void checkMediaFile(DiskEntity diskEntity, EpisodeEntity episode, String file) {
+        Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDiskEntityAndEpisodeEntityAndPath(diskEntity, episode, file);
         if (mediaFile.isEmpty()) {
-            MediaFileEntity entity = new MediaFileEntity(diskEntity, isEpisode, file.toString(), attrs.size());
+            MediaFileEntity entity = new MediaFileEntity(diskEntity, episode, file, 0);
             mediaFileRepository.save(entity);
             checkMediaFileForStreams(entity);
         }
     }
 
+    public void createBackground(DiskEntity diskEntity, EpisodeEntity episodeEntity, String toPath, String mediaFile) {
+        FFmpeg.atPath(Path.of(dirOfFFmpeg))
+                .addInput(
+                        UrlInput.fromUrl(mediaFile)
+                )
+                .addOutput(
+                        UrlOutput.toPath(Path.of(toPath))
+                                .addArguments("-ss", "00:01:00")
+                                .addArguments("-vf", "scale='trunc(ih*dar):ih',setsar=1/1")
+                                .addArguments("-frames:v", "1")
+                                .addArguments("-q:v", "2")
+                )
+                .setOverwriteOutput(true)
+                .setLogLevel(LogLevel.ERROR)
+                .execute();
+        imageRepository.save(ImageEntity.builder()
+                .diskEntity(diskEntity)
+                .path(toPath)
+                .type(ImageType.BACKGROUND)
+                .episodeEntity(episodeEntity)
+                .build());
+    }
+
     private void checkMediaFileForStreams(MediaFileEntity mediaFileEntity) {
-        FFprobeResult result = FFprobe.atPath()
+        FFprobeResult result = FFprobe.atPath(Paths.get(dirOfFFmpeg))
                 .setShowStreams(true)
 //                .setShowChapters(true)
 //                .setShowData(true)

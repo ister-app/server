@@ -1,7 +1,9 @@
 package app.ister.server.scanner;
 
 import app.ister.server.entitiy.*;
+import app.ister.server.enums.EventType;
 import app.ister.server.repository.EpisodeRepository;
+import app.ister.server.repository.ServerEventRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -13,13 +15,13 @@ import java.util.Optional;
 
 @Component
 @Slf4j
-public class EpisodeAnalyzer implements Analyzer {
+public class EpisodeScanner implements Scanner {
     final static String REGEX = "s(\\d{1,4})e(\\d{1,4}).mkv";
 
     @Autowired
     private EpisodeRepository episodeRepository;
     @Autowired
-    private MediaFileAnalyzer mediaFileAnalyzer;
+    private ServerEventRepository serverEventRepository;
 
     @Override
     public boolean analyzable(Path dir, BasicFileAttributes attrs, ArrayDeque<BaseEntity> analyzeStack) {
@@ -42,7 +44,7 @@ public class EpisodeAnalyzer implements Analyzer {
             } else {
                 EpisodeEntity episodeEntity1 = new EpisodeEntity(inShow, inSeason, number);
                 episodeRepository.save(episodeEntity1);
-                mediaFileAnalyzer.checkMediaFile(diskEntity, episodeEntity1, dir, attrs);
+                serverEventRepository.save(new ServerEventEntity(EventType.MEDIA_FILE_FOUND, diskEntity, episodeEntity1, dir.toString()));
                 return episodeEntity1;
             }
         }).findFirst().map(episodeEntity -> episodeEntity);

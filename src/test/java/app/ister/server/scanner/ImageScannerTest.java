@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ImageAnalyzerTest {
+class ImageScannerTest {
 
     @Mock
     private ImageRepository imageRepository;
@@ -26,7 +26,7 @@ class ImageAnalyzerTest {
     private BasicFileAttributes basicFileAttributes;
 
     @InjectMocks
-    ImageAnalyzer subject;
+    ImageScanner subject;
 
     @Test
     void analyzable() {

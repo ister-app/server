@@ -4,7 +4,6 @@ import app.ister.server.entitiy.CategorieEntity;
 import app.ister.server.entitiy.DiskEntity;
 import app.ister.server.entitiy.NodeEntity;
 import app.ister.server.enums.DiskType;
-import app.ister.server.repository.*;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
 import org.junit.jupiter.api.Test;
@@ -21,19 +20,19 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MockitoExtension.class)
-class ScannerTest {
+class LibraryScannerTest {
 
     @Mock
-    private ShowAnalyzer showAnalyzer;
+    private ShowScanner showAnalyzer;
     @Mock
-    private SeasonAnalyzer seasonAnalyzer;
+    private SeasonScanner seasonAnalyzer;
     @Mock
-    private EpisodeAnalyzer episodeAnalyzer;
+    private EpisodeScanner episodeAnalyzer;
     @Mock
     private MediaFileAnalyzer mediaFileAnalyzer;
 
     @InjectMocks
-    Scanner scanner;
+    LibraryScanner libraryScanner;
 
 
     @Test
@@ -54,7 +53,7 @@ class ScannerTest {
 
             DiskEntity diskEntity = new DiskEntity(new NodeEntity("TestServer"), new CategorieEntity(), "/disk/show", DiskType.LIBRARY);
 
-            scanner.scanDiskForCategorie(resourceFilePath, diskEntity);
+            libraryScanner.scanDiskForCategorie(resourceFilePath, diskEntity);
             assertTrue(true);
         }
     }

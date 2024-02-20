@@ -28,6 +28,9 @@ public class StartupTasks {
     @Value("${app.ister.server.library-path}")
     private String libraryPath;
 
+    @Value("${app.ister.server.cache-dir}")
+    private String cacheDir;
+
     @EventListener(ContextRefreshedEvent.class)
     public void contextRefreshedEvent() {
         CategorieEntity categorieEntity = new CategorieEntity();
@@ -38,5 +41,7 @@ public class StartupTasks {
 
         DiskEntity diskEntity = new DiskEntity(nodeEntity, categorieEntity, libraryPath, DiskType.LIBRARY);
         diskRepository.save(diskEntity);
+
+        diskRepository.save(new DiskEntity(nodeEntity, categorieEntity, cacheDir, DiskType.CACHE));
     }
 }

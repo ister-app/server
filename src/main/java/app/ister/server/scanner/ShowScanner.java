@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 
 @Component
 @Slf4j
-public class ShowAnalyzer implements Analyzer {
+public class ShowScanner implements Scanner {
 
     String regex = "(.*)\\((\\d{4})\\)*";
 

@@ -14,7 +14,7 @@ import java.util.Optional;
 
 @Component
 @Slf4j
-public class ImageAnalyzer implements Analyzer {
+public class ImageScanner implements Scanner {
     final static String REGEX = "(.*)\\.(jpg|png)";
 
     @Autowired

@@ -22,15 +22,15 @@ import java.nio.file.attribute.BasicFileAttributes;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @ExtendWith(MockitoExtension.class)
-class AnalyzerSimpleFileVisitorTest {
+class ScannerSimpleFileVisitorTest {
     @Mock
-    private ShowAnalyzer showAnalyzer;
+    private ShowScanner showAnalyzer;
     @Mock
-    private SeasonAnalyzer seasonAnalyzer;
+    private SeasonScanner seasonAnalyzer;
     @Mock
-    private EpisodeAnalyzer episodeAnalyzer;
+    private EpisodeScanner episodeAnalyzer;
     @Mock
-    private ImageAnalyzer imageAnalyzer;
+    private ImageScanner imageAnalyzer;
 
     @Mock
     private BasicFileAttributes basicFileAttributes;

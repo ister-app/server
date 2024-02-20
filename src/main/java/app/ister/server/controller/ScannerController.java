@@ -1,7 +1,8 @@
 package app.ister.server.controller;
 
+import app.ister.server.enums.DiskType;
 import app.ister.server.repository.*;
-import app.ister.server.scanner.Scanner;
+import app.ister.server.scanner.LibraryScanner;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,7 +14,7 @@ import java.io.IOException;
 @RequestMapping("scanner")
 public class ScannerController {
     @Autowired
-    private Scanner scanner;
+    private LibraryScanner libraryScanner;
 
     @Autowired
     private DiskRepository diskRepository;
@@ -21,10 +22,12 @@ public class ScannerController {
     @GetMapping(value = "/scan")
     public void scan() {
         diskRepository.findAll().forEach(disk1 -> {
-            try {
-                scanner.scanDiskForCategorie(disk1);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+            if (disk1.getDiskType().equals(DiskType.LIBRARY)) {
+                try {
+                    libraryScanner.scanDiskForCategorie(disk1);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
             }
         });
     }
