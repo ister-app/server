@@ -31,7 +31,7 @@ public class EventHandler {
             serverEventRepository.findAll().forEach(serverEventEntity -> {
                 log.debug("Handling event: {}", serverEventEntity.getEpisodeEntity().getId());
                 mediaFileAnalyzer.checkMediaFile(serverEventEntity.getDiskEntity(), serverEventEntity.getEpisodeEntity(), serverEventEntity.getPath());
-                mediaFileAnalyzer.createBackground(serverEventEntity.getDiskEntity(), serverEventEntity.getEpisodeEntity(), cacheDisk.getPath() + serverEventEntity.getEpisodeEntity().getId() + ".jpg", serverEventEntity.getPath());
+                mediaFileAnalyzer.createBackground(cacheDisk, serverEventEntity.getEpisodeEntity(), cacheDisk.getPath() + serverEventEntity.getEpisodeEntity().getId() + ".jpg", serverEventEntity.getPath());
                 serverEventRepository.delete(serverEventEntity);
             });
             handling = false;

@@ -1,9 +1,6 @@
 package app.ister.server.entitiy;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -11,8 +8,7 @@ import lombok.experimental.SuperBuilder;
 
 import java.util.UUID;
 
-@Entity
-//@RequiredArgsConstructor
+@MappedSuperclass
 @NoArgsConstructor(access = AccessLevel.PACKAGE)
 @Data
 @SuperBuilder

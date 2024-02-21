@@ -17,7 +17,7 @@ public class MediaFileStreamEntity extends BaseEntity {
     private MediaFileEntity mediaFileEntity;
 
     @NonNull
-    private int index;
+    private int streamIndex;
 
     @NonNull
     private String codecName;

@@ -25,23 +25,25 @@ public class StartupTasks {
     @Autowired
     private CatogorieRepository catogorieRepository;
 
-    @Value("${app.ister.server.library-path}")
-    private String libraryPath;
+    @Value("${app.ister.server.library-dir}")
+    private String libraryDir;
 
     @Value("${app.ister.server.cache-dir}")
     private String cacheDir;
 
     @EventListener(ContextRefreshedEvent.class)
     public void contextRefreshedEvent() {
-        CategorieEntity categorieEntity = new CategorieEntity();
-        catogorieRepository.save(categorieEntity);
+        if (diskRepository.findByDiskType(DiskType.LIBRARY).isEmpty()) {
+            CategorieEntity categorieEntity = new CategorieEntity();
+            catogorieRepository.save(categorieEntity);
 
-        NodeEntity nodeEntity = new NodeEntity("TestServer");
-        nodeRepository.save(nodeEntity);
+            NodeEntity nodeEntity = new NodeEntity("TestServer");
+            nodeRepository.save(nodeEntity);
 
-        DiskEntity diskEntity = new DiskEntity(nodeEntity, categorieEntity, libraryPath, DiskType.LIBRARY);
-        diskRepository.save(diskEntity);
+            DiskEntity diskEntity = new DiskEntity(nodeEntity, categorieEntity, libraryDir, DiskType.LIBRARY);
+            diskRepository.save(diskEntity);
 
-        diskRepository.save(new DiskEntity(nodeEntity, categorieEntity, cacheDir, DiskType.CACHE));
+            diskRepository.save(new DiskEntity(nodeEntity, categorieEntity, cacheDir, DiskType.CACHE));
+        }
     }
 }

@@ -65,7 +65,7 @@ public class TranscoderController {
         if (audioIndex.isEmpty()) {
             var firstAudioStream = mediaFile.getMediaFileStreamEntity().stream().filter(mediaFileStream -> mediaFileStream.getCodecType().equals("AUDIO")).findFirst();
             if (firstAudioStream.isPresent()) {
-                audioIndex = Optional.of(firstAudioStream.get().getIndex());
+                audioIndex = Optional.of(firstAudioStream.get().getStreamIndex());
             }
         }
         var transcodeSession = createSession();

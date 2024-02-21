@@ -79,7 +79,7 @@ public class MediaFileAnalyzer {
         for (com.github.kokorin.jaffree.ffprobe.Stream stream : result.getStreams()) {
             var mediaFileStream = new MediaFileStreamEntity();
             mediaFileStream.setMediaFileEntity(mediaFileEntity);
-            mediaFileStream.setIndex(stream.getIndex());
+            mediaFileStream.setStreamIndex(stream.getIndex());
             mediaFileStream.setCodecName(stream.getCodecName());
             mediaFileStream.setCodecType(stream.getCodecType().toString());
             if (stream.getWidth() != null && stream.getHeight() != null) {

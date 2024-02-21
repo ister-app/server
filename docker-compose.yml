@@ -1,0 +1,14 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16
+    restart: always
+    volumes:
+      - ./db-data/:/var/lib/postgresql/data/:Z
+    environment:
+      POSTGRES_USER: ister
+      POSTGRES_PASSWORD: ister
+      POSTGRES_DB: ister
+    ports:
+      - "5432:5432"
