@@ -44,7 +44,11 @@ public class EpisodeScanner implements Scanner {
             } else {
                 EpisodeEntity episodeEntity1 = new EpisodeEntity(inShow, inSeason, number);
                 episodeRepository.save(episodeEntity1);
-                serverEventRepository.save(new ServerEventEntity(EventType.MEDIA_FILE_FOUND, diskEntity, episodeEntity1, dir.toString()));
+                serverEventRepository.save(ServerEventEntity.builder()
+                        .eventType(EventType.MEDIA_FILE_FOUND)
+                        .diskEntity(diskEntity)
+                        .episodeEntity(episodeEntity1)
+                        .path(dir.toString()).build());
                 return episodeEntity1;
             }
         }).findFirst().map(episodeEntity -> episodeEntity);

@@ -1,9 +1,15 @@
 package app.ister.server;
 
+import app.ister.server.entitiy.DiskEntity;
+import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.enums.DiskType;
+import app.ister.server.enums.EventType;
 import app.ister.server.repository.DiskRepository;
 import app.ister.server.repository.ServerEventRepository;
 import app.ister.server.scanner.MediaFileAnalyzer;
+import app.ister.server.scanner.NfoAnalyzer;
+import app.ister.server.scanner.PathObject;
+import app.ister.server.scanner.PathType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -16,9 +22,11 @@ public class EventHandler {
     @Autowired
     private ServerEventRepository serverEventRepository;
     @Autowired
+    private DiskRepository diskRepository;
+    @Autowired
     private MediaFileAnalyzer mediaFileAnalyzer;
     @Autowired
-    private DiskRepository diskRepository;
+    private NfoAnalyzer nfoAnalyzer;
 
     private boolean handling;
 
@@ -29,12 +37,24 @@ public class EventHandler {
             handling = true;
             var cacheDisk = diskRepository.findByDiskType(DiskType.CACHE).stream().findFirst().orElseThrow();
             serverEventRepository.findAll().forEach(serverEventEntity -> {
-                log.debug("Handling event: {}", serverEventEntity.getEpisodeEntity().getId());
-                mediaFileAnalyzer.checkMediaFile(serverEventEntity.getDiskEntity(), serverEventEntity.getEpisodeEntity(), serverEventEntity.getPath());
-                mediaFileAnalyzer.createBackground(cacheDisk, serverEventEntity.getEpisodeEntity(), cacheDisk.getPath() + serverEventEntity.getEpisodeEntity().getId() + ".jpg", serverEventEntity.getPath());
+                log.debug("Handling event: {}, for type: {}", serverEventEntity.getPath(), serverEventEntity.getEventType());
+                if (serverEventEntity.getEventType().equals(EventType.MEDIA_FILE_FOUND)) {
+                    handleMediaFileFound(serverEventEntity, cacheDisk);
+                } else if (serverEventEntity.getEventType().equals(EventType.NFO_FILE_FOUND)) {
+                    handleNfoFileFound(serverEventEntity);
+                }
                 serverEventRepository.delete(serverEventEntity);
             });
             handling = false;
         }
+    }
+
+    private void handleMediaFileFound(ServerEventEntity serverEventEntity, DiskEntity cacheDisk) {
+//        mediaFileAnalyzer.checkMediaFile(serverEventEntity.getDiskEntity(), serverEventEntity.getEpisodeEntity(), serverEventEntity.getPath());
+//        mediaFileAnalyzer.createBackground(cacheDisk, serverEventEntity.getEpisodeEntity(), cacheDisk.getPath() + serverEventEntity.getEpisodeEntity().getId() + ".jpg", serverEventEntity.getPath());
+    }
+
+    private void handleNfoFileFound(ServerEventEntity serverEventEntity) {
+        nfoAnalyzer.analyze(serverEventEntity.getDiskEntity(), serverEventEntity.getPath());
     }
 }

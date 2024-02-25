@@ -19,8 +19,6 @@ public class ImageScanner implements Scanner {
 
     @Autowired
     private ImageRepository imageRepository;
-    @Autowired
-    private MediaFileAnalyzer mediaFileAnalyzer;
 
     @Override
     public boolean analyzable(Path dir, BasicFileAttributes attrs, ArrayDeque<BaseEntity> analyzeStack) {

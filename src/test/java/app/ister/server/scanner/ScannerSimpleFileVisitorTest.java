@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.IOException;
 import java.nio.file.FileSystem;
@@ -31,6 +32,8 @@ class ScannerSimpleFileVisitorTest {
     private EpisodeScanner episodeAnalyzer;
     @Mock
     private ImageScanner imageAnalyzer;
+    @Mock
+    private NfoScanner nfoScanner;
 
     @Mock
     private BasicFileAttributes basicFileAttributes;
@@ -65,7 +68,7 @@ class ScannerSimpleFileVisitorTest {
         @Test
         void theRootDirWillReturnContinue() {
             Path resourceFilePath = fileSystem.getPath("/disk/show");
-            var subject = new AnalyzerSimpleFileVisitor(diskEntity, showAnalyzer, seasonAnalyzer, episodeAnalyzer, imageAnalyzer);
+            var subject = new AnalyzerSimpleFileVisitor(diskEntity, showAnalyzer, seasonAnalyzer, episodeAnalyzer, imageAnalyzer, nfoScanner);
 
             var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
 
@@ -75,7 +78,7 @@ class ScannerSimpleFileVisitorTest {
         @Test
         void dotDirsWillBeSkipped() {
             Path resourceFilePath = fileSystem.getPath("/disk/show/.tmp");
-            var subject = new AnalyzerSimpleFileVisitor(diskEntity, showAnalyzer, seasonAnalyzer, episodeAnalyzer, imageAnalyzer);
+            var subject = new AnalyzerSimpleFileVisitor(diskEntity, showAnalyzer, seasonAnalyzer, episodeAnalyzer, imageAnalyzer, nfoScanner);
 
             var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
 

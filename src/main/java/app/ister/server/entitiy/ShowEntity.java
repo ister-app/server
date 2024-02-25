@@ -23,4 +23,7 @@ public class ShowEntity extends BaseEntity {
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "showEntity")
     private List<ImageEntity> imageEntities;
+
+    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "showEntity")
+    private List<MetadataEntity> metadataEntities;
 }

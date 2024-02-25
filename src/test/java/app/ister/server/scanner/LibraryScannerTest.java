@@ -44,7 +44,7 @@ class LibraryScannerTest {
             Files.createDirectories(fileSystem.getPath("/disk/show/Show (2024)/Season 01"));
             Files.createFile(fileSystem.getPath("/disk/show/Show (2024)/background.jpg"));
             Files.createFile(fileSystem.getPath("/disk/show/Show (2024)/cover.jpg"));
-            Files.createFile(fileSystem.getPath("/disk/show/Show (2024)/show.nfo"));
+            Files.createFile(fileSystem.getPath("/disk/show/Show (2024)/tvshow.nfo"));
             Files.createFile(fileSystem.getPath("/disk/show/Show (2024)/Season 01/cover.jpg"));
             Files.createFile(fileSystem.getPath("/disk/show/Show (2024)/Season 01/s01e01.mkv"));
             Files.createFile(fileSystem.getPath("/disk/show/Show (2024)/Season 01/s01e01.en.srt"));

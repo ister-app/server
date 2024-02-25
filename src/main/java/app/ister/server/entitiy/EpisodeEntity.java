@@ -35,6 +35,9 @@ public class EpisodeEntity extends BaseEntity {
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "episodeEntity")
     private List<ImageEntity> imagesEntities;
 
+    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "episodeEntity")
+    private List<MetadataEntity> metadataEntities;
+
     @NonNull
     private int number;
 }

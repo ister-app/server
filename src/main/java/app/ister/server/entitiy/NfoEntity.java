@@ -1,6 +1,6 @@
 package app.ister.server.entitiy;
 
-import app.ister.server.enums.EventType;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.Entity;
 import jakarta.persistence.ManyToOne;
 import lombok.AccessLevel;
@@ -9,23 +9,16 @@ import lombok.NoArgsConstructor;
 import lombok.NonNull;
 import lombok.experimental.SuperBuilder;
 
+import java.sql.Timestamp;
+
 @Entity
-@NoArgsConstructor(access = AccessLevel.PUBLIC)
 @SuperBuilder
-@Getter
-public class ServerEventEntity extends BaseEntity {
-
-    @NonNull
-    private EventType eventType;
-
+@NoArgsConstructor(access = AccessLevel.PUBLIC)
+public class NfoEntity extends BaseEntity {
     @NonNull
     @ManyToOne
     private DiskEntity diskEntity;
 
-    @ManyToOne
-    private EpisodeEntity episodeEntity;
-
     @NonNull
     private String path;
-
 }
