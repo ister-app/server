@@ -1,7 +1,9 @@
 package app.ister.server.entitiy;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -10,10 +12,9 @@ import java.sql.Timestamp;
 import java.util.List;
 
 @Entity
-@EntityListeners(AuditingEntityListener.class)
-@RequiredArgsConstructor(access = AccessLevel.PUBLIC)
-@NoArgsConstructor
-@Data
+@Getter
+@SuperBuilder
+@NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class EpisodeEntity extends BaseEntity {
 
     @CreatedDate
@@ -21,11 +22,11 @@ public class EpisodeEntity extends BaseEntity {
     @LastModifiedDate
     Timestamp dateUpdated;
 
-    @NonNull
+    @NotNull
     @ManyToOne
     private ShowEntity showEntity;
 
-    @NonNull
+    @NotNull
     @ManyToOne
     private SeasonEntity seasonEntity;
 
@@ -38,6 +39,6 @@ public class EpisodeEntity extends BaseEntity {
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "episodeEntity")
     private List<MetadataEntity> metadataEntities;
 
-    @NonNull
+    @NotNull
     private int number;
 }

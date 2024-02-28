@@ -48,7 +48,10 @@ public class ShowScanner implements Scanner {
                 log.debug("Saving: " + show.get().getName());
                 return show.get();
             } else {
-                ShowEntity showEntity = new ShowEntity(diskEntity.getCategorieEntity(), name, releaseYear);
+                ShowEntity showEntity = ShowEntity.builder()
+                        .categorieEntity(diskEntity.getCategorieEntity())
+                        .name(name)
+                        .releaseYear(releaseYear).build();
                 showRepository.save(showEntity);
                 return showEntity;
             }

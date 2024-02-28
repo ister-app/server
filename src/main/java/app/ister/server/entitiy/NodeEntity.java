@@ -1,17 +1,16 @@
 package app.ister.server.entitiy;
 
 import jakarta.persistence.Entity;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
+import jakarta.validation.constraints.NotNull;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 @Entity
-@RequiredArgsConstructor
-@NoArgsConstructor
-@Data
+@Getter
+@SuperBuilder
+@NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class NodeEntity extends BaseEntity {
 
-    @NonNull
+    @NotNull
     private String name;
 }

@@ -1,24 +1,26 @@
 package app.ister.server.entitiy;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 import java.util.List;
 
 @Entity
-@RequiredArgsConstructor(access = AccessLevel.PUBLIC)
-@NoArgsConstructor
-@Data
+@Getter
+@SuperBuilder
+@NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class ShowEntity extends BaseEntity {
 
-    @NonNull
+    @NotNull
     @ManyToOne
     private CategorieEntity categorieEntity;
 
-    @NonNull
+    @NotNull
     private String name;
 
-    @NonNull
+    @NotNull
     private int releaseYear;
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "showEntity")

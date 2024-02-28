@@ -42,7 +42,10 @@ public class EpisodeScanner implements Scanner {
                 log.debug("Saving: " + episode.get().getNumber());
                 return episode.get();
             } else {
-                EpisodeEntity episodeEntity1 = new EpisodeEntity(inShow, inSeason, number);
+                EpisodeEntity episodeEntity1 = EpisodeEntity.builder()
+                        .showEntity(inShow)
+                        .seasonEntity(inSeason)
+                        .number(number).build();
                 episodeRepository.save(episodeEntity1);
                 serverEventRepository.save(ServerEventEntity.builder()
                         .eventType(EventType.MEDIA_FILE_FOUND)

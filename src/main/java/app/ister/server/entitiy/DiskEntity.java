@@ -3,29 +3,31 @@ package app.ister.server.entitiy;
 import app.ister.server.enums.DiskType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.ManyToOne;
-import lombok.Data;
+import jakarta.validation.constraints.NotNull;
+import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 @Entity
-@RequiredArgsConstructor
-@NoArgsConstructor
-@Data
+@Getter
+@SuperBuilder
+@NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class DiskEntity extends BaseEntity {
 
-    @NonNull
+    @NotNull
     @ManyToOne
     private NodeEntity nodeEntity;
 
-    @NonNull
+    @NotNull
     @ManyToOne
     private CategorieEntity categorieEntity;
 
-    @NonNull
+    @NotNull
     private String path;
 
-    @NonNull
+    @NotNull
     private DiskType diskType;
 
 }

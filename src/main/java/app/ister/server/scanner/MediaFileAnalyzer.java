@@ -37,7 +37,11 @@ public class MediaFileAnalyzer {
     public void checkMediaFile(DiskEntity diskEntity, EpisodeEntity episode, String file) {
         Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDiskEntityAndEpisodeEntityAndPath(diskEntity, episode, file);
         if (mediaFile.isEmpty()) {
-            MediaFileEntity entity = new MediaFileEntity(diskEntity, episode, file, 0);
+            MediaFileEntity entity = MediaFileEntity.builder()
+                    .diskEntity(diskEntity)
+                    .episodeEntity(episode)
+                    .path(file)
+                    .size(0).build();
             mediaFileRepository.save(entity);
             checkMediaFileForStreams(entity);
         }
@@ -77,18 +81,18 @@ public class MediaFileAnalyzer {
 
 
         for (com.github.kokorin.jaffree.ffprobe.Stream stream : result.getStreams()) {
-            var mediaFileStream = new MediaFileStreamEntity();
-            mediaFileStream.setMediaFileEntity(mediaFileEntity);
-            mediaFileStream.setStreamIndex(stream.getIndex());
-            mediaFileStream.setCodecName(stream.getCodecName());
-            mediaFileStream.setCodecType(stream.getCodecType().toString());
+            var mediaFileStream = MediaFileStreamEntity.builder()
+                    .mediaFileEntity(mediaFileEntity)
+                    .streamIndex(stream.getIndex())
+                    .codecName(stream.getCodecName())
+                    .codecType(stream.getCodecType().toString())
+                    .language(stream.getTag("language"))
+                    .title(stream.getTag("title"));
             if (stream.getWidth() != null && stream.getHeight() != null) {
-                mediaFileStream.setWidth(stream.getWidth());
-                mediaFileStream.setHeight(stream.getHeight());
+                mediaFileStream.width(stream.getWidth())
+                        .height(stream.getHeight());
             }
-            mediaFileStream.setLanguage(stream.getTag("language"));
-            mediaFileStream.setTitle(stream.getTag("title"));
-            mediaFileStreamRepository.save(mediaFileStream);
+            mediaFileStreamRepository.save(mediaFileStream.build());
         }
     }
 }

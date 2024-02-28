@@ -2,18 +2,20 @@ package app.ister.server.entitiy;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.ManyToOne;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 @Entity
-@RequiredArgsConstructor(access = AccessLevel.PUBLIC)
-@NoArgsConstructor
-@Data
+@Getter
+@SuperBuilder
+@NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class SeasonEntity extends BaseEntity {
 
-    @NonNull
+    @NotNull
     @ManyToOne
     private ShowEntity showEntity;
 
-    @NonNull
+    @NotNull
     private int number;
 }

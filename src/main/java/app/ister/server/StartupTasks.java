@@ -37,13 +37,20 @@ public class StartupTasks {
             CategorieEntity categorieEntity = new CategorieEntity();
             catogorieRepository.save(categorieEntity);
 
-            NodeEntity nodeEntity = new NodeEntity("TestServer");
+            NodeEntity nodeEntity = NodeEntity.builder().name("TestServer").build();
             nodeRepository.save(nodeEntity);
 
-            DiskEntity diskEntity = new DiskEntity(nodeEntity, categorieEntity, libraryDir, DiskType.LIBRARY);
-            diskRepository.save(diskEntity);
+            diskRepository.save(DiskEntity.builder()
+                    .nodeEntity(nodeEntity)
+                    .categorieEntity(categorieEntity)
+                    .path(libraryDir)
+                    .diskType(DiskType.LIBRARY).build());
 
-            diskRepository.save(new DiskEntity(nodeEntity, categorieEntity, cacheDir, DiskType.CACHE));
+            diskRepository.save(DiskEntity.builder()
+                    .nodeEntity(nodeEntity)
+                    .categorieEntity(categorieEntity)
+                    .path(cacheDir)
+                    .diskType(DiskType.CACHE).build());
         }
     }
 }

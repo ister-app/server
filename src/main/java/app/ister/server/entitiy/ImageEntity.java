@@ -4,24 +4,24 @@ import app.ister.server.enums.ImageType;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.Entity;
 import jakarta.persistence.ManyToOne;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 @Entity
-@RequiredArgsConstructor(access = AccessLevel.PUBLIC)
-@NoArgsConstructor
-@Data
+@Getter
 @SuperBuilder
+@NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class ImageEntity extends BaseEntity {
 
-    @NonNull
+    @NotNull
     @ManyToOne
     private DiskEntity diskEntity;
 
-    @NonNull
+    @NotNull
     private String path;
 
-    @NonNull
+    @NotNull
     private ImageType type;
 
     @Getter(onMethod = @__(@JsonBackReference))

@@ -2,21 +2,23 @@ package app.ister.server.entitiy;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 import java.util.List;
 
 @Entity
-@RequiredArgsConstructor(access = AccessLevel.PUBLIC)
-@NoArgsConstructor
-@Data
+@Getter
+@SuperBuilder
+@NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class MediaFileEntity extends BaseEntity {
 
-    @NonNull
+    @NotNull
     @ManyToOne
     private DiskEntity diskEntity;
 
-    @NonNull
+    @NotNull
     @Getter(onMethod = @__(@JsonBackReference))
     @ManyToOne
     private EpisodeEntity episodeEntity;
@@ -24,9 +26,9 @@ public class MediaFileEntity extends BaseEntity {
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "mediaFileEntity")
     private List<MediaFileStreamEntity> mediaFileStreamEntity;
 
-    @NonNull
+    @NotNull
     private String path;
 
-    @NonNull
+    @NotNull
     private long size;
 }

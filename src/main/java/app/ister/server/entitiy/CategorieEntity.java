@@ -1,15 +1,12 @@
 package app.ister.server.entitiy;
 
 import jakarta.persistence.Entity;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
+import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 @Entity
-//@RequiredArgsConstructor
+@Getter
 @SuperBuilder
-@NoArgsConstructor
-@Data
+@NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class CategorieEntity extends BaseEntity {
 }

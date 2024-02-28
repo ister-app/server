@@ -3,32 +3,34 @@ package app.ister.server.entitiy;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.Entity;
 import jakarta.persistence.ManyToOne;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 @Entity
-@RequiredArgsConstructor(access = AccessLevel.PUBLIC)
-@NoArgsConstructor
-@Data
+@Getter
+@SuperBuilder
+@NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class MediaFileStreamEntity extends BaseEntity {
 
-    @NonNull
+    @NotNull
     @Getter(onMethod = @__(@JsonBackReference))
     @ManyToOne
     private MediaFileEntity mediaFileEntity;
 
-    @NonNull
+    @NotNull
     private int streamIndex;
 
-    @NonNull
+    @NotNull
     private String codecName;
 
-    @NonNull
+    @NotNull
     private String codecType;
 
-    @NonNull
+    @NotNull
     private int width;
 
-    @NonNull
+    @NotNull
     private int height;
 
     private String language;

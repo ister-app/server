@@ -12,10 +12,9 @@ import lombok.experimental.SuperBuilder;
 import java.sql.Timestamp;
 
 @Entity
-@SuperBuilder
-//@RequiredArgsConstructor(access = AccessLevel.PUBLIC)
-@NoArgsConstructor(access = AccessLevel.PUBLIC)
 @Getter
+@SuperBuilder
+@NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class MetadataEntity extends BaseEntity {
     @Getter(onMethod = @__(@JsonBackReference))
     @ManyToOne

@@ -28,9 +28,9 @@ public class ImageScanner implements Scanner {
 
     @Override
     public Optional<BaseEntity> analyze(DiskEntity diskEntity, Path file, BasicFileAttributes attrs, ArrayDeque<BaseEntity> analyzeStack) {
-        ImageEntity imageEntity = new ImageEntity();
-        imageEntity.setDiskEntity(diskEntity);
-        imageEntity.setPath(file.toString());
+        var imageEntity = ImageEntity.builder()
+                .diskEntity(diskEntity)
+                .path(file.toString());
 
         var filenameWithoutExt = removeExtension(file.getFileName().toString());
         ImageType imageType = switch (filenameWithoutExt) {
@@ -41,21 +41,22 @@ public class ImageScanner implements Scanner {
         if (imageType.equals(ImageType.UNKNOWN)) {
             return Optional.empty();
         }
-        imageEntity.setType(imageType);
+        imageEntity.type(imageType);
 
         BaseEntity parent = analyzeStack.peek();
         if (parent != null && parent.getClass().equals(ShowEntity.class)) {
             ShowEntity showEntity = (ShowEntity) parent;
-            imageEntity.setShowEntity(showEntity);
+            imageEntity.showEntity(showEntity);
         } else if (parent != null && parent.getClass().equals(SeasonEntity.class)) {
             SeasonEntity seasonEntity = (SeasonEntity) parent;
-            imageEntity.setSeasonEntity(seasonEntity);
+            imageEntity.seasonEntity(seasonEntity);
         } else {
             return Optional.empty();
         }
 
-        imageRepository.save(imageEntity);
-        return Optional.of(imageEntity);
+        ImageEntity build = imageEntity.build();
+        imageRepository.save(build);
+        return Optional.of(build);
     }
 
     private String removeExtension(String string) {

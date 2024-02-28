@@ -41,7 +41,9 @@ public class SeasonScanner implements Scanner {
                 log.debug("Saving: " + season.get().getNumber());
                 return season.get();
             } else {
-                SeasonEntity seasonEntity1 = new SeasonEntity(showEntity, number);
+                SeasonEntity seasonEntity1 = SeasonEntity.builder()
+                        .showEntity(showEntity)
+                        .number(number).build();
                 seasonRepository.save(seasonEntity1);
                 return seasonEntity1;
             }
