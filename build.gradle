@@ -53,7 +53,7 @@ tasks.named('test') {
 }
 
 tasks.named("bootBuildImage") {
-	imageName.set("ghrc.io/ister-app/server")
+	imageName.set("ghcr.io/ister-app/server")
 	docker {
 		host = "unix:///run/user/1000/podman/podman.sock"
 		bindHostToBuilder = true

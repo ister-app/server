@@ -13,14 +13,14 @@ services:
     ports:
       - "5432:5432"
   server:
-    image: ghrc.io/ister-app/server:latest
+    image: ghcr.io/ister-app/server:latest
     restart: always
     environment:
       DB_HOST: database
     ports:
       - "8080:8080"
   website:
-    image: ghrc.io/ister-app/website:latest
+    image: ghcr.io/ister-app/website:latest
     restart: always
     ports:
       - "8090:8080"
