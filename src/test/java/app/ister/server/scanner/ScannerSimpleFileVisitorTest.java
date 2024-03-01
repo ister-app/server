@@ -1,6 +1,8 @@
 package app.ister.server.scanner;
 
-import app.ister.server.entitiy.*;
+import app.ister.server.entitiy.CategorieEntity;
+import app.ister.server.entitiy.DiskEntity;
+import app.ister.server.entitiy.NodeEntity;
 import app.ister.server.enums.DiskType;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
@@ -11,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.IOException;
 import java.nio.file.FileSystem;
@@ -29,7 +30,7 @@ class ScannerSimpleFileVisitorTest {
     @Mock
     private SeasonScanner seasonAnalyzer;
     @Mock
-    private EpisodeScanner episodeAnalyzer;
+    private MediaFileScanner episodeAnalyzer;
     @Mock
     private ImageScanner imageAnalyzer;
     @Mock
@@ -54,7 +55,11 @@ class ScannerSimpleFileVisitorTest {
         Files.createFile(fileSystem.getPath("/disk/show/Show (2024)/Season 01/s01e01.jpg"));
         Files.createFile(fileSystem.getPath("/disk/show/Show (2024)/Season 01/s01e02.mkv"));
 
-        diskEntity = new DiskEntity(new NodeEntity("TestServer"), new CategorieEntity(), "/disk/show", DiskType.LIBRARY);
+        diskEntity = DiskEntity.builder()
+                .nodeEntity(NodeEntity.builder().name("TestServer").build())
+                .categorieEntity(CategorieEntity.builder().build())
+                .path("/disk/show")
+                .diskType(DiskType.LIBRARY).build();
     }
 
     @AfterEach
@@ -84,52 +89,5 @@ class ScannerSimpleFileVisitorTest {
 
             assertEquals(result, FileVisitResult.SKIP_SUBTREE);
         }
-
-//        @Test
-//        void itScansForShows() {
-//            Path resourceFilePath = fileSystem.getPath("/disk/show/Show (2024)");
-//            var subject = new AnalyzerSimpleFileVisitor(diskEntity, showAnalyzer, seasonAnalyzer, episodeAnalyzer, mediaFileAnalyzer);
-//
-//            when(showAnalyzer.get(any(), any())).thenReturn(Optional.of(new ShowEntity()));
-//
-//            var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
-//
-//            verify(showAnalyzer).get(any(), any());
-//            verify(seasonAnalyzer, never()).get(any(), any());
-//
-//            assertEquals(result, FileVisitResult.CONTINUE);
-//        }
-//
-//        @Test
-//        void itScansForSeasons() {
-//            Path resourceFilePath = fileSystem.getPath("/disk/show/Show (2024)");
-//            var subject = new AnalyzerSimpleFileVisitor(diskEntity, showAnalyzer, seasonAnalyzer, episodeAnalyzer, mediaFileAnalyzer);
-////            subject.inShow = Optional.of(new TVShow());
-//
-//            when(showAnalyzer.get(any(), any())).thenReturn(Optional.empty());
-//            when(seasonAnalyzer.get(any(), any())).thenReturn(Optional.of(new SeasonEntity()));
-//
-//            var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
-//
-//            verify(showAnalyzer).get(any(), any());
-//            verify(seasonAnalyzer).get(any(), any());
-//
-//            assertEquals(result, FileVisitResult.CONTINUE);
-//        }
-//
-//        @Test
-//        void itDoesntScanSeasonWithoutShow() {
-//            Path resourceFilePath = fileSystem.getPath("/disk/show/Show (2024)");
-//            var subject = new AnalyzerSimpleFileVisitor(diskEntity, showAnalyzer, seasonAnalyzer, episodeAnalyzer, mediaFileAnalyzer);
-//
-//            when(showAnalyzer.get(any(), any())).thenReturn(Optional.empty());
-//
-//            var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
-//
-//            verify(showAnalyzer).get(any(), any());
-//            verify(seasonAnalyzer, never()).get(any(), any());
-//
-//            assertEquals(result, FileVisitResult.SKIP_SUBTREE);
-//        }
     }
 }

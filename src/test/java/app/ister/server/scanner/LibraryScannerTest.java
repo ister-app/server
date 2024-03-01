@@ -27,7 +27,7 @@ class LibraryScannerTest {
     @Mock
     private SeasonScanner seasonAnalyzer;
     @Mock
-    private EpisodeScanner episodeAnalyzer;
+    private MediaFileScanner episodeAnalyzer;
     @Mock
     private MediaFileAnalyzer mediaFileAnalyzer;
 
@@ -51,7 +51,11 @@ class LibraryScannerTest {
             Files.createFile(fileSystem.getPath("/disk/show/Show (2024)/Season 01/s01e01.jpg"));
             Files.createFile(fileSystem.getPath("/disk/show/Show (2024)/Season 01/s01e02.mkv"));
 
-            DiskEntity diskEntity = new DiskEntity(new NodeEntity("TestServer"), new CategorieEntity(), "/disk/show", DiskType.LIBRARY);
+            DiskEntity diskEntity = DiskEntity.builder()
+                    .nodeEntity(NodeEntity.builder().name("TestServer").build())
+                    .categorieEntity(CategorieEntity.builder().build())
+                    .path("/disk/show")
+                    .diskType(DiskType.LIBRARY).build();
 
             libraryScanner.scanDiskForCategorie(resourceFilePath, diskEntity);
             assertTrue(true);

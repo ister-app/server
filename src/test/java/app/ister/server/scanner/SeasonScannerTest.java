@@ -34,19 +34,16 @@ class SeasonScannerTest {
         when(basicFileAttributes.isDirectory()).thenReturn(true);
         ArrayDeque<BaseEntity> analyzeStack = new ArrayDeque<>();
         analyzeStack.add(new ShowEntity());
-        assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/Season 01"), basicFileAttributes, analyzeStack));
-        assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/season 01"), basicFileAttributes, analyzeStack));
-        assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/SeaSoN 01"), basicFileAttributes, analyzeStack));
+        assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/Season 01"), basicFileAttributes));
+        assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/season 01"), basicFileAttributes));
+        assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/SeaSoN 01"), basicFileAttributes));
     }
 
     @Test
     void analyzableReturnsFalse() {
         when(basicFileAttributes.isDirectory()).thenReturn(true);
-        ArrayDeque<BaseEntity> analyzeStack = new ArrayDeque<>();
-        assertFalse(subject.analyzable(Path.of("/disk/shows/Show (2024)/Season 01"), basicFileAttributes, analyzeStack));
-        analyzeStack.add(new ShowEntity());
-        assertFalse(subject.analyzable(Path.of("/disk/shows/Show (2024)"), basicFileAttributes, analyzeStack));
+        assertFalse(subject.analyzable(Path.of("/disk/shows/Show (2024)"), basicFileAttributes));
         when(basicFileAttributes.isDirectory()).thenReturn(false);
-        assertFalse(subject.analyzable(Path.of("/disk/shows/Show (2024)/Season 01"), basicFileAttributes, analyzeStack));
+        assertFalse(subject.analyzable(Path.of("/disk/shows/Show (2024)/Season 01"), basicFileAttributes));
     }
 }

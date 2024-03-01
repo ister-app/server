@@ -2,9 +2,31 @@ package app.ister.server.scanner;
 
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class PathObjectTest {
+
+    @Test
+    void notCorrectPath() {
+        var subject = new PathObject("/disk/shows");
+        assertEquals(0, subject.getShowYear());
+        assertEquals(null, subject.getShow());
+        assertEquals(0, subject.getSeason());
+        assertEquals(0, subject.getEpisode());
+        assertEquals(DirType.NONE, subject.getDirType());
+        assertEquals(FileType.NONE, subject.getFileType());
+    }
+
+    @Test
+    void notCorrectMissingShowPath() {
+        var subject = new PathObject("/disk/shows/Season 08/s08e08.mkv");
+        assertEquals(0, subject.getShowYear());
+        assertEquals(null, subject.getShow());
+        assertEquals(0, subject.getSeason());
+        assertEquals(0, subject.getEpisode());
+        assertEquals(DirType.NONE, subject.getDirType());
+        assertEquals(FileType.NONE, subject.getFileType());
+    }
 
     @Test
     void showTest() {
@@ -13,17 +35,30 @@ class PathObjectTest {
         assertEquals("Show", subject.getShow());
         assertEquals(0, subject.getSeason());
         assertEquals(0, subject.getEpisode());
-        assertEquals(PathType.SHOW, subject.getType());
+        assertEquals(DirType.SHOW, subject.getDirType());
+        assertEquals(FileType.NONE, subject.getFileType());
     }
 
     @Test
-    void nfoFileForShowTest() {
-        var subject = new PathObject("/disk/shows/Show (2024)");
+    void coverShowTest() {
+        var subject = new PathObject("/disk/shows/Show (2024)/cover.png");
         assertEquals(2024, subject.getShowYear());
         assertEquals("Show", subject.getShow());
         assertEquals(0, subject.getSeason());
         assertEquals(0, subject.getEpisode());
-        assertEquals(PathType.SHOW, subject.getType());
+        assertEquals(DirType.SHOW, subject.getDirType());
+        assertEquals(FileType.IMAGE, subject.getFileType());
+    }
+
+    @Test
+    void nfoFileForShowTest() {
+        var subject = new PathObject("/disk/shows/Show (2024)/tvshow.nfo");
+        assertEquals(2024, subject.getShowYear());
+        assertEquals("Show", subject.getShow());
+        assertEquals(0, subject.getSeason());
+        assertEquals(0, subject.getEpisode());
+        assertEquals(DirType.SHOW, subject.getDirType());
+        assertEquals(FileType.NFO, subject.getFileType());
     }
 
     @Test
@@ -33,7 +68,19 @@ class PathObjectTest {
         assertEquals("Show", subject.getShow());
         assertEquals(1, subject.getSeason());
         assertEquals(0, subject.getEpisode());
-        assertEquals(PathType.SEASON, subject.getType());
+        assertEquals(DirType.SEASON, subject.getDirType());
+        assertEquals(FileType.NONE, subject.getFileType());
+    }
+
+    @Test
+    void imageSeasonTest() {
+        var subject = new PathObject("/disk/shows/Show (2024)/Season 01/cover.png");
+        assertEquals(2024, subject.getShowYear());
+        assertEquals("Show", subject.getShow());
+        assertEquals(1, subject.getSeason());
+        assertEquals(0, subject.getEpisode());
+        assertEquals(DirType.SEASON, subject.getDirType());
+        assertEquals(FileType.IMAGE, subject.getFileType());
     }
 
     @Test
@@ -43,26 +90,51 @@ class PathObjectTest {
         assertEquals("Show", subject.getShow());
         assertEquals(1, subject.getSeason());
         assertEquals(12, subject.getEpisode());
-        assertEquals(PathType.EPISODE, subject.getType());
+        assertEquals(DirType.EPISODE, subject.getDirType());
+        assertEquals(FileType.MEDIA, subject.getFileType());
     }
 
     @Test
     void episodeInSeasonDirTest() {
-        var subject = new PathObject("/disk/shows/Show (2024)/Season 01/s01e12.mkv");
+        var subject = new PathObject("/disk/shows/Show (2024)/Season 02/s02e99.mkv");
         assertEquals(2024, subject.getShowYear());
         assertEquals("Show", subject.getShow());
-        assertEquals(1, subject.getSeason());
-        assertEquals(12, subject.getEpisode());
-        assertEquals(PathType.EPISODE, subject.getType());
+        assertEquals(2, subject.getSeason());
+        assertEquals(99, subject.getEpisode());
+        assertEquals(DirType.EPISODE, subject.getDirType());
+        assertEquals(FileType.MEDIA, subject.getFileType());
+    }
+
+    @Test
+    void episodeWithCapitolInSeasonDirTest() {
+        var subject = new PathObject("/disk/shows/Show (2024)/Season 05/S05E05.mkv");
+        assertEquals(2024, subject.getShowYear());
+        assertEquals("Show", subject.getShow());
+        assertEquals(5, subject.getSeason());
+        assertEquals(5, subject.getEpisode());
+        assertEquals(DirType.EPISODE, subject.getDirType());
+        assertEquals(FileType.MEDIA, subject.getFileType());
     }
 
     @Test
     void nfoFileForEpisodeTest() {
-        var subject = new PathObject("/disk/shows/Show (2024)/Season 01/s01e12.nfo");
+        var subject = new PathObject("/disk/shows/Show (2024)/Season 02/s02e13.nfo");
+        assertEquals(2024, subject.getShowYear());
+        assertEquals("Show", subject.getShow());
+        assertEquals(2, subject.getSeason());
+        assertEquals(13, subject.getEpisode());
+        assertEquals(DirType.EPISODE, subject.getDirType());
+        assertEquals(FileType.NFO, subject.getFileType());
+    }
+
+    @Test
+    void imageFileForEpisodeTest() {
+        var subject = new PathObject("/disk/shows/Show (2024)/Season 01/s01e12-thumb.jpg");
         assertEquals(2024, subject.getShowYear());
         assertEquals("Show", subject.getShow());
         assertEquals(1, subject.getSeason());
         assertEquals(12, subject.getEpisode());
-        assertEquals(PathType.EPISODE, subject.getType());
+        assertEquals(DirType.EPISODE, subject.getDirType());
+        assertEquals(FileType.IMAGE, subject.getFileType());
     }
 }

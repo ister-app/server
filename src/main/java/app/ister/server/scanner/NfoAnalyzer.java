@@ -27,9 +27,9 @@ public class NfoAnalyzer {
 
     public void analyze(DiskEntity diskEntity, String path) {
         PathObject pathObject = new PathObject(path);
-        if (pathObject.getType().equals(PathType.SHOW)) {
+        if (pathObject.getDirType().equals(DirType.SHOW)) {
             analyzeShow(path, pathObject);
-        } else if (pathObject.getType().equals(PathType.EPISODE)) {
+        } else if (pathObject.getDirType().equals(DirType.EPISODE)) {
             analyzeEpisode(path, pathObject);
         }
     }

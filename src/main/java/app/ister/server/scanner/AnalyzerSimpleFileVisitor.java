@@ -16,15 +16,13 @@ import java.util.List;
 class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
     private final DiskEntity diskEntity;
 
-    ArrayDeque<BaseEntity> analyzeStack = new ArrayDeque<>();
-
     private final ShowScanner showAnalyzer;
     private final SeasonScanner seasonAnalyzer;
-    private final EpisodeScanner episodeAnalyzer;
+    private final MediaFileScanner episodeAnalyzer;
     private final ImageScanner imageAnalyzer;
     private final NfoScanner nfoScanner;
 
-    public AnalyzerSimpleFileVisitor(DiskEntity diskEntity, ShowScanner showAnalyzer, SeasonScanner seasonAnalyzer, EpisodeScanner episodeAnalyzer, ImageScanner imageAnalyzer, NfoScanner nfoScanner) {
+    public AnalyzerSimpleFileVisitor(DiskEntity diskEntity, ShowScanner showAnalyzer, SeasonScanner seasonAnalyzer, MediaFileScanner episodeAnalyzer, ImageScanner imageAnalyzer, NfoScanner nfoScanner) {
         this.diskEntity = diskEntity;
         this.showAnalyzer = showAnalyzer;
         this.seasonAnalyzer = seasonAnalyzer;
@@ -48,9 +46,9 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
 
     private FileVisitResult analyzeDir(Path dir, BasicFileAttributes attrs) {
         for (Scanner scanner : List.of(showAnalyzer, seasonAnalyzer)) {
-            if (scanner.analyzable(dir, attrs, analyzeStack)) {
+            if (scanner.analyzable(dir, attrs)) {
                 log.debug("Scanning dir: {}, with scanner: {}", dir, scanner);
-                analyzeStack.push(scanner.analyze(diskEntity, dir, attrs, analyzeStack).orElseThrow());
+                scanner.analyze(diskEntity, dir, attrs).orElseThrow();
                 return FileVisitResult.CONTINUE;
             }
         }
@@ -59,18 +57,15 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
 
     @Override
     public FileVisitResult postVisitDirectory(Path file, IOException exception) {
-        if (!analyzeStack.isEmpty()) {
-            analyzeStack.pop();
-        }
         return FileVisitResult.CONTINUE;
     }
 
     @Override
     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
         for (Scanner scanner : List.of(episodeAnalyzer, imageAnalyzer, nfoScanner)) {
-            if (scanner.analyzable(file, attrs, analyzeStack)) {
+            if (scanner.analyzable(file, attrs)) {
                 log.debug("Scanning file: {}, with scanner: {}", file, scanner);
-                scanner.analyze(diskEntity, file, attrs, analyzeStack);
+                scanner.analyze(diskEntity, file, attrs);
             }
         }
         return FileVisitResult.CONTINUE;

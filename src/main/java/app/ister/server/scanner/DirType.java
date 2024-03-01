@@ -1,6 +1,7 @@
 package app.ister.server.scanner;
 
-public enum PathType {
+public enum DirType {
+    NONE,
     SHOW,
     SEASON,
     EPISODE

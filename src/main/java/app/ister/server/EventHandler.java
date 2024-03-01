@@ -8,8 +8,6 @@ import app.ister.server.repository.DiskRepository;
 import app.ister.server.repository.ServerEventRepository;
 import app.ister.server.scanner.MediaFileAnalyzer;
 import app.ister.server.scanner.NfoAnalyzer;
-import app.ister.server.scanner.PathObject;
-import app.ister.server.scanner.PathType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;

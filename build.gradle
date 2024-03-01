@@ -52,6 +52,11 @@ tasks.named('test') {
 	useJUnitPlatform()
 }
 
+tasks.named('bootRun') {
+	bootRun.systemProperty 'spring.profiles.active', "local"
+}
+
+
 tasks.named("bootBuildImage") {
 	imageName.set("ghcr.io/ister-app/server")
 	docker {

@@ -23,7 +23,6 @@ import java.util.Optional;
 @Component
 @Slf4j
 public class MediaFileAnalyzer {
-
     @Autowired
     private MediaFileRepository mediaFileRepository;
     @Autowired
@@ -36,15 +35,7 @@ public class MediaFileAnalyzer {
 
     public void checkMediaFile(DiskEntity diskEntity, EpisodeEntity episode, String file) {
         Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDiskEntityAndEpisodeEntityAndPath(diskEntity, episode, file);
-        if (mediaFile.isEmpty()) {
-            MediaFileEntity entity = MediaFileEntity.builder()
-                    .diskEntity(diskEntity)
-                    .episodeEntity(episode)
-                    .path(file)
-                    .size(0).build();
-            mediaFileRepository.save(entity);
-            checkMediaFileForStreams(entity);
-        }
+        mediaFile.ifPresent(this::checkMediaFileForStreams);
     }
 
     public void createBackground(DiskEntity diskEntity, EpisodeEntity episodeEntity, String toPath, String mediaFile) {

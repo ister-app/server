@@ -1,47 +1,40 @@
 package app.ister.server.scanner;
 
-import app.ister.server.entitiy.*;
+import app.ister.server.entitiy.BaseEntity;
+import app.ister.server.entitiy.DiskEntity;
+import app.ister.server.entitiy.NfoEntity;
+import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.enums.EventType;
-import app.ister.server.enums.ImageType;
-import app.ister.server.repository.*;
+import app.ister.server.repository.NfoRepository;
+import app.ister.server.repository.ServerEventRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayDeque;
 import java.util.Optional;
 
 @Component
 @Slf4j
 public class NfoScanner implements Scanner {
-    final static String REGEX_EPISODE = "s(\\d{1,4})e(\\d{1,4}).nfo";
-    final static String REGEX_SHOW = "tvshow.nfo";
-
     @Autowired
     private NfoRepository nfoRepository;
     @Autowired
     private ServerEventRepository serverEventRepository;
 
     @Override
-    public boolean analyzable(Path path, BasicFileAttributes attrs, ArrayDeque<BaseEntity> analyzeStack) {
-        BaseEntity parent = analyzeStack.peek();
-        if (parent != null && parent.getClass().equals(ShowEntity.class)) {
-            return attrs.isRegularFile()
-                    && getMatcher(REGEX_SHOW, path.getFileName().toString().toLowerCase()).matches();
-        } else if (parent != null && parent.getClass().equals(SeasonEntity.class)) {
-            return attrs.isRegularFile()
-                    && getMatcher(REGEX_EPISODE, path.getFileName().toString().toLowerCase()).matches();
-        } else {
-            return false;
-        }
-
-
+    public boolean analyzable(Path path, BasicFileAttributes attrs) {
+        PathObject pathObject = new PathObject(path.toString());
+        Boolean showCorrect = pathObject.getDirType().equals(DirType.SHOW) && path.getFileName().toString().equals("tvshow.nfo");
+        Boolean episodeCorrect = pathObject.getDirType().equals(DirType.EPISODE) && pathObject.getFileType().equals(FileType.NFO);
+        return (attrs.isRegularFile()
+                && pathObject.getFileType().equals(FileType.NFO)
+                && (showCorrect ^ episodeCorrect));
     }
 
     @Override
-    public Optional<BaseEntity> analyze(DiskEntity diskEntity, Path file, BasicFileAttributes attrs, ArrayDeque<BaseEntity> analyzeStack) {
+    public Optional<BaseEntity> analyze(DiskEntity diskEntity, Path file, BasicFileAttributes attrs) {
         Optional<NfoEntity> nfoEntity = nfoRepository.findByDiskEntityAndPath(diskEntity, file.toString());
         if (nfoEntity.isEmpty()) {
             var entity = NfoEntity.builder()

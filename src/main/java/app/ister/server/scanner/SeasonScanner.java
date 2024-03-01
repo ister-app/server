@@ -2,51 +2,30 @@ package app.ister.server.scanner;
 
 import app.ister.server.entitiy.BaseEntity;
 import app.ister.server.entitiy.DiskEntity;
-import app.ister.server.entitiy.SeasonEntity;
-import app.ister.server.entitiy.ShowEntity;
-import app.ister.server.repository.SeasonRepository;
+import app.ister.server.service.ScannerHelperService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayDeque;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 @Component
 @Slf4j
 public class SeasonScanner implements Scanner {
-    final static String REGEX = "season\\s+(\\d{1,4})";
-
     @Autowired
-    private SeasonRepository seasonRepository;
+    private ScannerHelperService scannerHelperService;
 
     @Override
-    public boolean analyzable(Path dir, BasicFileAttributes attrs, ArrayDeque<BaseEntity> analyzeStack) {
-        return (analyzeStack.peek() != null
-                && analyzeStack.peek().getClass().equals(ShowEntity.class))
-                && attrs.isDirectory()
-                && Pattern.compile(REGEX, Pattern.DOTALL).matcher(dir.getFileName().toString().toLowerCase()).matches();
+    public boolean analyzable(Path dir, BasicFileAttributes attrs) {
+        return attrs.isDirectory()
+                && new PathObject(dir.toString()).getDirType().equals(DirType.SEASON);
     }
 
     @Override
-    public Optional<BaseEntity> analyze(DiskEntity diskEntity, Path dir, BasicFileAttributes attrs, ArrayDeque<BaseEntity> analyzeStack) {
-        ShowEntity showEntity = (ShowEntity) analyzeStack.peek();
-        return getMatcher(REGEX, dir.getFileName().toString().toLowerCase()).results().map(matchResult -> {
-            var number = Integer.parseInt(matchResult.group(1));
-            Optional<SeasonEntity> season = seasonRepository.findByShowEntityAndNumber(showEntity, number);
-            if (season.isPresent()) {
-                log.debug("Saving: " + season.get().getNumber());
-                return season.get();
-            } else {
-                SeasonEntity seasonEntity1 = SeasonEntity.builder()
-                        .showEntity(showEntity)
-                        .number(number).build();
-                seasonRepository.save(seasonEntity1);
-                return seasonEntity1;
-            }
-        }).findFirst().map(seasonEntity -> seasonEntity);
+    public Optional<BaseEntity> analyze(DiskEntity diskEntity, Path dir, BasicFileAttributes attrs) {
+        PathObject pathObject = new PathObject(dir.toString());
+        return Optional.ofNullable(scannerHelperService.getOrCreateSeason(diskEntity.getCategorieEntity(), pathObject.getShow(), pathObject.getShowYear(), pathObject.getSeason()));
     }
 }

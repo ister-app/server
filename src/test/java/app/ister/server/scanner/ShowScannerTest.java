@@ -9,7 +9,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayDeque;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
@@ -28,7 +27,7 @@ class ShowScannerTest {
     @Test
     void test() {
         when(basicFileAttributes.isDirectory()).thenReturn(true);
-        var result = subject.analyzable(Path.of("/disk/shows/Show (2024)"), basicFileAttributes, new ArrayDeque<>());
+        var result = subject.analyzable(Path.of("/disk/shows/Show (2024)"), basicFileAttributes);
         assertTrue(result);
     }
 }
