@@ -1,5 +1,6 @@
 package app.ister.server.entitiy;
 
+import app.ister.server.enums.StreamCodecType;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.Entity;
 import jakarta.persistence.ManyToOne;
@@ -18,14 +19,13 @@ public class MediaFileStreamEntity extends BaseEntity {
     @ManyToOne
     private MediaFileEntity mediaFileEntity;
 
-    @NotNull
     private int streamIndex;
 
     @NotNull
     private String codecName;
 
     @NotNull
-    private String codecType;
+    private StreamCodecType codecType;
 
     @NotNull
     private int width;
@@ -33,6 +33,10 @@ public class MediaFileStreamEntity extends BaseEntity {
     @NotNull
     private int height;
 
+    @NotNull
+    private String path;
+
+    // https://en.wikipedia.org/wiki/ISO_639-3
     private String language;
 
     private String title;

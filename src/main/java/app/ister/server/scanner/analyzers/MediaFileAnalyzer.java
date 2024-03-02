@@ -2,6 +2,7 @@ package app.ister.server.scanner.analyzers;
 
 import app.ister.server.entitiy.*;
 import app.ister.server.enums.ImageType;
+import app.ister.server.enums.StreamCodecType;
 import app.ister.server.repository.ImageRepository;
 import app.ister.server.repository.MediaFileRepository;
 import app.ister.server.repository.MediaFileStreamRepository;
@@ -72,18 +73,32 @@ public class MediaFileAnalyzer {
 
 
         for (com.github.kokorin.jaffree.ffprobe.Stream stream : result.getStreams()) {
+
             var mediaFileStream = MediaFileStreamEntity.builder()
                     .mediaFileEntity(mediaFileEntity)
                     .streamIndex(stream.getIndex())
                     .codecName(stream.getCodecName())
-                    .codecType(stream.getCodecType().toString())
+                    .codecType(codecTypeToEnum(stream.getCodecType().toString()))
                     .language(stream.getTag("language"))
-                    .title(stream.getTag("title"));
+                    .title(stream.getTag("title"))
+                    .path(mediaFileEntity.getPath());
             if (stream.getWidth() != null && stream.getHeight() != null) {
                 mediaFileStream.width(stream.getWidth())
                         .height(stream.getHeight());
             }
             mediaFileStreamRepository.save(mediaFileStream.build());
         }
+    }
+
+    private StreamCodecType codecTypeToEnum(String codecType) {
+        return switch (codecType) {
+            case "VIDEO" -> StreamCodecType.VIDEO;
+            case "AUDIO" -> StreamCodecType.AUDIO;
+            case "SUBTITLE" -> StreamCodecType.SUBTITLE;
+            case "VIDEO_NOT_PICTURE" -> StreamCodecType.VIDEO_NOT_PICTURE;
+            case "DATA" -> StreamCodecType.DATA;
+            case "ATTACHMENT" -> StreamCodecType.ATTACHMENT;
+            default -> StreamCodecType.UNKNOWN;
+        };
     }
 }

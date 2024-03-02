@@ -36,6 +36,8 @@ class ScannerSimpleFileVisitorTest {
     private ImageScanner imageAnalyzer;
     @Mock
     private NfoScanner nfoScanner;
+    @Mock
+    private SubtitleScanner subtitleScanner;
 
     @Mock
     private BasicFileAttributes basicFileAttributes;
@@ -74,7 +76,7 @@ class ScannerSimpleFileVisitorTest {
         @Test
         void theRootDirWillReturnContinue() {
             Path resourceFilePath = fileSystem.getPath("/disk/show");
-            var subject = new AnalyzerSimpleFileVisitor(diskEntity, showAnalyzer, seasonAnalyzer, episodeAnalyzer, imageAnalyzer, nfoScanner);
+            var subject = new AnalyzerSimpleFileVisitor(diskEntity, showAnalyzer, seasonAnalyzer, episodeAnalyzer, imageAnalyzer, nfoScanner, subtitleScanner);
 
             var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
 
@@ -84,7 +86,7 @@ class ScannerSimpleFileVisitorTest {
         @Test
         void dotDirsWillBeSkipped() {
             Path resourceFilePath = fileSystem.getPath("/disk/show/.tmp");
-            var subject = new AnalyzerSimpleFileVisitor(diskEntity, showAnalyzer, seasonAnalyzer, episodeAnalyzer, imageAnalyzer, nfoScanner);
+            var subject = new AnalyzerSimpleFileVisitor(diskEntity, showAnalyzer, seasonAnalyzer, episodeAnalyzer, imageAnalyzer, nfoScanner, subtitleScanner);
 
             var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
 

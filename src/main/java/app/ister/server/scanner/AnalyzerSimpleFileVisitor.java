@@ -20,14 +20,16 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
     private final MediaFileScanner episodeAnalyzer;
     private final ImageScanner imageAnalyzer;
     private final NfoScanner nfoScanner;
+    private final SubtitleScanner subtitleScanner;
 
-    public AnalyzerSimpleFileVisitor(DiskEntity diskEntity, ShowScanner showAnalyzer, SeasonScanner seasonAnalyzer, MediaFileScanner episodeAnalyzer, ImageScanner imageAnalyzer, NfoScanner nfoScanner) {
+    public AnalyzerSimpleFileVisitor(DiskEntity diskEntity, ShowScanner showAnalyzer, SeasonScanner seasonAnalyzer, MediaFileScanner episodeAnalyzer, ImageScanner imageAnalyzer, NfoScanner nfoScanner, SubtitleScanner subtitleScanner) {
         this.diskEntity = diskEntity;
         this.showAnalyzer = showAnalyzer;
         this.seasonAnalyzer = seasonAnalyzer;
         this.episodeAnalyzer = episodeAnalyzer;
         this.imageAnalyzer = imageAnalyzer;
         this.nfoScanner = nfoScanner;
+        this.subtitleScanner = subtitleScanner;
     }
 
     @Override
@@ -61,7 +63,7 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
 
     @Override
     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-        for (Scanner scanner : List.of(episodeAnalyzer, imageAnalyzer, nfoScanner)) {
+        for (Scanner scanner : List.of(episodeAnalyzer, imageAnalyzer, nfoScanner, subtitleScanner)) {
             if (scanner.analyzable(file, attrs)) {
                 log.debug("Scanning file: {}, with scanner: {}", file, scanner);
                 scanner.analyze(diskEntity, file, attrs);

@@ -1,8 +1,11 @@
 package app.ister.server.controller;
 
 import app.ister.server.Transcoder;
+import app.ister.server.entitiy.MediaFileStreamEntity;
 import app.ister.server.entitiy.TranscodeSessionEntity;
+import app.ister.server.enums.StreamCodecType;
 import app.ister.server.repository.MediaFileRepository;
+import app.ister.server.repository.MediaFileStreamRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,6 +26,8 @@ import java.util.UUID;
 public class TranscoderController {
     @Autowired
     private MediaFileRepository mediaFileRepository;
+    @Autowired
+    private MediaFileStreamRepository mediaFileStreamRepository;
 
     @Value("${app.ister.server.tmp-dir}")
     private String tmpDir;
@@ -60,17 +65,33 @@ public class TranscoderController {
     }
 
     @RequestMapping(value = "/start", method = RequestMethod.POST)
-    public UUID start(@RequestParam UUID mediaFileId, @RequestParam int startTimeInSeconds, @RequestParam Optional<Integer> audioIndex, @RequestParam Optional<Integer> subtitleIndex) throws IOException {
+    public UUID start(@RequestParam UUID mediaFileId, @RequestParam int startTimeInSeconds, @RequestParam Optional<UUID> audioId, @RequestParam Optional<UUID> subtitleId) throws IOException {
         var mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
-        if (audioIndex.isEmpty()) {
-            var firstAudioStream = mediaFile.getMediaFileStreamEntity().stream().filter(mediaFileStream -> mediaFileStream.getCodecType().equals("AUDIO")).findFirst();
+
+        // Set the optional subtitleMediaFileStream.
+        Optional<MediaFileStreamEntity> subtitleMediaFileStream = Optional.empty();
+        if (subtitleId.isPresent()) {
+            subtitleMediaFileStream = mediaFileStreamRepository.findById(subtitleId.get());
+        }
+
+        // Set the audio index
+        Integer audioIndex = null;
+        if (audioId.isPresent()) {
+            var audioMediaFileStream = mediaFileStreamRepository.findById(audioId.get());
+            if (audioMediaFileStream.isPresent()) {
+                audioIndex = audioMediaFileStream.get().getStreamIndex();
+            }
+
+        }
+        if (audioId.isEmpty() || audioIndex == null) {
+            var firstAudioStream = mediaFile.getMediaFileStreamEntity().stream().filter(mediaFileStream -> mediaFileStream.getCodecType().equals(StreamCodecType.AUDIO)).findFirst();
             if (firstAudioStream.isPresent()) {
-                audioIndex = Optional.of(firstAudioStream.get().getStreamIndex());
+                audioIndex = firstAudioStream.get().getStreamIndex();
             }
         }
         var transcodeSession = createSession();
         log.debug("Starting: {} for mediafile: {}", transcodeSession.getId(), mediaFileId);
-        transcodeSession.getTranscoder().start(mediaFile.getPath(), transcodeSession.getDir(), startTimeInSeconds, audioIndex.get(), subtitleIndex);
+        transcodeSession.getTranscoder().start(mediaFile.getPath(), transcodeSession.getDir(), startTimeInSeconds, audioIndex, subtitleMediaFileStream);
         return transcodeSession.getId();
     }
 

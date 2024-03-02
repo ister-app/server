@@ -4,6 +4,8 @@ import app.ister.server.scanner.enums.DirType;
 import app.ister.server.scanner.enums.FileType;
 import org.junit.jupiter.api.Test;
 
+import java.util.Locale;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class PathObjectTest {
@@ -138,5 +140,16 @@ class PathObjectTest {
         assertEquals(12, subject.getEpisode());
         assertEquals(DirType.EPISODE, subject.getDirType());
         assertEquals(FileType.IMAGE, subject.getFileType());
+    }
+
+    @Test
+    void subtitleFileForEpisodeTest() {
+        var subject = new PathObject("/disk/shows/Show (2024)/Season 01/s01e12.en.srt");
+        assertEquals(2024, subject.getShowYear());
+        assertEquals("Show", subject.getShow());
+        assertEquals(1, subject.getSeason());
+        assertEquals(12, subject.getEpisode());
+        assertEquals(DirType.EPISODE, subject.getDirType());
+        assertEquals(FileType.SUBTITLE, subject.getFileType());
     }
 }

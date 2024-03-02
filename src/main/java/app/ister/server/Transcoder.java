@@ -1,10 +1,14 @@
 package app.ister.server;
 
+import app.ister.server.entitiy.MediaFileStreamEntity;
+import app.ister.server.enums.StreamCodecType;
 import com.github.kokorin.jaffree.LogLevel;
-import com.github.kokorin.jaffree.ffmpeg.*;
+import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
+import com.github.kokorin.jaffree.ffmpeg.FFmpegResultFuture;
+import com.github.kokorin.jaffree.ffmpeg.UrlInput;
+import com.github.kokorin.jaffree.ffmpeg.UrlOutput;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -63,7 +67,7 @@ public class Transcoder {
 
     }
 
-    public void start(String filePath, String toDir, int startTimeInSeconds, int audioIndex, Optional<Integer> subtitleIndex) {
+    public void start(String filePath, String toDir, int startTimeInSeconds, int audioIndex, Optional<MediaFileStreamEntity> subtitleMediaFileStream) {
         this.toDir = toDir;
 
         UrlOutput outputWithArguments = UrlOutput.toPath(Path.of(toDir).resolve("index.m3u8"))
@@ -77,9 +81,14 @@ public class Transcoder {
                 .addArguments("-b:a", "128k")
                 .addArguments("-ac", "2");
 
-        //                                .addArguments("-c:s:3", "dvd_subtitle")
-        //                                .addArguments("-vf" , "subtitles='" + "s01e01.mkv"+"'")
-        subtitleIndex.ifPresent(integer -> outputWithArguments.addArguments("-filter_complex", "[0:v][0:" + integer + "]overlay"));
+
+        if (subtitleMediaFileStream.isPresent()) {
+            if (subtitleMediaFileStream.get().getCodecType().equals(StreamCodecType.SUBTITLE)) {
+                outputWithArguments.addArguments("-filter_complex", "[0:v][0:" + subtitleMediaFileStream.get().getStreamIndex() + "]overlay");
+            } else if (subtitleMediaFileStream.get().getCodecType().equals(StreamCodecType.EXTERNAL_SUBTITLE)) {
+                outputWithArguments.addArguments("-vf", "subtitles=" + pathStringEscapeSpecialChars(subtitleMediaFileStream.get().getPath()));
+            }
+        }
 
         outputWithArguments
                 .addArguments("-ss", String.valueOf(startTimeInSeconds))
@@ -99,5 +108,9 @@ public class Transcoder {
                 .setOverwriteOutput(true)
                 .setLogLevel(LogLevel.ERROR)
                 .executeAsync();
+    }
+
+    private String pathStringEscapeSpecialChars(String path) {
+        return path.replaceAll("'", "\\\\\\\\\\\\\'");
     }
 }

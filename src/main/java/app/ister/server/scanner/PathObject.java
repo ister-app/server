@@ -30,6 +30,7 @@ public class PathObject {
     private final static List<String> IMAGE_FILE_TYPES = List.of("jpg", "png");
     private final static List<String> NFO_FILE_TYPES = List.of("nfo");
     private final static List<String> MEDIA_FILES_FILE_TYPES = List.of("mkv", "mp4");
+    private final static List<String> SUBTITLE_FILES_FILE_TYPES = List.of("srt");
 
     public PathObject(String path) {
         if (setShow(path)) {
@@ -88,6 +89,8 @@ public class PathObject {
                 fileType = FileType.NFO;
             } else if (MEDIA_FILES_FILE_TYPES.contains(fileTypeString)) {
                 fileType = FileType.MEDIA;
+            } else if (SUBTITLE_FILES_FILE_TYPES.contains(fileTypeString)) {
+                fileType = FileType.SUBTITLE;
             } else {
                 fileType = FileType.NONE;
             }

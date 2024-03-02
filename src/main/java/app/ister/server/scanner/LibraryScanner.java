@@ -25,6 +25,8 @@ public class LibraryScanner {
     private ImageScanner imageScanner;
     @Autowired
     private NfoScanner nfoScanner;
+    @Autowired
+    private SubtitleScanner subtitleScanner;
 
     public void scanDiskForCategorie(DiskEntity diskEntity) throws IOException {
         scanDiskForCategorie(Path.of(diskEntity.getPath()), diskEntity);
@@ -32,6 +34,6 @@ public class LibraryScanner {
 
     public void scanDiskForCategorie(Path path, DiskEntity diskEntity) throws IOException {
         log.debug("Log: {}", path);
-        Files.walkFileTree(path, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new AnalyzerSimpleFileVisitor(diskEntity, showScanner, seasonScanner, mediaFileScanner, imageScanner, nfoScanner));
+        Files.walkFileTree(path, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new AnalyzerSimpleFileVisitor(diskEntity, showScanner, seasonScanner, mediaFileScanner, imageScanner, nfoScanner, subtitleScanner));
     }
 }

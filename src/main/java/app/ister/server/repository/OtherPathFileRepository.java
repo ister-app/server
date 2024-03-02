@@ -8,6 +8,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface NfoRepository extends JpaRepository<NfoEntity, UUID> {
-    Optional<NfoEntity> findByDiskEntityAndPath(DiskEntity diskEntity, String path);
+public interface OtherPathFileRepository extends JpaRepository<OtherPathFileEntity, UUID> {
+    Optional<OtherPathFileEntity> findByDiskEntityAndPath(DiskEntity diskEntity, String path);
 }

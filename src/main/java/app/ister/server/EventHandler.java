@@ -8,6 +8,7 @@ import app.ister.server.repository.DiskRepository;
 import app.ister.server.repository.ServerEventRepository;
 import app.ister.server.scanner.analyzers.MediaFileAnalyzer;
 import app.ister.server.scanner.analyzers.NfoAnalyzer;
+import app.ister.server.scanner.analyzers.SubtitleAnalyzer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -25,6 +26,8 @@ public class EventHandler {
     private MediaFileAnalyzer mediaFileAnalyzer;
     @Autowired
     private NfoAnalyzer nfoAnalyzer;
+    @Autowired
+    private SubtitleAnalyzer subtitleAnalyzer;
 
     private boolean handling;
 
@@ -40,6 +43,8 @@ public class EventHandler {
                     handleMediaFileFound(serverEventEntity, cacheDisk);
                 } else if (serverEventEntity.getEventType().equals(EventType.NFO_FILE_FOUND)) {
                     handleNfoFileFound(serverEventEntity);
+                } else if (serverEventEntity.getEventType().equals(EventType.SUBTITLE_FILE_FOUND)) {
+                    handleSubtitleFileFound(serverEventEntity);
                 }
                 serverEventRepository.delete(serverEventEntity);
             });
@@ -54,5 +59,9 @@ public class EventHandler {
 
     private void handleNfoFileFound(ServerEventEntity serverEventEntity) {
         nfoAnalyzer.analyze(serverEventEntity.getDiskEntity(), serverEventEntity.getPath());
+    }
+
+    private void handleSubtitleFileFound(ServerEventEntity serverEventEntity) {
+        subtitleAnalyzer.analyze(serverEventEntity.getDiskEntity(), serverEventEntity.getPath());
     }
 }
