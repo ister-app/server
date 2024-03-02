@@ -1,7 +1,7 @@
 package app.ister.server.scanner;
 
-import app.ister.server.entitiy.BaseEntity;
 import app.ister.server.entitiy.DiskEntity;
+import app.ister.server.scanner.scanners.*;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -9,7 +9,6 @@ import java.nio.file.FileVisitResult;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayDeque;
 import java.util.List;
 
 @Slf4j

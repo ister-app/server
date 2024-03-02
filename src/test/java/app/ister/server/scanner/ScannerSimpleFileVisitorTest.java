@@ -4,6 +4,7 @@ import app.ister.server.entitiy.CategorieEntity;
 import app.ister.server.entitiy.DiskEntity;
 import app.ister.server.entitiy.NodeEntity;
 import app.ister.server.enums.DiskType;
+import app.ister.server.scanner.scanners.*;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
 import org.junit.jupiter.api.AfterEach;

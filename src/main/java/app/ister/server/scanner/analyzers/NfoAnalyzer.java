@@ -1,4 +1,4 @@
-package app.ister.server.scanner;
+package app.ister.server.scanner.analyzers;
 
 import app.ister.server.entitiy.DiskEntity;
 import app.ister.server.entitiy.MetadataEntity;
@@ -7,6 +7,8 @@ import app.ister.server.repository.EpisodeRepository;
 import app.ister.server.repository.MetadataRepository;
 import app.ister.server.repository.SeasonRepository;
 import app.ister.server.repository.ShowRepository;
+import app.ister.server.scanner.PathObject;
+import app.ister.server.scanner.enums.DirType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;

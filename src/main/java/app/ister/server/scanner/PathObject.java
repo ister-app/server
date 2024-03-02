@@ -1,5 +1,7 @@
 package app.ister.server.scanner;
 
+import app.ister.server.scanner.enums.DirType;
+import app.ister.server.scanner.enums.FileType;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 

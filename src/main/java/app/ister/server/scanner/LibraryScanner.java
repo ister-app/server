@@ -1,6 +1,7 @@
 package app.ister.server.scanner;
 
 import app.ister.server.entitiy.DiskEntity;
+import app.ister.server.scanner.scanners.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;

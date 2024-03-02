@@ -1,8 +1,9 @@
-package app.ister.server.scanner;
+package app.ister.server.scanner.scanners;
 
 import app.ister.server.entitiy.BaseEntity;
 import app.ister.server.entitiy.ShowEntity;
 import app.ister.server.repository.SeasonRepository;
+import app.ister.server.scanner.scanners.SeasonScanner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

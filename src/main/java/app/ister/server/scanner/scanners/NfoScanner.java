@@ -1,4 +1,4 @@
-package app.ister.server.scanner;
+package app.ister.server.scanner.scanners;
 
 import app.ister.server.entitiy.BaseEntity;
 import app.ister.server.entitiy.DiskEntity;
@@ -7,6 +7,9 @@ import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.enums.EventType;
 import app.ister.server.repository.NfoRepository;
 import app.ister.server.repository.ServerEventRepository;
+import app.ister.server.scanner.PathObject;
+import app.ister.server.scanner.enums.DirType;
+import app.ister.server.scanner.enums.FileType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;

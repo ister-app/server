@@ -1,9 +1,12 @@
-package app.ister.server.scanner;
+package app.ister.server.scanner.scanners;
 
 import app.ister.server.entitiy.*;
 import app.ister.server.enums.EventType;
 import app.ister.server.repository.MediaFileRepository;
 import app.ister.server.repository.ServerEventRepository;
+import app.ister.server.scanner.PathObject;
+import app.ister.server.scanner.enums.DirType;
+import app.ister.server.scanner.enums.FileType;
 import app.ister.server.service.ScannerHelperService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

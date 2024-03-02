@@ -1,5 +1,7 @@
 package app.ister.server.scanner;
 
+import app.ister.server.scanner.enums.DirType;
+import app.ister.server.scanner.enums.FileType;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

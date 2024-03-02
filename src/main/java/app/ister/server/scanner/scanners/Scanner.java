@@ -1,4 +1,4 @@
-package app.ister.server.scanner;
+package app.ister.server.scanner.scanners;
 
 import app.ister.server.entitiy.BaseEntity;
 import app.ister.server.entitiy.DiskEntity;

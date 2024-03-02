@@ -1,4 +1,4 @@
-package app.ister.server.scanner;
+package app.ister.server.scanner.enums;
 
 public enum DirType {
     NONE,

@@ -1,4 +1,4 @@
-package app.ister.server.scanner;
+package app.ister.server.scanner.analyzers;
 
 import app.ister.server.entitiy.*;
 import app.ister.server.enums.ImageType;

@@ -1,9 +1,10 @@
-package app.ister.server.scanner;
+package app.ister.server.scanner.scanners;
 
 import app.ister.server.entitiy.DiskEntity;
 import app.ister.server.entitiy.ImageEntity;
 import app.ister.server.enums.ImageType;
 import app.ister.server.repository.ImageRepository;
+import app.ister.server.scanner.scanners.ImageScanner;
 import app.ister.server.service.ScannerHelperService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
