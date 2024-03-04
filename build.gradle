@@ -59,6 +59,8 @@ tasks.named('bootRun') {
 
 tasks.named("bootBuildImage") {
 	imageName.set("ghcr.io/ister-app/server")
+	builder = "docker.io/paketobuildpacks/builder-jammy-full:latest"
+	runImage = "docker.io/paketobuildpacks/run-jammy-full:latest"
 	docker {
 		host = "unix:///run/user/1000/podman/podman.sock"
 		bindHostToBuilder = true
