@@ -1,7 +1,8 @@
-package app.ister.server.scanner.analyzers;
+package app.ister.server.eventHandlers;
 
 import app.ister.server.entitiy.DiskEntity;
 import app.ister.server.entitiy.MetadataEntity;
+import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.nfo.Parser;
 import app.ister.server.repository.MetadataRepository;
 import app.ister.server.scanner.PathObject;
@@ -15,11 +16,17 @@ import java.io.FileNotFoundException;
 
 @Component
 @Slf4j
-public class NfoAnalyzer {
+public class HandleNfoFileFound implements Handle {
     @Autowired
     private MetadataRepository metadataRepository;
     @Autowired
     private ScannerHelperService scannerHelperService;
+
+    @Override
+    public Boolean handle(ServerEventEntity serverEventEntity) {
+        analyze(serverEventEntity.getDiskEntity(), serverEventEntity.getPath());
+        return true;
+    }
 
     public void analyze(DiskEntity diskEntity, String path) {
         PathObject pathObject = new PathObject(path);

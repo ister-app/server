@@ -1,16 +1,12 @@
 package app.ister.server;
 
-import app.ister.server.entitiy.DiskEntity;
-import app.ister.server.entitiy.ServerEventEntity;
-import app.ister.server.enums.DiskType;
-import app.ister.server.enums.EventType;
-import app.ister.server.repository.DiskRepository;
+import app.ister.server.eventHandlers.HandleMediaFileFound;
+import app.ister.server.eventHandlers.HandleNfoFileFound;
+import app.ister.server.eventHandlers.HandleSubtitleFileFound;
 import app.ister.server.repository.ServerEventRepository;
-import app.ister.server.scanner.analyzers.MediaFileAnalyzer;
-import app.ister.server.scanner.analyzers.NfoAnalyzer;
-import app.ister.server.scanner.analyzers.SubtitleAnalyzer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,13 +17,12 @@ public class EventHandler {
     @Autowired
     private ServerEventRepository serverEventRepository;
     @Autowired
-    private DiskRepository diskRepository;
+    private HandleMediaFileFound handleMediaFileFound;
     @Autowired
-    private MediaFileAnalyzer mediaFileAnalyzer;
+    private HandleNfoFileFound handleNfoFileFound;
     @Autowired
-    private NfoAnalyzer nfoAnalyzer;
-    @Autowired
-    private SubtitleAnalyzer subtitleAnalyzer;
+    private HandleSubtitleFileFound handleSubtitleFileFound;
+
 
     private boolean handling;
 
@@ -36,32 +31,18 @@ public class EventHandler {
     public void handleEvents() {
         if (!handling) {
             handling = true;
-            var cacheDisk = diskRepository.findByDiskType(DiskType.CACHE).stream().findFirst().orElseThrow();
-            serverEventRepository.findAll().forEach(serverEventEntity -> {
+            serverEventRepository.findAll(Pageable.ofSize(5)).forEach(serverEventEntity -> {
                 log.debug("Handling event: {}, for type: {}", serverEventEntity.getPath(), serverEventEntity.getEventType());
-                if (serverEventEntity.getEventType().equals(EventType.MEDIA_FILE_FOUND)) {
-                    handleMediaFileFound(serverEventEntity, cacheDisk);
-                } else if (serverEventEntity.getEventType().equals(EventType.NFO_FILE_FOUND)) {
-                    handleNfoFileFound(serverEventEntity);
-                } else if (serverEventEntity.getEventType().equals(EventType.SUBTITLE_FILE_FOUND)) {
-                    handleSubtitleFileFound(serverEventEntity);
+                Boolean successful = switch (serverEventEntity.getEventType()) {
+                    case MEDIA_FILE_FOUND -> handleMediaFileFound.handle(serverEventEntity);
+                    case NFO_FILE_FOUND -> handleNfoFileFound.handle(serverEventEntity);
+                    case SUBTITLE_FILE_FOUND -> handleSubtitleFileFound.handle(serverEventEntity);
+                };
+                if (successful) {
+                    serverEventRepository.delete(serverEventEntity);
                 }
-                serverEventRepository.delete(serverEventEntity);
             });
             handling = false;
         }
-    }
-
-    private void handleMediaFileFound(ServerEventEntity serverEventEntity, DiskEntity cacheDisk) {
-        mediaFileAnalyzer.checkMediaFile(serverEventEntity.getDiskEntity(), serverEventEntity.getEpisodeEntity(), serverEventEntity.getPath());
-        mediaFileAnalyzer.createBackground(cacheDisk, serverEventEntity.getEpisodeEntity(), cacheDisk.getPath() + serverEventEntity.getEpisodeEntity().getId() + ".jpg", serverEventEntity.getPath());
-    }
-
-    private void handleNfoFileFound(ServerEventEntity serverEventEntity) {
-        nfoAnalyzer.analyze(serverEventEntity.getDiskEntity(), serverEventEntity.getPath());
-    }
-
-    private void handleSubtitleFileFound(ServerEventEntity serverEventEntity) {
-        subtitleAnalyzer.analyze(serverEventEntity.getDiskEntity(), serverEventEntity.getPath());
     }
 }

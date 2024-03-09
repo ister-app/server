@@ -10,6 +10,7 @@ import java.util.List;
 
 @Entity
 @Getter
+@Setter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class MediaFileEntity extends BaseEntity {
@@ -31,4 +32,6 @@ public class MediaFileEntity extends BaseEntity {
 
     @NotNull
     private long size;
+
+    private long durationInMilliseconds;
 }

@@ -1,4 +1,4 @@
-package app.ister.server.scanner.analyzers;
+package app.ister.server.eventHandlers.subtitleFileFound;
 
 import org.junit.jupiter.api.Test;
 
