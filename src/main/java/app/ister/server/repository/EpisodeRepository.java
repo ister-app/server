@@ -19,5 +19,5 @@ public interface EpisodeRepository extends JpaRepository<EpisodeEntity, UUID> {
 
     Page<EpisodeEntity> findAll(Pageable pageable);
 
-    List<EpisodeEntity> findBySeasonEntityId(UUID season);
+    List<EpisodeEntity> findBySeasonEntityIdOrderByNumberAsc(UUID season);
 }
