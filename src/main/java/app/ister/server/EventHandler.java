@@ -31,7 +31,7 @@ public class EventHandler {
     public void handleEvents() {
         if (!handling) {
             handling = true;
-            serverEventRepository.findAll(Pageable.ofSize(5)).forEach(serverEventEntity -> {
+            serverEventRepository.findAll(Pageable.ofSize(30)).forEach(serverEventEntity -> {
                 log.debug("Handling event: {}, for type: {}", serverEventEntity.getPath(), serverEventEntity.getEventType());
                 Boolean successful = switch (serverEventEntity.getEventType()) {
                     case MEDIA_FILE_FOUND -> handleMediaFileFound.handle(serverEventEntity);

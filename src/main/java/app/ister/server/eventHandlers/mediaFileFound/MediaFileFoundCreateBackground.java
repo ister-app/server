@@ -1,9 +1,5 @@
 package app.ister.server.eventHandlers.mediaFileFound;
 
-import app.ister.server.entitiy.DiskEntity;
-import app.ister.server.entitiy.EpisodeEntity;
-import app.ister.server.entitiy.ImageEntity;
-import app.ister.server.enums.ImageType;
 import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.UrlInput;
@@ -12,14 +8,14 @@ import com.github.kokorin.jaffree.ffmpeg.UrlOutput;
 import java.nio.file.Path;
 
 public class MediaFileFoundCreateBackground {
-    public static ImageEntity createBackground(DiskEntity diskEntity, EpisodeEntity episodeEntity, String toPath, String mediaFile, String dirOfFFmpeg) {
+    public static void createBackground(Path toPath, Path mediaFilePath, String dirOfFFmpeg, long atDurationInMilliseconds) {
         FFmpeg.atPath(Path.of(dirOfFFmpeg))
                 .addInput(
-                        UrlInput.fromUrl(mediaFile)
+                        UrlInput.fromPath(mediaFilePath)
+                                .addArguments("-ss", atDurationInMilliseconds + "ms")
                 )
                 .addOutput(
-                        UrlOutput.toPath(Path.of(toPath))
-                                .addArguments("-ss", "00:01:00")
+                        UrlOutput.toPath(toPath)
                                 .addArguments("-vf", "scale='trunc(ih*dar):ih',setsar=1/1")
                                 .addArguments("-frames:v", "1")
                                 .addArguments("-q:v", "2")
@@ -27,11 +23,5 @@ public class MediaFileFoundCreateBackground {
                 .setOverwriteOutput(true)
                 .setLogLevel(LogLevel.ERROR)
                 .execute();
-        return ImageEntity.builder()
-                .diskEntity(diskEntity)
-                .path(toPath)
-                .type(ImageType.BACKGROUND)
-                .episodeEntity(episodeEntity)
-                .build();
     }
 }
