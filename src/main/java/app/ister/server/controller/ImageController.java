@@ -2,6 +2,7 @@ package app.ister.server.controller;
 
 import app.ister.server.entitiy.ImageEntity;
 import app.ister.server.repository.ImageRepository;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
@@ -16,6 +17,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("images")
+@SecurityRequirement(name = "oidc_auth")
 public class ImageController {
     @Autowired
     private ImageRepository imageRepository;

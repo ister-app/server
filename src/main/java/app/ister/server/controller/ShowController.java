@@ -4,6 +4,7 @@ import app.ister.server.entitiy.SeasonEntity;
 import app.ister.server.entitiy.ShowEntity;
 import app.ister.server.repository.SeasonRepository;
 import app.ister.server.repository.ShowRepository;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -19,6 +20,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("shows")
+@SecurityRequirement(name = "oidc_auth")
 public class ShowController {
     @Autowired
     private ShowRepository showRepository;

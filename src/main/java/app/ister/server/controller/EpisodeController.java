@@ -2,6 +2,7 @@ package app.ister.server.controller;
 
 import app.ister.server.entitiy.EpisodeEntity;
 import app.ister.server.repository.EpisodeRepository;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -16,6 +17,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("episodes")
+@SecurityRequirement(name = "oidc_auth")
 public class EpisodeController {
     @Autowired
     private EpisodeRepository episodeRepository;

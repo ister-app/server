@@ -6,6 +6,7 @@ import app.ister.server.entitiy.TranscodeSessionEntity;
 import app.ister.server.enums.StreamCodecType;
 import app.ister.server.repository.MediaFileRepository;
 import app.ister.server.repository.MediaFileStreamRepository;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,6 +24,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("transcode")
 @Slf4j
+@SecurityRequirement(name = "oidc_auth")
 public class TranscoderController {
     @Autowired
     private MediaFileRepository mediaFileRepository;

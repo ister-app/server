@@ -4,6 +4,7 @@ import app.ister.server.entitiy.EpisodeEntity;
 import app.ister.server.entitiy.SeasonEntity;
 import app.ister.server.repository.EpisodeRepository;
 import app.ister.server.repository.SeasonRepository;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,6 +17,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("season")
+@SecurityRequirement(name = "oidc_auth")
 public class SeasonController {
     @Autowired
     private SeasonRepository seasonRepository;
