@@ -5,6 +5,7 @@ import app.ister.server.entitiy.SeasonEntity;
 import app.ister.server.entitiy.ShowEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -20,4 +21,11 @@ public interface EpisodeRepository extends JpaRepository<EpisodeEntity, UUID> {
     Page<EpisodeEntity> findAll(Pageable pageable);
 
     List<EpisodeEntity> findBySeasonEntityIdOrderByNumberAsc(UUID season);
+
+    List<IdOnly> findByShowEntityId(UUID season, Sort sort);
+
+    interface IdOnly {
+
+        UUID getId();
+    }
 }
