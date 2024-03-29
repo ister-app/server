@@ -17,11 +17,6 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class EpisodeEntity extends BaseEntity {
 
-    @CreatedDate
-    Timestamp dateCreated;
-    @LastModifiedDate
-    Timestamp dateUpdated;
-
     @NotNull
     @ManyToOne
     private ShowEntity showEntity;
@@ -38,6 +33,10 @@ public class EpisodeEntity extends BaseEntity {
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "episodeEntity")
     private List<MetadataEntity> metadataEntities;
+
+    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "episodeEntity")
+    @OrderBy("dateUpdated DESC")
+    private List<WatchStatusEntity> watchStatusEntities;
 
     @NotNull
     private int number;

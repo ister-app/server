@@ -2,13 +2,22 @@ package app.ister.server.controller;
 
 import app.ister.server.entitiy.PlayQueueEntity;
 import app.ister.server.entitiy.PlayQueueItemEntity;
+import app.ister.server.entitiy.UserEntity;
+import app.ister.server.entitiy.WatchStatusEntity;
 import app.ister.server.repository.EpisodeRepository;
+import app.ister.server.repository.PlayQueueRepository;
+import app.ister.server.repository.WatchStatusRepository;
+import app.ister.server.service.UserService;
+import app.ister.server.service.WatchStatusService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -18,17 +27,59 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("playqueue")
 @SecurityRequirement(name = "oidc_auth")
+@Slf4j
 public class PlayQueueController {
+    @Autowired
+    private PlayQueueRepository playQueueRepository;
+
     @Autowired
     private EpisodeRepository episodeRepository;
 
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private WatchStatusRepository watchStatusRepository;
+
+    @Autowired
+    private WatchStatusService watchStatusService;
+
     @PostMapping(value = "/create/show/{showId}")
-    public PlayQueueEntity createNewForShow(@PathVariable UUID showId) {
-        List<PlayQueueItemEntity> items = episodeRepository.findByShowEntityId(
+    public PlayQueueEntity createNewForShow(@PathVariable UUID showId, Authentication authentication) {
+        log.debug("Creating play queue for user: {}, show: {}", authentication.getName(), showId);
+        List<PlayQueueItemEntity> items = episodeRepository.findIdsOnlyByShowEntityId(
                         UUID.fromString(showId.toString()),
                         Sort.by("SeasonEntityNumber").ascending().and(
                                 Sort.by("number").ascending())).stream()
                 .map(idOnly -> PlayQueueItemEntity.builder().id(UUID.randomUUID()).itemId(idOnly.getId()).build()).collect(Collectors.toList());
-        return PlayQueueEntity.builder().items(items).build();
+        UserEntity userEntity = userService.getOrCreateUser(authentication);
+        var playQueueEntity = PlayQueueEntity.builder().userEntity(userEntity).items(items).build();
+        playQueueRepository.save(playQueueEntity);
+        return playQueueEntity;
+    }
+
+    @PostMapping(value = "/update/{id}")
+    public void updateWatchStatus(@PathVariable UUID id, @RequestParam long progressInMilliseconds, @RequestParam UUID playQueueItemId, Authentication authentication) {
+        log.debug("Updating play queue for user: {}", authentication.getName());
+        // Update the current playing episode
+        playQueueRepository.findById(id).ifPresent(playQueueEntity -> {
+            playQueueEntity.getItems().stream().filter(item -> item.getId().equals(playQueueItemId)).findAny().ifPresent(playQueueItemEntity -> {
+                playQueueEntity.setCurrentItem(playQueueItemEntity.getId());
+                playQueueRepository.save(playQueueEntity);
+                // Update the watch status of an episode if it's played for more then one minute
+                if (progressInMilliseconds > 60000) {
+                    episodeRepository.findById(playQueueItemEntity.getItemId()).ifPresent(episodeEntity -> {
+                        WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreate(authentication, playQueueItemId, episodeEntity);
+                        watchStatusEntity.setProgressInMilliseconds(progressInMilliseconds);
+                        if (!episodeEntity.getMediaFileEntities().isEmpty()) {
+                            long durationOfMediaFile = episodeEntity.getMediaFileEntities().get(0).getDurationInMilliseconds();
+                            boolean durationIsLessThenOneMinute = durationOfMediaFile - progressInMilliseconds < 60000;
+                            watchStatusEntity.setWatched(durationIsLessThenOneMinute);
+                        }
+                        watchStatusRepository.save(watchStatusEntity);
+                    });
+                }
+            });
+        });
     }
 }

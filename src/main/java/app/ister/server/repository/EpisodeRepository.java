@@ -22,7 +22,9 @@ public interface EpisodeRepository extends JpaRepository<EpisodeEntity, UUID> {
 
     List<EpisodeEntity> findBySeasonEntityIdOrderByNumberAsc(UUID season);
 
-    List<IdOnly> findByShowEntityId(UUID season, Sort sort);
+    List<IdOnly> findIdsOnlyByShowEntityId(UUID season, Sort sort);
+
+    List<EpisodeEntity> findByShowEntityId(UUID season, Sort sort);
 
     interface IdOnly {
 
