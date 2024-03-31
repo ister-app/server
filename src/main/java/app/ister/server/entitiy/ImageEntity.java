@@ -2,26 +2,30 @@ package app.ister.server.entitiy;
 
 import app.ister.server.enums.ImageType;
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.ManyToOne;
-import jakarta.validation.constraints.NotNull;
-import lombok.*;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
 @Entity
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"directoryEntityId", "path"}))
 @Getter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class ImageEntity extends BaseEntity {
 
-    @NotNull
-    @ManyToOne
-    private DiskEntity diskEntity;
+    @ManyToOne(optional=false)
+    private DirectoryEntity directoryEntity;
 
-    @NotNull
+    @Column(nullable = false)
     private String path;
 
-    @NotNull
+    @Column(nullable = false)
     private ImageType type;
 
     @Getter(onMethod = @__(@JsonBackReference))

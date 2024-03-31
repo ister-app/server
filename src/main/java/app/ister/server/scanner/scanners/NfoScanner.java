@@ -1,7 +1,7 @@
 package app.ister.server.scanner.scanners;
 
 import app.ister.server.entitiy.BaseEntity;
-import app.ister.server.entitiy.DiskEntity;
+import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.entitiy.OtherPathFileEntity;
 import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.enums.EventType;
@@ -38,16 +38,16 @@ public class NfoScanner implements Scanner {
     }
 
     @Override
-    public Optional<BaseEntity> analyze(DiskEntity diskEntity, Path path, BasicFileAttributes attrs) {
-        Optional<OtherPathFileEntity> otherPathFileEntity = otherPathFileRepository.findByDiskEntityAndPath(diskEntity, path.toString());
+    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, BasicFileAttributes attrs) {
+        Optional<OtherPathFileEntity> otherPathFileEntity = otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString());
         if (otherPathFileEntity.isEmpty()) {
             var entity = OtherPathFileEntity.builder()
-                    .diskEntity(diskEntity)
+                    .directoryEntity(directoryEntity)
                     .pathFileType(PathFileType.NFO)
                     .path(path.toString()).build();
             otherPathFileRepository.save(entity);
             serverEventRepository.save(ServerEventEntity.builder()
-                    .diskEntity(diskEntity)
+                    .directoryEntity(directoryEntity)
                     .eventType(EventType.NFO_FILE_FOUND)
                     .path(path.toString()).build());
             return Optional.of(entity);

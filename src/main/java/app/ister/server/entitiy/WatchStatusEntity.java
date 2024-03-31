@@ -1,9 +1,11 @@
 package app.ister.server.entitiy;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.ManyToOne;
-import jakarta.validation.constraints.NotNull;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -13,6 +15,7 @@ import lombok.experimental.SuperBuilder;
 import java.util.UUID;
 
 @Entity
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"playQueueItemId", "userEntitIdy", "episodeEntityId"}))
 @Getter
 @Setter
 @SuperBuilder
@@ -23,19 +26,17 @@ public class WatchStatusEntity extends BaseEntity {
      * The play queue item id. Every user can have multiple WatchStatusEntity of the same media item.
      * When watching a media item it needs to update the correct WatchStatusEntity.
      */
-    @NotNull
+    @Column(nullable = false)
     private UUID playQueueItemId;
 
-    @NotNull
-    @ManyToOne
+    @ManyToOne(optional=false)
     private UserEntity userEntity;
 
-    @NotNull
     @Getter(onMethod = @__(@JsonBackReference))
-    @ManyToOne
+    @ManyToOne(optional=false)
     private EpisodeEntity episodeEntity;
 
-    @NotNull
+    @Column(nullable = false)
     private boolean watched;
 
     private long progressInMilliseconds;

@@ -1,4 +1,4 @@
-package app.ister.server;
+package app.ister.server.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

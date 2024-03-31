@@ -1,6 +1,6 @@
 package app.ister.server.eventHandlers;
 
-import app.ister.server.entitiy.DiskEntity;
+import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.entitiy.MetadataEntity;
 import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.nfo.Parser;
@@ -24,21 +24,21 @@ public class HandleNfoFileFound implements Handle {
 
     @Override
     public Boolean handle(ServerEventEntity serverEventEntity) {
-        analyze(serverEventEntity.getDiskEntity(), serverEventEntity.getPath());
+        analyze(serverEventEntity.getDirectoryEntity(), serverEventEntity.getPath());
         return true;
     }
 
-    public void analyze(DiskEntity diskEntity, String path) {
+    public void analyze(DirectoryEntity directoryEntity, String path) {
         PathObject pathObject = new PathObject(path);
         if (pathObject.getDirType().equals(DirType.SHOW)) {
-            analyzeShow(diskEntity, path, pathObject);
+            analyzeShow(directoryEntity, path, pathObject);
         } else if (pathObject.getDirType().equals(DirType.EPISODE)) {
-            analyzeEpisode(diskEntity, path, pathObject);
+            analyzeEpisode(directoryEntity, path, pathObject);
         }
     }
 
-    private void analyzeShow(DiskEntity diskEntity, String path, PathObject pathObject) {
-        var show = scannerHelperService.getOrCreateShow(diskEntity.getCategorieEntity(), pathObject.getShow(), pathObject.getShowYear());
+    private void analyzeShow(DirectoryEntity directoryEntity, String path, PathObject pathObject) {
+        var show = scannerHelperService.getOrCreateShow(directoryEntity.getLibraryEntity(), pathObject.getShow(), pathObject.getShowYear());
         try {
             var parsed = Parser.parseShow(path).orElseThrow();
             metadataRepository.save(MetadataEntity.builder()
@@ -51,8 +51,8 @@ public class HandleNfoFileFound implements Handle {
         }
     }
 
-    private void analyzeEpisode(DiskEntity diskEntity, String path, PathObject pathObject) {
-        var episode = scannerHelperService.getOrCreateEpisode(diskEntity.getCategorieEntity(), pathObject.getShow(), pathObject.getShowYear(), pathObject.getSeason(), pathObject.getEpisode());
+    private void analyzeEpisode(DirectoryEntity directoryEntity, String path, PathObject pathObject) {
+        var episode = scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getShow(), pathObject.getShowYear(), pathObject.getSeason(), pathObject.getEpisode());
         try {
             var parsed = Parser.parseEpisode(path).orElseThrow();
             metadataRepository.save(MetadataEntity.builder()

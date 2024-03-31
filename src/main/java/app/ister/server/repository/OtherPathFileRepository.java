@@ -9,5 +9,5 @@ import java.util.UUID;
 
 @Repository
 public interface OtherPathFileRepository extends JpaRepository<OtherPathFileEntity, UUID> {
-    Optional<OtherPathFileEntity> findByDiskEntityAndPath(DiskEntity diskEntity, String path);
+    Optional<OtherPathFileEntity> findByDirectoryEntityAndPath(DirectoryEntity directoryEntity, String path);
 }

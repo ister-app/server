@@ -1,7 +1,7 @@
 package app.ister.server.scanner.scanners;
 
 import app.ister.server.entitiy.BaseEntity;
-import app.ister.server.entitiy.DiskEntity;
+import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.scanner.PathObject;
 import app.ister.server.scanner.enums.DirType;
 import app.ister.server.service.ScannerHelperService;
@@ -26,8 +26,8 @@ public class ShowScanner implements Scanner {
     }
 
     @Override
-    public Optional<BaseEntity> analyze(DiskEntity diskEntity, Path dir, BasicFileAttributes attrs) {
+    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path dir, BasicFileAttributes attrs) {
         PathObject pathObject = new PathObject(dir.toString());
-        return Optional.ofNullable(scannerHelperService.getOrCreateShow(diskEntity.getCategorieEntity(), pathObject.getShow(), pathObject.getShowYear()));
+        return Optional.ofNullable(scannerHelperService.getOrCreateShow(directoryEntity.getLibraryEntity(), pathObject.getShow(), pathObject.getShowYear()));
     }
 }

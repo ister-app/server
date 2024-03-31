@@ -35,16 +35,16 @@ public class SubtitleScanner implements Scanner {
     }
 
     @Override
-    public Optional<BaseEntity> analyze(DiskEntity diskEntity, Path path, BasicFileAttributes attrs) {
-        Optional<OtherPathFileEntity> otherPathFileEntity = otherPathFileRepository.findByDiskEntityAndPath(diskEntity, path.toString());
+    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, BasicFileAttributes attrs) {
+        Optional<OtherPathFileEntity> otherPathFileEntity = otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString());
         if (otherPathFileEntity.isEmpty()) {
             var entity = OtherPathFileEntity.builder()
-                    .diskEntity(diskEntity)
+                    .directoryEntity(directoryEntity)
                     .pathFileType(PathFileType.SUBTITLE)
                     .path(path.toString()).build();
             otherPathFileRepository.save(entity);
             serverEventRepository.save(ServerEventEntity.builder()
-                    .diskEntity(diskEntity)
+                    .directoryEntity(directoryEntity)
                     .eventType(EventType.SUBTITLE_FILE_FOUND)
                     .path(path.toString()).build());
             return Optional.of(entity);

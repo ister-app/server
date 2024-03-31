@@ -8,5 +8,5 @@ import java.util.UUID;
 
 public interface MediaFileRepository extends CrudRepository<MediaFileEntity, UUID> {
 
-    Optional<MediaFileEntity> findByDiskEntityAndEpisodeEntityAndPath(DiskEntity diskEntity, EpisodeEntity episodeEntity, String path);
+    Optional<MediaFileEntity> findByDirectoryEntityAndEpisodeEntityAndPath(DirectoryEntity directoryEntity, EpisodeEntity episodeEntity, String path);
 }

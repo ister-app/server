@@ -1,22 +1,23 @@
 package app.ister.server.entitiy;
 
+import app.ister.server.enums.LibraryType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 @Entity
 @Getter
+@Setter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
-public class UserEntity extends BaseEntity {
-
+public class LibraryEntity extends BaseEntity {
     @Column(nullable = false)
-    private String externalId;
+    private LibraryType libraryType;
 
+    @Column(nullable = false, unique = true)
     private String name;
-
-    private String email;
 }

@@ -1,56 +1,96 @@
 package app.ister.server;
 
-import app.ister.server.entitiy.CategorieEntity;
-import app.ister.server.entitiy.DiskEntity;
+import app.ister.server.config.AppIsterServerConfig;
+import app.ister.server.config.DirectoryConfigClass;
+import app.ister.server.config.LibraryConfigClass;
+import app.ister.server.entitiy.DirectoryEntity;
+import app.ister.server.entitiy.LibraryEntity;
 import app.ister.server.entitiy.NodeEntity;
-import app.ister.server.enums.DiskType;
-import app.ister.server.repository.CatogorieRepository;
-import app.ister.server.repository.DiskRepository;
-import app.ister.server.repository.NodeRepository;
+import app.ister.server.enums.DirectoryType;
+import app.ister.server.repository.DirectoryRepository;
+import app.ister.server.repository.LibraryRepository;
+import app.ister.server.service.NodeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
+
 @Component
 public class StartupTasks {
 
     @Autowired
-    private NodeRepository nodeRepository;
+    private NodeService nodeService;
 
     @Autowired
-    private DiskRepository diskRepository;
+    private AppIsterServerConfig appIsterServerConfig;
 
     @Autowired
-    private CatogorieRepository catogorieRepository;
+    private DirectoryRepository directoryRepository;
 
-    @Value("${app.ister.server.library-dir}")
-    private String libraryDir;
+    @Autowired
+    private LibraryRepository libraryRepository;
 
     @Value("${app.ister.server.cache-dir}")
     private String cacheDir;
 
+    /**
+     * Create the node, libraries and directories (als the cache directory) entities in the database if they not exist there.
+     */
     @EventListener(ContextRefreshedEvent.class)
     public void contextRefreshedEvent() {
-        if (diskRepository.findByDiskType(DiskType.LIBRARY).isEmpty()) {
-            CategorieEntity categorieEntity = new CategorieEntity();
-            catogorieRepository.save(categorieEntity);
+        NodeEntity nodeEntity = nodeService.getOrCreateNodeEntityForThisNode();
 
-            NodeEntity nodeEntity = NodeEntity.builder().name("TestServer").build();
-            nodeRepository.save(nodeEntity);
+        appIsterServerConfig.getLibraries().forEach(this::handleLibrariesFromConfig);
+        appIsterServerConfig.getDirectories().forEach(directoryConfigClass -> handleDirectoriesFromConfig(directoryConfigClass, nodeEntity));
 
-            diskRepository.save(DiskEntity.builder()
+        createCacheDirectoryIfNotExistForThisNode(nodeEntity);
+    }
+
+
+
+    private void handleLibrariesFromConfig(LibraryConfigClass libraryConfigClass) {
+        if (libraryRepository.findByName(libraryConfigClass.getName()).isEmpty()) {
+            LibraryEntity libraryEntity = LibraryEntity.builder()
+                    .libraryType(libraryConfigClass.getType())
+                    .name(libraryConfigClass.getName()).build();
+            libraryRepository.save(libraryEntity);
+        }
+    }
+
+    private void handleDirectoriesFromConfig(DirectoryConfigClass directoryConfigClass, NodeEntity nodeEntity) {
+        Optional<DirectoryEntity> directoryEntityOptional = directoryRepository.findByName(directoryConfigClass.getName());
+        if (directoryEntityOptional.isPresent()) {
+            DirectoryEntity directoryEntity = directoryEntityOptional.get();
+            // Check that the directory is used by the correct node
+            if (!directoryEntity.getNodeEntity().equals(nodeEntity)) {
+                throw new RuntimeException("Directory " + directoryConfigClass.getName() + " name is already used by an other node");
+            }
+            // Check if the path of the directory is changed and if so change it in the database
+            if (!directoryEntity.getPath().equals(directoryConfigClass.getPath())) {
+                directoryEntity.setPath(directoryConfigClass.getPath());
+                directoryRepository.save(directoryEntity);
+            }
+        } else {
+            LibraryEntity libraryEntity = libraryRepository.findByName(directoryConfigClass.getLibrary()).orElseThrow();
+            directoryRepository.save(DirectoryEntity.builder()
+                    .name(directoryConfigClass.getName())
                     .nodeEntity(nodeEntity)
-                    .categorieEntity(categorieEntity)
-                    .path(libraryDir)
-                    .diskType(DiskType.LIBRARY).build());
+                    .libraryEntity(libraryEntity)
+                    .path(directoryConfigClass.getPath())
+                    .directoryType(DirectoryType.LIBRARY).build());
+        }
+    }
 
-            diskRepository.save(DiskEntity.builder()
+    private void createCacheDirectoryIfNotExistForThisNode(NodeEntity nodeEntity) {
+        if (directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity).isEmpty()) {
+            directoryRepository.save(DirectoryEntity.builder()
+                    .name(nodeEntity.getName() + "-cache-directory")
                     .nodeEntity(nodeEntity)
-                    .categorieEntity(categorieEntity)
                     .path(cacheDir)
-                    .diskType(DiskType.CACHE).build());
+                    .directoryType(DirectoryType.CACHE).build());
         }
     }
 }

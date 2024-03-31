@@ -34,20 +34,20 @@ public class MediaFileScanner implements Scanner {
     }
 
     @Override
-    public Optional<BaseEntity> analyze(DiskEntity diskEntity, Path path, BasicFileAttributes attrs) {
+    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, BasicFileAttributes attrs) {
         PathObject pathObject = new PathObject(path.toString());
-        EpisodeEntity episodeEntity = scannerHelperService.getOrCreateEpisode(diskEntity.getCategorieEntity(), pathObject.getShow(), pathObject.getShowYear(), pathObject.getSeason(), pathObject.getEpisode());
-        Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDiskEntityAndEpisodeEntityAndPath(diskEntity, episodeEntity, path.toString());
+        EpisodeEntity episodeEntity = scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getShow(), pathObject.getShowYear(), pathObject.getSeason(), pathObject.getEpisode());
+        Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndEpisodeEntityAndPath(directoryEntity, episodeEntity, path.toString());
         if (mediaFile.isEmpty()) {
             MediaFileEntity entity = MediaFileEntity.builder()
-                    .diskEntity(diskEntity)
+                    .directoryEntity(directoryEntity)
                     .episodeEntity(episodeEntity)
                     .path(path.toString())
                     .size(attrs.size()).build();
             mediaFileRepository.save(entity);
             serverEventRepository.save(ServerEventEntity.builder()
                     .eventType(EventType.MEDIA_FILE_FOUND)
-                    .diskEntity(diskEntity)
+                    .directoryEntity(directoryEntity)
                     .episodeEntity(episodeEntity)
                     .path(path.toString()).build());
         }

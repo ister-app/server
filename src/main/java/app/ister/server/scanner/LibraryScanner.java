@@ -1,6 +1,6 @@
 package app.ister.server.scanner;
 
-import app.ister.server.entitiy.DiskEntity;
+import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.scanner.scanners.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,12 +28,12 @@ public class LibraryScanner {
     @Autowired
     private SubtitleScanner subtitleScanner;
 
-    public void scanDiskForCategorie(DiskEntity diskEntity) throws IOException {
-        scanDiskForCategorie(Path.of(diskEntity.getPath()), diskEntity);
+    public void scanDirectory(DirectoryEntity directoryEntity) throws IOException {
+        scanDirectory(Path.of(directoryEntity.getPath()), directoryEntity);
     }
 
-    public void scanDiskForCategorie(Path path, DiskEntity diskEntity) throws IOException {
+    public void scanDirectory(Path path, DirectoryEntity directoryEntity) throws IOException {
         log.debug("Log: {}", path);
-        Files.walkFileTree(path, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new AnalyzerSimpleFileVisitor(diskEntity, showScanner, seasonScanner, mediaFileScanner, imageScanner, nfoScanner, subtitleScanner));
+        Files.walkFileTree(path, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new AnalyzerSimpleFileVisitor(directoryEntity, showScanner, seasonScanner, mediaFileScanner, imageScanner, nfoScanner, subtitleScanner));
     }
 }

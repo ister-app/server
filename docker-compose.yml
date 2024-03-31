@@ -17,6 +17,16 @@ services:
     restart: always
     environment:
       DB_HOST: database
+      APP_ISTER_SERVER_NAME: Test server
+      APP_ISTER_SERVER_URL: http://localhost:8080
+      APP_ISTER_SERVER_LIBRARIES_0_NAME: shows
+      APP_ISTER_SERVER_LIBRARIES_0_TYPE: SHOW
+#      APP_ISTER_SERVER_DIRECTORIES_0_NAME: disk1
+#      APP_ISTER_SERVER_DIRECTORIES_0_PATH: /disk1
+#      APP_ISTER_SERVER_DIRECTORIES_0_LIBRARY: shows
+#      APP_ISTER_SERVER_DIRECTORIES_1_NAME: disk2
+#      APP_ISTER_SERVER_DIRECTORIES_1_PATH: /disk2
+#      APP_ISTER_SERVER_DIRECTORIES_1_LIBRARY: shows
     ports:
       - "8080:8080"
   website:

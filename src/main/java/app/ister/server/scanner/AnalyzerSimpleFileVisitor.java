@@ -1,6 +1,6 @@
 package app.ister.server.scanner;
 
-import app.ister.server.entitiy.DiskEntity;
+import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.scanner.scanners.*;
 import lombok.extern.slf4j.Slf4j;
 
@@ -13,7 +13,7 @@ import java.util.List;
 
 @Slf4j
 class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
-    private final DiskEntity diskEntity;
+    private final DirectoryEntity directoryEntity;
 
     private final ShowScanner showAnalyzer;
     private final SeasonScanner seasonAnalyzer;
@@ -22,8 +22,8 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
     private final NfoScanner nfoScanner;
     private final SubtitleScanner subtitleScanner;
 
-    public AnalyzerSimpleFileVisitor(DiskEntity diskEntity, ShowScanner showAnalyzer, SeasonScanner seasonAnalyzer, MediaFileScanner episodeAnalyzer, ImageScanner imageAnalyzer, NfoScanner nfoScanner, SubtitleScanner subtitleScanner) {
-        this.diskEntity = diskEntity;
+    public AnalyzerSimpleFileVisitor(DirectoryEntity directoryEntity, ShowScanner showAnalyzer, SeasonScanner seasonAnalyzer, MediaFileScanner episodeAnalyzer, ImageScanner imageAnalyzer, NfoScanner nfoScanner, SubtitleScanner subtitleScanner) {
+        this.directoryEntity = directoryEntity;
         this.showAnalyzer = showAnalyzer;
         this.seasonAnalyzer = seasonAnalyzer;
         this.episodeAnalyzer = episodeAnalyzer;
@@ -34,7 +34,7 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
 
     @Override
     public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-        if (dir.toString().equals(diskEntity.getPath())) {
+        if (dir.toString().equals(directoryEntity.getPath())) {
             // Root dir
             return FileVisitResult.CONTINUE;
         } else if (dir.getFileName().toString().startsWith(".")) {
@@ -49,7 +49,7 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
         for (Scanner scanner : List.of(showAnalyzer, seasonAnalyzer)) {
             if (scanner.analyzable(dir, attrs)) {
                 log.debug("Scanning dir: {}, with scanner: {}", dir, scanner);
-                scanner.analyze(diskEntity, dir, attrs).orElseThrow();
+                scanner.analyze(directoryEntity, dir, attrs).orElseThrow();
                 return FileVisitResult.CONTINUE;
             }
         }
@@ -66,7 +66,7 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
         for (Scanner scanner : List.of(episodeAnalyzer, imageAnalyzer, nfoScanner, subtitleScanner)) {
             if (scanner.analyzable(file, attrs)) {
                 log.debug("Scanning file: {}, with scanner: {}", file, scanner);
-                scanner.analyze(diskEntity, file, attrs);
+                scanner.analyze(directoryEntity, file, attrs);
             }
         }
         return FileVisitResult.CONTINUE;

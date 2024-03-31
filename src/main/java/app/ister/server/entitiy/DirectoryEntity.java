@@ -1,33 +1,36 @@
 package app.ister.server.entitiy;
 
-import app.ister.server.enums.DiskType;
+import app.ister.server.enums.DirectoryType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.ManyToOne;
 import jakarta.validation.constraints.NotNull;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 @Entity
 @Getter
+@Setter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
-public class DiskEntity extends BaseEntity {
+public class DirectoryEntity extends BaseEntity {
 
-    @NotNull
-    @ManyToOne
+    @ManyToOne(optional=false)
     private NodeEntity nodeEntity;
 
-    @NotNull
     @ManyToOne
-    private CategorieEntity categorieEntity;
+    private LibraryEntity libraryEntity;
 
-    @NotNull
+    @Column(nullable = false, unique = true)
+    private String name;
+
+    @Column(nullable = false)
     private String path;
 
-    @NotNull
-    private DiskType diskType;
+    @Column(nullable = false)
+    private DirectoryType directoryType;
 
 }

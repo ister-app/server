@@ -1,28 +1,32 @@
 package app.ister.server.entitiy;
 
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
-import lombok.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.sql.Timestamp;
 import java.util.List;
 
 @Entity
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"showEntityId", "seasonEntityId", "number"}))
 @Getter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class EpisodeEntity extends BaseEntity {
 
-    @NotNull
-    @ManyToOne
+    @ManyToOne(optional = false)
     private ShowEntity showEntity;
 
-    @NotNull
-    @ManyToOne
+    @ManyToOne(optional = false)
     private SeasonEntity seasonEntity;
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "episodeEntity")
@@ -38,6 +42,6 @@ public class EpisodeEntity extends BaseEntity {
     @OrderBy("dateUpdated DESC")
     private List<WatchStatusEntity> watchStatusEntities;
 
-    @NotNull
+    @Column(nullable = false)
     private int number;
 }

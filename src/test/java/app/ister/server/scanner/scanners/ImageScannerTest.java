@@ -1,10 +1,9 @@
 package app.ister.server.scanner.scanners;
 
-import app.ister.server.entitiy.DiskEntity;
+import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.entitiy.ImageEntity;
 import app.ister.server.enums.ImageType;
 import app.ister.server.repository.ImageRepository;
-import app.ister.server.scanner.scanners.ImageScanner;
 import app.ister.server.service.ScannerHelperService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,28 +53,28 @@ class ImageScannerTest {
 
     @Test
     void analyzeShowBackground() {
-        ImageEntity result = (ImageEntity) subject.analyze(new DiskEntity(), Path.of("/disk/show/Show (2024)/background.jpg"), basicFileAttributes).orElseThrow();
+        ImageEntity result = (ImageEntity) subject.analyze(new DirectoryEntity(), Path.of("/disk/show/Show (2024)/background.jpg"), basicFileAttributes).orElseThrow();
         assertEquals(result.getType(), ImageType.BACKGROUND);
         assertNull(result.getSeasonEntity());
     }
 
     @Test
     void analyzeSeasonBackground() {
-        ImageEntity result = (ImageEntity) subject.analyze(new DiskEntity(), Path.of("/disk/show/Show (2024)/Season 01/background.jpg"), basicFileAttributes).orElseThrow();
+        ImageEntity result = (ImageEntity) subject.analyze(new DirectoryEntity(), Path.of("/disk/show/Show (2024)/Season 01/background.jpg"), basicFileAttributes).orElseThrow();
         assertEquals(ImageType.BACKGROUND, result.getType());
         assertNull(result.getShowEntity());
     }
 
     @Test
     void analyzeEpisodeBackground() {
-        ImageEntity result = (ImageEntity) subject.analyze(new DiskEntity(), Path.of("/disk/show/Show (2024)/Season 01/s01e01-thumb.jpg"), basicFileAttributes).orElseThrow();
+        ImageEntity result = (ImageEntity) subject.analyze(new DirectoryEntity(), Path.of("/disk/show/Show (2024)/Season 01/s01e01-thumb.jpg"), basicFileAttributes).orElseThrow();
         assertEquals(ImageType.BACKGROUND, result.getType());
         assertNull(result.getShowEntity());
     }
 
     @Test
     void analyzeEmpty() {
-        var result = subject.analyze(new DiskEntity(), Path.of("/disk/show/Show (2024)/Season 01/s01e01.mkv"), basicFileAttributes);
+        var result = subject.analyze(new DirectoryEntity(), Path.of("/disk/show/Show (2024)/Season 01/s01e01.mkv"), basicFileAttributes);
         assertTrue(result.isEmpty());
     }
 }

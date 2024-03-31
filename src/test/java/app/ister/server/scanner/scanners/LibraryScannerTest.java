@@ -1,9 +1,9 @@
 package app.ister.server.scanner.scanners;
 
-import app.ister.server.entitiy.CategorieEntity;
-import app.ister.server.entitiy.DiskEntity;
+import app.ister.server.entitiy.LibraryEntity;
+import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.entitiy.NodeEntity;
-import app.ister.server.enums.DiskType;
+import app.ister.server.enums.DirectoryType;
 import app.ister.server.scanner.LibraryScanner;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
@@ -50,13 +50,13 @@ class LibraryScannerTest {
             Files.createFile(fileSystem.getPath("/disk/show/Show (2024)/Season 01/s01e01.jpg"));
             Files.createFile(fileSystem.getPath("/disk/show/Show (2024)/Season 01/s01e02.mkv"));
 
-            DiskEntity diskEntity = DiskEntity.builder()
+            DirectoryEntity directoryEntity = DirectoryEntity.builder()
                     .nodeEntity(NodeEntity.builder().name("TestServer").build())
-                    .categorieEntity(CategorieEntity.builder().build())
+                    .libraryEntity(LibraryEntity.builder().build())
                     .path("/disk/show")
-                    .diskType(DiskType.LIBRARY).build();
+                    .directoryType(DirectoryType.LIBRARY).build();
 
-            libraryScanner.scanDiskForCategorie(resourceFilePath, diskEntity);
+            libraryScanner.scanDirectory(resourceFilePath, directoryEntity);
             assertTrue(true);
         }
     }

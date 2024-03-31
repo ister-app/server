@@ -8,7 +8,6 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.ManyToOne;
-import jakarta.validation.constraints.NotNull;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -25,15 +24,13 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class PlayQueueEntity extends BaseEntity {
 
-    @NotNull
-    @ManyToOne
+    @ManyToOne(optional=false)
     private UserEntity userEntity;
 
     private UUID currentItem;
 
-    @NotNull
     @Convert(converter = ItemsConverter.class)
-    @Column(columnDefinition = "text")
+    @Column(nullable = false, columnDefinition = "text")
     private List<PlayQueueItemEntity> items;
 
     private static class ItemsConverter implements AttributeConverter<List<PlayQueueItemEntity>, String> {

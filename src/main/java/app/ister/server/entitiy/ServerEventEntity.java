@@ -1,9 +1,9 @@
 package app.ister.server.entitiy;
 
 import app.ister.server.enums.EventType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.ManyToOne;
-import jakarta.validation.constraints.NotNull;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -15,17 +15,15 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class ServerEventEntity extends BaseEntity {
 
-    @NotNull
+    @Column(nullable = false)
     private EventType eventType;
 
-    @NotNull
     @ManyToOne
-    private DiskEntity diskEntity;
+    private DirectoryEntity directoryEntity;
 
     @ManyToOne
     private EpisodeEntity episodeEntity;
 
-    @NotNull
     private String path;
 
 }

@@ -1,8 +1,8 @@
 package app.ister.server.entitiy;
 
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.validation.constraints.NotNull;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -16,6 +16,6 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class PlayQueueItemEntity extends BaseEntity {
 
-    @NotNull
+    @Column(nullable = false)
     private UUID itemId;
 }

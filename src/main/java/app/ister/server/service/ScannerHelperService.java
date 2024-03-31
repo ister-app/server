@@ -1,7 +1,6 @@
 package app.ister.server.service;
 
 import app.ister.server.entitiy.*;
-import app.ister.server.enums.EventType;
 import app.ister.server.repository.EpisodeRepository;
 import app.ister.server.repository.SeasonRepository;
 import app.ister.server.repository.ShowRepository;
@@ -21,13 +20,13 @@ public class ScannerHelperService {
     @Autowired
     private EpisodeRepository episodeRepository;
 
-    public ShowEntity getOrCreateShow(CategorieEntity categorieEntity, String showName, int releaseYear) {
+    public ShowEntity getOrCreateShow(LibraryEntity libraryEntity, String showName, int releaseYear) {
         Optional<ShowEntity> show = showRepository.findByNameAndReleaseYear(showName, releaseYear);
         if (show.isPresent()) {
             return show.get();
         } else {
             ShowEntity showEntity = ShowEntity.builder()
-                    .categorieEntity(categorieEntity)
+                    .libraryEntity(libraryEntity)
                     .name(showName)
                     .releaseYear(releaseYear).build();
             showRepository.save(showEntity);
@@ -35,8 +34,8 @@ public class ScannerHelperService {
         }
     }
 
-    public SeasonEntity getOrCreateSeason(CategorieEntity categorieEntity, String showName, int releaseYear, int seasonNumber) {
-        ShowEntity showEntity = getOrCreateShow(categorieEntity, showName, releaseYear);
+    public SeasonEntity getOrCreateSeason(LibraryEntity libraryEntity, String showName, int releaseYear, int seasonNumber) {
+        ShowEntity showEntity = getOrCreateShow(libraryEntity, showName, releaseYear);
         Optional<SeasonEntity> season = seasonRepository.findByShowEntityAndNumber(showEntity, seasonNumber);
         if (season.isPresent()) {
             return season.get();
@@ -49,9 +48,9 @@ public class ScannerHelperService {
         }
     }
 
-    public EpisodeEntity getOrCreateEpisode(CategorieEntity categorieEntity, String showName, int releaseYear, int seasonNumber, int episodeNumber) {
-        ShowEntity showEntity = getOrCreateShow(categorieEntity, showName, releaseYear);
-        SeasonEntity seasonEntity = getOrCreateSeason(categorieEntity, showName, releaseYear, seasonNumber);
+    public EpisodeEntity getOrCreateEpisode(LibraryEntity libraryEntity, String showName, int releaseYear, int seasonNumber, int episodeNumber) {
+        ShowEntity showEntity = getOrCreateShow(libraryEntity, showName, releaseYear);
+        SeasonEntity seasonEntity = getOrCreateSeason(libraryEntity, showName, releaseYear, seasonNumber);
         Optional<EpisodeEntity> episode = episodeRepository.findByShowEntityAndSeasonEntityAndNumber(showEntity, seasonEntity, episodeNumber);
         if (episode.isPresent()) {
             return episode.get();

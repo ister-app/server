@@ -1,7 +1,7 @@
 package app.ister.server.scanner.scanners;
 
 import app.ister.server.entitiy.BaseEntity;
-import app.ister.server.entitiy.DiskEntity;
+import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.entitiy.ImageEntity;
 import app.ister.server.enums.ImageType;
 import app.ister.server.repository.ImageRepository;
@@ -37,12 +37,12 @@ public class ImageScanner implements Scanner {
     }
 
     @Override
-    public Optional<BaseEntity> analyze(DiskEntity diskEntity, Path path, BasicFileAttributes attrs) {
-        if (imageRepository.findByDiskEntityAndPath(diskEntity, path.toString()).isEmpty()) {
+    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, BasicFileAttributes attrs) {
+        if (imageRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString()).isEmpty()) {
             PathObject pathObject = new PathObject(path.toString());
 
             var imageEntity = ImageEntity.builder()
-                    .diskEntity(diskEntity)
+                    .directoryEntity(directoryEntity)
                     .path(path.toString());
 
             ImageType imageType = getImageType(path);
@@ -52,11 +52,11 @@ public class ImageScanner implements Scanner {
             imageEntity.type(imageType);
 
             if (pathObject.getDirType().equals(DirType.SHOW)) {
-                imageEntity.showEntity(scannerHelperService.getOrCreateShow(diskEntity.getCategorieEntity(), pathObject.getShow(), pathObject.getShowYear()));
+                imageEntity.showEntity(scannerHelperService.getOrCreateShow(directoryEntity.getLibraryEntity(), pathObject.getShow(), pathObject.getShowYear()));
             } else if (pathObject.getDirType().equals(DirType.SEASON)) {
-                imageEntity.seasonEntity(scannerHelperService.getOrCreateSeason(diskEntity.getCategorieEntity(), pathObject.getShow(), pathObject.getShowYear(), pathObject.getSeason()));
+                imageEntity.seasonEntity(scannerHelperService.getOrCreateSeason(directoryEntity.getLibraryEntity(), pathObject.getShow(), pathObject.getShowYear(), pathObject.getSeason()));
             } else if (pathObject.getDirType().equals(DirType.EPISODE)) {
-                imageEntity.episodeEntity(scannerHelperService.getOrCreateEpisode(diskEntity.getCategorieEntity(), pathObject.getShow(), pathObject.getShowYear(), pathObject.getSeason(), pathObject.getEpisode()));
+                imageEntity.episodeEntity(scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getShow(), pathObject.getShowYear(), pathObject.getSeason(), pathObject.getEpisode()));
             }
 
             ImageEntity build = imageEntity.build();
