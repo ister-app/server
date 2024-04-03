@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(SpringExtension.class)
 @TestPropertySource(locations = {
         "classpath:application.properties",
-        "classpath:application-local.properties"
+//        "classpath:application-local.properties"
 })
 class mediaFileFoundGetDurationTest {
     @Value("${app.ister.server.ffmpeg-dir}")

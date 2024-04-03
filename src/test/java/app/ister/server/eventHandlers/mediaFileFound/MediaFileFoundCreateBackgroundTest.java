@@ -1,7 +1,5 @@
 package app.ister.server.eventHandlers.mediaFileFound;
 
-import com.google.common.jimfs.Configuration;
-import com.google.common.jimfs.Jimfs;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ExtendWith(SpringExtension.class)
 @TestPropertySource(locations = {
         "classpath:application.properties",
-        "classpath:application-local.properties"
+//        "classpath:application-local.properties"
 })
 class MediaFileFoundCreateBackgroundTest {
     @Value("${app.ister.server.ffmpeg-dir}")
