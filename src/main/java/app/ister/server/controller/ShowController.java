@@ -40,6 +40,6 @@ public class ShowController {
 
     @GetMapping(value = "/{id}/seasons")
     public List<SeasonEntity> getSeasons(@PathVariable UUID id) {
-        return seasonRepository.findByShowEntityId(id);
+        return seasonRepository.findByShowEntityId(id, Sort.by("number").ascending());
     }
 }
