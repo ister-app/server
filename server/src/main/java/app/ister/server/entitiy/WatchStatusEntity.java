@@ -15,7 +15,7 @@ import lombok.experimental.SuperBuilder;
 import java.util.UUID;
 
 @Entity
-@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"playQueueItemId", "userEntitIdy", "episodeEntityId"}))
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"playQueueItemId", "userEntityId", "episodeEntityId"}))
 @Getter
 @Setter
 @SuperBuilder
