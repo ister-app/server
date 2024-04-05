@@ -9,6 +9,7 @@ RUN ./gradlew nativeCompile
 
 FROM fedora:39
 WORKDIR /home/app
+RUN dnf install -y fontconfig && dnf clean -y all
 EXPOSE 8080
 COPY --from=graalvm /usr/bin/ffmpeg /usr/bin/ffprobe /usr/bin/
 COPY --from=graalvm /home/app/server/build/native/nativeCompile /home/app

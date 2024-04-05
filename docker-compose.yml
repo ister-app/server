@@ -27,10 +27,15 @@ services:
 #      APP_ISTER_SERVER_DIRECTORIES_1_NAME: disk2
 #      APP_ISTER_SERVER_DIRECTORIES_1_PATH: /disk2
 #      APP_ISTER_SERVER_DIRECTORIES_1_LIBRARY: shows
+      OIDC_URL: https://localhost:8060/realms/Ister
     ports:
       - "8080:8080"
+    depends_on:
+      - database
   website:
     image: ghcr.io/ister-app/website:latest
     restart: always
     ports:
       - "8090:8080"
+    depends_on:
+      - server
