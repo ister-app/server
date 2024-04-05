@@ -11,5 +11,5 @@ FROM fedora:39
 WORKDIR /home/app
 EXPOSE 8080
 COPY --from=graalvm /usr/bin/ffmpeg /usr/bin/ffprobe /usr/bin/
-COPY --from=graalvm /home/app/build/native/nativeCompile /home/app
+COPY --from=graalvm /home/app/server/build/native/nativeCompile /home/app
 ENTRYPOINT ["/home/app/server"]
