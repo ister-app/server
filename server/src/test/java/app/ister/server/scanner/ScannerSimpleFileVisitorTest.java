@@ -1,10 +1,13 @@
 package app.ister.server.scanner;
 
-import app.ister.server.entitiy.LibraryEntity;
 import app.ister.server.entitiy.DirectoryEntity;
+import app.ister.server.entitiy.LibraryEntity;
 import app.ister.server.entitiy.NodeEntity;
 import app.ister.server.enums.DirectoryType;
-import app.ister.server.scanner.scanners.*;
+import app.ister.server.scanner.scanners.ImageScanner;
+import app.ister.server.scanner.scanners.MediaFileScanner;
+import app.ister.server.scanner.scanners.NfoScanner;
+import app.ister.server.scanner.scanners.SubtitleScanner;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
 import org.junit.jupiter.api.AfterEach;
@@ -26,10 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @ExtendWith(MockitoExtension.class)
 class ScannerSimpleFileVisitorTest {
-    @Mock
-    private ShowScanner showAnalyzer;
-    @Mock
-    private SeasonScanner seasonAnalyzer;
     @Mock
     private MediaFileScanner episodeAnalyzer;
     @Mock
@@ -76,7 +75,7 @@ class ScannerSimpleFileVisitorTest {
         @Test
         void theRootDirWillReturnContinue() {
             Path resourceFilePath = fileSystem.getPath("/disk/show");
-            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, showAnalyzer, seasonAnalyzer, episodeAnalyzer, imageAnalyzer, nfoScanner, subtitleScanner);
+            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, episodeAnalyzer, imageAnalyzer, nfoScanner, subtitleScanner);
 
             var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
 
@@ -86,7 +85,7 @@ class ScannerSimpleFileVisitorTest {
         @Test
         void dotDirsWillBeSkipped() {
             Path resourceFilePath = fileSystem.getPath("/disk/show/.tmp");
-            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, showAnalyzer, seasonAnalyzer, episodeAnalyzer, imageAnalyzer, nfoScanner, subtitleScanner);
+            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, episodeAnalyzer, imageAnalyzer, nfoScanner, subtitleScanner);
 
             var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
 

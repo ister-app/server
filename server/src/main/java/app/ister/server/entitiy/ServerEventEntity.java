@@ -26,4 +26,9 @@ public class ServerEventEntity extends BaseEntity {
 
     private String path;
 
+    /**
+     * Json string with data for the event.
+     */
+    @Column(columnDefinition = "text")
+    private String data;
 }

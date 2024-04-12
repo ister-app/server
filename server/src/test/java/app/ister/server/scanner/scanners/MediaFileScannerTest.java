@@ -1,7 +1,6 @@
 package app.ister.server.scanner.scanners;
 
 import app.ister.server.repository.ShowRepository;
-import app.ister.server.scanner.scanners.MediaFileScanner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

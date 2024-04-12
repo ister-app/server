@@ -1,7 +1,7 @@
 package app.ister.server.scanner.scanners;
 
-import app.ister.server.entitiy.LibraryEntity;
 import app.ister.server.entitiy.DirectoryEntity;
+import app.ister.server.entitiy.LibraryEntity;
 import app.ister.server.entitiy.NodeEntity;
 import app.ister.server.enums.DirectoryType;
 import app.ister.server.scanner.LibraryScanner;
@@ -22,13 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MockitoExtension.class)
 class LibraryScannerTest {
-
     @Mock
-    private ShowScanner showAnalyzer;
+    private MediaFileScanner mediaFileScanner;
     @Mock
-    private SeasonScanner seasonAnalyzer;
+    private ImageScanner imageScanner;
     @Mock
-    private MediaFileScanner episodeAnalyzer;
+    private NfoScanner nfoScanner;
+    @Mock
+    private SubtitleScanner subtitleScanner;
 
     @InjectMocks
     LibraryScanner libraryScanner;

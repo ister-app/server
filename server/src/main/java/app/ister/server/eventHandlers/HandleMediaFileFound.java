@@ -1,6 +1,11 @@
 package app.ister.server.eventHandlers;
 
-import app.ister.server.entitiy.*;
+import app.ister.server.entitiy.DirectoryEntity;
+import app.ister.server.entitiy.EpisodeEntity;
+import app.ister.server.entitiy.ImageEntity;
+import app.ister.server.entitiy.MediaFileEntity;
+import app.ister.server.entitiy.NodeEntity;
+import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.enums.DirectoryType;
 import app.ister.server.enums.ImageType;
 import app.ister.server.eventHandlers.mediaFileFound.MediaFileFoundGetDuration;
@@ -67,6 +72,7 @@ public class HandleMediaFileFound implements Handle {
         ImageEntity imageEntity = ImageEntity.builder()
                 .directoryEntity(cacheDisk)
                 .path(toPath)
+                .sourceUri("file://" + mediaFilePath)
                 .type(ImageType.BACKGROUND)
                 .episodeEntity(episode)
                 .build();

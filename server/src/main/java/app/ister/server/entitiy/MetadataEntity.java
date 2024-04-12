@@ -9,7 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
-import java.sql.Timestamp;
+import java.time.LocalDate;
 
 @Entity
 @Getter
@@ -30,8 +30,11 @@ public class MetadataEntity extends BaseEntity {
 
     private String sourceUri;
 
+    // https://en.wikipedia.org/wiki/ISO_639-3
+    private String language;
+
     private String title;
     @Column(columnDefinition = "text")
     private String description;
-    private Timestamp released;
+    private LocalDate released;
 }

@@ -28,6 +28,11 @@ public class ImageEntity extends BaseEntity {
     @Column(nullable = false)
     private ImageType type;
 
+    // https://en.wikipedia.org/wiki/ISO_639-3
+    private String language;
+
+    private String sourceUri;
+
     @Getter(onMethod = @__(@JsonBackReference))
     @ManyToOne
     private ShowEntity showEntity;

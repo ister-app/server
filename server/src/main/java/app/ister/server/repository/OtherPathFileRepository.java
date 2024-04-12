@@ -1,6 +1,7 @@
 package app.ister.server.repository;
 
-import app.ister.server.entitiy.*;
+import app.ister.server.entitiy.DirectoryEntity;
+import app.ister.server.entitiy.OtherPathFileEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

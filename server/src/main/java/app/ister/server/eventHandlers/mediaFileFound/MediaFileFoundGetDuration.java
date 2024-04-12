@@ -1,6 +1,8 @@
 package app.ister.server.eventHandlers.mediaFileFound;
 
-import com.github.kokorin.jaffree.ffmpeg.*;
+import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
+import com.github.kokorin.jaffree.ffmpeg.NullOutput;
+import com.github.kokorin.jaffree.ffmpeg.UrlInput;
 
 import java.nio.file.Paths;
 import java.util.concurrent.atomic.AtomicLong;

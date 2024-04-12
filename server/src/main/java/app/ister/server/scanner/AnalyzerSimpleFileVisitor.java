@@ -1,7 +1,12 @@
 package app.ister.server.scanner;
 
 import app.ister.server.entitiy.DirectoryEntity;
-import app.ister.server.scanner.scanners.*;
+import app.ister.server.scanner.enums.DirType;
+import app.ister.server.scanner.scanners.ImageScanner;
+import app.ister.server.scanner.scanners.MediaFileScanner;
+import app.ister.server.scanner.scanners.NfoScanner;
+import app.ister.server.scanner.scanners.Scanner;
+import app.ister.server.scanner.scanners.SubtitleScanner;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -15,23 +20,25 @@ import java.util.List;
 class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
     private final DirectoryEntity directoryEntity;
 
-    private final ShowScanner showAnalyzer;
-    private final SeasonScanner seasonAnalyzer;
     private final MediaFileScanner episodeAnalyzer;
     private final ImageScanner imageAnalyzer;
     private final NfoScanner nfoScanner;
     private final SubtitleScanner subtitleScanner;
 
-    public AnalyzerSimpleFileVisitor(DirectoryEntity directoryEntity, ShowScanner showAnalyzer, SeasonScanner seasonAnalyzer, MediaFileScanner episodeAnalyzer, ImageScanner imageAnalyzer, NfoScanner nfoScanner, SubtitleScanner subtitleScanner) {
+    public AnalyzerSimpleFileVisitor(DirectoryEntity directoryEntity, MediaFileScanner episodeAnalyzer, ImageScanner imageAnalyzer, NfoScanner nfoScanner, SubtitleScanner subtitleScanner) {
         this.directoryEntity = directoryEntity;
-        this.showAnalyzer = showAnalyzer;
-        this.seasonAnalyzer = seasonAnalyzer;
         this.episodeAnalyzer = episodeAnalyzer;
         this.imageAnalyzer = imageAnalyzer;
         this.nfoScanner = nfoScanner;
         this.subtitleScanner = subtitleScanner;
     }
 
+    /**
+     * Called before visiting a dir.
+     * - If it's the root dir continue the scan in that dir.
+     * - If it's a dor dir (ex: .config) don't scan it.
+     * - Else check if it's correct media dir.
+     */
     @Override
     public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
         if (dir.toString().equals(directoryEntity.getPath())) {
@@ -41,19 +48,21 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
             // Dot dir
             return FileVisitResult.SKIP_SUBTREE;
         } else {
+            // Other dirs
             return analyzeDir(dir, attrs);
         }
     }
 
+    /**
+     * Check if the path is part of Show or Season.
+     */
     private FileVisitResult analyzeDir(Path dir, BasicFileAttributes attrs) {
-        for (Scanner scanner : List.of(showAnalyzer, seasonAnalyzer)) {
-            if (scanner.analyzable(dir, attrs)) {
-                log.debug("Scanning dir: {}, with scanner: {}", dir, scanner);
-                scanner.analyze(directoryEntity, dir, attrs).orElseThrow();
-                return FileVisitResult.CONTINUE;
-            }
+        if (attrs.isDirectory() && List.of(DirType.SHOW, DirType.SEASON).contains(new PathObject(dir.toString()).getDirType())) {
+            return FileVisitResult.CONTINUE;
         }
-        return FileVisitResult.SKIP_SUBTREE;
+        else {
+            return FileVisitResult.SKIP_SUBTREE;
+        }
     }
 
     @Override

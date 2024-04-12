@@ -43,6 +43,7 @@ public class ImageScanner implements Scanner {
 
             var imageEntity = ImageEntity.builder()
                     .directoryEntity(directoryEntity)
+                    .sourceUri("file://" + path)
                     .path(path.toString());
 
             ImageType imageType = getImageType(path);

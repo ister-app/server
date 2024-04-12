@@ -1,6 +1,9 @@
 package app.ister.server.scanner.scanners;
 
-import app.ister.server.entitiy.*;
+import app.ister.server.entitiy.BaseEntity;
+import app.ister.server.entitiy.DirectoryEntity;
+import app.ister.server.entitiy.OtherPathFileEntity;
+import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.enums.EventType;
 import app.ister.server.enums.PathFileType;
 import app.ister.server.repository.OtherPathFileRepository;

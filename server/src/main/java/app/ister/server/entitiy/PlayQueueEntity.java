@@ -49,8 +49,7 @@ public class PlayQueueEntity extends BaseEntity {
         @Override
         public List<PlayQueueItemEntity> convertToEntityAttribute(String value) {
             try {
-                return objectMapper.readValue(value, new TypeReference<List<PlayQueueItemEntity>>() {
-                });
+                return objectMapper.readValue(value, new TypeReference<>() {});
             } catch (JsonProcessingException e) {
                 System.out.println("Cannot convert JSON into List<PlaylistItemEntity>");
                 return null;

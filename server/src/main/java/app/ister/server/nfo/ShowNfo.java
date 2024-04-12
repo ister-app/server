@@ -5,7 +5,7 @@ import jakarta.xml.bind.annotation.XmlRootElement;
 import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import lombok.Getter;
 
-import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.util.List;
 
 @XmlRootElement(name = "tvshow")
@@ -22,5 +22,5 @@ public class ShowNfo {
 
     @XmlElement
     @XmlJavaTypeAdapter(DateAdapter.class)
-    private Timestamp premiered;
+    private LocalDate premiered;
 }

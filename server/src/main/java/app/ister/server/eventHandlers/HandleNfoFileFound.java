@@ -59,7 +59,8 @@ public class HandleNfoFileFound implements Handle {
                     .title(parsed.getTitle())
                     .description(parsed.getPlot())
                     .released(parsed.getAired())
-                    .episodeEntity(episode).build());
+                    .episodeEntity(episode)
+                    .sourceUri("file://" + path).build());
         } catch (FileNotFoundException e) {
             log.error("Something went wrong when nfo parsing: {}", path);
         }

@@ -1,6 +1,5 @@
 package app.ister.server.nfo;
 
-import app.ister.server.entitiy.EpisodeEntity;
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBException;
 import lombok.extern.slf4j.Slf4j;

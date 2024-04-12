@@ -10,6 +10,7 @@ import app.ister.server.enums.DirectoryType;
 import app.ister.server.repository.DirectoryRepository;
 import app.ister.server.repository.LibraryRepository;
 import app.ister.server.service.NodeService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.ContextRefreshedEvent;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
+@Slf4j
 @Component
 public class StartupTasks {
 
