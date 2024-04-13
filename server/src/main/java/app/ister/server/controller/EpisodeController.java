@@ -1,11 +1,15 @@
 package app.ister.server.controller;
 
 import app.ister.server.entitiy.EpisodeEntity;
+import app.ister.server.entitiy.UserEntity;
 import app.ister.server.repository.EpisodeRepository;
 import app.ister.server.repository.WatchStatusRepository;
+import app.ister.server.service.UserService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,6 +23,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("episodes")
 @SecurityRequirement(name = "oidc_auth")
+@Slf4j
 public class EpisodeController {
     @Autowired
     private EpisodeRepository episodeRepository;
@@ -26,10 +31,15 @@ public class EpisodeController {
     @Autowired
     private WatchStatusRepository watchStatusRepository;
 
+    @Autowired
+    private UserService userService;
+
     @GetMapping(value = "/recent")
-    public List<EpisodeEntity> getRecent() {
+    public List<EpisodeEntity> getRecent(Authentication authentication) {
+        log.debug("Getting recent episode list for user: {}", authentication.getName());
+        UserEntity userEntity = userService.getOrCreateUser(authentication);
         List<EpisodeEntity> result = new ArrayList<>();
-        for (String[] strings : watchStatusRepository.findRecentEpisodesAndShowIds()) {
+        for (String[] strings : watchStatusRepository.findRecentEpisodesAndShowIdsByUserId(userEntity.getId())) {
             List<EpisodeEntity> seasonEpisodes = episodeRepository.findByShowEntityId(
                     UUID.fromString(strings[1]),
                     Sort.by("SeasonEntityNumber").ascending().and(
