@@ -1,0 +1,100 @@
+type Query {
+    episodesRecentWatched: [Episode!]
+    episodeById(id: ID): Episode
+    seasonById(id: ID): Season
+    showsRecentAdded: [Show!]
+    showById(id: ID): Show
+}
+
+type Mutation {
+    createPlayQueue(showId: ID!): PlayQueue
+    updatePlayQueue(id: ID!, progressInMilliseconds: Int!, playQueueItemId: ID!): Boolean
+    startTranscoding(mediaFileId: ID!, startTimeInSeconds: Int!, audioId: ID, subtitleId: ID): ID!
+    readyTranscoding(id: ID!): Boolean!
+    stopTranscoding(id: ID!): Boolean!
+}
+
+type Episode {
+    id: ID!
+    number: Int
+    show: Show
+    images: [Image!]
+    season: Season
+    metadata: [Metadata!]
+    watchStatus: [WatchStatus!]
+    mediaFile: [MediaFile!]
+}
+
+type Image {
+    id: ID!
+    path: String!
+    type: String!
+    language: String
+    sourceUri: String
+    show: Show
+}
+
+type MediaFile {
+    id: ID!
+    episodes: [Episode!]
+    path: String!
+    size: Int!
+    durationInMilliseconds: Int
+    mediaFileStreams: [MediaFileStream]
+}
+
+type MediaFileStream {
+    id: ID!
+    streamIndex: Int
+    codecName: String!
+    codecType: String!
+    width: Int!
+    height: Int!
+    path: String!
+    language: String
+    title: String
+}
+
+type Metadata {
+    id: ID!
+    sourceUri: String
+    language: String
+    title: String
+    description: String
+}
+
+type PlayQueue {
+    id: ID!
+    currentItem: String
+    playQueueItems: [PlayQueueItem!]
+}
+
+type PlayQueueItem {
+    id: ID!
+    itemId: String!
+}
+
+type Season {
+    id: ID!
+    episodes: [Episode!]
+    show: Show!
+    number: Int!
+}
+
+type Show {
+    id: ID!
+    name: String!
+    releaseYear: Int!
+    episodes: [Episode!]
+    seasons: [Season!]
+    images: [Image!]
+    metadata: [Metadata!]
+}
+
+type WatchStatus {
+    id: ID!
+    playQueueItemId: String!
+    episodes: [Episode!]
+    watched: Boolean!
+    progressInMilliseconds: Int!
+}

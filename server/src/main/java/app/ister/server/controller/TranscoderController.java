@@ -6,18 +6,14 @@ import app.ister.server.entitiy.TranscodeSessionEntity;
 import app.ister.server.enums.StreamCodecType;
 import app.ister.server.repository.MediaFileRepository;
 import app.ister.server.repository.MediaFileStreamRepository;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.InputStreamResource;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.MutationMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Controller;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -25,10 +21,8 @@ import java.util.ArrayList;
 import java.util.Optional;
 import java.util.UUID;
 
-@RestController
-@RequestMapping("transcode")
 @Slf4j
-@SecurityRequirement(name = "oidc_auth")
+@Controller
 public class TranscoderController {
     @Autowired
     private MediaFileRepository mediaFileRepository;
@@ -41,37 +35,30 @@ public class TranscoderController {
     @Value("${app.ister.server.ffmpeg-dir}")
     private String dirOfFFmpeg;
 
-    private ArrayList<TranscodeSessionEntity> transcodeSessionEntities = new ArrayList<>();
+    private final ArrayList<TranscodeSessionEntity> transcodeSessionEntities = new ArrayList<>();
 
-    @RequestMapping(value = "/download/{id}/{fileName}", method = RequestMethod.GET)
-    public InputStreamResource download(@PathVariable UUID id, @PathVariable String fileName) throws IOException {
-        String filePath = tmpDir + id + "/" + fileName;
-        return new InputStreamResource(new FileInputStream(filePath)) {
-            @Override
-            public long contentLength() throws IOException {
-                return Files.size(Paths.get(filePath));
-            }
-        };
-    }
-
-    @RequestMapping(value = "/stop/{id}", method = RequestMethod.GET)
-    public void stop(@PathVariable UUID id) {
+    @PreAuthorize("hasRole('user')")
+    @MutationMapping
+    public boolean stopTranscoding(@Argument UUID id) {
         log.debug("Stopping: {}", id);
         getSesion(id).orElseThrow().getTranscoder().stop();
+        return true;
     }
 
-    @RequestMapping(value = "/ready/{id}", method = RequestMethod.GET)
-    public boolean ready(@PathVariable UUID id) {
+    @PreAuthorize("hasRole('user')")
+    @MutationMapping
+    public boolean readyTranscoding(@Argument UUID id) {
         log.debug("Ready check: {}", id);
         var result = false;
-        if (transcodeSessionEntities != null) {
+        if (!transcodeSessionEntities.isEmpty()) {
             result = getSesion(id).orElseThrow().getTranscoder().ready();
         }
         return  result;
     }
 
-    @RequestMapping(value = "/start", method = RequestMethod.POST)
-    public UUID start(@RequestParam UUID mediaFileId, @RequestParam int startTimeInSeconds, @RequestParam Optional<UUID> audioId, @RequestParam Optional<UUID> subtitleId) throws IOException {
+    @PreAuthorize("hasRole('user')")
+    @MutationMapping
+    public UUID startTranscoding(@Argument UUID mediaFileId, @Argument int startTimeInSeconds, @Argument Optional<UUID> audioId, @Argument Optional<UUID> subtitleId) throws IOException {
         var mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
 
         // Set the optional subtitleMediaFileStream.

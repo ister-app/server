@@ -9,24 +9,21 @@ import app.ister.server.repository.PlayQueueRepository;
 import app.ister.server.repository.WatchStatusRepository;
 import app.ister.server.service.UserService;
 import app.ister.server.service.WatchStatusService;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
+import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.MutationMapping;
+import org.springframework.graphql.data.method.annotation.SchemaMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.stereotype.Controller;
 
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-@RestController
-@RequestMapping("playqueue")
-@SecurityRequirement(name = "oidc_auth")
+@Controller
 @Slf4j
 public class PlayQueueController {
     @Autowired
@@ -44,8 +41,9 @@ public class PlayQueueController {
     @Autowired
     private WatchStatusService watchStatusService;
 
-    @PostMapping(value = "/create/show/{showId}")
-    public PlayQueueEntity createNewForShow(@PathVariable UUID showId, Authentication authentication) {
+    @PreAuthorize("hasRole('user')")
+    @MutationMapping
+    public PlayQueueEntity createPlayQueue(@Argument UUID showId, Authentication authentication) {
         log.debug("Creating play queue for user: {}, show: {}", authentication.getName(), showId);
         List<PlayQueueItemEntity> items = episodeRepository.findIdsOnlyByShowEntityId(
                         UUID.fromString(showId.toString()),
@@ -58,8 +56,9 @@ public class PlayQueueController {
         return playQueueEntity;
     }
 
-    @PostMapping(value = "/update/{id}")
-    public void updateWatchStatus(@PathVariable UUID id, @RequestParam long progressInMilliseconds, @RequestParam UUID playQueueItemId, Authentication authentication) {
+    @PreAuthorize("hasRole('user')")
+    @MutationMapping
+    public Boolean updatePlayQueue(@Argument UUID id, @Argument long progressInMilliseconds, @Argument UUID playQueueItemId, Authentication authentication) {
         log.debug("Updating play queue for user: {}", authentication.getName());
         // Update the current playing episode
         playQueueRepository.findById(id).ifPresent(playQueueEntity -> {
@@ -81,5 +80,11 @@ public class PlayQueueController {
                 }
             });
         });
+        return true;
+    }
+
+    @SchemaMapping(typeName = "PlayQueue", field = "playQueueItems")
+    public List<PlayQueueItemEntity> playQueueItems(PlayQueueEntity playQueueEntity) {
+        return playQueueEntity.getItems();
     }
 }

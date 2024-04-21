@@ -19,6 +19,10 @@
   }, {
     "pattern":"\\QMETA-INF/services/com.fasterxml.jackson.databind.Module\\E"
   }, {
+    "pattern":"\\QMETA-INF/services/io.micrometer.context.ContextAccessor\\E"
+  }, {
+    "pattern":"\\QMETA-INF/services/io.micrometer.context.ThreadLocalAccessor\\E"
+  }, {
     "pattern":"\\QMETA-INF/services/jakarta.xml.bind.JAXBContextFactory\\E"
   }, {
     "pattern":"\\QMETA-INF/services/java.sql.Driver\\E"
@@ -50,6 +54,8 @@
     "pattern":"\\Qapp/ister/server/config/SpringConfig.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/controller/EpisodeController.class\\E"
+  }, {
+    "pattern":"\\Qapp/ister/server/controller/FileController.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/controller/ImageController.class\\E"
   }, {
@@ -224,6 +230,10 @@
     "pattern":"\\Qapplication.properties\\E"
   }, {
     "pattern":"\\Qcom/fasterxml/jackson/core/type/TypeReference.class\\E"
+  }, {
+    "pattern":"\\Qgraphiql/index.html\\E"
+  }, {
+    "pattern":"\\Qgraphql/\\E"
   }, {
     "pattern":"\\Qio/swagger/v3/oas/annotations/Hidden.class\\E"
   }, {
@@ -458,6 +468,32 @@
     "pattern":"\\Qorg/springframework/boot/autoconfigure/data/jpa/JpaRepositoriesRegistrar.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/boot/autoconfigure/data/web/SpringDataWebAutoConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/graphql/ConditionalOnGraphQlSchema.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/graphql/GraphQlAutoConfiguration$GraphQlDataAutoConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/graphql/GraphQlAutoConfiguration$GraphQlResourcesRuntimeHints.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/graphql/GraphQlAutoConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/graphql/data/GraphQlQueryByExampleAutoConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/graphql/data/GraphQlReactiveQueryByExampleAutoConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/graphql/reactive/GraphQlWebFluxAutoConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/graphql/security/GraphQlWebFluxSecurityAutoConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/graphql/security/GraphQlWebMvcSecurityAutoConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/graphql/servlet/GraphQlWebMvcAutoConfiguration$GraphQlEndpointCorsConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/graphql/servlet/GraphQlWebMvcAutoConfiguration$GraphiQlResourceHints.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/graphql/servlet/GraphQlWebMvcAutoConfiguration$WebSocketConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/graphql/servlet/GraphQlWebMvcAutoConfiguration.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/boot/autoconfigure/h2/H2ConsoleAutoConfiguration.class\\E"
   }, {
@@ -827,6 +863,8 @@
   }, {
     "pattern":"\\Qorg/springframework/boot/sql/init/dependency/DatabaseInitializationDependencyConfigurer.class\\E"
   }, {
+    "pattern":"\\Qorg/springframework/boot/web/server/mime-mappings.properties\\E"
+  }, {
     "pattern":"\\Qorg/springframework/context/ApplicationContextAware.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/context/EnvironmentAware.class\\E"
@@ -903,6 +941,10 @@
   }, {
     "pattern":"\\Qorg/springframework/data/web/config/SpringDataWebConfiguration.class\\E"
   }, {
+    "pattern":"\\Qorg/springframework/http/codec/CodecConfigurer.properties\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/http/mime.types\\E"
+  }, {
     "pattern":"\\Qorg/springframework/scheduling/annotation/EnableScheduling.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/scheduling/annotation/SchedulingConfiguration.class\\E"
@@ -930,6 +972,8 @@
     "pattern":"\\Qorg/springframework/security/config/annotation/method/configuration/PrePostMethodSecurityConfiguration$DeferringMethodSecurityExpressionHandler.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/security/config/annotation/method/configuration/PrePostMethodSecurityConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/security/config/annotation/method/configuration/SecuredMethodSecurityConfiguration.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/security/config/annotation/web/configuration/EnableWebSecurity.class\\E"
   }, {
@@ -1000,6 +1044,12 @@
     "pattern":"java.base:\\Qsun/net/idn/uidna.spp\\E"
   }]},
   "bundles":[{
+    "name":"i18n.Parsing",
+    "locales":[""]
+  }, {
+    "name":"i18n.Validation",
+    "locales":[""]
+  }, {
     "name":"jakarta.servlet.LocalStrings",
     "locales":["", "und"]
   }, {

@@ -1,29 +1,34 @@
 package app.ister.server.controller;
 
 import app.ister.server.entitiy.EpisodeEntity;
+import app.ister.server.entitiy.ImageEntity;
+import app.ister.server.entitiy.MediaFileEntity;
+import app.ister.server.entitiy.MediaFileStreamEntity;
+import app.ister.server.entitiy.MetadataEntity;
+import app.ister.server.entitiy.SeasonEntity;
+import app.ister.server.entitiy.ShowEntity;
 import app.ister.server.entitiy.UserEntity;
+import app.ister.server.entitiy.WatchStatusEntity;
 import app.ister.server.repository.EpisodeRepository;
 import app.ister.server.repository.WatchStatusRepository;
 import app.ister.server.service.UserService;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
+import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.graphql.data.method.annotation.SchemaMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.stereotype.Controller;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@RestController
-@RequestMapping("episodes")
-@SecurityRequirement(name = "oidc_auth")
 @Slf4j
+@Controller
 public class EpisodeController {
     @Autowired
     private EpisodeRepository episodeRepository;
@@ -34,8 +39,9 @@ public class EpisodeController {
     @Autowired
     private UserService userService;
 
-    @GetMapping(value = "/recent")
-    public List<EpisodeEntity> getRecent(Authentication authentication) {
+    @PreAuthorize("hasRole('user')")
+    @QueryMapping
+    public List<EpisodeEntity> episodesRecentWatched(Authentication authentication) {
         log.debug("Getting recent episode list for user: {}", authentication.getName());
         UserEntity userEntity = userService.getOrCreateUser(authentication);
         List<EpisodeEntity> result = new ArrayList<>();
@@ -68,8 +74,44 @@ public class EpisodeController {
         }
     }
 
-    @GetMapping(value = "/{id}")
-    public Optional<EpisodeEntity> getEpisode(@PathVariable UUID id) {
+    @PreAuthorize("hasRole('user')")
+    @QueryMapping
+    public Optional<EpisodeEntity> episodeById(@Argument UUID id) {
         return episodeRepository.findById(id);
     }
+
+    @SchemaMapping(typeName = "Episode", field = "show")
+    public ShowEntity show(EpisodeEntity episodeEntity) {
+        return episodeEntity.getShowEntity();
+    }
+
+    @SchemaMapping(typeName = "Episode", field = "season")
+    public SeasonEntity season(EpisodeEntity episodeEntity) {
+        return episodeEntity.getSeasonEntity();
+    }
+
+    @SchemaMapping(typeName = "Episode", field = "metadata")
+    public List<MetadataEntity> metadata(EpisodeEntity episodeEntity) {
+        return episodeEntity.getMetadataEntities();
+    }
+
+    @SchemaMapping(typeName = "Episode", field = "images")
+    public List<ImageEntity> images(EpisodeEntity episodeEntity) {
+        return episodeEntity.getImagesEntities();
+    }
+
+    @SchemaMapping(typeName = "Episode", field = "watchStatus")
+    public List<WatchStatusEntity> watchStatus(EpisodeEntity episodeEntity, Authentication authentication) {
+        return watchStatusRepository.findByUserEntityExternalIdAndEpisodeEntity(authentication.getName(), episodeEntity, Sort.by("DateUpdated").descending());    }
+
+    @SchemaMapping(typeName = "Episode", field = "mediaFile")
+    public List<MediaFileEntity> mediaFile(EpisodeEntity episodeEntity) {
+        return episodeEntity.getMediaFileEntities();
+    }
+
+    @SchemaMapping(typeName = "MediaFile", field = "mediaFileStreams")
+    public List<MediaFileStreamEntity> mediaFileStreams(MediaFileEntity mediaFileEntity) {
+        return mediaFileEntity.getMediaFileStreamEntity();
+    }
+
 }

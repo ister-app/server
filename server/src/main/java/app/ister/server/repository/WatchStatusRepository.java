@@ -3,6 +3,7 @@ package app.ister.server.repository;
 import app.ister.server.entitiy.EpisodeEntity;
 import app.ister.server.entitiy.UserEntity;
 import app.ister.server.entitiy.WatchStatusEntity;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +14,8 @@ import java.util.UUID;
 
 public interface WatchStatusRepository extends CrudRepository<WatchStatusEntity, UUID> {
     Optional<WatchStatusEntity> findByUserEntityAndPlayQueueItemIdAndEpisodeEntity(UserEntity userEntity, UUID playQueueItemId, EpisodeEntity episodeEntity);
+
+    List<WatchStatusEntity> findByUserEntityExternalIdAndEpisodeEntity(String userEntityExternalId, EpisodeEntity episodeEntity, Sort sort);
 
     @Query(
             value = "WITH added_row_number AS (\n" +

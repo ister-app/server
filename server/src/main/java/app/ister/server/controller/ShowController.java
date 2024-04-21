@@ -1,45 +1,74 @@
 package app.ister.server.controller;
 
+import app.ister.server.entitiy.EpisodeEntity;
+import app.ister.server.entitiy.ImageEntity;
+import app.ister.server.entitiy.MetadataEntity;
 import app.ister.server.entitiy.SeasonEntity;
 import app.ister.server.entitiy.ShowEntity;
-import app.ister.server.repository.SeasonRepository;
+import app.ister.server.repository.EpisodeRepository;
+import app.ister.server.repository.ImageRepository;
 import app.ister.server.repository.ShowRepository;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.graphql.data.method.annotation.SchemaMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Controller;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@RestController
-@RequestMapping("shows")
-@SecurityRequirement(name = "oidc_auth")
+@Slf4j
+@Controller
 public class ShowController {
     @Autowired
     private ShowRepository showRepository;
-
     @Autowired
-    private SeasonRepository seasonRepository;
+    private EpisodeRepository episodeRepository;
+    @Autowired
+    private ImageRepository imageRepository;
 
-    @GetMapping(value = "/recent")
-    public Page<ShowEntity> getRecent() {
-        return showRepository.findAll(PageRequest.of(0, 10, Sort.by("name").descending()));
-    }
-
-    @GetMapping(value = "/{id}")
-    public Optional<ShowEntity> getTVShow(@PathVariable UUID id) {
+    @PreAuthorize("hasRole('user')")
+    @QueryMapping
+    public Optional<ShowEntity> showById(@Argument UUID id) {
         return showRepository.findById(id);
     }
 
-    @GetMapping(value = "/{id}/seasons")
-    public List<SeasonEntity> getSeasons(@PathVariable UUID id) {
-        return seasonRepository.findByShowEntityId(id, Sort.by("number").ascending());
+    @PreAuthorize("hasRole('user')")
+    @QueryMapping
+    public List<ShowEntity> showsRecentAdded() {
+        List<ShowEntity> result = new ArrayList<>();
+        showRepository.findAll().forEach(result::add);
+        return result;
+    }
+
+    @SchemaMapping(typeName = "Show", field = "episodes")
+    public List<EpisodeEntity> episodes(ShowEntity showEntity) {
+        return episodeRepository.findByShowEntityId(showEntity.getId(), Sort.by("number").ascending());
+    }
+
+    @SchemaMapping(typeName = "Show", field = "seasons")
+    public List<SeasonEntity> seasons(ShowEntity showEntity) {
+        return showEntity.getSeasonEntities();
+    }
+
+    @SchemaMapping(typeName = "Show", field = "metadata")
+    public List<MetadataEntity> metadata(ShowEntity showEntity) {
+        return showEntity.getMetadataEntities();
+    }
+
+
+    @SchemaMapping(typeName = "Show", field = "images")
+    public List<ImageEntity> images(ShowEntity showEntity) {
+        return imageRepository.findByShowEntityId(showEntity.getId());
+    }
+
+    @SchemaMapping(typeName = "Image", field = "show")
+    public ShowEntity showForImage(ImageEntity imageEntity) {
+        return imageEntity.getShowEntity();
     }
 }
