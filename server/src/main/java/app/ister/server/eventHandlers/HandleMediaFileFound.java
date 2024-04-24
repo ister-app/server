@@ -16,7 +16,6 @@ import app.ister.server.repository.ImageRepository;
 import app.ister.server.repository.MediaFileRepository;
 import app.ister.server.repository.MediaFileStreamRepository;
 import app.ister.server.service.NodeService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -25,26 +24,36 @@ import java.util.Optional;
 
 @Component
 public class HandleMediaFileFound implements Handle {
-    @Autowired
-    private NodeService nodeService;
-    @Autowired
-    private DirectoryRepository directoryRepository;
-    @Autowired
-    private MediaFileRepository mediaFileRepository;
-    @Autowired
-    private MediaFileStreamRepository mediaFileStreamRepository;
-    @Autowired
-    private ImageRepository imageRepository;
+    private final NodeService nodeService;
+    private final DirectoryRepository directoryRepository;
+    private final MediaFileRepository mediaFileRepository;
+    private final MediaFileStreamRepository mediaFileStreamRepository;
+    private final ImageRepository imageRepository;
 
-    @Autowired
-    private MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams;
-    @Autowired
-    private MediaFileFoundCreateBackground mediaFileFoundCreateBackground;
-    @Autowired
-    private MediaFileFoundGetDuration mediaFileFoundGetDuration;
+    private final MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams;
+    private final MediaFileFoundCreateBackground mediaFileFoundCreateBackground;
+    private final MediaFileFoundGetDuration mediaFileFoundGetDuration;
 
     @Value("${app.ister.server.ffmpeg-dir}")
     private String dirOfFFmpeg;
+
+    public HandleMediaFileFound(NodeService nodeService,
+                                DirectoryRepository directoryRepository,
+                                MediaFileRepository mediaFileRepository,
+                                MediaFileStreamRepository mediaFileStreamRepository,
+                                ImageRepository imageRepository,
+                                MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams,
+                                MediaFileFoundCreateBackground mediaFileFoundCreateBackground,
+                                MediaFileFoundGetDuration mediaFileFoundGetDuration) {
+        this.nodeService = nodeService;
+        this.directoryRepository = directoryRepository;
+        this.mediaFileRepository = mediaFileRepository;
+        this.mediaFileStreamRepository = mediaFileStreamRepository;
+        this.imageRepository = imageRepository;
+        this.mediaFileFoundCheckForStreams = mediaFileFoundCheckForStreams;
+        this.mediaFileFoundCreateBackground = mediaFileFoundCreateBackground;
+        this.mediaFileFoundGetDuration = mediaFileFoundGetDuration;
+    }
 
     @Override
     public Boolean handle(ServerEventEntity serverEventEntity) {

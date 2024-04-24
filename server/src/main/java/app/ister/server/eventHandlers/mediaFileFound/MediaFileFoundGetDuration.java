@@ -19,6 +19,8 @@ public class MediaFileFoundGetDuration {
     private final FFmpeg ffmpeg;
     private final FFprobe ffprobe;
 
+    private final List<String> durationString = List.of("DURATION", "DURATION-eng");
+
     public MediaFileFoundGetDuration(FFmpeg ffmpeg, FFprobe ffprobe) {
         this.ffmpeg = ffmpeg;
         this.ffprobe = ffprobe;
@@ -43,18 +45,22 @@ public class MediaFileFoundGetDuration {
         List<Long> longList = new ArrayList<>();
         result.getStreams().forEach(stream -> {
             if (stream.getDuration() != null) {
-                longList.add(stream.getDuration().longValue());
+                // Get the duration in seconds and multiply with 1000 for milliseconds.
+                longList.add(stream.getDuration().longValue() * 1000);
             }
-            if (stream.getTag("DURATION") != null) {
-                longList.add(LocalTime.parse(stream.getTag("DURATION")).getLong(ChronoField.MILLI_OF_DAY));
-            }
+            durationString.forEach(durationString -> {
+                if (stream.getTag(durationString) != null) {
+                    longList.add(LocalTime.parse(stream.getTag(durationString)).getLong(ChronoField.MILLI_OF_DAY));
+                }
+            });
+
         });
-        Collections.reverse(longList);
 
         if (longList.isEmpty()) {
             return 0L;
         } else {
-            return longList.get(0);
+            Collections.sort(longList);
+            return Collections.max(longList);
         }
 
     }

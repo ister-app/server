@@ -48,7 +48,22 @@ class MediaFileFoundGetDurationTest {
 
         when(ffprobeResultMock.getStreams()).thenReturn(List.of(streamMock));
 
-        when(streamMock.getDuration()).thenReturn(1F);
+        when(streamMock.getDuration()).thenReturn(4F);
+        when(streamMock.getTag("DURATION")).thenReturn("00:00:03.000000000");
+
+        var result = subject.getDuration("src/test/resources/eventHandlers/mediaFileFound/test.mkv");
+        assertEquals(4000L, result);
+    }
+
+    @Test
+    void getDurationFromStreamTag() {
+        when(ffprobeMock.setShowStreams(true)).thenReturn(ffprobeMock);
+        when(ffprobeMock.setInput(anyString())).thenReturn(ffprobeMock);
+        when(ffprobeMock.execute()).thenReturn(ffprobeResultMock);
+
+        when(ffprobeResultMock.getStreams()).thenReturn(List.of(streamMock));
+
+        when(streamMock.getDuration()).thenReturn(null);
         when(streamMock.getTag("DURATION")).thenReturn("00:00:03.000000000");
 
         var result = subject.getDuration("src/test/resources/eventHandlers/mediaFileFound/test.mkv");

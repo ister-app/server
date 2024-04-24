@@ -40,7 +40,7 @@ public class EventHandler {
     public void handleEvents() {
         if (!handling) {
             handling = true;
-            serverEventRepository.findAll(Pageable.ofSize(30)).forEach(serverEventEntity -> {
+            serverEventRepository.findAll(Pageable.ofSize(300)).forEach(serverEventEntity -> {
                 log.debug("Handling event: {}, for type: {}", serverEventEntity.getPath(), serverEventEntity.getEventType());
                 Boolean successful = switch (serverEventEntity.getEventType()) {
                     case NEW_DIRECTORIES_SCAN_REQUEST -> handleNewDirectoriesScanRequested.handle(serverEventEntity);
