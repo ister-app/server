@@ -4,11 +4,13 @@ import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.UrlInput;
 import com.github.kokorin.jaffree.ffmpeg.UrlOutput;
+import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
 
+@Component
 public class MediaFileFoundCreateBackground {
-    public static void createBackground(Path toPath, Path mediaFilePath, String dirOfFFmpeg, long atDurationInMilliseconds) {
+    public void createBackground(Path toPath, Path mediaFilePath, String dirOfFFmpeg, long atDurationInMilliseconds) {
         FFmpeg.atPath(Path.of(dirOfFFmpeg))
                 .addInput(
                         UrlInput.fromPath(mediaFilePath)

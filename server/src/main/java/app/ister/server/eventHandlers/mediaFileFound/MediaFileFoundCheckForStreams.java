@@ -6,13 +6,15 @@ import app.ister.server.enums.StreamCodecType;
 import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.ffprobe.FFprobe;
 import com.github.kokorin.jaffree.ffprobe.FFprobeResult;
+import org.springframework.stereotype.Component;
 
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
+@Component
 public class MediaFileFoundCheckForStreams {
-    public static List<MediaFileStreamEntity> checkForStreams(MediaFileEntity mediaFileEntity, String dirOfFFmpeg) {
+    public List<MediaFileStreamEntity> checkForStreams(MediaFileEntity mediaFileEntity, String dirOfFFmpeg) {
         List<MediaFileStreamEntity> result = new ArrayList<>();
         FFprobeResult mediaStreams = FFprobe.atPath(Paths.get(dirOfFFmpeg))
                 .setShowStreams(true)

@@ -8,6 +8,8 @@ import app.ister.server.entitiy.NodeEntity;
 import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.enums.DirectoryType;
 import app.ister.server.enums.ImageType;
+import app.ister.server.eventHandlers.mediaFileFound.MediaFileFoundCheckForStreams;
+import app.ister.server.eventHandlers.mediaFileFound.MediaFileFoundCreateBackground;
 import app.ister.server.eventHandlers.mediaFileFound.MediaFileFoundGetDuration;
 import app.ister.server.repository.DirectoryRepository;
 import app.ister.server.repository.ImageRepository;
@@ -21,9 +23,6 @@ import org.springframework.stereotype.Component;
 import java.nio.file.Path;
 import java.util.Optional;
 
-import static app.ister.server.eventHandlers.mediaFileFound.MediaFileFoundCheckForStreams.checkForStreams;
-import static app.ister.server.eventHandlers.mediaFileFound.MediaFileFoundCreateBackground.createBackground;
-
 @Component
 public class HandleMediaFileFound implements Handle {
     @Autowired
@@ -36,6 +35,13 @@ public class HandleMediaFileFound implements Handle {
     private MediaFileStreamRepository mediaFileStreamRepository;
     @Autowired
     private ImageRepository imageRepository;
+
+    @Autowired
+    private MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams;
+    @Autowired
+    private MediaFileFoundCreateBackground mediaFileFoundCreateBackground;
+    @Autowired
+    private MediaFileFoundGetDuration mediaFileFoundGetDuration;
 
     @Value("${app.ister.server.ffmpeg-dir}")
     private String dirOfFFmpeg;
@@ -51,11 +57,11 @@ public class HandleMediaFileFound implements Handle {
         Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndEpisodeEntityAndPath(directoryEntity, episode, file);
         mediaFile.ifPresent(mediaFileEntity -> {
             // Get duration.
-            mediaFileEntity.setDurationInMilliseconds(MediaFileFoundGetDuration.getDuration(mediaFileEntity.getPath(), dirOfFFmpeg));
+            mediaFileEntity.setDurationInMilliseconds(mediaFileFoundGetDuration.getDuration(mediaFileEntity.getPath()));
             mediaFileRepository.save(mediaFileEntity);
 
             // Analyze media file streams and save the metadata.
-            mediaFileStreamRepository.saveAll(checkForStreams(mediaFileEntity, dirOfFFmpeg));
+            mediaFileStreamRepository.saveAll(mediaFileFoundCheckForStreams.checkForStreams(mediaFileEntity, dirOfFFmpeg));
         });
         return mediaFile;
     }
@@ -67,7 +73,7 @@ public class HandleMediaFileFound implements Handle {
         NodeEntity nodeEntity = nodeService.getOrCreateNodeEntityForThisNode();
         var cacheDisk = directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity).stream().findFirst().orElseThrow();
         String toPath = cacheDisk.getPath() + episode.getId() + ".jpg";
-        createBackground(Path.of(toPath), Path.of(mediaFilePath), dirOfFFmpeg, durationInMilliseconds / 2);
+        mediaFileFoundCreateBackground.createBackground(Path.of(toPath), Path.of(mediaFilePath), dirOfFFmpeg, durationInMilliseconds / 2);
 
         ImageEntity imageEntity = ImageEntity.builder()
                 .directoryEntity(cacheDisk)
