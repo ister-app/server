@@ -23,7 +23,7 @@ public class MediaFileFoundCheckForStreams {
                 .execute();
 
         for (com.github.kokorin.jaffree.ffprobe.Stream stream : mediaStreams.getStreams()) {
-            var mediaFileStream = MediaFileStreamEntity.builder()
+            MediaFileStreamEntity.MediaFileStreamEntityBuilder<?, ?> mediaFileStream = MediaFileStreamEntity.builder()
                     .mediaFileEntity(mediaFileEntity)
                     .streamIndex(stream.getIndex())
                     .codecName(stream.getCodecName())
