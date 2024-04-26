@@ -29,7 +29,7 @@ public class MediaFileFoundGetDuration {
     /**
      * Given the path is from a media file.
      * - It first checks the media streams from the file for duration.
-     * - If it not contains a duration it will get the media file with ffmpeg wich contains longer.
+     * - If it not contains a duration it will get the media file with ffmpeg which takes longer.
      */
     public long getDuration(String path) {
         long duration = getDurationFromStream(path);
