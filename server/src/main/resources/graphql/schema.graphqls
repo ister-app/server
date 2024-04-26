@@ -38,7 +38,7 @@ type MediaFile {
     id: ID!
     episodes: [Episode!]
     path: String!
-    size: Int!
+    size: Float!
     durationInMilliseconds: Int
     mediaFileStreams: [MediaFileStream]
 }
