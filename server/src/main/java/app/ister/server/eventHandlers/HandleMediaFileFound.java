@@ -55,6 +55,14 @@ public class HandleMediaFileFound implements Handle {
         this.mediaFileFoundGetDuration = mediaFileFoundGetDuration;
     }
 
+    /**
+     * When the scanner find the media file it saves the data in the database.
+     * The scanner is not analyzing the media file, because it can take a bit longer.
+     * So this handler will analyze the media file.
+     * - The duration of the file.
+     * - And the containing streams (video, audio and subtitles streams).
+     * - And will create a background image.
+     */
     @Override
     public Boolean handle(ServerEventEntity serverEventEntity) {
         var mediaFile = checkMediaFile(serverEventEntity.getDirectoryEntity(), serverEventEntity.getEpisodeEntity(), serverEventEntity.getPath());
@@ -80,7 +88,7 @@ public class HandleMediaFileFound implements Handle {
      */
     private void createBackgroundImage(EpisodeEntity episode, String mediaFilePath, Long durationInMilliseconds) {
         NodeEntity nodeEntity = nodeService.getOrCreateNodeEntityForThisNode();
-        var cacheDisk = directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity).stream().findFirst().orElseThrow();
+        DirectoryEntity cacheDisk = directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity).stream().findFirst().orElseThrow();
         String toPath = cacheDisk.getPath() + episode.getId() + ".jpg";
         mediaFileFoundCreateBackground.createBackground(Path.of(toPath), Path.of(mediaFilePath), dirOfFFmpeg, durationInMilliseconds / 2);
 
