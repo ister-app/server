@@ -33,7 +33,7 @@ class MediaFileFoundCreateBackgroundTest {
         URL resourceAsStream = MediaFileFoundCreateBackgroundTest.class.getResource("/eventHandlers/mediaFileFound/test.mkv");
 
         Path toPath = Path.of("item.jpg");
-        MediaFileFoundCreateBackground.createBackground(toPath, Path.of(resourceAsStream.getPath()), dirOfFFmpeg, 1000);
+        new MediaFileFoundCreateBackground().createBackground(toPath, Path.of(resourceAsStream.getPath()), dirOfFFmpeg, 1000);
 
         assertTrue(Files.isRegularFile(toPath));
     }

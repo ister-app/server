@@ -22,7 +22,7 @@ class MediaFileFoundCheckForStreamsTest {
     @Test
     void checkMediaFileForStreams() {
         MediaFileEntity mediaFileEntity = MediaFileEntity.builder().path("src/test/resources/eventHandlers/mediaFileFound/test.mkv").build();
-        var result = MediaFileFoundCheckForStreams.checkForStreams(mediaFileEntity, dirOfFFmpeg);
+        var result = new MediaFileFoundCheckForStreams().checkForStreams(mediaFileEntity, dirOfFFmpeg);
         assertEquals("vp9", result.get(0).getCodecName());
     }
 }
