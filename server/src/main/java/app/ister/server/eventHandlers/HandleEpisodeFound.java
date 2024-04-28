@@ -17,6 +17,7 @@ import app.ister.server.service.NodeService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import info.movito.themoviedbapi.model.core.responses.TmdbResponseException;
 import info.movito.themoviedbapi.tools.TmdbException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -80,6 +81,8 @@ public class HandleEpisodeFound implements Handle {
         } catch (JsonProcessingException jpe) {
             log.error("Cannot convert JSON into ShowFoundData", jpe);
             return false;
+        } catch (TmdbResponseException e) {
+            log.error("Cannot get TMDB data response", e);
         } catch (TmdbException e) {
             log.error("Cannot get TMDB data", e);
             return false;

@@ -48,11 +48,13 @@ dependencies {
 	// https://mvnrepository.com/artifact/com.google.jimfs/jimfs
 	testImplementation("com.google.jimfs:jimfs:1.3.0")
 
-	implementation "uk.co.conoregan:themoviedbapi:2.0.2"
+	implementation "uk.co.conoregan:themoviedbapi:2.0.4"
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// When enable native image trace agent, disable jacoco.
+//	jvmArgs '-agentlib:native-image-agent=config-merge-dir=src/main/resources/META-INF/native-image'
 }
 
 tasks.named('bootRun') {
