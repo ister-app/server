@@ -3,6 +3,7 @@ package app.ister.server.eventHandlers;
 import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.entitiy.MetadataEntity;
 import app.ister.server.entitiy.ServerEventEntity;
+import app.ister.server.enums.EventType;
 import app.ister.server.nfo.Parser;
 import app.ister.server.repository.MetadataRepository;
 import app.ister.server.scanner.PathObject;
@@ -21,6 +22,11 @@ public class HandleNfoFileFound implements Handle {
     private MetadataRepository metadataRepository;
     @Autowired
     private ScannerHelperService scannerHelperService;
+
+    @Override
+    public EventType handles() {
+        return EventType.NFO_FILE_FOUND;
+    }
 
     @Override
     public Boolean handle(ServerEventEntity serverEventEntity) {

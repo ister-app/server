@@ -4,6 +4,7 @@ import app.ister.server.entitiy.NodeEntity;
 import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.entitiy.ShowEntity;
 import app.ister.server.enums.DirectoryType;
+import app.ister.server.enums.EventType;
 import app.ister.server.enums.ImageType;
 import app.ister.server.eventHandlers.TMDBMetadata.ImageDownload;
 import app.ister.server.eventHandlers.TMDBMetadata.ImageSave;
@@ -52,6 +53,11 @@ public class HandleShowFound implements Handle {
     private static final List<String> supportLanguages = List.of("en", "nl");
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Override
+    public EventType handles() {
+        return EventType.SHOW_FOUND;
+    }
 
     @Override
     public Boolean handle(ServerEventEntity serverEventEntity) {
