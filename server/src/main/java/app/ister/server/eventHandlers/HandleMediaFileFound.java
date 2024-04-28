@@ -7,6 +7,7 @@ import app.ister.server.entitiy.MediaFileEntity;
 import app.ister.server.entitiy.NodeEntity;
 import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.enums.DirectoryType;
+import app.ister.server.enums.EventType;
 import app.ister.server.enums.ImageType;
 import app.ister.server.eventHandlers.mediaFileFound.MediaFileFoundCheckForStreams;
 import app.ister.server.eventHandlers.mediaFileFound.MediaFileFoundCreateBackground;
@@ -53,6 +54,11 @@ public class HandleMediaFileFound implements Handle {
         this.mediaFileFoundCheckForStreams = mediaFileFoundCheckForStreams;
         this.mediaFileFoundCreateBackground = mediaFileFoundCreateBackground;
         this.mediaFileFoundGetDuration = mediaFileFoundGetDuration;
+    }
+
+    @Override
+    public EventType handles() {
+        return EventType.MEDIA_FILE_FOUND;
     }
 
     /**

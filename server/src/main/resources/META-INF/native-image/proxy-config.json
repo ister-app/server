@@ -90,6 +90,9 @@
     "interfaces":["net.bytebuddy.description.type.TypeDescription$Generic$AnnotationReader$Delegator$ForLoadedExecutableParameterType$Dispatcher"]
   },
   {
+    "interfaces":["net.bytebuddy.description.type.TypeDescription$Generic$AnnotationReader$Delegator$ForLoadedField$Dispatcher"]
+  },
+  {
     "interfaces":["net.bytebuddy.description.type.TypeDescription$Generic$AnnotationReader$Delegator$ForLoadedMethodReturnType$Dispatcher"]
   },
   {
@@ -102,6 +105,12 @@
     "interfaces":["net.bytebuddy.description.type.TypeDescription$Generic$AnnotationReader$ForTypeArgument$AnnotatedParameterizedType"]
   },
   {
+    "interfaces":["net.bytebuddy.description.type.TypeDescription$Generic$AnnotationReader$ForTypeVariableBoundType$AnnotatedTypeVariable"]
+  },
+  {
+    "interfaces":["net.bytebuddy.description.type.TypeDescription$Generic$AnnotationReader$ForTypeVariableBoundType$OfFormalTypeVariable$FormalTypeVariable"]
+  },
+  {
     "interfaces":["net.bytebuddy.description.type.TypeDescription$Generic$AnnotationReader$ForWildcardUpperBoundType$AnnotatedWildcardType"]
   },
   {
@@ -111,10 +120,43 @@
     "interfaces":["net.bytebuddy.dynamic.loading.ClassInjector$UsingLookup$MethodHandles$Lookup"]
   },
   {
+    "interfaces":["net.bytebuddy.utility.JavaConstant$Simple$Dispatcher"]
+  },
+  {
+    "interfaces":["net.bytebuddy.utility.JavaConstant$Simple$Dispatcher$OfClassDesc"]
+  },
+  {
+    "interfaces":["net.bytebuddy.utility.JavaConstant$Simple$Dispatcher$OfDirectMethodHandleDesc"]
+  },
+  {
+    "interfaces":["net.bytebuddy.utility.JavaConstant$Simple$Dispatcher$OfDirectMethodHandleDesc$ForKind"]
+  },
+  {
+    "interfaces":["net.bytebuddy.utility.JavaConstant$Simple$Dispatcher$OfDynamicConstantDesc"]
+  },
+  {
+    "interfaces":["net.bytebuddy.utility.JavaConstant$Simple$Dispatcher$OfMethodHandleDesc"]
+  },
+  {
+    "interfaces":["net.bytebuddy.utility.JavaConstant$Simple$Dispatcher$OfMethodTypeDesc"]
+  },
+  {
     "interfaces":["net.bytebuddy.utility.JavaModule$Module"]
   },
   {
     "interfaces":["net.bytebuddy.utility.JavaModule$Resolver"]
+  },
+  {
+    "interfaces":["org.gradle.api.internal.tasks.testing.TestClassProcessor"]
+  },
+  {
+    "interfaces":["org.gradle.api.internal.tasks.testing.TestResultProcessor","org.gradle.internal.concurrent.ThreadSafe"]
+  },
+  {
+    "interfaces":["org.gradle.internal.logging.events.OutputEventListener"]
+  },
+  {
+    "interfaces":["org.gradle.process.internal.worker.child.WorkerLoggingProtocol","org.gradle.internal.concurrent.ThreadSafe"]
   },
   {
     "interfaces":["org.hibernate.Session","org.springframework.orm.jpa.EntityManagerProxy"]

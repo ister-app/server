@@ -3,6 +3,7 @@ package app.ister.server.eventHandlers;
 import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.entitiy.MediaFileStreamEntity;
 import app.ister.server.entitiy.ServerEventEntity;
+import app.ister.server.enums.EventType;
 import app.ister.server.enums.StreamCodecType;
 import app.ister.server.eventHandlers.subtitleFileFound.SubtitleFilePathParser;
 import app.ister.server.repository.MediaFileStreamRepository;
@@ -20,6 +21,11 @@ public class HandleSubtitleFileFound implements Handle {
     private ScannerHelperService scannerHelperService;
     @Autowired
     private MediaFileStreamRepository mediaFileStreamRepository;
+
+    @Override
+    public EventType handles() {
+        return EventType.SUBTITLE_FILE_FOUND;
+    }
 
     @Override
     public Boolean handle(ServerEventEntity serverEventEntity) {

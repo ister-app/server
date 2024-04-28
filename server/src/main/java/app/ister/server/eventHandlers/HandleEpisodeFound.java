@@ -5,6 +5,7 @@ import app.ister.server.entitiy.NodeEntity;
 import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.entitiy.ShowEntity;
 import app.ister.server.enums.DirectoryType;
+import app.ister.server.enums.EventType;
 import app.ister.server.enums.ImageType;
 import app.ister.server.eventHandlers.TMDBMetadata.EpisodeMetadata;
 import app.ister.server.eventHandlers.TMDBMetadata.ImageDownload;
@@ -17,6 +18,7 @@ import app.ister.server.service.NodeService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import info.movito.themoviedbapi.model.core.responses.TmdbResponseException;
 import info.movito.themoviedbapi.tools.TmdbException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,6 +57,11 @@ public class HandleEpisodeFound implements Handle {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
+    public EventType handles() {
+        return EventType.EPISODE_FOUND;
+    }
+
+    @Override
     public Boolean handle(ServerEventEntity serverEventEntity) {
         // If no tmdb api key is set. Skip this event.
         if (apikey.equals("'No api key available'")) {
@@ -80,6 +87,8 @@ public class HandleEpisodeFound implements Handle {
         } catch (JsonProcessingException jpe) {
             log.error("Cannot convert JSON into ShowFoundData", jpe);
             return false;
+        } catch (TmdbResponseException e) {
+            log.error("Cannot get TMDB data response", e);
         } catch (TmdbException e) {
             log.error("Cannot get TMDB data", e);
             return false;

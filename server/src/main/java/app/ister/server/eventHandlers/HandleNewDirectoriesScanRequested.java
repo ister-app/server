@@ -3,6 +3,7 @@ package app.ister.server.eventHandlers;
 import app.ister.server.entitiy.NodeEntity;
 import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.enums.DirectoryType;
+import app.ister.server.enums.EventType;
 import app.ister.server.repository.DirectoryRepository;
 import app.ister.server.scanner.LibraryScanner;
 import app.ister.server.service.NodeService;
@@ -19,6 +20,11 @@ public class HandleNewDirectoriesScanRequested implements Handle {
     private DirectoryRepository directoryRepository;
     @Autowired
     private LibraryScanner libraryScanner;
+
+    @Override
+    public EventType handles() {
+        return EventType.NEW_DIRECTORIES_SCAN_REQUEST;
+    }
 
     @Override
     public Boolean handle(ServerEventEntity serverEventEntity) {

@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,6 +50,11 @@ class HandleMediaFileFoundTest {
     private MediaFileFoundGetDuration mediaFileFoundGetDurationMock;
 
     private HandleMediaFileFound subject;
+
+    @Test
+    void handles() {
+        assertEquals(EventType.MEDIA_FILE_FOUND, subject.handles());
+    }
 
     @BeforeEach
     void setup() {
