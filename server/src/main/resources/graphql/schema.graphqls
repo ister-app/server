@@ -7,9 +7,9 @@ type Query {
 }
 
 type Mutation {
-    createPlayQueue(showId: ID!): PlayQueue
+    createPlayQueue(showId: ID!, episodeId: ID!): PlayQueue
     updatePlayQueue(id: ID!, progressInMilliseconds: Int!, playQueueItemId: ID!): Boolean
-    startTranscoding(mediaFileId: ID!, startTimeInSeconds: Int!, audioId: ID, subtitleId: ID): ID!
+    startTranscoding(playQueueId: ID!, mediaFileId: ID!, startTimeInSeconds: Int!, audioId: ID, subtitleId: ID): ID!
     readyTranscoding(id: ID!): Boolean!
     stopTranscoding(id: ID!): Boolean!
 }
