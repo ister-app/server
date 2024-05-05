@@ -1,10 +1,10 @@
 package app.ister.server;
 
 import app.ister.server.entitiy.MediaFileStreamEntity;
+import app.ister.server.entitiy.TranscodeSessionEntity;
 import app.ister.server.enums.StreamCodecType;
 import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
-import com.github.kokorin.jaffree.ffmpeg.FFmpegProgress;
 import com.github.kokorin.jaffree.ffmpeg.FFmpegResultFuture;
 import com.github.kokorin.jaffree.ffmpeg.ProgressListener;
 import com.github.kokorin.jaffree.ffmpeg.UrlInput;
@@ -24,10 +24,12 @@ public class Transcoder {
 
     private String toDir;
 
-    private final String dirOfFFmpeg;
+    private final FFmpeg ffmpeg;
 
-    public Transcoder(String dirOfFFmpeg) {
-        this.dirOfFFmpeg = dirOfFFmpeg;
+    private TranscodeSessionEntity transcodeSessionEntity;
+
+    public Transcoder(FFmpeg ffmpeg) {
+        this.ffmpeg = ffmpeg;
     }
 
 
@@ -69,8 +71,9 @@ public class Transcoder {
 
     }
 
-    public void start(String filePath, String toDir, int startTimeInSeconds, int audioIndex, Optional<MediaFileStreamEntity> subtitleMediaFileStream, ProgressListener progressListener) {
+    public void start(String filePath, String toDir, int startTimeInSeconds, int audioIndex, Optional<MediaFileStreamEntity> subtitleMediaFileStream, ProgressListener progressListener, TranscodeSessionEntity transcodeSession) {
         this.toDir = toDir;
+        this.transcodeSessionEntity = transcodeSession;
 
         UrlOutput outputWithArguments = UrlOutput.toPath(Path.of(toDir).resolve("index.m3u8"))
                 .setFormat("hls")
@@ -88,11 +91,6 @@ public class Transcoder {
                 .addArguments("-hls_segment_type", "mpegts")
                 .addArguments("-hls_playlist_type", "event");
 
-        //for i in *.mkv; do ./ffmpeg -i "$i" -preset ultrafast -map 0:v -map 0:1 -c:v:0 libx264 -c:a aac -ar 48000 -b:a 128k -ac 2 "${i%.*}.ts"; done
-//        /usr/bin/ffmpeg -loglevel level+error -ss 0 -i "/mnt2/The Big Bang Theory (2007)/Season 07/s07e09.mkv" -y -f hls -preset ultrafast -map 0:v -map 0:1 -c:v:0 libx264 -c:a aac -ar 48000 -b:a 128k -ac 2 -hls_time 6 -copyts -hls_segment_type mpegts -hls_playlist_type event /tmp/6ca0b778-7bf3-4bf1-a873-b2aa36cadeec/index.m3u8
-// yt-dlp --hls-prefer-native "" --write-subs
-        // ./ffmpeg -y -ss 60 -i s07e01.mkv -preset ultrafast -copyts -map 0:v -map 0:1 -c:v:0 libx264 -c:a aac -ar 48000 -b:a 128k -ac 2 -vsync passthrough -avoid_negative_ts make_non_negative -max_muxing_queue_size 2048 -f hls -start_number 10 -movflags frag_custom+dash+delay_moov+frag_discont -hls_flags temp_file -max_delay 5000000 -hls_time 6 -force_key_frames "expr:gte(t,n_forced*6)" -hls_segment_type mpegts -hls_playlist_type event -hls_segment_filename ./test/%d.m4s ./test/playlist.m3u8
-
         if (subtitleMediaFileStream.isPresent()) {
             String[] subtileArguments = getSubtitleArgument(subtitleMediaFileStream.get(), startTimeInSeconds);
             outputWithArguments
@@ -100,7 +98,7 @@ public class Transcoder {
         }
 
 
-        async = FFmpeg.atPath(Path.of(dirOfFFmpeg))
+        async = ffmpeg
                 .addInput(
                         UrlInput.fromUrl(filePath)
                                 .addArguments("-ss", String.valueOf(startTimeInSeconds))
@@ -112,7 +110,6 @@ public class Transcoder {
                 .setLogLevel(LogLevel.ERROR)
                 .setProgressListener(progressListener)
                 .executeAsync();
-        ProcessHandle.current().children().forEach(System.out::println);
     }
 
     private String[] getSubtitleArgument(MediaFileStreamEntity subtitleMediaFileStream, int startTimeInSeconds) {
@@ -125,7 +122,7 @@ public class Transcoder {
                 result[0] = "-vf";
                 result[1] = "subtitles=" + pathStringEscapeSpecialChars(subtitleMediaFileStream.getPath());
             } else {
-                FFmpeg.atPath(Path.of(dirOfFFmpeg))
+                ffmpeg
                         .addInput(
                                 UrlInput.fromUrl(subtitleMediaFileStream.getPath())
                         )
@@ -145,5 +142,39 @@ public class Transcoder {
 
     private String pathStringEscapeSpecialChars(String path) {
         return path.replaceAll("'", "\\\\\\\\\\\\\'");
+    }
+
+    public void pauseTranscodeProcess() {
+        getProcess().ifPresent(pid -> {
+            try {
+                new ProcessBuilder("/usr/bin/kill", "-19", Long.toString(pid)).start();
+                transcodeSessionEntity.getPaused().set(true);
+                log.debug("Pausing transcoding for transcodeSessionEntity: {}", transcodeSessionEntity.getId());
+            } catch (IOException e) {
+                log.error("Failed pausing transcodeSessionEntity: {}, pid: {}", transcodeSessionEntity.getId(), pid, e);
+            }
+        });
+    }
+
+    public void continueTranscodeProcess() {
+        getProcess().ifPresent(pid -> {
+            try {
+                new ProcessBuilder("/usr/bin/kill", "-18", Long.toString(pid)).start();
+                transcodeSessionEntity.getPaused().set(false);
+                log.debug("Resuming transcoding for transcodeSessionEntity: {}", transcodeSessionEntity.getId());
+            } catch (IOException e) {
+                log.error("Failed continuing transcodeSessionEntity: {}, pid: {}", transcodeSessionEntity.getId(), pid, e);
+            }
+        });
+    }
+
+    private Optional<Long> getProcess() {
+        for(ProcessHandle processHandle: ProcessHandle.current().children().toList()) {
+            if (processHandle.info().commandLine().orElse("").contains(transcodeSessionEntity.getDir())) {
+                log.debug("Process found for transcodeSessionEntity: {}, pid: {}", transcodeSessionEntity.getId(), processHandle.pid());
+                return Optional.of(processHandle.pid());
+            }
+        }
+        return Optional.empty();
     }
 }

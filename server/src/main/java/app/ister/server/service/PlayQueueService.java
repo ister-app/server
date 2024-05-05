@@ -55,9 +55,7 @@ public class PlayQueueService {
     public Boolean updatePlayQueue(UUID id, long progressInMilliseconds, UUID playQueueItemId, Authentication authentication) {
         log.debug("Updating play queue for user: {}", authentication.getName());
         // Update the current playing episode
-        playQueueRepository.findById(id).ifPresent(playQueueEntity -> {
-            updatePlayQueueItemWithProgress(progressInMilliseconds, playQueueItemId, authentication, playQueueEntity);
-        });
+        playQueueRepository.findById(id).ifPresent(playQueueEntity -> updatePlayQueueItemWithProgress(progressInMilliseconds, playQueueItemId, authentication, playQueueEntity));
         return true;
     }
 
