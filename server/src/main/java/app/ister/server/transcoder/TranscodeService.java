@@ -65,9 +65,7 @@ public class TranscodeService {
     @PreDestroy
     public void clearMovieCache() {
         log.debug("Shutting down transcode sessions");
-        transcodeSessionEntities.forEach(transcodeSession -> {
-            stopTranscoding(transcodeSession.getId());
-        });
+        transcodeSessionEntities.forEach(transcodeSession -> stopTranscoding(transcodeSession.getId()));
     }
 
     /**
