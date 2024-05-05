@@ -1,6 +1,6 @@
-package app.ister.server.entitiy;
+package app.ister.server.transcoder;
 
-import app.ister.server.Transcoder;
+import app.ister.server.entitiy.MediaFileEntity;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Getter
 @Builder
-public class TranscodeSessionEntity {
+public class TranscodeSessionData {
     private UUID id;
     private UUID playQueueId;
     private String dir;

@@ -1,16 +1,13 @@
-package app.ister.server.service;
+package app.ister.server.transcoder;
 
-import app.ister.server.Transcoder;
 import app.ister.server.entitiy.MediaFileEntity;
 import app.ister.server.entitiy.MediaFileStreamEntity;
-import app.ister.server.entitiy.TranscodeSessionEntity;
 import app.ister.server.enums.StreamCodecType;
 import app.ister.server.repository.MediaFileRepository;
 import app.ister.server.repository.MediaFileStreamRepository;
 import app.ister.server.repository.PlayQueueRepository;
-import app.ister.server.transcoder.ProcessHelper;
-import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.ProgressListener;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,7 +40,7 @@ public class TranscodeService {
     @Value("${app.ister.server.ffmpeg-dir}")
     private String dirOfFFmpeg;
 
-    private final ArrayList<TranscodeSessionEntity> transcodeSessionEntities = new ArrayList<>();
+    private final ArrayList<TranscodeSessionData> transcodeSessionEntities = new ArrayList<>();
 
     /**
      * Every 5 seconds check all the transcode sessions.
@@ -54,15 +51,23 @@ public class TranscodeService {
     @Scheduled(cron = "*/5 * * * * *")
     @Transactional
     public void checkTranscodeSessions() {
-        transcodeSessionEntities.forEach(transcodeSessionEntity -> playQueueRepository.findById(transcodeSessionEntity.getPlayQueueId()).ifPresent(playQueue -> {
-            long progressOfTranscodingInSeconds = (transcodeSessionEntity.getProgressTimeInMilliseconds().get() / 1000) + transcodeSessionEntity.getStartTimeInSeconds() - (playQueue.getProgressInMilliseconds() / 1000);
-            log.debug("Check transcode sessions: {}, item: {}, progress: {}, stopped: {}, paused: {}", transcodeSessionEntity.getId(), playQueue.getCurrentItem(), progressOfTranscodingInSeconds, transcodeSessionEntity.getStopped().get(), transcodeSessionEntity.getPaused().get());
-            if (!transcodeSessionEntity.getStopped().get() && !transcodeSessionEntity.getPaused().get() && playQueue.getProgressInMilliseconds() != 0 && progressOfTranscodingInSeconds > 120) {
-                ProcessHelper.pauseTranscodeProcess(transcodeSessionEntity);
-            } else if(!transcodeSessionEntity.getStopped().get() && transcodeSessionEntity.getPaused().get() && progressOfTranscodingInSeconds < 60) {
-                ProcessHelper.continueTranscodeProcess(transcodeSessionEntity);
+        transcodeSessionEntities.forEach(transcodeSessionData -> playQueueRepository.findById(transcodeSessionData.getPlayQueueId()).ifPresent(playQueue -> {
+            long progressOfTranscodingInSeconds = (transcodeSessionData.getProgressTimeInMilliseconds().get() / 1000) + transcodeSessionData.getStartTimeInSeconds() - (playQueue.getProgressInMilliseconds() / 1000);
+            log.debug("Check transcode sessions: {}, item: {}, progress: {}, stopped: {}, paused: {}", transcodeSessionData.getId(), playQueue.getCurrentItem(), progressOfTranscodingInSeconds, transcodeSessionData.getStopped().get(), transcodeSessionData.getPaused().get());
+            if (!transcodeSessionData.getStopped().get() && !transcodeSessionData.getPaused().get() && playQueue.getProgressInMilliseconds() != 0 && progressOfTranscodingInSeconds > 120) {
+                ProcessUtils.pauseTranscodeProcess(transcodeSessionData);
+            } else if(!transcodeSessionData.getStopped().get() && transcodeSessionData.getPaused().get() && progressOfTranscodingInSeconds < 60) {
+                ProcessUtils.continueTranscodeProcess(transcodeSessionData);
             }
         }));
+    }
+
+    @PreDestroy
+    public void clearMovieCache() {
+        log.debug("Shutting down transcode sessions");
+        transcodeSessionEntities.forEach(transcodeSession -> {
+            stopTranscoding(transcodeSession.getId());
+        });
     }
 
     /**
@@ -82,12 +87,12 @@ public class TranscodeService {
      * Stop a transcode session.
      */
     public boolean stopTranscoding(UUID id) {
-        log.debug("Stopping: {}", id);
-        TranscodeSessionEntity transcodeSessionEntity = getSesion(id).orElseThrow();
-        transcodeSessionEntity.getStopped().set(true);
-        ProcessHelper.continueTranscodeProcess(transcodeSessionEntity);
-        transcodeSessionEntity.getTranscoder().stop();
-        transcodeSessionEntities.remove(transcodeSessionEntity);
+        log.debug("Shutting down transcode sessions: {}", id);
+        TranscodeSessionData transcodeSessionData = getSesion(id).orElseThrow();
+        transcodeSessionData.getStopped().set(true);
+        ProcessUtils.continueTranscodeProcess(transcodeSessionData);
+        transcodeSessionData.getTranscoder().stop();
+        transcodeSessionEntities.remove(transcodeSessionData);
         return true;
     }
 
@@ -117,13 +122,13 @@ public class TranscodeService {
                 audioIndex = firstAudioStream.get().getStreamIndex();
             }
         }
-        TranscodeSessionEntity transcodeSession = createSession(playQueueId, mediaFile, startTimeInSeconds);
+        TranscodeSessionData transcodeSession = createSession(playQueueId, mediaFile, startTimeInSeconds);
         log.debug("Starting: {} for mediafile: {}", transcodeSession.getId(), mediaFileId);
         transcodeSession.getTranscoder().start(mediaFile.getPath(), transcodeSession.getDir(), startTimeInSeconds, audioIndex, subtitleMediaFileStream, onProgress(transcodeSession));
         return transcodeSession.getId();
     }
 
-    private ProgressListener onProgress(TranscodeSessionEntity transcodeSession) {
+    private ProgressListener onProgress(TranscodeSessionData transcodeSession) {
         return progress -> {
             log.debug("Transcoding mediafile: {}, time: {}", transcodeSession.getDir(), progress.getTime(TimeUnit.SECONDS));
             if (progress.getTime(TimeUnit.MILLISECONDS) != null) {
@@ -132,9 +137,9 @@ public class TranscodeService {
         };
     }
 
-    private TranscodeSessionEntity createSession(UUID playQueueId, MediaFileEntity mediaFile, int startTimeInSeconds) throws IOException {
+    private TranscodeSessionData createSession(UUID playQueueId, MediaFileEntity mediaFile, int startTimeInSeconds) throws IOException {
         UUID id = UUID.randomUUID();
-        TranscodeSessionEntity transcodeSessionEntity = TranscodeSessionEntity.builder()
+        TranscodeSessionData transcodeSessionData = TranscodeSessionData.builder()
                 .transcoder(new Transcoder(dirOfFFmpeg))
                 .playQueueId(playQueueId)
                 .mediaFile(mediaFile)
@@ -145,13 +150,13 @@ public class TranscodeService {
                 .stopped(new AtomicBoolean(false))
                 .paused(new AtomicBoolean(false))
                 .dir(tmpDir + id + "/").build();
-        Files.createDirectories(Paths.get(tmpDir + transcodeSessionEntity.getId()));
-        transcodeSessionEntities.add(transcodeSessionEntity);
-        return transcodeSessionEntity;
+        Files.createDirectories(Paths.get(tmpDir + transcodeSessionData.getId()));
+        transcodeSessionEntities.add(transcodeSessionData);
+        return transcodeSessionData;
     }
 
-    private Optional<TranscodeSessionEntity> getSesion(UUID id) {
-        return transcodeSessionEntities.stream().filter(transcodeSessionEntity -> transcodeSessionEntity.getId().equals(id)).findFirst();
+    private Optional<TranscodeSessionData> getSesion(UUID id) {
+        return transcodeSessionEntities.stream().filter(transcodeSessionData -> transcodeSessionData.getId().equals(id)).findFirst();
     }
 
 }

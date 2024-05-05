@@ -10,7 +10,12 @@ import com.github.kokorin.jaffree.ffmpeg.UrlOutput;
 import java.nio.file.Path;
 import java.util.Optional;
 
-public class UrlOutputCreator {
+public class UrlOutputUtils {
+
+    private UrlOutputUtils() {
+        throw new IllegalStateException("Utility class");
+    }
+
     public static UrlOutput getUrlOutput(String toDir, int startTimeInSeconds, int audioIndex, Optional<MediaFileStreamEntity> subtitleMediaFileStream, String dirOfFFmpeg) {
         UrlOutput outputWithArguments = UrlOutput.toPath(Path.of(toDir).resolve("index.m3u8"))
                 .setFormat("hls")
@@ -65,6 +70,6 @@ public class UrlOutputCreator {
     }
 
     private static String pathStringEscapeSpecialChars(String path) {
-        return path.replaceAll("'", "\\\\\\\\\\\\\'");
+        return path.replace("'", "\\\\\\\\\\\\\'");
     }
 }

@@ -1,15 +1,12 @@
-package app.ister.server;
+package app.ister.server.transcoder;
 
 import app.ister.server.entitiy.MediaFileStreamEntity;
-import app.ister.server.entitiy.TranscodeSessionEntity;
-import app.ister.server.transcoder.UrlOutputCreator;
 import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.FFmpegResultFuture;
 import com.github.kokorin.jaffree.ffmpeg.ProgressListener;
 import com.github.kokorin.jaffree.ffmpeg.UrlInput;
 import com.github.kokorin.jaffree.ffmpeg.UrlOutput;
-import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -24,17 +21,10 @@ public class Transcoder {
 
     private String toDir;
 
-    private String dirOfFFmpeg;
+    private final String dirOfFFmpeg;
 
     public Transcoder(String dirOfFFmpeg) {
         this.dirOfFFmpeg = dirOfFFmpeg;
-    }
-
-
-    @PreDestroy
-    public void clearMovieCache() {
-        stop();
-        System.out.println("shutting down!!!");
     }
 
     public void stop() {
@@ -72,7 +62,7 @@ public class Transcoder {
     public void start(String filePath, String toDir, int startTimeInSeconds, int audioIndex, Optional<MediaFileStreamEntity> subtitleMediaFileStream, ProgressListener progressListener) {
         this.toDir = toDir;
 
-        UrlOutput outputWithArguments = UrlOutputCreator.getUrlOutput(toDir, startTimeInSeconds, audioIndex, subtitleMediaFileStream, dirOfFFmpeg);
+        UrlOutput outputWithArguments = UrlOutputUtils.getUrlOutput(toDir, startTimeInSeconds, audioIndex, subtitleMediaFileStream, dirOfFFmpeg);
 
         async = FFmpeg.atPath(Path.of(dirOfFFmpeg))
                 .addInput(

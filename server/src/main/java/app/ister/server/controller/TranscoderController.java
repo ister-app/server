@@ -1,8 +1,7 @@
 package app.ister.server.controller;
 
-import app.ister.server.service.TranscodeService;
+import app.ister.server.transcoder.TranscodeService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,8 +14,11 @@ import java.util.UUID;
 @Slf4j
 @Controller
 public class TranscoderController {
-    @Autowired
-    private TranscodeService transcodeService;
+    private final TranscodeService transcodeService;
+
+    public TranscoderController(TranscodeService transcodeService) {
+        this.transcodeService = transcodeService;
+    }
 
     @PreAuthorize("hasRole('user')")
     @MutationMapping
