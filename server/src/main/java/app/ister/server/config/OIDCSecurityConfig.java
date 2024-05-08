@@ -30,6 +30,7 @@ public class OIDCSecurityConfig {
                         .requestMatchers("/graphiql/**").permitAll()
                         .requestMatchers("/graphiql").permitAll()
                         .requestMatchers("/graphql").permitAll()
+                        .requestMatchers("/actuator/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
