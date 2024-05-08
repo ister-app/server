@@ -28,6 +28,7 @@ public class PlayQueueEntity extends BaseEntity {
     private UserEntity userEntity;
 
     private UUID currentItem;
+    private long progressInMilliseconds;
 
     @Convert(converter = ItemsConverter.class)
     @Column(nullable = false, columnDefinition = "text")

@@ -1,75 +1,22 @@
-package app.ister.server;
+package app.ister.server.transcoder;
 
 import app.ister.server.entitiy.MediaFileStreamEntity;
 import app.ister.server.enums.StreamCodecType;
 import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
-import com.github.kokorin.jaffree.ffmpeg.FFmpegResultFuture;
 import com.github.kokorin.jaffree.ffmpeg.UrlInput;
 import com.github.kokorin.jaffree.ffmpeg.UrlOutput;
-import jakarta.annotation.PreDestroy;
-import lombok.extern.slf4j.Slf4j;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
-@Slf4j
-public class Transcoder {
-    private FFmpegResultFuture async;
+public class UrlOutputUtils {
 
-    private String toDir;
-
-    private String dirOfFFmpeg;
-
-    public Transcoder(String dirOfFFmpeg) {
-        this.dirOfFFmpeg = dirOfFFmpeg;
+    private UrlOutputUtils() {
+        throw new IllegalStateException("Utility class");
     }
 
-
-    @PreDestroy
-    public void clearMovieCache() {
-        stop();
-        System.out.println("shutting down!!!");
-    }
-
-    public void stop() {
-        if (async != null) {
-            async.graceStop();
-            async = null;
-            try {
-                TimeUnit.SECONDS.sleep(5);
-            } catch (InterruptedException e) {
-                log.error("Error during deleting files: ", e);
-            }
-        }
-        try {
-            Files.list(Path.of(toDir)).forEach(path -> {
-                if (path.toString().endsWith("vtt") || path.toString().endsWith("ts") || path.toString().endsWith("m3u8") || path.toString().endsWith("srt") ) {
-                    log.debug("Deleting: " + path);
-                    try {
-                        Files.deleteIfExists(path);
-                    } catch (IOException e) {
-                        log.error("Error during deleting files: ", e);
-                    }
-                }
-            });
-            Files.deleteIfExists(Path.of(toDir));
-        } catch (IOException e) {
-            log.error("Error during deleting files: ", e);
-        }
-    }
-
-    public boolean ready() {
-        return Files.exists(Path.of(toDir + "index.m3u8"));
-
-    }
-
-    public void start(String filePath, String toDir, int startTimeInSeconds, int audioIndex, Optional<MediaFileStreamEntity> subtitleMediaFileStream) {
-        this.toDir = toDir;
-
+    public static UrlOutput getUrlOutput(String toDir, int startTimeInSeconds, int audioIndex, Optional<MediaFileStreamEntity> subtitleMediaFileStream, String dirOfFFmpeg) {
         UrlOutput outputWithArguments = UrlOutput.toPath(Path.of(toDir).resolve("index.m3u8"))
                 .setFormat("hls")
                 .addArguments("-preset", "ultrafast")
@@ -82,30 +29,19 @@ public class Transcoder {
                 .addArguments("-ac", "2")
                 .addArguments("-hls_time", "6")
                 .addArgument("-copyts")
+                .addArguments("-hls_flags", "temp_file")
                 .addArguments("-hls_segment_type", "mpegts")
                 .addArguments("-hls_playlist_type", "event");
 
         if (subtitleMediaFileStream.isPresent()) {
-            String[] subtileArguments = getSubtitleArgument(subtitleMediaFileStream.get(), startTimeInSeconds);
+            String[] subtileArguments = getSubtitleArgument(toDir, subtitleMediaFileStream.get(), startTimeInSeconds, dirOfFFmpeg);
             outputWithArguments
                     .addArguments(subtileArguments[0], subtileArguments[1]);
         }
-
-
-        async = FFmpeg.atPath(Path.of(dirOfFFmpeg))
-                .addInput(
-                        UrlInput.fromUrl(filePath)
-                                .addArguments("-ss", String.valueOf(startTimeInSeconds))
-                )
-                .addOutput(
-                        outputWithArguments
-                )
-                .setOverwriteOutput(true)
-                .setLogLevel(LogLevel.ERROR)
-                .executeAsync();
+        return outputWithArguments;
     }
 
-    private String[] getSubtitleArgument(MediaFileStreamEntity subtitleMediaFileStream, int startTimeInSeconds) {
+    private static String[] getSubtitleArgument(String toDir, MediaFileStreamEntity subtitleMediaFileStream, int startTimeInSeconds, String dirOfFFmpeg) {
         String[] result = new String[2];
         if (subtitleMediaFileStream.getCodecType().equals(StreamCodecType.SUBTITLE)) {
             result[0] = "-filter_complex";
@@ -133,7 +69,7 @@ public class Transcoder {
         return result;
     }
 
-    private String pathStringEscapeSpecialChars(String path) {
-        return path.replaceAll("'", "\\\\\\\\\\\\\'");
+    private static String pathStringEscapeSpecialChars(String path) {
+        return path.replace("'", "\\\\\\\\\\\\\'");
     }
 }
