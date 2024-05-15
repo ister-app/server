@@ -93,19 +93,21 @@ public class HandleMediaFileFound implements Handle {
      * Create background image for media file and save a reference to it in the database.
      */
     private void createBackgroundImage(EpisodeEntity episode, String mediaFilePath, Long durationInMilliseconds) {
-        NodeEntity nodeEntity = nodeService.getOrCreateNodeEntityForThisNode();
-        DirectoryEntity cacheDisk = directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity).stream().findFirst().orElseThrow();
-        String toPath = cacheDisk.getPath() + episode.getId() + ".jpg";
-        mediaFileFoundCreateBackground.createBackground(Path.of(toPath), Path.of(mediaFilePath), dirOfFFmpeg, durationInMilliseconds / 2);
+        if (episode.getImagesEntities().size() == 0) {
+            NodeEntity nodeEntity = nodeService.getOrCreateNodeEntityForThisNode();
+            DirectoryEntity cacheDisk = directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity).stream().findFirst().orElseThrow();
+            String toPath = cacheDisk.getPath() + episode.getId() + ".jpg";
+            mediaFileFoundCreateBackground.createBackground(Path.of(toPath), Path.of(mediaFilePath), dirOfFFmpeg, durationInMilliseconds / 2);
 
-        ImageEntity imageEntity = ImageEntity.builder()
-                .directoryEntity(cacheDisk)
-                .path(toPath)
-                .sourceUri("file://" + mediaFilePath)
-                .type(ImageType.BACKGROUND)
-                .episodeEntity(episode)
-                .build();
+            ImageEntity imageEntity = ImageEntity.builder()
+                    .directoryEntity(cacheDisk)
+                    .path(toPath)
+                    .sourceUri("file://" + mediaFilePath)
+                    .type(ImageType.BACKGROUND)
+                    .episodeEntity(episode)
+                    .build();
 
-        imageRepository.save(imageEntity);
+            imageRepository.save(imageEntity);
+        }
     }
 }

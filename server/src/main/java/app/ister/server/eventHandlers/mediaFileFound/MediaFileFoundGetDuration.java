@@ -1,5 +1,6 @@
 package app.ister.server.eventHandlers.mediaFileFound;
 
+import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.NullOutput;
 import com.github.kokorin.jaffree.ffmpeg.UrlInput;
@@ -41,7 +42,9 @@ public class MediaFileFoundGetDuration {
     }
 
     private long getDurationFromStream(String path) {
-        FFprobeResult result = ffprobe.setShowStreams(true).setInput(path).execute();
+        FFprobeResult result = ffprobe.setShowStreams(true)
+                .setLogLevel(LogLevel.ERROR)
+                .setInput(path).execute();
         List<Long> longList = new ArrayList<>();
         result.getStreams().forEach(stream -> {
             if (stream.getDuration() != null) {

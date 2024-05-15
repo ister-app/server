@@ -3,7 +3,6 @@ package app.ister.server.entitiy;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
@@ -29,16 +28,16 @@ public class EpisodeEntity extends BaseEntity {
     @ManyToOne(optional = false)
     private SeasonEntity seasonEntity;
 
-    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "episodeEntity")
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "episodeEntity")
     private List<MediaFileEntity> mediaFileEntities;
 
-    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "episodeEntity")
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "episodeEntity")
     private List<ImageEntity> imagesEntities;
 
-    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "episodeEntity")
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "episodeEntity")
     private List<MetadataEntity> metadataEntities;
 
-    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "episodeEntity")
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "episodeEntity")
     @OrderBy("dateUpdated DESC")
     private List<WatchStatusEntity> watchStatusEntities;
 

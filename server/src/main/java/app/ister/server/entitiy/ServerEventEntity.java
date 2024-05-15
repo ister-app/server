@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.ManyToOne;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -21,7 +22,8 @@ public class ServerEventEntity extends BaseEntity {
     private EventType eventType;
 
     @Column(nullable = false, columnDefinition = "boolean default false")
-    private Boolean failed;
+    @Builder.Default
+    private Boolean failed = false;
 
     @ManyToOne
     private DirectoryEntity directoryEntity;

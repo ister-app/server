@@ -1,5 +1,6 @@
 package app.ister.server;
 
+import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.enums.EventType;
 import app.ister.server.eventHandlers.Handle;
 import app.ister.server.repository.ServerEventRepository;
@@ -34,22 +35,24 @@ public class EventHandler {
     public void handleEvents() {
         if (!handling) {
             handling = true;
-            serverEventRepository.findAllByFailedIsFalse(Pageable.ofSize(300)).forEach(serverEventEntity -> {
-                Handle handle = handles.get(serverEventEntity.getEventType());
-                if (handle != null) {
-                    log.debug("Handling event: {}, for type: {}", serverEventEntity.getPath(), serverEventEntity.getEventType());
-                    Boolean successful = handle.handle(serverEventEntity);
-                    if (successful) {
-                        serverEventRepository.delete(serverEventEntity);
-                    } else {
-                        serverEventEntity.setFailed(true);
-                        serverEventRepository.save(serverEventEntity);
-                    }
-                } else {
-                    log.debug("No handler found for event: {}, for type: {}", serverEventEntity.getPath(), serverEventEntity.getEventType());
-                }
-            });
+            serverEventRepository.findAllByFailedIsFalse(Pageable.ofSize(300)).forEach(this::handleEvent);
             handling = false;
+        }
+    }
+
+    private void handleEvent(ServerEventEntity serverEventEntity) {
+        Handle handle = handles.get(serverEventEntity.getEventType());
+        if (handle != null) {
+            log.debug("Handling event: {}, for type: {}", serverEventEntity.getPath(), serverEventEntity.getEventType());
+            Boolean successful = handle.handle(serverEventEntity);
+            if (successful) {
+                serverEventRepository.delete(serverEventEntity);
+            } else {
+                serverEventEntity.setFailed(true);
+                serverEventRepository.save(serverEventEntity);
+            }
+        } else {
+            log.debug("No handler found for event: {}, for type: {}", serverEventEntity.getPath(), serverEventEntity.getEventType());
         }
     }
 }
