@@ -111,6 +111,9 @@
     "interfaces":["net.bytebuddy.description.type.TypeDescription$Generic$AnnotationReader$ForTypeVariableBoundType$OfFormalTypeVariable$FormalTypeVariable"]
   },
   {
+    "interfaces":["net.bytebuddy.description.type.TypeDescription$Generic$AnnotationReader$ForWildcardLowerBoundType$AnnotatedWildcardType"]
+  },
+  {
     "interfaces":["net.bytebuddy.description.type.TypeDescription$Generic$AnnotationReader$ForWildcardUpperBoundType$AnnotatedWildcardType"]
   },
   {
@@ -207,13 +210,7 @@
     "interfaces":["org.springframework.web.bind.annotation.PathVariable"]
   },
   {
-    "interfaces":["org.springframework.web.bind.annotation.PostMapping"]
-  },
-  {
     "interfaces":["org.springframework.web.bind.annotation.RequestMapping"]
-  },
-  {
-    "interfaces":["org.springframework.web.bind.annotation.RequestParam"]
   },
   {
     "interfaces":["org.springframework.web.bind.annotation.RestController"]

@@ -1,19 +1,19 @@
 {
   "resources":{
   "includes":[{
-    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.10.3/favicon-16x16.png\\E"
+    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.13.0/favicon-16x16.png\\E"
   }, {
-    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.10.3/index.css\\E"
+    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.13.0/index.css\\E"
   }, {
-    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.10.3/index.html\\E"
+    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.13.0/index.html\\E"
   }, {
-    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.10.3/swagger-initializer.js\\E"
+    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.13.0/swagger-initializer.js\\E"
   }, {
-    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.10.3/swagger-ui-bundle.js\\E"
+    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.13.0/swagger-ui-bundle.js\\E"
   }, {
-    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.10.3/swagger-ui-standalone-preset.js\\E"
+    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.13.0/swagger-ui-standalone-preset.js\\E"
   }, {
-    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.10.3/swagger-ui.css\\E"
+    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.13.0/swagger-ui.css\\E"
   }, {
     "pattern":"\\QMETA-INF/services/ch.qos.logback.classic.spi.Configurator\\E"
   }, {
@@ -28,6 +28,8 @@
     "pattern":"\\QMETA-INF/services/java.nio.file.spi.FileSystemProvider\\E"
   }, {
     "pattern":"\\QMETA-INF/services/java.sql.Driver\\E"
+  }, {
+    "pattern":"\\QMETA-INF/services/org.hibernate.bytecode.spi.BytecodeProvider\\E"
   }, {
     "pattern":"\\QMETA-INF/services/org.junit.platform.engine.TestEngine\\E"
   }, {
@@ -78,8 +80,6 @@
     "pattern":"\\Qapp/ister/server/controller/EpisodeController.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/controller/FileController.class\\E"
-  }, {
-    "pattern":"\\Qapp/ister/server/controller/ImageController.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/controller/PlayQueueController.class\\E"
   }, {
@@ -239,10 +239,6 @@
   }, {
     "pattern":"\\Qapp/ister/server/scanner/scanners/Scanner.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/scanner/scanners/SeasonScanner.class\\E"
-  }, {
-    "pattern":"\\Qapp/ister/server/scanner/scanners/ShowScanner.class\\E"
-  }, {
     "pattern":"\\Qapp/ister/server/scanner/scanners/SubtitleScanner.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/service/NodeService.class\\E"
@@ -290,6 +286,8 @@
     "pattern":"\\Qgraphiql/index.html\\E"
   }, {
     "pattern":"\\Qgraphql/\\E"
+  }, {
+    "pattern":"\\Qgraphql/execution/instrumentation/Instrumentation.class\\E"
   }, {
     "pattern":"\\Qgraphql/execution/instrumentation/SimplePerformantInstrumentation.class\\E"
   }, {
@@ -339,11 +337,11 @@
   }, {
     "pattern":"\\Qio/micrometer/observation/annotation/Observed.class\\E"
   }, {
-    "pattern":"\\Qio/micrometer/prometheus/PrometheusConfig.class\\E"
+    "pattern":"\\Qio/micrometer/prometheusmetrics/PrometheusConfig.class\\E"
   }, {
-    "pattern":"\\Qio/micrometer/prometheus/PrometheusMeterRegistry.class\\E"
+    "pattern":"\\Qio/micrometer/prometheusmetrics/PrometheusMeterRegistry.class\\E"
   }, {
-    "pattern":"\\Qio/prometheus/client/CollectorRegistry.class\\E"
+    "pattern":"\\Qio/prometheus/metrics/model/registry/PrometheusRegistry.class\\E"
   }, {
     "pattern":"\\Qio/swagger/v3/core/converter/ModelConverter.class\\E"
   }, {
@@ -416,6 +414,30 @@
     "pattern":"\\Qorg/hibernate/SessionFactory.class\\E"
   }, {
     "pattern":"\\Qorg/hibernate/SharedSessionContract.class\\E"
+  }, {
+    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$AreFieldsDirty.class\\E"
+  }, {
+    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$AreFieldsDirtyWithoutCollections.class\\E"
+  }, {
+    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$ClearDirtyAttributes.class\\E"
+  }, {
+    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$ClearDirtyAttributesWithoutCollections.class\\E"
+  }, {
+    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$ClearOwner.class\\E"
+  }, {
+    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$GetCollectionTrackerWithoutCollections.class\\E"
+  }, {
+    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$GetDirtyAttributes.class\\E"
+  }, {
+    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$GetDirtyAttributesWithoutCollections.class\\E"
+  }, {
+    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$InitializeLazyAttributeLoadingInterceptor.class\\E"
+  }, {
+    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$SetOwner.class\\E"
+  }, {
+    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$SuspendDirtyTracking.class\\E"
+  }, {
+    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$TrackChange.class\\E"
   }, {
     "pattern":"\\Qorg/hibernate/hibernate-configuration-3.0.dtd\\E"
   }, {
@@ -500,6 +522,8 @@
     "pattern":"\\Qorg/springdoc/core/configuration/SpringDocSecurityConfiguration.class\\E"
   }, {
     "pattern":"\\Qorg/springdoc/core/configuration/SpringDocSortConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springdoc/core/configuration/SpringDocSpecPropertiesConfiguration.class\\E"
   }, {
     "pattern":"\\Qorg/springdoc/core/configuration/SpringDocUIConfiguration.class\\E"
   }, {
@@ -643,6 +667,8 @@
   }, {
     "pattern":"\\Qorg/springframework/aop/framework/Advised.class\\E"
   }, {
+    "pattern":"\\Qorg/springframework/aop/framework/AopInfrastructureBean.class\\E"
+  }, {
     "pattern":"\\Qorg/springframework/aot/hint/annotation/Reflective.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/beans/factory/Aware.class\\E"
@@ -656,12 +682,6 @@
     "pattern":"\\Qorg/springframework/beans/factory/InitializingBean.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/beans/factory/aot/BeanRegistrationAotProcessor.class\\E"
-  }, {
-    "pattern":"\\Qorg/springframework/beans/factory/aspectj/AbstractDependencyInjectionAspect.class\\E"
-  }, {
-    "pattern":"\\Qorg/springframework/beans/factory/aspectj/AbstractInterfaceDrivenDependencyInjectionAspect.class\\E"
-  }, {
-    "pattern":"\\Qorg/springframework/beans/factory/aspectj/AnnotationBeanConfigurerAspect.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/beans/factory/config/AbstractFactoryBean.class\\E"
   }, {
@@ -851,8 +871,6 @@
   }, {
     "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/metrics/export/ConditionalOnEnabledMetricsExport.class\\E"
   }, {
-    "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/metrics/export/prometheus/PrometheusMetricsExportAutoConfiguration$PrometheusPushGatewayConfiguration.class\\E"
-  }, {
     "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/metrics/export/prometheus/PrometheusMetricsExportAutoConfiguration$PrometheusScrapeEndpointConfiguration.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/metrics/export/prometheus/PrometheusMetricsExportAutoConfiguration.class\\E"
@@ -924,6 +942,8 @@
     "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/observation/web/servlet/WebMvcObservationAutoConfiguration$MeterFilterConfiguration.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/observation/web/servlet/WebMvcObservationAutoConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/sbom/SbomEndpointAutoConfiguration.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/scheduling/ScheduledTasksEndpointAutoConfiguration.class\\E"
   }, {
@@ -1368,6 +1388,16 @@
     "pattern":"\\Qorg/springframework/boot/autoconfigure/security/oauth2/resource/reactive/ReactiveOAuth2ResourceServerAutoConfiguration.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/boot/autoconfigure/security/oauth2/resource/servlet/OAuth2ResourceServerAutoConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/security/oauth2/resource/servlet/OAuth2ResourceServerJwtConfiguration$JwtConverterConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/security/oauth2/resource/servlet/OAuth2ResourceServerJwtConfiguration$JwtConverterPropertiesCondition$OnAuthoritiesClaimName.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/security/oauth2/resource/servlet/OAuth2ResourceServerJwtConfiguration$JwtConverterPropertiesCondition$OnAuthorityPrefix.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/security/oauth2/resource/servlet/OAuth2ResourceServerJwtConfiguration$JwtConverterPropertiesCondition$OnPrincipalClaimName.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/security/oauth2/resource/servlet/OAuth2ResourceServerJwtConfiguration$JwtConverterPropertiesCondition.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/boot/autoconfigure/security/oauth2/resource/servlet/OAuth2ResourceServerJwtConfiguration$JwtDecoderConfiguration.class\\E"
   }, {
@@ -1861,6 +1891,8 @@
   }, {
     "pattern":"\\Qorg/springframework/data/web/config/EnableSpringDataWebSupport$SpringDataWebConfigurationImportSelector.class\\E"
   }, {
+    "pattern":"\\Qorg/springframework/data/web/config/EnableSpringDataWebSupport$SpringDataWebSettingsRegistar.class\\E"
+  }, {
     "pattern":"\\Qorg/springframework/data/web/config/EnableSpringDataWebSupport.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/data/web/config/ProjectingArgumentResolverRegistrar$ProjectingArgumentResolverBeanPostProcessor.class\\E"
@@ -1875,11 +1907,19 @@
   }, {
     "pattern":"\\Qorg/springframework/data/web/config/SpringDataWebConfiguration.class\\E"
   }, {
+    "pattern":"\\Qorg/springframework/data/web/config/SpringDataWebSettings.class\\E"
+  }, {
     "pattern":"\\Qorg/springframework/format/support/DefaultFormattingConversionService.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/format/support/FormattingConversionService.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/graphql/data/method/annotation/support/AnnotatedControllerConfigurer.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/graphql/data/method/annotation/support/AnnotatedControllerDetectionSupport.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/graphql/data/method/annotation/support/AnnotatedControllerExceptionResolver.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/graphql/data/method/annotation/support/HandlerDataFetcherExceptionResolver.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/graphql/data/pagination/CursorStrategy.class\\E"
   }, {
@@ -1907,7 +1947,11 @@
   }, {
     "pattern":"\\Qorg/springframework/graphql/server/WebGraphQlHandler.class\\E"
   }, {
+    "pattern":"\\Qorg/springframework/graphql/server/webmvc/AbstractGraphQlHttpHandler.class\\E"
+  }, {
     "pattern":"\\Qorg/springframework/graphql/server/webmvc/GraphQlHttpHandler.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/graphql/server/webmvc/GraphQlSseHandler.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/http/client/ReactorResourceFactory.class\\E"
   }, {
@@ -1985,6 +2029,8 @@
   }, {
     "pattern":"\\Qorg/springframework/security/authorization/AuthorizationManager.class\\E"
   }, {
+    "pattern":"\\Qorg/springframework/security/authorization/method/AuthorizationAdvisorProxyFactory.class\\E"
+  }, {
     "pattern":"\\Qorg/springframework/security/config/annotation/AbstractConfiguredSecurityBuilder.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/security/config/annotation/AbstractSecurityBuilder.class\\E"
@@ -2015,13 +2061,15 @@
   }, {
     "pattern":"\\Qorg/springframework/security/config/annotation/configuration/ObjectPostProcessorConfiguration.class\\E"
   }, {
+    "pattern":"\\Qorg/springframework/security/config/annotation/method/configuration/AuthorizationProxyConfiguration.class\\E"
+  }, {
     "pattern":"\\Qorg/springframework/security/config/annotation/method/configuration/EnableMethodSecurity.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/security/config/annotation/method/configuration/MethodSecurityAdvisorRegistrar.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/security/config/annotation/method/configuration/MethodSecuritySelector.class\\E"
   }, {
-    "pattern":"\\Qorg/springframework/security/config/annotation/method/configuration/PrePostMethodSecurityConfiguration$DeferringMethodSecurityExpressionHandler.class\\E"
+    "pattern":"\\Qorg/springframework/security/config/annotation/method/configuration/PrePostMethodSecurityConfiguration$DeferringMethodInterceptor.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/security/config/annotation/method/configuration/PrePostMethodSecurityConfiguration.class\\E"
   }, {
@@ -2293,10 +2341,10 @@
   }]},
   "bundles":[{
     "name":"i18n.Parsing",
-    "locales":["", "und"]
+    "locales":["", "nl", "und"]
   }, {
     "name":"i18n.Validation",
-    "locales":["und"]
+    "locales":["", "nl", "und"]
   }, {
     "name":"jakarta.servlet.LocalStrings",
     "locales":["", "und"]
@@ -2400,10 +2448,10 @@
     "name":"org.apache.tomcat.websocket.server.LocalStrings",
     "locales":["", "und"]
   }, {
-    "name":"org.postgresql.translation.messages",
-    "classNames":["org.postgresql.translation.messages_nl"]
+    "name":"org.aspectj.weaver.weaver-messages",
+    "locales":["", "und"]
   }, {
     "name":"org.springframework.security.messages",
-    "locales":["", "nl"]
+    "locales":["nl", "und"]
   }]
 }
