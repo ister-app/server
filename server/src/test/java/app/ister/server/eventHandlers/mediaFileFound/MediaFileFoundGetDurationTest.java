@@ -1,5 +1,7 @@
 package app.ister.server.eventHandlers.mediaFileFound;
 
+import app.ister.server.utils.Jaffree;
+import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffprobe.FFprobe;
 import com.github.kokorin.jaffree.ffprobe.FFprobeResult;
@@ -31,17 +33,22 @@ class MediaFileFoundGetDurationTest {
     @Mock
     private Stream streamMock;
 
+    @Mock
+    private Jaffree jaffree;
+
     private MediaFileFoundGetDuration subject;
 
     @BeforeEach
     void setup() {
-        subject = new MediaFileFoundGetDuration(ffmpegMock, ffprobeMock);
+        subject = new MediaFileFoundGetDuration(jaffree);
     }
 
     @Test
     void getDurationFromStreams() {
+        when(jaffree.getFFPROBE()).thenReturn(ffprobeMock);
         when(ffprobeMock.setShowStreams(true)).thenReturn(ffprobeMock);
         when(ffprobeMock.setInput(anyString())).thenReturn(ffprobeMock);
+        when(ffprobeMock.setLogLevel(LogLevel.ERROR)).thenReturn(ffprobeMock);
         when(ffprobeMock.execute()).thenReturn(ffprobeResultMock);
 
         when(ffprobeResultMock.getStreams()).thenReturn(List.of(streamMock));
@@ -55,8 +62,10 @@ class MediaFileFoundGetDurationTest {
 
     @Test
     void getDurationFromStreamTag() {
+        when(jaffree.getFFPROBE()).thenReturn(ffprobeMock);
         when(ffprobeMock.setShowStreams(true)).thenReturn(ffprobeMock);
         when(ffprobeMock.setInput(anyString())).thenReturn(ffprobeMock);
+        when(ffprobeMock.setLogLevel(LogLevel.ERROR)).thenReturn(ffprobeMock);
         when(ffprobeMock.execute()).thenReturn(ffprobeResultMock);
 
         when(ffprobeResultMock.getStreams()).thenReturn(List.of(streamMock));
@@ -70,11 +79,14 @@ class MediaFileFoundGetDurationTest {
 
     @Test
     void getDurationWithFFmpegBecauseStreamAreEmpty() {
+        when(jaffree.getFFPROBE()).thenReturn(ffprobeMock);
         when(ffprobeMock.setShowStreams(true)).thenReturn(ffprobeMock);
         when(ffprobeMock.setInput(anyString())).thenReturn(ffprobeMock);
+        when(ffprobeMock.setLogLevel(LogLevel.ERROR)).thenReturn(ffprobeMock);
         when(ffprobeMock.execute()).thenReturn(ffprobeResultMock);
         when(ffprobeResultMock.getStreams()).thenReturn(List.of());
 
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
         when(ffmpegMock.addInput(any())).thenReturn(ffmpegMock);
         when(ffmpegMock.addOutput(any())).thenReturn(ffmpegMock);
         when(ffmpegMock.setProgressListener(any())).thenReturn(ffmpegMock);

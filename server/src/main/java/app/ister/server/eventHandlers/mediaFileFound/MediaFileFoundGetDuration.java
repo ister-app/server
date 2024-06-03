@@ -1,10 +1,9 @@
 package app.ister.server.eventHandlers.mediaFileFound;
 
+import app.ister.server.utils.Jaffree;
 import com.github.kokorin.jaffree.LogLevel;
-import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.NullOutput;
 import com.github.kokorin.jaffree.ffmpeg.UrlInput;
-import com.github.kokorin.jaffree.ffprobe.FFprobe;
 import com.github.kokorin.jaffree.ffprobe.FFprobeResult;
 import org.springframework.stereotype.Component;
 
@@ -17,14 +16,13 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 public class MediaFileFoundGetDuration {
-    private final FFmpeg ffmpeg;
-    private final FFprobe ffprobe;
+
+    private final Jaffree jaffree;
 
     private final List<String> durationStrings = List.of("DURATION", "DURATION-eng");
 
-    public MediaFileFoundGetDuration(FFmpeg ffmpeg, FFprobe ffprobe) {
-        this.ffmpeg = ffmpeg;
-        this.ffprobe = ffprobe;
+    public MediaFileFoundGetDuration(Jaffree jaffree) {
+        this.jaffree = jaffree;
     }
 
     /**
@@ -42,7 +40,7 @@ public class MediaFileFoundGetDuration {
     }
 
     private long getDurationFromStream(String path) {
-        FFprobeResult result = ffprobe.setShowStreams(true)
+        FFprobeResult result = jaffree.getFFPROBE().setShowStreams(true)
                 .setLogLevel(LogLevel.ERROR)
                 .setInput(path).execute();
         List<Long> longList = new ArrayList<>();
@@ -70,7 +68,7 @@ public class MediaFileFoundGetDuration {
 
     private long getDurationWithLoadingFile(String path) {
         final AtomicLong durationMillis = new AtomicLong();
-        ffmpeg
+        jaffree.getFFMPEG()
                 .addInput(
                         UrlInput.fromUrl(path)
                 )

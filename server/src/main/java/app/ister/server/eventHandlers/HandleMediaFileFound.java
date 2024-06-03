@@ -93,7 +93,7 @@ public class HandleMediaFileFound implements Handle {
      * Create background image for media file and save a reference to it in the database.
      */
     private void createBackgroundImage(EpisodeEntity episode, String mediaFilePath, Long durationInMilliseconds) {
-        if (episode.getImagesEntities().size() == 0) {
+        if (episode.getImagesEntities().isEmpty()) {
             NodeEntity nodeEntity = nodeService.getOrCreateNodeEntityForThisNode();
             DirectoryEntity cacheDisk = directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity).stream().findFirst().orElseThrow();
             String toPath = cacheDisk.getPath() + episode.getId() + ".jpg";

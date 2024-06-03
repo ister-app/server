@@ -16,21 +16,8 @@ public class SpringConfig {
     @Value("${app.ister.server.TMDB.apikey:'No api key available'}")
     private String apikey;
 
-    @Value("${app.ister.server.ffmpeg-dir}")
-    private String dirOfFFmpeg;
-
     @Bean
     public TmdbApi tmdbApi() {
         return new TmdbApi(apikey);
-    }
-
-    @Bean
-    public FFmpeg fFmpeg() {
-        return FFmpeg.atPath(Paths.get(dirOfFFmpeg));
-    }
-
-    @Bean
-    public FFprobe ffprobe() {
-        return FFprobe.atPath(Paths.get(dirOfFFmpeg));
     }
 }

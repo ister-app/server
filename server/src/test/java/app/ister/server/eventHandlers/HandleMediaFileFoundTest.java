@@ -2,6 +2,7 @@ package app.ister.server.eventHandlers;
 
 import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.entitiy.EpisodeEntity;
+import app.ister.server.entitiy.ImageEntity;
 import app.ister.server.entitiy.MediaFileEntity;
 import app.ister.server.entitiy.MediaFileStreamEntity;
 import app.ister.server.entitiy.NodeEntity;
@@ -72,7 +73,11 @@ class HandleMediaFileFoundTest {
     @Test
     void happyFlow() {
         DirectoryEntity directoryEntity = DirectoryEntity.builder().build();
-        EpisodeEntity episodeEntity = EpisodeEntity.builder().id(UUID.randomUUID()).build();
+        EpisodeEntity episodeEntity = EpisodeEntity.builder()
+                .id(UUID.randomUUID())
+                .imagesEntities(List.of(
+                        ImageEntity.builder().build()
+                )).build();
         String filePath = "/home/path";
         ServerEventEntity serverEventEntity = ServerEventEntity.builder()
                 .eventType(EventType.MEDIA_FILE_FOUND)
@@ -82,16 +87,10 @@ class HandleMediaFileFoundTest {
                 .build();
         MediaFileEntity mediaFileEntity = MediaFileEntity.builder().path(filePath).build();
         MediaFileStreamEntity mediaFileStreamEntity = MediaFileStreamEntity.builder().build();
-        DirectoryEntity directoryEntityCache = DirectoryEntity.builder().path("/home/").build();
-
-        NodeEntity nodeEntity = NodeEntity.builder().build();
 
         when(mediaFileRepositoryMock.findByDirectoryEntityAndEpisodeEntityAndPath(directoryEntity, episodeEntity, filePath)).thenReturn(Optional.of(mediaFileEntity));
         when(mediaFileFoundGetDurationMock.getDuration(filePath)).thenReturn(10L);
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(mediaFileEntity, null)).thenReturn(List.of(mediaFileStreamEntity));
-
-        when(nodeServiceMock.getOrCreateNodeEntityForThisNode()).thenReturn(nodeEntity);
-        when(directoryRepositoryMock.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity)).thenReturn(List.of(directoryEntityCache));
 
         subject.handle(serverEventEntity);
     }
