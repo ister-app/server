@@ -23,6 +23,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class EpisodeMetadataTest {
+    TvSeries tvSeries = new TvSeries();
+    TvEpisodeDb tvEpisode = new TvEpisodeDb();
     @Mock
     private TmdbApi tmdbApiMock;
     @Mock
@@ -31,12 +33,7 @@ class EpisodeMetadataTest {
     private TvSeriesResultsPage tvSeriesResultsPageMock;
     @Mock
     private TmdbTvEpisodes tmdbTvEpisodesMock;
-
-
     private EpisodeMetadata subject;
-
-    TvSeries tvSeries = new TvSeries();
-    TvEpisodeDb tvEpisode = new TvEpisodeDb();
 
     @BeforeEach
     void setUp() {
@@ -53,7 +50,7 @@ class EpisodeMetadataTest {
     @Test
     void happyFlow() throws TmdbException {
         when(tmdbApiMock.getSearch()).thenReturn(tmdbSearchMock);
-        when(tmdbSearchMock.searchTv("Showname", null, null, null,null, 2024)).thenReturn(tvSeriesResultsPageMock);
+        when(tmdbSearchMock.searchTv("Showname", null, null, null, null, 2024)).thenReturn(tvSeriesResultsPageMock);
         when(tvSeriesResultsPageMock.getResults()).thenReturn(List.of(tvSeries));
 
         when(tmdbApiMock.getTvEpisodes()).thenReturn(tmdbTvEpisodesMock);
@@ -75,7 +72,7 @@ class EpisodeMetadataTest {
     @Test
     void returnsNullWhenNoResults() throws TmdbException {
         when(tmdbApiMock.getSearch()).thenReturn(tmdbSearchMock);
-        when(tmdbSearchMock.searchTv("Showname", null, null, null,null, 2024)).thenReturn(tvSeriesResultsPageMock);
+        when(tmdbSearchMock.searchTv("Showname", null, null, null, null, 2024)).thenReturn(tvSeriesResultsPageMock);
         when(tvSeriesResultsPageMock.getResults()).thenReturn(List.of());
         Optional<TMDBResult> result = subject.getMetadata("Showname", 2024, 1, 1, "en");
         assertTrue(result.isEmpty());

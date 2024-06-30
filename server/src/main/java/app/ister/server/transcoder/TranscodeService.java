@@ -28,19 +28,17 @@ import java.util.concurrent.atomic.AtomicLong;
 @Service
 @Slf4j
 public class TranscodeService {
+    private final ArrayList<TranscodeSessionData> transcodeSessionEntities = new ArrayList<>();
     @Autowired
     private MediaFileRepository mediaFileRepository;
     @Autowired
     private MediaFileStreamRepository mediaFileStreamRepository;
     @Autowired
     private PlayQueueRepository playQueueRepository;
-
     @Value("${app.ister.server.tmp-dir}")
     private String tmpDir;
     @Value("${app.ister.server.ffmpeg-dir}")
     private String dirOfFFmpeg;
-
-    private final ArrayList<TranscodeSessionData> transcodeSessionEntities = new ArrayList<>();
 
     /**
      * Every 5 seconds check all the transcode sessions.
@@ -56,7 +54,7 @@ public class TranscodeService {
             log.debug("Check transcode sessions: {}, item: {}, progress: {}, stopped: {}, paused: {}", transcodeSessionData.getId(), playQueue.getCurrentItem(), progressOfTranscodingInSeconds, transcodeSessionData.getStopped().get(), transcodeSessionData.getPaused().get());
             if (!transcodeSessionData.getStopped().get() && !transcodeSessionData.getPaused().get() && playQueue.getProgressInMilliseconds() != 0 && progressOfTranscodingInSeconds > 120) {
                 ProcessUtils.pauseTranscodeProcess(transcodeSessionData);
-            } else if(!transcodeSessionData.getStopped().get() && transcodeSessionData.getPaused().get() && progressOfTranscodingInSeconds < 60) {
+            } else if (!transcodeSessionData.getStopped().get() && transcodeSessionData.getPaused().get() && progressOfTranscodingInSeconds < 60) {
                 ProcessUtils.continueTranscodeProcess(transcodeSessionData);
             }
         }));

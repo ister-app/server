@@ -17,11 +17,9 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 public class Transcoder {
-    private FFmpegResultFuture async;
-
-    private String toDir;
-
     private final String dirOfFFmpeg;
+    private FFmpegResultFuture async;
+    private String toDir;
 
     public Transcoder(String dirOfFFmpeg) {
         this.dirOfFFmpeg = dirOfFFmpeg;
@@ -39,7 +37,7 @@ public class Transcoder {
         }
         try {
             Files.list(Path.of(toDir)).forEach(path -> {
-                if (path.toString().endsWith("vtt") || path.toString().endsWith("ts") || path.toString().endsWith("m3u8") || path.toString().endsWith("srt") ) {
+                if (path.toString().endsWith("vtt") || path.toString().endsWith("ts") || path.toString().endsWith("m3u8") || path.toString().endsWith("srt")) {
                     log.debug("Deleting: " + path);
                     try {
                         Files.deleteIfExists(path);

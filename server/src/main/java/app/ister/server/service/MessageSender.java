@@ -1,6 +1,5 @@
 package app.ister.server.service;
 
-import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.eventHandlers.data.EpisodeFoundData;
 import app.ister.server.eventHandlers.data.MediaFileFoundData;
 import app.ister.server.eventHandlers.data.NewDirectoriesScanRequestedData;
@@ -27,32 +26,32 @@ public class MessageSender {
     public MessageSender(final RabbitTemplate rabbitTemplate) {
         this.rabbitTemplate = rabbitTemplate;
     }
-    
+
     public void sendEpisodeFound(EpisodeFoundData episodeFoundData) {
         log.info("Sending message for queue: {} and episodeFoundData: {}", APP_ISTER_SERVER_EPISODE_FOUND, episodeFoundData);
         rabbitTemplate.convertAndSend(APP_ISTER_SERVER_EPISODE_FOUND, episodeFoundData);
     }
-    
+
     public void sendMediaFileFound(MediaFileFoundData mediaFileFoundData) {
         log.info("Sending message for queue: {} and mediaFileFoundData: {}", APP_ISTER_SERVER_MEDIA_FILE_FOUND, mediaFileFoundData);
         rabbitTemplate.convertAndSend(APP_ISTER_SERVER_MEDIA_FILE_FOUND, mediaFileFoundData);
     }
-    
+
     public void sendNewDirectoriesScanRequested(NewDirectoriesScanRequestedData newDirectoriesScanRequestedData) {
         log.info("Sending message for queue: {} and newDirectoriesScanRequestedData: {}", APP_ISTER_SERVER_NEW_DIRECTORIES_SCAN_REQUESTED, newDirectoriesScanRequestedData);
         rabbitTemplate.convertAndSend(APP_ISTER_SERVER_NEW_DIRECTORIES_SCAN_REQUESTED, newDirectoriesScanRequestedData);
     }
-    
+
     public void sendNfoFileFound(NfoFileFoundData nfoFileFoundData) {
         log.info("Sending message for queue: {} and nfoFileFoundData: {}", APP_ISTER_SERVER_NFO_FILE_FOUND, nfoFileFoundData);
         rabbitTemplate.convertAndSend(APP_ISTER_SERVER_NFO_FILE_FOUND, nfoFileFoundData);
     }
-    
+
     public void sendShowFound(ShowFoundData showFoundData) {
         log.info("Sending message for queue: {} and showFoundData: {}", APP_ISTER_SERVER_SHOW_FOUND, showFoundData);
         rabbitTemplate.convertAndSend(APP_ISTER_SERVER_SHOW_FOUND, showFoundData);
     }
-    
+
     public void sendSubtitleFileFound(SubtitleFileFoundData subtitleFileFoundData) {
         log.info("Sending message for queue: {} and subtitleFileFoundData: {}", APP_ISTER_SERVER_SUBTITLE_FILE_FOUND, subtitleFileFoundData);
         rabbitTemplate.convertAndSend(APP_ISTER_SERVER_SUBTITLE_FILE_FOUND, subtitleFileFoundData);

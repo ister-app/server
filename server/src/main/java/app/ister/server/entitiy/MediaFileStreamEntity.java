@@ -20,7 +20,7 @@ import lombok.experimental.SuperBuilder;
 public class MediaFileStreamEntity extends BaseEntity {
 
     @Getter(onMethod = @__(@JsonBackReference))
-    @ManyToOne(optional=false)
+    @ManyToOne(optional = false)
     private MediaFileEntity mediaFileEntity;
 
     private int streamIndex;

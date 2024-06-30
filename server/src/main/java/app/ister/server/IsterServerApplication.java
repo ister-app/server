@@ -34,32 +34,32 @@ public class IsterServerApplication {
     }
 
     @Bean
-    public Queue QueueEpisodeFound() {
+    public Queue queueEpisodeFound() {
         return new Queue(APP_ISTER_SERVER_EPISODE_FOUND);
     }
 
     @Bean
-    public Queue QueueMediaFileFound() {
+    public Queue queueMediaFileFound() {
         return new Queue(APP_ISTER_SERVER_MEDIA_FILE_FOUND);
     }
 
     @Bean
-    public Queue QueueNewDirectoriesScanRequested() {
+    public Queue queueNewDirectoriesScanRequested() {
         return new Queue(APP_ISTER_SERVER_NEW_DIRECTORIES_SCAN_REQUESTED);
     }
 
     @Bean
-    public Queue QueueNfoFileFound() {
+    public Queue queueNfoFileFound() {
         return new Queue(APP_ISTER_SERVER_NFO_FILE_FOUND);
     }
 
     @Bean
-    public Queue QueueShowFound() {
+    public Queue queueShowFound() {
         return new Queue(APP_ISTER_SERVER_SHOW_FOUND);
     }
 
     @Bean
-    public Queue QueueSubtitleFileFound() {
+    public Queue queueSubtitleFileFound() {
         return new Queue(APP_ISTER_SERVER_SUBTITLE_FILE_FOUND);
     }
 

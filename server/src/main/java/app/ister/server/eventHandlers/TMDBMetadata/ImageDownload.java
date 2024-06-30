@@ -14,9 +14,9 @@ public class ImageDownload {
     public void download(String imageUrl, String toPath) throws IOException {
         URL url = new URL(imageUrl);
         ReadableByteChannel readableByteChannel = Channels.newChannel(url.openStream());
-         try (FileOutputStream fileOutputStream = new FileOutputStream(toPath)) {
-             FileChannel fileChannel = fileOutputStream.getChannel();
-             fileChannel.transferFrom(readableByteChannel, 0, Long.MAX_VALUE);
-         }
+        try (FileOutputStream fileOutputStream = new FileOutputStream(toPath)) {
+            FileChannel fileChannel = fileOutputStream.getChannel();
+            fileChannel.transferFrom(readableByteChannel, 0, Long.MAX_VALUE);
+        }
     }
 }

@@ -26,16 +26,14 @@ import java.util.UUID;
 @SuperBuilder
 @EntityListeners(AuditingEntityListener.class)
 public class BaseEntity {
+    @Column(nullable = false)
+    @CreatedDate
+    Instant dateCreated;
+    @Column(nullable = false)
+    @LastModifiedDate
+    Instant dateUpdated;
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(nullable = false)
     private UUID id;
-
-    @Column(nullable = false)
-    @CreatedDate
-    Instant dateCreated;
-
-    @Column(nullable = false)
-    @LastModifiedDate
-    Instant dateUpdated;
 }

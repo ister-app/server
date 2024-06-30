@@ -16,7 +16,7 @@ public class SubtitleFilePathParser {
     public static String langCodeToIso3(String path) {
         var matches = regex(REGEX_FOR_LANG_CODE, path);
         return matches.map(
-                matchResult -> Locale.forLanguageTag(matchResult.group(1).trim()).getISO3Language())
+                        matchResult -> Locale.forLanguageTag(matchResult.group(1).trim()).getISO3Language())
                 .orElse(null);
     }
 

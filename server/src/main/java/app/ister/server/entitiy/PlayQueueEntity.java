@@ -24,7 +24,7 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class PlayQueueEntity extends BaseEntity {
 
-    @ManyToOne(optional=false)
+    @ManyToOne(optional = false)
     private UserEntity userEntity;
 
     private UUID currentItem;
@@ -50,7 +50,8 @@ public class PlayQueueEntity extends BaseEntity {
         @Override
         public List<PlayQueueItemEntity> convertToEntityAttribute(String value) {
             try {
-                return objectMapper.readValue(value, new TypeReference<>() {});
+                return objectMapper.readValue(value, new TypeReference<>() {
+                });
             } catch (JsonProcessingException e) {
                 System.out.println("Cannot convert JSON into List<PlaylistItemEntity>");
                 return null;

@@ -59,8 +59,7 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
     private FileVisitResult analyzeDir(Path dir, BasicFileAttributes attrs) {
         if (attrs.isDirectory() && List.of(DirType.SHOW, DirType.SEASON).contains(new PathObject(dir.toString()).getDirType())) {
             return FileVisitResult.CONTINUE;
-        }
-        else {
+        } else {
             return FileVisitResult.SKIP_SUBTREE;
         }
     }

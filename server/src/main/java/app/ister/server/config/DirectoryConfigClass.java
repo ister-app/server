@@ -6,5 +6,5 @@ import lombok.Setter;
 @Getter
 @Setter
 public class DirectoryConfigClass {
-    private  String name, path, library;
+    private String name, path, library;
 }

@@ -14,6 +14,18 @@ import java.util.List;
 
 @Component
 public class MediaFileFoundCheckForStreams {
+    private static StreamCodecType codecTypeToEnum(String codecType) {
+        return switch (codecType) {
+            case "VIDEO" -> StreamCodecType.VIDEO;
+            case "AUDIO" -> StreamCodecType.AUDIO;
+            case "SUBTITLE" -> StreamCodecType.SUBTITLE;
+            case "VIDEO_NOT_PICTURE" -> StreamCodecType.VIDEO_NOT_PICTURE;
+            case "DATA" -> StreamCodecType.DATA;
+            case "ATTACHMENT" -> StreamCodecType.ATTACHMENT;
+            default -> StreamCodecType.UNKNOWN;
+        };
+    }
+
     public List<MediaFileStreamEntity> checkForStreams(MediaFileEntity mediaFileEntity, String dirOfFFmpeg) {
         List<MediaFileStreamEntity> result = new ArrayList<>();
         FFprobeResult mediaStreams = FFprobe.atPath(Paths.get(dirOfFFmpeg))
@@ -38,17 +50,5 @@ public class MediaFileFoundCheckForStreams {
             result.add(mediaFileStream.build());
         }
         return result;
-    }
-
-    private static StreamCodecType codecTypeToEnum(String codecType) {
-        return switch (codecType) {
-            case "VIDEO" -> StreamCodecType.VIDEO;
-            case "AUDIO" -> StreamCodecType.AUDIO;
-            case "SUBTITLE" -> StreamCodecType.SUBTITLE;
-            case "VIDEO_NOT_PICTURE" -> StreamCodecType.VIDEO_NOT_PICTURE;
-            case "DATA" -> StreamCodecType.DATA;
-            case "ATTACHMENT" -> StreamCodecType.ATTACHMENT;
-            default -> StreamCodecType.UNKNOWN;
-        };
     }
 }

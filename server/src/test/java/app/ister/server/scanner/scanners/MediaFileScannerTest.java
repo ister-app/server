@@ -16,14 +16,12 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class MediaFileScannerTest {
-    @Mock
-    private ShowRepository showRepository;
-
-    @Mock
-    private BasicFileAttributes basicFileAttributes;
-
     @InjectMocks
     MediaFileScanner subject;
+    @Mock
+    private ShowRepository showRepository;
+    @Mock
+    private BasicFileAttributes basicFileAttributes;
 
     @Test
     void analyzable() {

@@ -7,6 +7,6 @@ import lombok.Setter;
 @Getter
 @Setter
 public class LibraryConfigClass {
-    private  String name;
+    private String name;
     private LibraryType type;
 }

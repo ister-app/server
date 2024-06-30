@@ -24,13 +24,12 @@ import java.util.Optional;
 @Slf4j
 @Transactional(propagation = Propagation.REQUIRES_NEW)
 public class ImageScanner implements Scanner {
+    private final static List<String> BACKGROUND_FILE_NAMES = List.of("background", "thumb");
+    private final static List<String> COVER_FILE_NAMES = List.of("cover");
     @Autowired
     private ScannerHelperService scannerHelperService;
     @Autowired
     private ImageRepository imageRepository;
-
-    private final static List<String>  BACKGROUND_FILE_NAMES = List.of("background", "thumb");
-    private final static List<String>  COVER_FILE_NAMES = List.of("cover");
 
     @Override
     public boolean analyzable(Path path, BasicFileAttributes attrs) {

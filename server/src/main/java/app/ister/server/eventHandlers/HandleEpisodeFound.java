@@ -16,7 +16,6 @@ import app.ister.server.repository.DirectoryRepository;
 import app.ister.server.repository.EpisodeRepository;
 import app.ister.server.service.NodeService;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import info.movito.themoviedbapi.model.core.responses.TmdbResponseException;
 import info.movito.themoviedbapi.tools.TmdbException;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +36,8 @@ import static app.ister.server.eventHandlers.MessageQueue.APP_ISTER_SERVER_EPISO
 @Slf4j
 @Transactional
 public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
+    // List of languages in https://en.wikipedia.org/wiki/ISO_639-1.
+    private static final List<String> supportLanguages = List.of("en", "nl");
     @Autowired
     private NodeService nodeService;
     @Autowired
@@ -51,14 +52,8 @@ public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
     private ImageDownload imageDownload;
     @Autowired
     private ImageSave imageSave;
-
     @Value("${app.ister.server.TMDB.apikey:'No api key available'}")
     private String apikey;
-
-    // List of languages in https://en.wikipedia.org/wiki/ISO_639-1.
-    private static final List<String> supportLanguages = List.of("en", "nl");
-
-    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public EventType handles() {

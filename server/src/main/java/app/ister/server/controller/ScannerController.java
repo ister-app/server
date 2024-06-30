@@ -1,6 +1,5 @@
 package app.ister.server.controller;
 
-import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.enums.EventType;
 import app.ister.server.eventHandlers.data.NewDirectoriesScanRequestedData;
 import app.ister.server.service.MessageSender;
@@ -21,6 +20,6 @@ public class ScannerController {
     public void scan() {
         messageSender.sendNewDirectoriesScanRequested(
                 NewDirectoriesScanRequestedData.builder()
-                    .eventType(EventType.NEW_DIRECTORIES_SCAN_REQUEST).build());
+                        .eventType(EventType.NEW_DIRECTORIES_SCAN_REQUEST).build());
     }
 }

@@ -22,6 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MockitoExtension.class)
 class LibraryScannerTest {
+    @InjectMocks
+    LibraryScanner libraryScanner;
     @Mock
     private MediaFileScanner mediaFileScanner;
     @Mock
@@ -30,10 +32,6 @@ class LibraryScannerTest {
     private NfoScanner nfoScanner;
     @Mock
     private SubtitleScanner subtitleScanner;
-
-    @InjectMocks
-    LibraryScanner libraryScanner;
-
 
     @Test
     void simpleTest() throws IOException {

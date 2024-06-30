@@ -15,7 +15,6 @@ import app.ister.server.repository.DirectoryRepository;
 import app.ister.server.repository.ShowRepository;
 import app.ister.server.service.NodeService;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import info.movito.themoviedbapi.tools.TmdbException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -29,13 +28,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static app.ister.server.eventHandlers.MessageQueue.APP_ISTER_SERVER_MEDIA_FILE_FOUND;
 import static app.ister.server.eventHandlers.MessageQueue.APP_ISTER_SERVER_SHOW_FOUND;
 
 @Service
 @Transactional
 @Slf4j
 public class HandleShowFound implements Handle<ShowFoundData> {
+    // List of languages in https://en.wikipedia.org/wiki/ISO_639-1.
+    private static final List<String> supportLanguages = List.of("en", "nl");
     @Autowired
     private NodeService nodeService;
     @Autowired
@@ -50,14 +50,8 @@ public class HandleShowFound implements Handle<ShowFoundData> {
     private ImageDownload imageDownload;
     @Autowired
     private ImageSave imageSave;
-
     @Value("${app.ister.server.TMDB.apikey:'No api key available'}")
     private String apikey;
-
-    // List of languages in https://en.wikipedia.org/wiki/ISO_639-1.
-    private static final List<String> supportLanguages = List.of("en", "nl");
-
-    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public EventType handles() {
@@ -88,7 +82,8 @@ public class HandleShowFound implements Handle<ShowFoundData> {
                     if (TMDBResult.get().getPosterUrl() != null) {
                         getAndSaveImage(TMDBResult.get().getPosterUrl(), ImageType.COVER, TMDBResult.get().getLanguage(), showEntity);
                     }
-                };
+                }
+                ;
             }
         } catch (JsonProcessingException jpe) {
             log.error("Cannot convert JSON into ShowFoundData", jpe);
