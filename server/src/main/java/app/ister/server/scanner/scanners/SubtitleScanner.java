@@ -5,7 +5,7 @@ import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.entitiy.OtherPathFileEntity;
 import app.ister.server.enums.EventType;
 import app.ister.server.enums.PathFileType;
-import app.ister.server.eventHandlers.data.SubtitleFileFoundData;
+import app.ister.server.events.subtitlefilefound.SubtitleFileFoundData;
 import app.ister.server.repository.OtherPathFileRepository;
 import app.ister.server.scanner.PathObject;
 import app.ister.server.scanner.enums.DirType;

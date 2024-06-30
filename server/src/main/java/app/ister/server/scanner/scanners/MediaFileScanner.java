@@ -5,7 +5,7 @@ import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.entitiy.EpisodeEntity;
 import app.ister.server.entitiy.MediaFileEntity;
 import app.ister.server.enums.EventType;
-import app.ister.server.eventHandlers.data.MediaFileFoundData;
+import app.ister.server.events.mediafilefound.MediaFileFoundData;
 import app.ister.server.repository.MediaFileRepository;
 import app.ister.server.scanner.PathObject;
 import app.ister.server.scanner.enums.DirType;

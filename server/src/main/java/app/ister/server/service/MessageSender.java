@@ -1,21 +1,21 @@
 package app.ister.server.service;
 
-import app.ister.server.eventHandlers.data.EpisodeFoundData;
-import app.ister.server.eventHandlers.data.MediaFileFoundData;
-import app.ister.server.eventHandlers.data.NewDirectoriesScanRequestedData;
-import app.ister.server.eventHandlers.data.NfoFileFoundData;
-import app.ister.server.eventHandlers.data.ShowFoundData;
-import app.ister.server.eventHandlers.data.SubtitleFileFoundData;
+import app.ister.server.events.episodefound.EpisodeFoundData;
+import app.ister.server.events.mediafilefound.MediaFileFoundData;
+import app.ister.server.events.newdirectoriesscanrequested.NewDirectoriesScanRequestedData;
+import app.ister.server.events.nfofilefound.NfoFileFoundData;
+import app.ister.server.events.showfound.ShowFoundData;
+import app.ister.server.events.subtitlefilefound.SubtitleFileFoundData;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
-import static app.ister.server.eventHandlers.MessageQueue.APP_ISTER_SERVER_EPISODE_FOUND;
-import static app.ister.server.eventHandlers.MessageQueue.APP_ISTER_SERVER_MEDIA_FILE_FOUND;
-import static app.ister.server.eventHandlers.MessageQueue.APP_ISTER_SERVER_NEW_DIRECTORIES_SCAN_REQUESTED;
-import static app.ister.server.eventHandlers.MessageQueue.APP_ISTER_SERVER_NFO_FILE_FOUND;
-import static app.ister.server.eventHandlers.MessageQueue.APP_ISTER_SERVER_SHOW_FOUND;
-import static app.ister.server.eventHandlers.MessageQueue.APP_ISTER_SERVER_SUBTITLE_FILE_FOUND;
+import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_EPISODE_FOUND;
+import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_MEDIA_FILE_FOUND;
+import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_NEW_DIRECTORIES_SCAN_REQUESTED;
+import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_NFO_FILE_FOUND;
+import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_SHOW_FOUND;
+import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_SUBTITLE_FILE_FOUND;
 
 @Service
 @Slf4j

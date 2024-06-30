@@ -1,8 +1,8 @@
 package app.ister.server.service;
 
 import app.ister.server.enums.EventType;
-import app.ister.server.eventHandlers.data.EpisodeFoundData;
-import app.ister.server.eventHandlers.data.ShowFoundData;
+import app.ister.server.events.episodefound.EpisodeFoundData;
+import app.ister.server.events.showfound.ShowFoundData;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
