@@ -35,7 +35,7 @@ class LibraryScannerTest {
 
     @Test
     void simpleTest() throws IOException {
-        try (FileSystem fileSystem = Jimfs.newFileSystem(Configuration.unix());) {
+        try (FileSystem fileSystem = Jimfs.newFileSystem(Configuration.unix())) {
             Path resourceFilePath = fileSystem.getPath("/disk/show");
 
             Files.createDirectories(resourceFilePath);

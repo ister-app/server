@@ -21,7 +21,6 @@ import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_NEW_DIRECTOR
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_NFO_FILE_FOUND;
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_SHOW_FOUND;
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_SUBTITLE_FILE_FOUND;
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
