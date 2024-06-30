@@ -11,8 +11,8 @@ import app.ister.server.events.MessageQueue;
 import app.ister.server.events.TMDBMetadata.EpisodeMetadata;
 import app.ister.server.events.TMDBMetadata.ImageDownload;
 import app.ister.server.events.TMDBMetadata.ImageSave;
+import app.ister.server.events.TMDBMetadata.MetadataSave;
 import app.ister.server.events.TMDBMetadata.TMDBResult;
-import app.ister.server.events.TMDBMetadata.metadataSave;
 import app.ister.server.repository.DirectoryRepository;
 import app.ister.server.repository.EpisodeRepository;
 import app.ister.server.service.NodeService;
@@ -46,7 +46,7 @@ public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
     @Autowired
     private EpisodeMetadata episodeMetadata;
     @Autowired
-    private metadataSave metaDataSave;
+    private MetadataSave metaDataSave;
     @Autowired
     private ImageDownload imageDownload;
     @Autowired

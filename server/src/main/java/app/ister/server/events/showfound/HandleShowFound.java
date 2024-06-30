@@ -8,9 +8,9 @@ import app.ister.server.enums.ImageType;
 import app.ister.server.events.Handle;
 import app.ister.server.events.TMDBMetadata.ImageDownload;
 import app.ister.server.events.TMDBMetadata.ImageSave;
+import app.ister.server.events.TMDBMetadata.MetadataSave;
 import app.ister.server.events.TMDBMetadata.ShowMetadata;
 import app.ister.server.events.TMDBMetadata.TMDBResult;
-import app.ister.server.events.TMDBMetadata.metadataSave;
 import app.ister.server.repository.DirectoryRepository;
 import app.ister.server.repository.ShowRepository;
 import app.ister.server.service.NodeService;
@@ -45,7 +45,7 @@ public class HandleShowFound implements Handle<ShowFoundData> {
     @Autowired
     private ShowMetadata showMetadata;
     @Autowired
-    private metadataSave metaDataSave;
+    private MetadataSave metaDataSave;
     @Autowired
     private ImageDownload imageDownload;
     @Autowired
