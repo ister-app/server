@@ -52,7 +52,6 @@ public class StartupTasks {
     }
 
 
-
     private void handleLibrariesFromConfig(LibraryConfigClass libraryConfigClass) {
         if (libraryRepository.findByName(libraryConfigClass.getName()).isEmpty()) {
             LibraryEntity libraryEntity = LibraryEntity.builder()

@@ -11,5 +11,6 @@ import java.util.UUID;
 
 public interface DirectoryRepository extends CrudRepository<DirectoryEntity, UUID> {
     Optional<DirectoryEntity> findByName(String name);
+
     List<DirectoryEntity> findByDirectoryTypeAndNodeEntity(DirectoryType directoryType, NodeEntity nodeEntity);
 }

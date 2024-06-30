@@ -36,9 +36,6 @@
     "interfaces":["app.ister.server.repository.SeasonRepository","org.springframework.data.repository.Repository","org.springframework.transaction.interceptor.TransactionalProxy","org.springframework.aop.framework.Advised","org.springframework.core.DecoratingProxy"]
   },
   {
-    "interfaces":["app.ister.server.repository.ServerEventRepository","org.springframework.data.repository.Repository","org.springframework.transaction.interceptor.TransactionalProxy","org.springframework.aop.framework.Advised","org.springframework.core.DecoratingProxy"]
-  },
-  {
     "interfaces":["app.ister.server.repository.ShowRepository","org.springframework.data.repository.Repository","org.springframework.transaction.interceptor.TransactionalProxy","org.springframework.aop.framework.Advised","org.springframework.core.DecoratingProxy"]
   },
   {
@@ -123,6 +120,12 @@
     "interfaces":["net.bytebuddy.dynamic.loading.ClassInjector$UsingLookup$MethodHandles$Lookup"]
   },
   {
+    "interfaces":["net.bytebuddy.dynamic.loading.ClassInjector$UsingReflection$System"]
+  },
+  {
+    "interfaces":["net.bytebuddy.dynamic.loading.ClassInjector$UsingUnsafe$System"]
+  },
+  {
     "interfaces":["net.bytebuddy.utility.JavaConstant$Simple$Dispatcher"]
   },
   {
@@ -171,6 +174,12 @@
     "interfaces":["org.hibernate.query.hql.spi.SqmQueryImplementor","org.hibernate.query.sqm.internal.SqmInterpretationsKey$InterpretationsKeySource","org.hibernate.query.spi.DomainQueryExecutionContext","org.hibernate.query.SelectionQuery","org.hibernate.query.CommonQueryContract"]
   },
   {
+    "interfaces":["org.springframework.amqp.rabbit.annotation.RabbitListener"]
+  },
+  {
+    "interfaces":["org.springframework.amqp.rabbit.connection.ChannelProxy"]
+  },
+  {
     "interfaces":["org.springframework.boot.actuate.endpoint.annotation.Endpoint"]
   },
   {
@@ -190,9 +199,6 @@
   },
   {
     "interfaces":["org.springframework.graphql.data.method.annotation.SchemaMapping"]
-  },
-  {
-    "interfaces":["org.springframework.jdbc.datasource.ConnectionProxy"]
   },
   {
     "interfaces":["org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity"]

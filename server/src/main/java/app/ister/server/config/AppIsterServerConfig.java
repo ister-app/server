@@ -9,7 +9,7 @@ import java.util.List;
 
 @Getter
 @Configuration
-@ConfigurationProperties(prefix="app.ister.server")
+@ConfigurationProperties(prefix = "app.ister.server")
 public class AppIsterServerConfig {
     private final List<LibraryConfigClass> libraries = new ArrayList<>();
     private final List<DirectoryConfigClass> directories = new ArrayList<>();

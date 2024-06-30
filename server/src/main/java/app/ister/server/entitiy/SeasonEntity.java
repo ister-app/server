@@ -23,7 +23,7 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class SeasonEntity extends BaseEntity {
 
-    @ManyToOne(optional=false)
+    @ManyToOne(optional = false)
     private ShowEntity showEntity;
 
     @Column(nullable = false)

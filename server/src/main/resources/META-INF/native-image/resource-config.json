@@ -15,6 +15,8 @@
   }, {
     "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.13.0/swagger-ui.css\\E"
   }, {
+    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui\\E"
+  }, {
     "pattern":"\\QMETA-INF/services/ch.qos.logback.classic.spi.Configurator\\E"
   }, {
     "pattern":"\\QMETA-INF/services/com.fasterxml.jackson.databind.Module\\E"
@@ -28,8 +30,6 @@
     "pattern":"\\QMETA-INF/services/java.nio.file.spi.FileSystemProvider\\E"
   }, {
     "pattern":"\\QMETA-INF/services/java.sql.Driver\\E"
-  }, {
-    "pattern":"\\QMETA-INF/services/org.hibernate.bytecode.spi.BytecodeProvider\\E"
   }, {
     "pattern":"\\QMETA-INF/services/org.junit.platform.engine.TestEngine\\E"
   }, {
@@ -46,8 +46,6 @@
     "pattern":"\\QMETA-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports\\E"
   }, {
     "pattern":"\\Q\\E"
-  }, {
-    "pattern":"\\Qapp/ister/server/EventHandler.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/IsterServerApplication$$SpringCGLIB$$0.class\\E"
   }, {
@@ -161,39 +159,51 @@
   }, {
     "pattern":"\\Qapp/ister/server/entitiy/WatchStatusEntity.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/eventHandlers/EpisodeFoundData$EpisodeFoundDataBuilder.class\\E"
+    "pattern":"\\Qapp/ister/server/events/Handle.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/eventHandlers/Handle.class\\E"
+    "pattern":"\\Qapp/ister/server/events/MessageData$MessageDataBuilder.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/eventHandlers/HandleEpisodeFound.class\\E"
+    "pattern":"\\Qapp/ister/server/events/MessageData.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/eventHandlers/HandleMediaFileFound.class\\E"
+    "pattern":"\\Qapp/ister/server/events/TMDBMetadata/EpisodeMetadata.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/eventHandlers/HandleNewDirectoriesScanRequested.class\\E"
+    "pattern":"\\Qapp/ister/server/events/TMDBMetadata/ImageDownload.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/eventHandlers/HandleNfoFileFound.class\\E"
+    "pattern":"\\Qapp/ister/server/events/TMDBMetadata/ImageSave.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/eventHandlers/HandleShowFound.class\\E"
+    "pattern":"\\Qapp/ister/server/events/TMDBMetadata/MetadataSave.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/eventHandlers/HandleSubtitleFileFound.class\\E"
+    "pattern":"\\Qapp/ister/server/events/TMDBMetadata/ShowMetadata.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/eventHandlers/ShowFoundData$ShowFoundDataBuilder.class\\E"
+    "pattern":"\\Qapp/ister/server/events/episodefound/EpisodeFoundData$EpisodeFoundDataBuilder.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/eventHandlers/TMDBMetadata/EpisodeMetadata.class\\E"
+    "pattern":"\\Qapp/ister/server/events/episodefound/HandleEpisodeFound.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/eventHandlers/TMDBMetadata/ImageDownload.class\\E"
+    "pattern":"\\Qapp/ister/server/events/mediafilefound/HandleMediaFileFound.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/eventHandlers/TMDBMetadata/ImageSave.class\\E"
+    "pattern":"\\Qapp/ister/server/events/mediafilefound/MediaFileFoundCheckForStreams.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/eventHandlers/TMDBMetadata/ShowMetadata.class\\E"
+    "pattern":"\\Qapp/ister/server/events/mediafilefound/MediaFileFoundCreateBackground.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/eventHandlers/TMDBMetadata/metadataSave.class\\E"
+    "pattern":"\\Qapp/ister/server/events/mediafilefound/MediaFileFoundData$MediaFileFoundDataBuilder.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/eventHandlers/mediaFileFound/MediaFileFoundCheckForStreams.class\\E"
+    "pattern":"\\Qapp/ister/server/events/mediafilefound/MediaFileFoundGetDuration.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/eventHandlers/mediaFileFound/MediaFileFoundCreateBackground.class\\E"
+    "pattern":"\\Qapp/ister/server/events/newdirectoriesscanrequested/HandleNewDirectoriesScanRequested.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/eventHandlers/mediaFileFound/MediaFileFoundGetDuration.class\\E"
+    "pattern":"\\Qapp/ister/server/events/newdirectoriesscanrequested/NewDirectoriesScanRequestedData$NewDirectoriesScanRequestedDataBuilder.class\\E"
+  }, {
+    "pattern":"\\Qapp/ister/server/events/nfofilefound/HandleNfoFileFound.class\\E"
+  }, {
+    "pattern":"\\Qapp/ister/server/events/nfofilefound/NfoFileFoundData$NfoFileFoundDataBuilder.class\\E"
+  }, {
+    "pattern":"\\Qapp/ister/server/events/showfound/HandleShowFound.class\\E"
+  }, {
+    "pattern":"\\Qapp/ister/server/events/showfound/ShowFoundData$ShowFoundDataBuilder.class\\E"
+  }, {
+    "pattern":"\\Qapp/ister/server/events/subtitlefilefound/HandleSubtitleFileFound.class\\E"
+  }, {
+    "pattern":"\\Qapp/ister/server/events/subtitlefilefound/SubtitleFileFoundData$SubtitleFileFoundDataBuilder.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/repository/DirectoryRepository.class\\E"
   }, {
@@ -219,8 +229,6 @@
   }, {
     "pattern":"\\Qapp/ister/server/repository/SeasonRepository.class\\E"
   }, {
-    "pattern":"\\Qapp/ister/server/repository/ServerEventRepository.class\\E"
-  }, {
     "pattern":"\\Qapp/ister/server/repository/ShowRepository.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/repository/UserRepository.class\\E"
@@ -241,6 +249,8 @@
   }, {
     "pattern":"\\Qapp/ister/server/scanner/scanners/SubtitleScanner.class\\E"
   }, {
+    "pattern":"\\Qapp/ister/server/service/MessageSender.class\\E"
+  }, {
     "pattern":"\\Qapp/ister/server/service/NodeService.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/service/PlayQueueService.class\\E"
@@ -254,6 +264,8 @@
     "pattern":"\\Qapp/ister/server/service/WatchStatusService.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/transcoder/TranscodeService.class\\E"
+  }, {
+    "pattern":"\\Qapp/ister/server/utils/Jaffree.class\\E"
   }, {
     "pattern":"\\Qapplication-local.properties\\E"
   }, {
@@ -272,10 +284,6 @@
     "pattern":"\\Qcom/fasterxml/jackson/databind/module/SimpleModule.class\\E"
   }, {
     "pattern":"\\Qcom/fasterxml/jackson/module/paramnames/ParameterNamesModule.class\\E"
-  }, {
-    "pattern":"\\Qcom/github/kokorin/jaffree/ffmpeg/FFmpeg.class\\E"
-  }, {
-    "pattern":"\\Qcom/github/kokorin/jaffree/ffprobe/FFprobe.class\\E"
   }, {
     "pattern":"\\Qcom/zaxxer/hikari/HikariConfig.class\\E"
   }, {
@@ -373,6 +381,8 @@
   }, {
     "pattern":"\\Qjava/lang/Record.class\\E"
   }, {
+    "pattern":"\\Qjava/lang/reflect/AccessibleObject.class\\E"
+  }, {
     "pattern":"\\Qjava/lang/reflect/Proxy.class\\E"
   }, {
     "pattern":"\\Qjava/util/function/BiPredicate.class\\E"
@@ -414,30 +424,6 @@
     "pattern":"\\Qorg/hibernate/SessionFactory.class\\E"
   }, {
     "pattern":"\\Qorg/hibernate/SharedSessionContract.class\\E"
-  }, {
-    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$AreFieldsDirty.class\\E"
-  }, {
-    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$AreFieldsDirtyWithoutCollections.class\\E"
-  }, {
-    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$ClearDirtyAttributes.class\\E"
-  }, {
-    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$ClearDirtyAttributesWithoutCollections.class\\E"
-  }, {
-    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$ClearOwner.class\\E"
-  }, {
-    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$GetCollectionTrackerWithoutCollections.class\\E"
-  }, {
-    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$GetDirtyAttributes.class\\E"
-  }, {
-    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$GetDirtyAttributesWithoutCollections.class\\E"
-  }, {
-    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$InitializeLazyAttributeLoadingInterceptor.class\\E"
-  }, {
-    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$SetOwner.class\\E"
-  }, {
-    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$SuspendDirtyTracking.class\\E"
-  }, {
-    "pattern":"\\Qorg/hibernate/bytecode/enhance/internal/bytebuddy/CodeTemplates$TrackChange.class\\E"
   }, {
     "pattern":"\\Qorg/hibernate/hibernate-configuration-3.0.dtd\\E"
   }, {
@@ -661,6 +647,54 @@
   }, {
     "pattern":"\\Qorg/springdoc/webmvc/ui/SwaggerWelcomeWebMvc.class\\E"
   }, {
+    "pattern":"\\Qorg/springframework/amqp/core/AbstractDeclarable.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/core/MessageListener.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/core/Queue.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/rabbit/annotation/EnableRabbit.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/rabbit/annotation/MultiRabbitBootstrapConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/rabbit/annotation/RabbitBootstrapConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/rabbit/annotation/RabbitListenerConfigurationSelector.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/rabbit/config/AbstractRabbitListenerContainerFactory.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/rabbit/config/BaseRabbitListenerContainerFactory.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/rabbit/config/SimpleRabbitListenerContainerFactory.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/rabbit/connection/AbstractConnectionFactory.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/rabbit/connection/CachingConnectionFactory.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/rabbit/connection/RabbitAccessor.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/rabbit/core/RabbitAdmin.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/rabbit/core/RabbitMessagingTemplate.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/rabbit/core/RabbitOperations.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/rabbit/core/RabbitTemplate.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/rabbit/listener/RabbitListenerContainerFactory.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/rabbit/listener/RabbitListenerEndpointRegistry.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/rabbit/listener/api/ChannelAwareMessageListener.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/support/converter/AbstractJackson2MessageConverter.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/support/converter/AbstractMessageConverter.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/support/converter/Jackson2JsonMessageConverter.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/amqp/support/converter/MessageConverter.class\\E"
+  }, {
     "pattern":"\\Qorg/springframework/aop/TargetClassAware.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/aop/aspectj/annotation/AnnotationAwareAspectJAutoProxyCreator.class\\E"
@@ -696,6 +730,10 @@
     "pattern":"\\Qorg/springframework/beans/factory/support/NullBean.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/boot/LazyInitializationExcludeFilter.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/actuate/amqp/RabbitHealthIndicator.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/amqp/RabbitHealthContributorAutoConfiguration.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/audit/AuditAutoConfiguration.class\\E"
   }, {
@@ -753,11 +791,15 @@
   }, {
     "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/env/EnvironmentEndpointAutoConfiguration.class\\E"
   }, {
+    "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/health/AbstractCompositeHealthContributorConfiguration.class\\E"
+  }, {
     "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/health/AutoConfiguredHealthContributorRegistry.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/health/AutoConfiguredHealthEndpointGroups.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/health/AutoConfiguredReactiveHealthContributorRegistry.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/health/CompositeHealthContributorConfiguration.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/health/ConditionalOnEnabledHealthIndicator.class\\E"
   }, {
@@ -848,6 +890,8 @@
     "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/metrics/PropertiesMeterFilter.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/metrics/SystemMetricsAutoConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/metrics/amqp/RabbitMetricsAutoConfiguration.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/boot/actuate/autoconfigure/metrics/cache/CacheMeterBinderProvidersConfiguration$Cache2kCacheMeterBinderProviderConfiguration.class\\E"
   }, {
@@ -1112,6 +1156,40 @@
     "pattern":"\\Qorg/springframework/boot/autoconfigure/AutoConfigureOrder.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/boot/autoconfigure/admin/SpringApplicationAdminJmxAutoConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/amqp/AbstractConnectionFactoryConfigurer.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/amqp/AbstractRabbitListenerContainerFactoryConfigurer.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/amqp/CachingConnectionFactoryConfigurer.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/amqp/DirectRabbitListenerContainerFactoryConfigurer.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/amqp/PropertiesRabbitConnectionDetails.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/amqp/RabbitAnnotationDrivenConfiguration$EnableRabbitConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/amqp/RabbitAnnotationDrivenConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/amqp/RabbitAutoConfiguration$MessagingTemplateConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/amqp/RabbitAutoConfiguration$RabbitConnectionFactoryCreator.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/amqp/RabbitAutoConfiguration$RabbitTemplateConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/amqp/RabbitAutoConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/amqp/RabbitConnectionDetails.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/amqp/RabbitConnectionFactoryBeanConfigurer.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/amqp/RabbitProperties.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/amqp/RabbitStreamConfiguration.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/amqp/RabbitTemplateConfigurer.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/boot/autoconfigure/amqp/SimpleRabbitListenerContainerFactoryConfigurer.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/boot/autoconfigure/aop/AopAutoConfiguration$AspectJAutoProxyingConfiguration$CglibAutoProxyConfiguration.class\\E"
   }, {
@@ -1765,6 +1843,8 @@
   }, {
     "pattern":"\\Qorg/springframework/context/annotation/Configuration.class\\E"
   }, {
+    "pattern":"\\Qorg/springframework/context/annotation/DeferredImportSelector.class\\E"
+  }, {
     "pattern":"\\Qorg/springframework/context/annotation/EnableAspectJAutoProxy.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/context/annotation/Import.class\\E"
@@ -1983,6 +2063,12 @@
   }, {
     "pattern":"\\Qorg/springframework/jdbc/support/JdbcAccessor.class\\E"
   }, {
+    "pattern":"\\Qorg/springframework/messaging/core/AbstractMessageReceivingTemplate.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/messaging/core/AbstractMessageSendingTemplate.class\\E"
+  }, {
+    "pattern":"\\Qorg/springframework/messaging/core/AbstractMessagingTemplate.class\\E"
+  }, {
     "pattern":"\\Qorg/springframework/orm/jpa/AbstractEntityManagerFactoryBean.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/orm/jpa/EntityManagerFactoryAccessor.class\\E"
@@ -2177,6 +2263,8 @@
   }, {
     "pattern":"\\Qorg/springframework/transaction/annotation/TransactionManagementConfigurationSelector.class\\E"
   }, {
+    "pattern":"\\Qorg/springframework/transaction/annotation/Transactional.class\\E"
+  }, {
     "pattern":"\\Qorg/springframework/transaction/interceptor/AbstractFallbackTransactionAttributeSource.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/transaction/support/AbstractPlatformTransactionManager.class\\E"
@@ -2230,8 +2318,6 @@
     "pattern":"\\Qorg/springframework/web/reactive/config/WebFluxConfigurer.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/web/servlet/DispatcherServlet.class\\E"
-  }, {
-    "pattern":"\\Qorg/springframework/web/servlet/DispatcherServlet.properties\\E"
   }, {
     "pattern":"\\Qorg/springframework/web/servlet/FrameworkServlet.class\\E"
   }, {
@@ -2315,6 +2401,8 @@
   }, {
     "pattern":"\\Qorg/springframework/web/util/pattern/PathPatternParser.class\\E"
   }, {
+    "pattern":"\\Qrabbitmq-amqp-client.properties\\E"
+  }, {
     "pattern":"\\Qspringdoc.config.properties\\E"
   }, {
     "pattern":"java.base:\\Qjava/lang/Iterable.class\\E"
@@ -2322,6 +2410,8 @@
     "pattern":"java.base:\\Qjava/lang/Object.class\\E"
   }, {
     "pattern":"java.base:\\Qjava/lang/Record.class\\E"
+  }, {
+    "pattern":"java.base:\\Qjava/lang/reflect/AccessibleObject.class\\E"
   }, {
     "pattern":"java.base:\\Qjava/lang/reflect/Proxy.class\\E"
   }, {
@@ -2341,117 +2431,117 @@
   }]},
   "bundles":[{
     "name":"i18n.Parsing",
-    "locales":["", "nl", "und"]
+    "locales":["", "nl"]
   }, {
     "name":"i18n.Validation",
-    "locales":["", "nl", "und"]
+    "locales":["", "nl"]
   }, {
     "name":"jakarta.servlet.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"jakarta.servlet.http.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"jakarta.xml.bind.helpers.Messages",
     "locales":["und"]
   }, {
     "name":"org.apache.catalina.authenticator.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.catalina.authenticator.jaspic.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.catalina.connector.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.catalina.core.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.catalina.deploy.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.catalina.loader.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.catalina.mapper.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.catalina.mbeans.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.catalina.realm.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.catalina.security.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.catalina.session.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.catalina.startup.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.catalina.util.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.catalina.valves.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.catalina.webresources.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.coyote.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.coyote.http11.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.coyote.http11.filters.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.naming.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.tomcat.util.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.tomcat.util.buf.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.tomcat.util.compat.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.tomcat.util.descriptor.web.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.tomcat.util.http.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.tomcat.util.http.parser.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.tomcat.util.modeler.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.tomcat.util.net.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.tomcat.util.scan.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.tomcat.util.threads.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.tomcat.websocket.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.apache.tomcat.websocket.server.LocalStrings",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.aspectj.weaver.weaver-messages",
-    "locales":["", "und"]
+    "locales":[""]
   }, {
     "name":"org.springframework.security.messages",
-    "locales":["nl", "und"]
+    "locales":["", "nl"]
   }]
 }

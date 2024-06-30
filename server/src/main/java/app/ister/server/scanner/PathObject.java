@@ -15,22 +15,20 @@ import java.util.regex.Pattern;
 @Slf4j
 public class PathObject {
 
+    private final static String REGEX_SHOW = ".*\\/(.*)\\((\\d{4})\\)*";
+    private final static String REGEX_SEASON = "season\\s+(\\d{1,4})";
+    private final static String REGEX_EPISODE = "s(\\d{1,4})e(\\d{1,4}).*";
+    private final static String REGEX_FILE_TYPE = ".*\\.(.*)";
+    private final static List<String> IMAGE_FILE_TYPES = List.of("jpg", "png");
+    private final static List<String> NFO_FILE_TYPES = List.of("nfo");
+    private final static List<String> MEDIA_FILES_FILE_TYPES = List.of("mkv", "mp4");
+    private final static List<String> SUBTITLE_FILES_FILE_TYPES = List.of("srt");
     private String show;
     private int showYear;
     private int season;
     private int episode;
     private DirType dirType;
     private FileType fileType;
-
-    private final static String REGEX_SHOW = ".*\\/(.*)\\((\\d{4})\\)*";
-    private final static String REGEX_SEASON = "season\\s+(\\d{1,4})";
-    private final static String REGEX_EPISODE = "s(\\d{1,4})e(\\d{1,4}).*";
-    private final static String REGEX_FILE_TYPE = ".*\\.(.*)";
-
-    private final static List<String> IMAGE_FILE_TYPES = List.of("jpg", "png");
-    private final static List<String> NFO_FILE_TYPES = List.of("nfo");
-    private final static List<String> MEDIA_FILES_FILE_TYPES = List.of("mkv", "mp4");
-    private final static List<String> SUBTITLE_FILES_FILE_TYPES = List.of("srt");
 
     public PathObject(String path) {
         if (setShow(path)) {

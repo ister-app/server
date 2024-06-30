@@ -29,11 +29,11 @@ public class WatchStatusEntity extends BaseEntity {
     @Column(nullable = false)
     private UUID playQueueItemId;
 
-    @ManyToOne(optional=false)
+    @ManyToOne(optional = false)
     private UserEntity userEntity;
 
     @Getter(onMethod = @__(@JsonBackReference))
-    @ManyToOne(optional=false)
+    @ManyToOne(optional = false)
     private EpisodeEntity episodeEntity;
 
     @Column(nullable = false)

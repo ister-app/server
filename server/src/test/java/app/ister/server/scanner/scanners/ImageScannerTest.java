@@ -22,16 +22,14 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ImageScannerTest {
 
+    @InjectMocks
+    ImageScanner subject;
     @Mock
     private ScannerHelperService scannerHelperService;
     @Mock
     private ImageRepository imageRepository;
-
     @Mock
     private BasicFileAttributes basicFileAttributes;
-
-    @InjectMocks
-    ImageScanner subject;
 
     @Test
     void analyzable() {

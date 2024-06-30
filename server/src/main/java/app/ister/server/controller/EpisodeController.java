@@ -102,7 +102,8 @@ public class EpisodeController {
 
     @SchemaMapping(typeName = "Episode", field = "watchStatus")
     public List<WatchStatusEntity> watchStatus(EpisodeEntity episodeEntity, Authentication authentication) {
-        return watchStatusRepository.findByUserEntityExternalIdAndEpisodeEntity(authentication.getName(), episodeEntity, Sort.by("DateUpdated").descending());    }
+        return watchStatusRepository.findByUserEntityExternalIdAndEpisodeEntity(authentication.getName(), episodeEntity, Sort.by("DateUpdated").descending());
+    }
 
     @SchemaMapping(typeName = "Episode", field = "mediaFile")
     public List<MediaFileEntity> mediaFile(EpisodeEntity episodeEntity) {

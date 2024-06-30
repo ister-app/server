@@ -17,7 +17,7 @@ public class ShowNfo {
     @XmlElement
     private String plot;
 
-    @XmlElement(name="tag")
+    @XmlElement(name = "tag")
     private List<String> tags;
 
     @XmlElement

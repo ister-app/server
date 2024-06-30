@@ -70,6 +70,6 @@ public class UrlOutputUtils {
     }
 
     private static String pathStringEscapeSpecialChars(String path) {
-        return path.replace("'", "\\\\\\\\\\\\\'");
+        return path.replace("'", "\\\\\\\\\\\\'");
     }
 }

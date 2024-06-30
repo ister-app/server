@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ParserTest {
 
     @Test
-    void parseShowSuccessful () {
+    void parseShowSuccessful() {
         InputStream resourceAsStream = ParserTest.class.getResourceAsStream("/nfo/tvshow.nfo");
         var subject = Parser.parseShow(resourceAsStream).orElseThrow();
         assertEquals("Star Trek: Discovery", subject.getTitle());
@@ -29,7 +29,7 @@ class ParserTest {
     }
 
     @Test
-    void parseEpisodeSuccessful () {
+    void parseEpisodeSuccessful() {
         InputStream resourceAsStream = ParserTest.class.getResourceAsStream("/nfo/episode.nfo");
         var subject = Parser.parseEpisode(resourceAsStream).orElseThrow();
         assertEquals("Filmed Before a Live Studio Audience", subject.getTitle());

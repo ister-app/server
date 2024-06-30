@@ -12,6 +12,8 @@ import app.ister.server.service.ScannerHelperService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -20,14 +22,14 @@ import java.util.Optional;
 
 @Component
 @Slf4j
+@Transactional(propagation = Propagation.REQUIRES_NEW)
 public class ImageScanner implements Scanner {
+    private final static List<String> BACKGROUND_FILE_NAMES = List.of("background", "thumb");
+    private final static List<String> COVER_FILE_NAMES = List.of("cover");
     @Autowired
     private ScannerHelperService scannerHelperService;
     @Autowired
     private ImageRepository imageRepository;
-
-    private final static List<String>  BACKGROUND_FILE_NAMES = List.of("background", "thumb");
-    private final static List<String>  COVER_FILE_NAMES = List.of("cover");
 
     @Override
     public boolean analyzable(Path path, BasicFileAttributes attrs) {

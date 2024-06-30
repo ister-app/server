@@ -22,6 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MockitoExtension.class)
 class LibraryScannerTest {
+    @InjectMocks
+    LibraryScanner libraryScanner;
     @Mock
     private MediaFileScanner mediaFileScanner;
     @Mock
@@ -31,13 +33,9 @@ class LibraryScannerTest {
     @Mock
     private SubtitleScanner subtitleScanner;
 
-    @InjectMocks
-    LibraryScanner libraryScanner;
-
-
     @Test
     void simpleTest() throws IOException {
-        try (FileSystem fileSystem = Jimfs.newFileSystem(Configuration.unix());) {
+        try (FileSystem fileSystem = Jimfs.newFileSystem(Configuration.unix())) {
             Path resourceFilePath = fileSystem.getPath("/disk/show");
 
             Files.createDirectories(resourceFilePath);

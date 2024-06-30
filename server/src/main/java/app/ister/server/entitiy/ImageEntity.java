@@ -19,7 +19,7 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class ImageEntity extends BaseEntity {
 
-    @ManyToOne(optional=false)
+    @ManyToOne(optional = false)
     private DirectoryEntity directoryEntity;
 
     @Column(nullable = false)

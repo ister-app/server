@@ -37,7 +37,7 @@ public class ProcessUtils {
     }
 
     private static Optional<Long> getProcess(TranscodeSessionData transcodeSessionData) {
-        for(ProcessHandle processHandle: ProcessHandle.current().children().toList()) {
+        for (ProcessHandle processHandle : ProcessHandle.current().children().toList()) {
             if (processHandle.info().commandLine().orElse("").contains(transcodeSessionData.getDir())) {
                 log.debug("Process found for transcodeSessionEntity: {}, pid: {}", transcodeSessionData.getId(), processHandle.pid());
                 return Optional.of(processHandle.pid());

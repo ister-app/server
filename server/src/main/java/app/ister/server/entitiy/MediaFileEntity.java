@@ -25,11 +25,11 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class MediaFileEntity extends BaseEntity {
 
-    @ManyToOne(optional=false)
+    @ManyToOne(optional = false)
     private DirectoryEntity directoryEntity;
 
     @Getter(onMethod = @__(@JsonBackReference))
-    @ManyToOne(optional=false)
+    @ManyToOne(optional = false)
     private EpisodeEntity episodeEntity;
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "mediaFileEntity")

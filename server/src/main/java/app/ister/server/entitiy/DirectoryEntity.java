@@ -17,7 +17,7 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class DirectoryEntity extends BaseEntity {
 
-    @ManyToOne(optional=false)
+    @ManyToOne(optional = false)
     private NodeEntity nodeEntity;
 
     @ManyToOne

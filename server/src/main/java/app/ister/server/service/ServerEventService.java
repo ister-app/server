@@ -1,12 +1,8 @@
 package app.ister.server.service;
 
-import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.enums.EventType;
-import app.ister.server.eventHandlers.EpisodeFoundData;
-import app.ister.server.eventHandlers.ShowFoundData;
-import app.ister.server.repository.ServerEventRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import app.ister.server.events.episodefound.EpisodeFoundData;
+import app.ister.server.events.showfound.ShowFoundData;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -17,31 +13,19 @@ import java.util.UUID;
 @Slf4j
 public class ServerEventService {
     @Autowired
-    private ServerEventRepository serverEventRepository;
-
-    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private MessageSender messageSender;
 
     public void createShowFoundEvent(UUID showId) {
-        try {
-            ShowFoundData showFoundData = ShowFoundData.builder().showId(showId).build();
-            String data = objectMapper.writeValueAsString(showFoundData);
-            serverEventRepository.save(ServerEventEntity.builder()
-                    .eventType(EventType.SHOW_FOUND)
-                    .data(data).build());
-        } catch (JsonProcessingException jpe) {
-            log.error("Cannot convert ShowFoundData into JSON", jpe);
-        }
+        messageSender.sendShowFound(ShowFoundData.builder()
+                .eventType(EventType.SHOW_FOUND)
+                .showId(showId)
+                .build());
     }
 
     public void createEpisodeFoundEvent(UUID episodeId) {
-        try {
-            EpisodeFoundData episodeFoundData = EpisodeFoundData.builder().episodeId(episodeId).build();
-            String data = objectMapper.writeValueAsString(episodeFoundData);
-            serverEventRepository.save(ServerEventEntity.builder()
-                    .eventType(EventType.EPISODE_FOUND)
-                    .data(data).build());
-        } catch (JsonProcessingException jpe) {
-            log.error("Cannot convert EpisodeFoundData into JSON", jpe);
-        }
+        messageSender.sendEpisodeFound(EpisodeFoundData.builder()
+                .eventType(EventType.EPISODE_FOUND)
+                .episodeId(episodeId)
+                .build());
     }
 }

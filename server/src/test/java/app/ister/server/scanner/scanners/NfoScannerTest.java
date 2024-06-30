@@ -16,14 +16,12 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class NfoScannerTest {
-    @Mock
-    private ShowRepository showRepository;
-
-    @Mock
-    private BasicFileAttributes basicFileAttributes;
-
     @InjectMocks
     NfoScanner subject;
+    @Mock
+    private ShowRepository showRepository;
+    @Mock
+    private BasicFileAttributes basicFileAttributes;
 
     @Test
     void analyzable() {

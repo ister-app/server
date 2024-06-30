@@ -5,6 +5,7 @@ import app.ister.server.scanner.enums.FileType;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class PathObjectTest {
 
@@ -12,7 +13,7 @@ class PathObjectTest {
     void notCorrectPath() {
         var subject = new PathObject("/disk/shows");
         assertEquals(0, subject.getShowYear());
-        assertEquals(null, subject.getShow());
+        assertNull(subject.getShow());
         assertEquals(0, subject.getSeason());
         assertEquals(0, subject.getEpisode());
         assertEquals(DirType.NONE, subject.getDirType());
@@ -23,7 +24,7 @@ class PathObjectTest {
     void notCorrectMissingShowPath() {
         var subject = new PathObject("/disk/shows/Season 08/s08e08.mkv");
         assertEquals(0, subject.getShowYear());
-        assertEquals(null, subject.getShow());
+        assertNull(subject.getShow());
         assertEquals(0, subject.getSeason());
         assertEquals(0, subject.getEpisode());
         assertEquals(DirType.NONE, subject.getDirType());
