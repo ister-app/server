@@ -1,5 +1,17 @@
 # Ister server
 
+## Update reflection files
+
+- Delete JSON files from: `server/src/main/resources/META-INF/native-image`. 
+- Start the app with `./gradlew bootRun`
+- In the frontend start rescan
+- Go to the folowing urls:
+  - http://localhost:8080/graphiql
+  - http://localhost:8080/swagger-ui/index.html
+  - http://localhost:8081/actuator
+  - http://localhost:8081/actuator/health
+  - http://localhost:8081/actuator/prometheus
+  - http://localhost:8081/actuator/metrics
 
 ## Create test video
 

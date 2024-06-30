@@ -201,6 +201,9 @@
     "interfaces":["org.springframework.graphql.data.method.annotation.SchemaMapping"]
   },
   {
+    "interfaces":["org.springframework.jdbc.datasource.ConnectionProxy"]
+  },
+  {
     "interfaces":["org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity"]
   },
   {
