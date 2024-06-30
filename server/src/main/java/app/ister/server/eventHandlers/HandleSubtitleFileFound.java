@@ -2,21 +2,28 @@ package app.ister.server.eventHandlers;
 
 import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.entitiy.MediaFileStreamEntity;
-import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.enums.EventType;
 import app.ister.server.enums.StreamCodecType;
+import app.ister.server.eventHandlers.data.SubtitleFileFoundData;
 import app.ister.server.eventHandlers.subtitleFileFound.SubtitleFilePathParser;
+import app.ister.server.repository.DirectoryRepository;
 import app.ister.server.repository.MediaFileStreamRepository;
 import app.ister.server.scanner.PathObject;
 import app.ister.server.scanner.enums.DirType;
 import app.ister.server.service.ScannerHelperService;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import static app.ister.server.eventHandlers.MessageQueue.APP_ISTER_SERVER_SUBTITLE_FILE_FOUND;
 import static app.ister.server.eventHandlers.subtitleFileFound.SubtitleFilePathParser.mediaFileAndSubtitleFileBelongTogether;
 
-@Component
-public class HandleSubtitleFileFound implements Handle {
+@Service
+@Transactional
+public class HandleSubtitleFileFound implements Handle<SubtitleFileFoundData> {
+    @Autowired
+    private DirectoryRepository directoryRepository;
     @Autowired
     private ScannerHelperService scannerHelperService;
     @Autowired
@@ -27,9 +34,16 @@ public class HandleSubtitleFileFound implements Handle {
         return EventType.SUBTITLE_FILE_FOUND;
     }
 
+    @RabbitListener(queues = APP_ISTER_SERVER_SUBTITLE_FILE_FOUND)
     @Override
-    public Boolean handle(ServerEventEntity serverEventEntity) {
-        analyze(serverEventEntity.getDirectoryEntity(), serverEventEntity.getPath());
+    public void listener(SubtitleFileFoundData subtitleFileFoundData) {
+        Handle.super.listener(subtitleFileFoundData);
+    }
+
+    @Override
+    public Boolean handle(SubtitleFileFoundData subtitleFileFoundData) {
+        var directoryEntity = directoryRepository.findById(subtitleFileFoundData.getDirectoryEntityUUID()).orElseThrow();
+        analyze(directoryEntity, subtitleFileFoundData.getPath());
         return true;
     }
 

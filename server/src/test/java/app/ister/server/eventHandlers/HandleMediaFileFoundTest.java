@@ -5,14 +5,13 @@ import app.ister.server.entitiy.EpisodeEntity;
 import app.ister.server.entitiy.ImageEntity;
 import app.ister.server.entitiy.MediaFileEntity;
 import app.ister.server.entitiy.MediaFileStreamEntity;
-import app.ister.server.entitiy.NodeEntity;
-import app.ister.server.entitiy.ServerEventEntity;
-import app.ister.server.enums.DirectoryType;
 import app.ister.server.enums.EventType;
+import app.ister.server.eventHandlers.data.MediaFileFoundData;
 import app.ister.server.eventHandlers.mediaFileFound.MediaFileFoundCheckForStreams;
 import app.ister.server.eventHandlers.mediaFileFound.MediaFileFoundCreateBackground;
 import app.ister.server.eventHandlers.mediaFileFound.MediaFileFoundGetDuration;
 import app.ister.server.repository.DirectoryRepository;
+import app.ister.server.repository.EpisodeRepository;
 import app.ister.server.repository.ImageRepository;
 import app.ister.server.repository.MediaFileRepository;
 import app.ister.server.repository.MediaFileStreamRepository;
@@ -39,6 +38,8 @@ class HandleMediaFileFoundTest {
     @Mock
     private MediaFileRepository mediaFileRepositoryMock;
     @Mock
+    private EpisodeRepository episodeRepositoryMock;
+    @Mock
     private MediaFileStreamRepository mediaFileStreamRepositoryMock;
     @Mock
     private ImageRepository imageRepositoryMock;
@@ -63,6 +64,7 @@ class HandleMediaFileFoundTest {
                 nodeServiceMock,
                 directoryRepositoryMock,
                 mediaFileRepositoryMock,
+                episodeRepositoryMock,
                 mediaFileStreamRepositoryMock,
                 imageRepositoryMock,
                 mediaFileFoundCheckForStreamsMock,
@@ -79,19 +81,21 @@ class HandleMediaFileFoundTest {
                         ImageEntity.builder().build()
                 )).build();
         String filePath = "/home/path";
-        ServerEventEntity serverEventEntity = ServerEventEntity.builder()
+        MediaFileFoundData mediaFileFoundData = MediaFileFoundData.builder()
                 .eventType(EventType.MEDIA_FILE_FOUND)
-                .directoryEntity(directoryEntity)
-                .episodeEntity(episodeEntity)
+                .directoryEntityUUID(directoryEntity.getId())
+                .episodeEntityUUID(episodeEntity.getId())
                 .path(filePath)
                 .build();
         MediaFileEntity mediaFileEntity = MediaFileEntity.builder().path(filePath).build();
         MediaFileStreamEntity mediaFileStreamEntity = MediaFileStreamEntity.builder().build();
 
+        when(directoryRepositoryMock.findById(directoryEntity.getId())).thenReturn(Optional.of(directoryEntity));
+        when(episodeRepositoryMock.findById(episodeEntity.getId())).thenReturn(Optional.of(episodeEntity));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndEpisodeEntityAndPath(directoryEntity, episodeEntity, filePath)).thenReturn(Optional.of(mediaFileEntity));
         when(mediaFileFoundGetDurationMock.getDuration(filePath)).thenReturn(10L);
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(mediaFileEntity, null)).thenReturn(List.of(mediaFileStreamEntity));
 
-        subject.handle(serverEventEntity);
+        subject.handle(mediaFileFoundData);
     }
 }

@@ -12,6 +12,8 @@ import app.ister.server.service.ScannerHelperService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -20,6 +22,7 @@ import java.util.Optional;
 
 @Component
 @Slf4j
+@Transactional(propagation = Propagation.REQUIRES_NEW)
 public class ImageScanner implements Scanner {
     @Autowired
     private ScannerHelperService scannerHelperService;

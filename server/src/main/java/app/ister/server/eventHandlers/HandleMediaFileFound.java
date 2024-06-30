@@ -5,29 +5,36 @@ import app.ister.server.entitiy.EpisodeEntity;
 import app.ister.server.entitiy.ImageEntity;
 import app.ister.server.entitiy.MediaFileEntity;
 import app.ister.server.entitiy.NodeEntity;
-import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.enums.DirectoryType;
 import app.ister.server.enums.EventType;
 import app.ister.server.enums.ImageType;
+import app.ister.server.eventHandlers.data.MediaFileFoundData;
 import app.ister.server.eventHandlers.mediaFileFound.MediaFileFoundCheckForStreams;
 import app.ister.server.eventHandlers.mediaFileFound.MediaFileFoundCreateBackground;
 import app.ister.server.eventHandlers.mediaFileFound.MediaFileFoundGetDuration;
 import app.ister.server.repository.DirectoryRepository;
+import app.ister.server.repository.EpisodeRepository;
 import app.ister.server.repository.ImageRepository;
 import app.ister.server.repository.MediaFileRepository;
 import app.ister.server.repository.MediaFileStreamRepository;
 import app.ister.server.service.NodeService;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Path;
 import java.util.Optional;
 
-@Component
-public class HandleMediaFileFound implements Handle {
+import static app.ister.server.eventHandlers.MessageQueue.APP_ISTER_SERVER_MEDIA_FILE_FOUND;
+
+@Service
+@Transactional
+public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     private final NodeService nodeService;
     private final DirectoryRepository directoryRepository;
     private final MediaFileRepository mediaFileRepository;
+    private final EpisodeRepository episodeRepository;
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final ImageRepository imageRepository;
 
@@ -40,7 +47,7 @@ public class HandleMediaFileFound implements Handle {
 
     public HandleMediaFileFound(NodeService nodeService,
                                 DirectoryRepository directoryRepository,
-                                MediaFileRepository mediaFileRepository,
+                                MediaFileRepository mediaFileRepository, EpisodeRepository episodeRepository,
                                 MediaFileStreamRepository mediaFileStreamRepository,
                                 ImageRepository imageRepository,
                                 MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams,
@@ -49,6 +56,7 @@ public class HandleMediaFileFound implements Handle {
         this.nodeService = nodeService;
         this.directoryRepository = directoryRepository;
         this.mediaFileRepository = mediaFileRepository;
+        this.episodeRepository = episodeRepository;
         this.mediaFileStreamRepository = mediaFileStreamRepository;
         this.imageRepository = imageRepository;
         this.mediaFileFoundCheckForStreams = mediaFileFoundCheckForStreams;
@@ -61,6 +69,12 @@ public class HandleMediaFileFound implements Handle {
         return EventType.MEDIA_FILE_FOUND;
     }
 
+    @RabbitListener(queues = APP_ISTER_SERVER_MEDIA_FILE_FOUND)
+    @Override
+    public void listener(MediaFileFoundData mediaFileFoundData) {
+        Handle.super.listener(mediaFileFoundData);
+    }
+
     /**
      * When the scanner find the media file it saves the data in the database.
      * The scanner is not analyzing the media file, because it can take a bit longer.
@@ -70,9 +84,11 @@ public class HandleMediaFileFound implements Handle {
      * - And will create a background image.
      */
     @Override
-    public Boolean handle(ServerEventEntity serverEventEntity) {
-        var mediaFile = checkMediaFile(serverEventEntity.getDirectoryEntity(), serverEventEntity.getEpisodeEntity(), serverEventEntity.getPath());
-        mediaFile.ifPresent(mediaFileEntity -> createBackgroundImage(serverEventEntity.getEpisodeEntity(), serverEventEntity.getPath(), mediaFileEntity.getDurationInMilliseconds()));
+    public Boolean handle(MediaFileFoundData mediaFileFoundData) {
+        DirectoryEntity directoryEntity = directoryRepository.findById(mediaFileFoundData.getDirectoryEntityUUID()).orElseThrow();
+        EpisodeEntity episodeEntity = episodeRepository.findById(mediaFileFoundData.getEpisodeEntityUUID()).orElseThrow();
+        var mediaFile = checkMediaFile(directoryEntity, episodeEntity, mediaFileFoundData.getPath());
+        mediaFile.ifPresent(mediaFileEntity -> createBackgroundImage(episodeEntity, mediaFileFoundData.getPath(), mediaFileEntity.getDurationInMilliseconds()));
         return true;
     }
 

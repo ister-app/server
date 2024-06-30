@@ -1,7 +1,6 @@
 package app.ister.server.eventHandlers;
 
 import app.ister.server.entitiy.NodeEntity;
-import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.entitiy.ShowEntity;
 import app.ister.server.enums.DirectoryType;
 import app.ister.server.enums.EventType;
@@ -11,26 +10,32 @@ import app.ister.server.eventHandlers.TMDBMetadata.ImageSave;
 import app.ister.server.eventHandlers.TMDBMetadata.ShowMetadata;
 import app.ister.server.eventHandlers.TMDBMetadata.TMDBResult;
 import app.ister.server.eventHandlers.TMDBMetadata.metadataSave;
+import app.ister.server.eventHandlers.data.ShowFoundData;
 import app.ister.server.repository.DirectoryRepository;
 import app.ister.server.repository.ShowRepository;
 import app.ister.server.service.NodeService;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import info.movito.themoviedbapi.tools.TmdbException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@Component
+import static app.ister.server.eventHandlers.MessageQueue.APP_ISTER_SERVER_MEDIA_FILE_FOUND;
+import static app.ister.server.eventHandlers.MessageQueue.APP_ISTER_SERVER_SHOW_FOUND;
+
+@Service
+@Transactional
 @Slf4j
-public class HandleShowFound implements Handle {
+public class HandleShowFound implements Handle<ShowFoundData> {
     @Autowired
     private NodeService nodeService;
     @Autowired
@@ -59,14 +64,19 @@ public class HandleShowFound implements Handle {
         return EventType.SHOW_FOUND;
     }
 
+    @RabbitListener(queues = APP_ISTER_SERVER_SHOW_FOUND)
     @Override
-    public Boolean handle(ServerEventEntity serverEventEntity) {
+    public void listener(ShowFoundData showFoundData) {
+        Handle.super.listener(showFoundData);
+    }
+
+    @Override
+    public Boolean handle(ShowFoundData showFoundData) {
         // If no tmdb api key is set. Skip this event.
         if (apikey.equals("'No api key available'")) {
             return true;
         }
         try {
-            ShowFoundData showFoundData = objectMapper.readValue(serverEventEntity.getData(), new TypeReference<>() {});
             ShowEntity showEntity = showRepository.findById(showFoundData.getShowId()).orElseThrow();
             for (String language : supportLanguages) {
                 Optional<TMDBResult> TMDBResult = showMetadata.getMetadata(showEntity.getName(), showEntity.getReleaseYear(), language);

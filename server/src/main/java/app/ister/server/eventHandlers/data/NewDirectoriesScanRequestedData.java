@@ -1,17 +1,12 @@
-package app.ister.server.eventHandlers;
+package app.ister.server.eventHandlers.data;
 
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
-import java.util.UUID;
-
 @Getter
-@Setter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
-public class ShowFoundData {
-    private UUID showId;
+public class NewDirectoriesScanRequestedData extends MessageData {
 }

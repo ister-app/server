@@ -6,14 +6,17 @@ import app.ister.server.entitiy.OtherPathFileEntity;
 import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.enums.EventType;
 import app.ister.server.enums.PathFileType;
+import app.ister.server.eventHandlers.data.NfoFileFoundData;
 import app.ister.server.repository.OtherPathFileRepository;
-import app.ister.server.repository.ServerEventRepository;
 import app.ister.server.scanner.PathObject;
 import app.ister.server.scanner.enums.DirType;
 import app.ister.server.scanner.enums.FileType;
+import app.ister.server.service.MessageSender;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -21,11 +24,12 @@ import java.util.Optional;
 
 @Component
 @Slf4j
+@Transactional(propagation = Propagation.REQUIRES_NEW)
 public class NfoScanner implements Scanner {
     @Autowired
     private OtherPathFileRepository otherPathFileRepository;
     @Autowired
-    private ServerEventRepository serverEventRepository;
+    private MessageSender messageSender;
 
     @Override
     public boolean analyzable(Path path, BasicFileAttributes attrs) {
@@ -46,8 +50,8 @@ public class NfoScanner implements Scanner {
                     .pathFileType(PathFileType.NFO)
                     .path(path.toString()).build();
             otherPathFileRepository.save(entity);
-            serverEventRepository.save(ServerEventEntity.builder()
-                    .directoryEntity(directoryEntity)
+            messageSender.sendNfoFileFound(NfoFileFoundData.builder()
+                    .directoryEntityUUID(directoryEntity.getId())
                     .eventType(EventType.NFO_FILE_FOUND)
                     .path(path.toString()).build());
             return Optional.of(entity);

@@ -2,22 +2,30 @@ package app.ister.server.eventHandlers;
 
 import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.entitiy.MetadataEntity;
-import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.enums.EventType;
+import app.ister.server.eventHandlers.data.NfoFileFoundData;
 import app.ister.server.nfo.Parser;
+import app.ister.server.repository.DirectoryRepository;
 import app.ister.server.repository.MetadataRepository;
 import app.ister.server.scanner.PathObject;
 import app.ister.server.scanner.enums.DirType;
 import app.ister.server.service.ScannerHelperService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.FileNotFoundException;
 
-@Component
+import static app.ister.server.eventHandlers.MessageQueue.APP_ISTER_SERVER_NFO_FILE_FOUND;
+
+@Service
+@Transactional
 @Slf4j
-public class HandleNfoFileFound implements Handle {
+public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
+    @Autowired
+    private DirectoryRepository directoryRepository;
     @Autowired
     private MetadataRepository metadataRepository;
     @Autowired
@@ -28,9 +36,16 @@ public class HandleNfoFileFound implements Handle {
         return EventType.NFO_FILE_FOUND;
     }
 
+    @RabbitListener(queues = APP_ISTER_SERVER_NFO_FILE_FOUND)
     @Override
-    public Boolean handle(ServerEventEntity serverEventEntity) {
-        analyze(serverEventEntity.getDirectoryEntity(), serverEventEntity.getPath());
+    public void listener(NfoFileFoundData nfoFileFoundData) {
+        Handle.super.listener(nfoFileFoundData);
+    }
+
+    @Override
+    public Boolean handle(NfoFileFoundData nfoFileFoundData) {
+        var directoryEntity = directoryRepository.findById(nfoFileFoundData.getDirectoryEntityUUID()).orElseThrow();
+        analyze(directoryEntity, nfoFileFoundData.getPath());
         return true;
     }
 

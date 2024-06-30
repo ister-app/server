@@ -2,7 +2,6 @@ package app.ister.server.eventHandlers;
 
 import app.ister.server.entitiy.EpisodeEntity;
 import app.ister.server.entitiy.NodeEntity;
-import app.ister.server.entitiy.ServerEventEntity;
 import app.ister.server.entitiy.ShowEntity;
 import app.ister.server.enums.DirectoryType;
 import app.ister.server.enums.EventType;
@@ -12,27 +11,32 @@ import app.ister.server.eventHandlers.TMDBMetadata.ImageDownload;
 import app.ister.server.eventHandlers.TMDBMetadata.ImageSave;
 import app.ister.server.eventHandlers.TMDBMetadata.TMDBResult;
 import app.ister.server.eventHandlers.TMDBMetadata.metadataSave;
+import app.ister.server.eventHandlers.data.EpisodeFoundData;
 import app.ister.server.repository.DirectoryRepository;
 import app.ister.server.repository.EpisodeRepository;
 import app.ister.server.service.NodeService;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import info.movito.themoviedbapi.model.core.responses.TmdbResponseException;
 import info.movito.themoviedbapi.tools.TmdbException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@Component
+import static app.ister.server.eventHandlers.MessageQueue.APP_ISTER_SERVER_EPISODE_FOUND;
+
+@Service
 @Slf4j
-public class HandleEpisodeFound implements Handle {
+@Transactional
+public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
     @Autowired
     private NodeService nodeService;
     @Autowired
@@ -61,14 +65,19 @@ public class HandleEpisodeFound implements Handle {
         return EventType.EPISODE_FOUND;
     }
 
+    @RabbitListener(queues = APP_ISTER_SERVER_EPISODE_FOUND)
     @Override
-    public Boolean handle(ServerEventEntity serverEventEntity) {
+    public void listener(EpisodeFoundData episodeFoundData) {
+        Handle.super.listener(episodeFoundData);
+    }
+
+    @Override
+    public Boolean handle(EpisodeFoundData episodeFoundData) {
         // If no tmdb api key is set. Skip this event.
         if (apikey.equals("'No api key available'")) {
             return true;
         }
         try {
-            EpisodeFoundData episodeFoundData = objectMapper.readValue(serverEventEntity.getData(), new TypeReference<>() {});
             EpisodeEntity episodeEntity = episodeRepository.findById(episodeFoundData.getEpisodeId()).orElseThrow();
             for (String language : supportLanguages) {
                 ShowEntity showEntity = episodeEntity.getShowEntity();
@@ -82,7 +91,6 @@ public class HandleEpisodeFound implements Handle {
                         getAndSaveImage(TMDBResult.get().getPosterUrl(), ImageType.COVER, TMDBResult.get().getLanguage(), episodeEntity);
                     }
                 }
-                ;
             }
         } catch (JsonProcessingException jpe) {
             log.error("Cannot convert JSON into ShowFoundData", jpe);
