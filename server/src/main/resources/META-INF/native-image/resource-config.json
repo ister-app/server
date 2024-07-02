@@ -101,6 +101,8 @@
   }, {
     "pattern":"\\Qapp/ister/server/entitiy/EpisodeEntity.class\\E"
   }, {
+    "pattern":"\\Qapp/ister/server/entitiy/FileFromPathEntity.class\\E"
+  }, {
     "pattern":"\\Qapp/ister/server/entitiy/ImageEntity$ImageEntityBuilder.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/entitiy/ImageEntity.class\\E"
@@ -178,6 +180,8 @@
     "pattern":"\\Qapp/ister/server/events/episodefound/EpisodeFoundData$EpisodeFoundDataBuilder.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/events/episodefound/HandleEpisodeFound.class\\E"
+  }, {
+    "pattern":"\\Qapp/ister/server/events/filescanrequested/FileScanRequestedHandle.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/events/mediafilefound/HandleMediaFileFound.class\\E"
   }, {
@@ -2544,6 +2548,6 @@
     "locales":["", "und"]
   }, {
     "name":"org.springframework.security.messages",
-    "locales":["", "nl", "und"]
+    "locales":["nl", "und"]
   }]
 }
