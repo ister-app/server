@@ -50,8 +50,8 @@ class FileScanRequestedHandleTest {
 
     @Test
     void listenerThrowNotSupported() {
+        FileScanRequestedData fileScanRequestedData = FileScanRequestedData.builder().eventType(EventType.SHOW_FOUND).build();
         assertThrows(IllegalArgumentException.class, () -> {
-            FileScanRequestedData fileScanRequestedData = FileScanRequestedData.builder().eventType(EventType.SHOW_FOUND).build();
             subject.listener(fileScanRequestedData);
         });
     }
