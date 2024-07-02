@@ -24,16 +24,19 @@ import static app.ister.server.enums.EventType.FILE_SCAN_REQUESTED;
 @Service
 @Transactional
 public class FileScanRequestedHandle implements Handle<FileScanRequestedData> {
-    @Autowired
-    private DirectoryRepository directoryRepository;
-    @Autowired
-    private MediaFileScanner mediaFileScanner;
-    @Autowired
-    private ImageScanner imageScanner;
-    @Autowired
-    private NfoScanner nfoScanner;
-    @Autowired
-    private SubtitleScanner subtitleScanner;
+    private final DirectoryRepository directoryRepository;
+    private final MediaFileScanner mediaFileScanner;
+    private final ImageScanner imageScanner;
+    private final NfoScanner nfoScanner;
+    private final SubtitleScanner subtitleScanner;
+
+    public FileScanRequestedHandle(DirectoryRepository directoryRepository, MediaFileScanner mediaFileScanner, ImageScanner imageScanner, NfoScanner nfoScanner, SubtitleScanner subtitleScanner) {
+        this.directoryRepository = directoryRepository;
+        this.mediaFileScanner = mediaFileScanner;
+        this.imageScanner = imageScanner;
+        this.nfoScanner = nfoScanner;
+        this.subtitleScanner = subtitleScanner;
+    }
 
     @RabbitListener(queues = MessageQueue.APP_ISTER_SERVER_FILE_SCAN_REQUESTED)
     @Override
