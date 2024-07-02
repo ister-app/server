@@ -1,7 +1,7 @@
 package app.ister.server.service;
 
 import app.ister.server.events.episodefound.EpisodeFoundData;
-import app.ister.server.events.fileScanRequested.FileScanRequestedData;
+import app.ister.server.events.filescanrequested.FileScanRequestedData;
 import app.ister.server.events.mediafilefound.MediaFileFoundData;
 import app.ister.server.events.newdirectoriesscanrequested.NewDirectoriesScanRequestedData;
 import app.ister.server.events.nfofilefound.NfoFileFoundData;

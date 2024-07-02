@@ -1,4 +1,4 @@
-package app.ister.server.events.fileScanRequested;
+package app.ister.server.events.filescanrequested;
 
 import app.ister.server.events.MessageData;
 import lombok.AccessLevel;

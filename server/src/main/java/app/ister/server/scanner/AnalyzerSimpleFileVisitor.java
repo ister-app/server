@@ -2,7 +2,7 @@ package app.ister.server.scanner;
 
 import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.enums.EventType;
-import app.ister.server.events.fileScanRequested.FileScanRequestedData;
+import app.ister.server.events.filescanrequested.FileScanRequestedData;
 import app.ister.server.scanner.enums.DirType;
 import app.ister.server.scanner.scanners.ImageScanner;
 import app.ister.server.scanner.scanners.MediaFileScanner;
@@ -85,17 +85,16 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
     @Override
     public FileVisitResult visitFile(Path path, BasicFileAttributes basicFileAttributes) {
         for (Scanner scanner : List.of(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner)) {
-            if (scanner.analyzable(path, basicFileAttributes.isRegularFile(), basicFileAttributes.size())) {
-                if (!scannedCache.foundPath(path.toString())) {
-                    log.debug("Found file: {}, for scanner: {}", path, scanner);
-                    messageSender.sendFileScanRequested(FileScanRequestedData.builder()
-                            .path(path)
-                            .regularFile(basicFileAttributes.isRegularFile())
-                            .size(basicFileAttributes.size())
-                            .directoryEntityUUID(directoryEntity.getId())
-                            .eventType(EventType.FILE_SCAN_REQUESTED)
-                            .build());
-                }
+            // Check if scan is analyzable by scanner and is not analyzed before.
+            if (scanner.analyzable(path, basicFileAttributes.isRegularFile(), basicFileAttributes.size()) && !scannedCache.foundPath(path.toString())) {
+                log.debug("Found file: {}, for scanner: {}", path, scanner);
+                messageSender.sendFileScanRequested(FileScanRequestedData.builder()
+                        .path(path)
+                        .regularFile(basicFileAttributes.isRegularFile())
+                        .size(basicFileAttributes.size())
+                        .directoryEntityUUID(directoryEntity.getId())
+                        .eventType(EventType.FILE_SCAN_REQUESTED)
+                        .build());
             }
         }
         return FileVisitResult.CONTINUE;
