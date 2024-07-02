@@ -1,6 +1,5 @@
 package app.ister.server;
 
-import app.ister.server.events.MessageQueue;
 import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import org.springframework.amqp.core.Queue;
@@ -40,7 +39,8 @@ public class IsterServerApplication {
         return new Queue(APP_ISTER_SERVER_EPISODE_FOUND);
     }
 
-    @Bean Queue queueFileScanRequested() {
+    @Bean
+    Queue queueFileScanRequested() {
         return new Queue(APP_ISTER_SERVER_FILE_SCAN_REQUESTED);
     }
 

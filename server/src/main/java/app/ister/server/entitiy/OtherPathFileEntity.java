@@ -3,7 +3,6 @@ package app.ister.server.entitiy;
 import app.ister.server.enums.PathFileType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;

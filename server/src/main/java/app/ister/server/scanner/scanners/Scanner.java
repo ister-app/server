@@ -4,7 +4,6 @@ import app.ister.server.entitiy.BaseEntity;
 import app.ister.server.entitiy.DirectoryEntity;
 
 import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Optional;
 
 public interface Scanner {

@@ -15,9 +15,9 @@ public class ScannedCache {
     private final List<MediaFileEntity> mediaFileEntities;
     private final List<OtherPathFileEntity> otherPathFileEntities;
 
-    private ImageRepository imageRepository;
-    private MediaFileRepository mediaFileRepository;
-    private OtherPathFileRepository otherPathFileRepository;
+    private final ImageRepository imageRepository;
+    private final MediaFileRepository mediaFileRepository;
+    private final OtherPathFileRepository otherPathFileRepository;
 
     public ScannedCache(DirectoryEntity directoryEntity,
                         ImageRepository imageRepository,
