@@ -18,7 +18,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Optional;
 
 @Component
@@ -31,17 +30,17 @@ public class NfoScanner implements Scanner {
     private MessageSender messageSender;
 
     @Override
-    public boolean analyzable(Path path, BasicFileAttributes attrs) {
+    public boolean analyzable(Path path, Boolean isRegularFile, long size) {
         PathObject pathObject = new PathObject(path.toString());
         Boolean showCorrect = pathObject.getDirType().equals(DirType.SHOW) && path.getFileName().toString().equals("tvshow.nfo");
         Boolean episodeCorrect = pathObject.getDirType().equals(DirType.EPISODE) && pathObject.getFileType().equals(FileType.NFO);
-        return (attrs.isRegularFile()
+        return (isRegularFile
                 && pathObject.getFileType().equals(FileType.NFO)
                 && (showCorrect ^ episodeCorrect));
     }
 
     @Override
-    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, BasicFileAttributes attrs) {
+    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, Boolean isRegularFile, long size) {
         Optional<OtherPathFileEntity> otherPathFileEntity = otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString());
         if (otherPathFileEntity.isEmpty()) {
             var entity = OtherPathFileEntity.builder()

@@ -16,7 +16,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,14 +31,12 @@ public class ImageScanner implements Scanner {
     private ImageRepository imageRepository;
 
     @Override
-    public boolean analyzable(Path path, BasicFileAttributes attrs) {
-        return attrs.isRegularFile()
-                && attrs.isRegularFile()
-                && new PathObject(path.toString()).getFileType().equals(FileType.IMAGE);
+    public boolean analyzable(Path path, Boolean isRegularFile, long size) {
+        return isRegularFile && new PathObject(path.toString()).getFileType().equals(FileType.IMAGE);
     }
 
     @Override
-    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, BasicFileAttributes attrs) {
+    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, Boolean isRegularFile, long size) {
         if (imageRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString()).isEmpty()) {
             PathObject pathObject = new PathObject(path.toString());
 

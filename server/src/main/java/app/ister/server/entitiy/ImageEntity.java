@@ -17,14 +17,7 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
-public class ImageEntity extends BaseEntity {
-
-    @ManyToOne(optional = false)
-    private DirectoryEntity directoryEntity;
-
-    @Column(nullable = false)
-    private String path;
-
+public class ImageEntity extends FileFromPathEntity {
     @Column(nullable = false)
     private ImageType type;
 

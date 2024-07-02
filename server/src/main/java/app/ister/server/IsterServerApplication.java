@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_EPISODE_FOUND;
+import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_FILE_SCAN_REQUESTED;
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_MEDIA_FILE_FOUND;
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_NEW_DIRECTORIES_SCAN_REQUESTED;
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_NFO_FILE_FOUND;
@@ -36,6 +37,11 @@ public class IsterServerApplication {
     @Bean
     public Queue queueEpisodeFound() {
         return new Queue(APP_ISTER_SERVER_EPISODE_FOUND);
+    }
+
+    @Bean
+    Queue queueFileScanRequested() {
+        return new Queue(APP_ISTER_SERVER_FILE_SCAN_REQUESTED);
     }
 
     @Bean

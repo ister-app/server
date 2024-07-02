@@ -4,10 +4,12 @@ import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.entitiy.LibraryEntity;
 import app.ister.server.entitiy.NodeEntity;
 import app.ister.server.enums.DirectoryType;
+import app.ister.server.events.filescanrequested.FileScanRequestedData;
 import app.ister.server.scanner.scanners.ImageScanner;
 import app.ister.server.scanner.scanners.MediaFileScanner;
 import app.ister.server.scanner.scanners.NfoScanner;
 import app.ister.server.scanner.scanners.SubtitleScanner;
+import app.ister.server.service.MessageSender;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
 import org.junit.jupiter.api.AfterEach;
@@ -26,13 +28,20 @@ import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ScannerSimpleFileVisitorTest {
     @Mock
-    private MediaFileScanner episodeAnalyzer;
+    private ScannedCache scannedCache;
     @Mock
-    private ImageScanner imageAnalyzer;
+    private MessageSender messageSender;
+    @Mock
+    private MediaFileScanner mediaFileScanner;
+    @Mock
+    private ImageScanner imageScanner;
     @Mock
     private NfoScanner nfoScanner;
     @Mock
@@ -69,13 +78,28 @@ class ScannerSimpleFileVisitorTest {
         fileSystem.close();
     }
 
+    @Test
+    void visitFile() {
+        Path path = Path.of("/path");
+
+        when(mediaFileScanner.analyzable(path, false, 0)).thenReturn(false);
+        when(imageScanner.analyzable(path, false, 0)).thenReturn(false);
+        when(nfoScanner.analyzable(path, false, 0)).thenReturn(false);
+        when(subtitleScanner.analyzable(path, false, 0)).thenReturn(true);
+
+        var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, mediaFileScanner, imageScanner, nfoScanner, subtitleScanner);
+
+        assertEquals(FileVisitResult.CONTINUE, subject.visitFile(path, basicFileAttributes));
+
+        verify(messageSender).sendFileScanRequested(any(FileScanRequestedData.class));
+    }
 
     @Nested
     class PreVisitDirectory {
         @Test
         void theRootDirWillReturnContinue() {
             Path resourceFilePath = fileSystem.getPath("/disk/show");
-            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, episodeAnalyzer, imageAnalyzer, nfoScanner, subtitleScanner);
+            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, mediaFileScanner, imageScanner, nfoScanner, subtitleScanner);
 
             var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
 
@@ -85,7 +109,7 @@ class ScannerSimpleFileVisitorTest {
         @Test
         void dotDirsWillBeSkipped() {
             Path resourceFilePath = fileSystem.getPath("/disk/show/.tmp");
-            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, episodeAnalyzer, imageAnalyzer, nfoScanner, subtitleScanner);
+            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, mediaFileScanner, imageScanner, nfoScanner, subtitleScanner);
 
             var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
 

@@ -1,12 +1,15 @@
 package app.ister.server.scanner;
 
 import app.ister.server.entitiy.DirectoryEntity;
+import app.ister.server.enums.EventType;
+import app.ister.server.events.filescanrequested.FileScanRequestedData;
 import app.ister.server.scanner.enums.DirType;
 import app.ister.server.scanner.scanners.ImageScanner;
 import app.ister.server.scanner.scanners.MediaFileScanner;
 import app.ister.server.scanner.scanners.NfoScanner;
 import app.ister.server.scanner.scanners.Scanner;
 import app.ister.server.scanner.scanners.SubtitleScanner;
+import app.ister.server.service.MessageSender;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -20,15 +23,25 @@ import java.util.List;
 class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
     private final DirectoryEntity directoryEntity;
 
-    private final MediaFileScanner episodeAnalyzer;
-    private final ImageScanner imageAnalyzer;
+    private final ScannedCache scannedCache;
+    private final MessageSender messageSender;
+    private final MediaFileScanner mediaFileScanner;
+    private final ImageScanner imageScanner;
     private final NfoScanner nfoScanner;
     private final SubtitleScanner subtitleScanner;
 
-    public AnalyzerSimpleFileVisitor(DirectoryEntity directoryEntity, MediaFileScanner episodeAnalyzer, ImageScanner imageAnalyzer, NfoScanner nfoScanner, SubtitleScanner subtitleScanner) {
+    public AnalyzerSimpleFileVisitor(DirectoryEntity directoryEntity,
+                                     ScannedCache scannedCache,
+                                     MessageSender messageSender,
+                                     MediaFileScanner mediaFileScanner,
+                                     ImageScanner imageScanner,
+                                     NfoScanner nfoScanner,
+                                     SubtitleScanner subtitleScanner) {
         this.directoryEntity = directoryEntity;
-        this.episodeAnalyzer = episodeAnalyzer;
-        this.imageAnalyzer = imageAnalyzer;
+        this.scannedCache = scannedCache;
+        this.messageSender = messageSender;
+        this.mediaFileScanner = mediaFileScanner;
+        this.imageScanner = imageScanner;
         this.nfoScanner = nfoScanner;
         this.subtitleScanner = subtitleScanner;
     }
@@ -36,7 +49,7 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
     /**
      * Called before visiting a dir.
      * - If it's the root dir continue the scan in that dir.
-     * - If it's a dor dir (ex: .config) don't scan it.
+     * - If it's a dot dir (ex: .config) don't scan it.
      * - Else check if it's correct media dir.
      */
     @Override
@@ -70,11 +83,18 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
     }
 
     @Override
-    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-        for (Scanner scanner : List.of(episodeAnalyzer, imageAnalyzer, nfoScanner, subtitleScanner)) {
-            if (scanner.analyzable(file, attrs)) {
-                log.debug("Scanning file: {}, with scanner: {}", file, scanner);
-                scanner.analyze(directoryEntity, file, attrs);
+    public FileVisitResult visitFile(Path path, BasicFileAttributes basicFileAttributes) {
+        for (Scanner scanner : List.of(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner)) {
+            // Check if scan is analyzable by scanner and is not analyzed before.
+            if (scanner.analyzable(path, basicFileAttributes.isRegularFile(), basicFileAttributes.size()) && !scannedCache.foundPath(path.toString())) {
+                log.debug("Found file: {}, for scanner: {}", path, scanner);
+                messageSender.sendFileScanRequested(FileScanRequestedData.builder()
+                        .path(path)
+                        .regularFile(basicFileAttributes.isRegularFile())
+                        .size(basicFileAttributes.size())
+                        .directoryEntityUUID(directoryEntity.getId())
+                        .eventType(EventType.FILE_SCAN_REQUESTED)
+                        .build());
             }
         }
         return FileVisitResult.CONTINUE;

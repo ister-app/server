@@ -23,10 +23,7 @@ import java.util.List;
 @Setter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
-public class MediaFileEntity extends BaseEntity {
-
-    @ManyToOne(optional = false)
-    private DirectoryEntity directoryEntity;
+public class MediaFileEntity extends FileFromPathEntity {
 
     @Getter(onMethod = @__(@JsonBackReference))
     @ManyToOne(optional = false)
@@ -34,9 +31,6 @@ public class MediaFileEntity extends BaseEntity {
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "mediaFileEntity")
     private List<MediaFileStreamEntity> mediaFileStreamEntity;
-
-    @Column(nullable = false)
-    private String path;
 
     @Column(nullable = false)
     private long size;

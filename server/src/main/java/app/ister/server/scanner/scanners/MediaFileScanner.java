@@ -19,7 +19,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Optional;
 
 @Component
@@ -34,14 +33,14 @@ public class MediaFileScanner implements Scanner {
     private MessageSender messageSender;
 
     @Override
-    public boolean analyzable(Path path, BasicFileAttributes attrs) {
-        return attrs.isRegularFile()
+    public boolean analyzable(Path path, Boolean isRegularFile, long size) {
+        return isRegularFile
                 && new PathObject(path.toString()).getDirType().equals(DirType.EPISODE)
                 && new PathObject(path.toString()).getFileType().equals(FileType.MEDIA);
     }
 
     @Override
-    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, BasicFileAttributes attrs) {
+    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, Boolean isRegularFile, long size) {
         PathObject pathObject = new PathObject(path.toString());
         EpisodeEntity episodeEntity = scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getShow(), pathObject.getShowYear(), pathObject.getSeason(), pathObject.getEpisode());
         Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndEpisodeEntityAndPath(directoryEntity, episodeEntity, path.toString());
@@ -50,7 +49,7 @@ public class MediaFileScanner implements Scanner {
                     .directoryEntity(directoryEntity)
                     .episodeEntity(episodeEntity)
                     .path(path.toString())
-                    .size(attrs.size()).build();
+                    .size(size).build();
             mediaFileRepository.save(entity);
             messageSender.sendMediaFileFound(MediaFileFoundData.builder()
                     .eventType(EventType.MEDIA_FILE_FOUND)

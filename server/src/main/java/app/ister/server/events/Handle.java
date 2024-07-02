@@ -11,6 +11,7 @@ public interface Handle<T extends MessageData> {
             handle(t);
         } else {
             loggerForInterface.error("Received message for queue: {} with wrong event type: {}", handles(), t.getEventType());
+            throw new IllegalArgumentException();
         }
     }
 

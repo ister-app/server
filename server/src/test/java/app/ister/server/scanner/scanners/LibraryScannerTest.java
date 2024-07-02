@@ -4,7 +4,11 @@ import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.entitiy.LibraryEntity;
 import app.ister.server.entitiy.NodeEntity;
 import app.ister.server.enums.DirectoryType;
+import app.ister.server.repository.ImageRepository;
+import app.ister.server.repository.MediaFileRepository;
+import app.ister.server.repository.OtherPathFileRepository;
 import app.ister.server.scanner.LibraryScanner;
+import app.ister.server.service.MessageSender;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
 import org.junit.jupiter.api.Test;
@@ -25,6 +29,8 @@ class LibraryScannerTest {
     @InjectMocks
     LibraryScanner libraryScanner;
     @Mock
+    private MessageSender messageSender;
+    @Mock
     private MediaFileScanner mediaFileScanner;
     @Mock
     private ImageScanner imageScanner;
@@ -32,6 +38,12 @@ class LibraryScannerTest {
     private NfoScanner nfoScanner;
     @Mock
     private SubtitleScanner subtitleScanner;
+    @Mock
+    private ImageRepository imageRepository;
+    @Mock
+    private MediaFileRepository mediaFileRepository;
+    @Mock
+    private OtherPathFileRepository otherPathFileRepository;
 
     @Test
     void simpleTest() throws IOException {

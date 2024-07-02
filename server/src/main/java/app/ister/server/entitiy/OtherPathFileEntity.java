@@ -3,7 +3,6 @@ package app.ister.server.entitiy;
 import app.ister.server.enums.PathFileType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -16,14 +15,8 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
-public class OtherPathFileEntity extends BaseEntity {
-
-    @ManyToOne(optional = false)
-    private DirectoryEntity directoryEntity;
+public class OtherPathFileEntity extends FileFromPathEntity {
 
     @Column(nullable = false)
     private PathFileType pathFileType;
-
-    @Column(nullable = false)
-    private String path;
 }
