@@ -33,48 +33,46 @@ class ImageScannerTest {
 
     @Test
     void analyzable() {
-        when(basicFileAttributes.isRegularFile()).thenReturn(true);
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/background.jpg"), basicFileAttributes));
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/cover.png"), basicFileAttributes));
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/cover.jpg"), basicFileAttributes));
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/background.png"), basicFileAttributes));
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/s01e01.jpg"), basicFileAttributes));
+        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/background.jpg"), true, 0));
+        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/cover.png"), true, 0));
+        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/cover.jpg"), true, 0));
+        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/background.png"), true, 0));
+        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/s01e01.jpg"), true, 0));
     }
 
     @Test
     void notAnalyzable() {
-        when(basicFileAttributes.isRegularFile()).thenReturn(true);
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/background.jpg"), basicFileAttributes));
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/cover.png"), basicFileAttributes));
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/cover.jpg"), basicFileAttributes));
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/background.png"), basicFileAttributes));
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/s01e01.jpg"), basicFileAttributes));
+        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/background.jpg"), true, 0));
+        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/cover.png"), true, 0));
+        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/cover.jpg"), true, 0));
+        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/background.png"), true, 0));
+        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/s01e01.jpg"), true, 0));
     }
 
     @Test
     void analyzeShowBackground() {
-        ImageEntity result = (ImageEntity) subject.analyze(new DirectoryEntity(), Path.of("/disk/show/Show (2024)/background.jpg"), basicFileAttributes).orElseThrow();
+        ImageEntity result = (ImageEntity) subject.analyze(new DirectoryEntity(), Path.of("/disk/show/Show (2024)/background.jpg"), false, 0).orElseThrow();
         assertEquals(result.getType(), ImageType.BACKGROUND);
         assertNull(result.getSeasonEntity());
     }
 
     @Test
     void analyzeSeasonBackground() {
-        ImageEntity result = (ImageEntity) subject.analyze(new DirectoryEntity(), Path.of("/disk/show/Show (2024)/Season 01/background.jpg"), basicFileAttributes).orElseThrow();
+        ImageEntity result = (ImageEntity) subject.analyze(new DirectoryEntity(), Path.of("/disk/show/Show (2024)/Season 01/background.jpg"), false, 0).orElseThrow();
         assertEquals(ImageType.BACKGROUND, result.getType());
         assertNull(result.getShowEntity());
     }
 
     @Test
     void analyzeEpisodeBackground() {
-        ImageEntity result = (ImageEntity) subject.analyze(new DirectoryEntity(), Path.of("/disk/show/Show (2024)/Season 01/s01e01-thumb.jpg"), basicFileAttributes).orElseThrow();
+        ImageEntity result = (ImageEntity) subject.analyze(new DirectoryEntity(), Path.of("/disk/show/Show (2024)/Season 01/s01e01-thumb.jpg"), false, 0).orElseThrow();
         assertEquals(ImageType.BACKGROUND, result.getType());
         assertNull(result.getShowEntity());
     }
 
     @Test
     void analyzeEmpty() {
-        var result = subject.analyze(new DirectoryEntity(), Path.of("/disk/show/Show (2024)/Season 01/s01e01.mkv"), basicFileAttributes);
+        var result = subject.analyze(new DirectoryEntity(), Path.of("/disk/show/Show (2024)/Season 01/s01e01.mkv"), false, 0);
         assertTrue(result.isEmpty());
     }
 }

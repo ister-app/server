@@ -25,9 +25,8 @@ class NfoScannerTest {
 
     @Test
     void analyzable() {
-        when(basicFileAttributes.isRegularFile()).thenReturn(true);
-        assertTrue(subject.analyzable(Path.of("/disk/shows/SHOW (2024)/tvshow.nfo"), basicFileAttributes));
-        assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/Season 01/s01e01.nfo"), basicFileAttributes));
-        assertFalse(subject.analyzable(Path.of("/disk/shows/Show (2024)/Season 01/tvshow.nfo"), basicFileAttributes));
+        assertTrue(subject.analyzable(Path.of("/disk/shows/SHOW (2024)/tvshow.nfo"), true, 0));
+        assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/Season 01/s01e01.nfo"), true, 0));
+        assertFalse(subject.analyzable(Path.of("/disk/shows/Show (2024)/Season 01/tvshow.nfo"), true, 0));
     }
 }

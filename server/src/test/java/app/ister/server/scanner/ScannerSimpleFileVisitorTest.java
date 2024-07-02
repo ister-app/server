@@ -8,6 +8,7 @@ import app.ister.server.scanner.scanners.ImageScanner;
 import app.ister.server.scanner.scanners.MediaFileScanner;
 import app.ister.server.scanner.scanners.NfoScanner;
 import app.ister.server.scanner.scanners.SubtitleScanner;
+import app.ister.server.service.MessageSender;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
 import org.junit.jupiter.api.AfterEach;
@@ -29,6 +30,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @ExtendWith(MockitoExtension.class)
 class ScannerSimpleFileVisitorTest {
+    @Mock
+    private ScannedCache scannedCache;
+    @Mock
+    private MessageSender messageSender;
     @Mock
     private MediaFileScanner episodeAnalyzer;
     @Mock
@@ -75,7 +80,7 @@ class ScannerSimpleFileVisitorTest {
         @Test
         void theRootDirWillReturnContinue() {
             Path resourceFilePath = fileSystem.getPath("/disk/show");
-            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, episodeAnalyzer, imageAnalyzer, nfoScanner, subtitleScanner);
+            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, episodeAnalyzer, imageAnalyzer, nfoScanner, subtitleScanner);
 
             var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
 
@@ -85,7 +90,7 @@ class ScannerSimpleFileVisitorTest {
         @Test
         void dotDirsWillBeSkipped() {
             Path resourceFilePath = fileSystem.getPath("/disk/show/.tmp");
-            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, episodeAnalyzer, imageAnalyzer, nfoScanner, subtitleScanner);
+            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, episodeAnalyzer, imageAnalyzer, nfoScanner, subtitleScanner);
 
             var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
 

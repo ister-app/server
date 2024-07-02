@@ -25,10 +25,9 @@ class MediaFileScannerTest {
 
     @Test
     void analyzable() {
-        when(basicFileAttributes.isRegularFile()).thenReturn(true);
-        assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/s01e01.mkv"), basicFileAttributes));
-        assertTrue(subject.analyzable(Path.of("/disk/shows/SHOW (2024)/s01e01.mkv"), basicFileAttributes));
-        assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/s02E03.mkv"), basicFileAttributes));
-        assertFalse(subject.analyzable(Path.of("/disk/shows/Show (2024)/s01e01.png"), basicFileAttributes));
+        assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/s01e01.mkv"), true, 0));
+        assertTrue(subject.analyzable(Path.of("/disk/shows/SHOW (2024)/s01e01.mkv"), true, 0));
+        assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/s02E03.mkv"), true, 0));
+        assertFalse(subject.analyzable(Path.of("/disk/shows/Show (2024)/s01e01.png"), true, 0));
     }
 }
