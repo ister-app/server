@@ -55,7 +55,7 @@ public class HandleSubtitleFileFound implements Handle<SubtitleFileFoundData> {
 
 
     private void analyzeSubtitleFile(DirectoryEntity directoryEntity, String path, PathObject pathObject) {
-        var episode = scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getShow(), pathObject.getShowYear(), pathObject.getSeason(), pathObject.getEpisode());
+        var episode = scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear(), pathObject.getSeason(), pathObject.getEpisode());
         episode.getMediaFileEntities().forEach(mediaFileEntity -> {
             if (directoryEntity.getId().equals(mediaFileEntity.getDirectoryEntity().getId()) && mediaFileAndSubtitleFileBelongTogether(mediaFileEntity.getPath(), path)) {
                 var mediaFileStream = MediaFileStreamEntity.builder()

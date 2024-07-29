@@ -6,6 +6,7 @@ public enum EventType {
     SHOW_FOUND,
     EPISODE_FOUND,
     MEDIA_FILE_FOUND,
+    MOVIE_FOUND,
     NFO_FILE_FOUND,
     SUBTITLE_FILE_FOUND
 }

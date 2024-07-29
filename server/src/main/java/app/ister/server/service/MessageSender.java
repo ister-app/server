@@ -3,6 +3,7 @@ package app.ister.server.service;
 import app.ister.server.events.episodefound.EpisodeFoundData;
 import app.ister.server.events.filescanrequested.FileScanRequestedData;
 import app.ister.server.events.mediafilefound.MediaFileFoundData;
+import app.ister.server.events.moviefound.MovieFoundData;
 import app.ister.server.events.newdirectoriesscanrequested.NewDirectoriesScanRequestedData;
 import app.ister.server.events.nfofilefound.NfoFileFoundData;
 import app.ister.server.events.showfound.ShowFoundData;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_EPISODE_FOUND;
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_FILE_SCAN_REQUESTED;
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_MEDIA_FILE_FOUND;
+import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_MOVIE_FOUND;
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_NEW_DIRECTORIES_SCAN_REQUESTED;
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_NFO_FILE_FOUND;
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_SHOW_FOUND;
@@ -42,6 +44,11 @@ public class MessageSender {
     public void sendMediaFileFound(MediaFileFoundData mediaFileFoundData) {
         log.info("Sending message for queue: {} and mediaFileFoundData: {}", APP_ISTER_SERVER_MEDIA_FILE_FOUND, mediaFileFoundData);
         rabbitTemplate.convertAndSend(APP_ISTER_SERVER_MEDIA_FILE_FOUND, mediaFileFoundData);
+    }
+
+    public void sendMovieFound(MovieFoundData movieFoundData) {
+        log.info("Sending message for queue: {} and movieFoundData: {}", APP_ISTER_SERVER_MOVIE_FOUND, movieFoundData);
+        rabbitTemplate.convertAndSend(APP_ISTER_SERVER_MOVIE_FOUND, movieFoundData);
     }
 
     public void sendNewDirectoriesScanRequested(NewDirectoriesScanRequestedData newDirectoriesScanRequestedData) {

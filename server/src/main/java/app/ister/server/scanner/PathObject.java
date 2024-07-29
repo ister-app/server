@@ -15,6 +15,7 @@ import java.util.regex.Pattern;
 @Slf4j
 public class PathObject {
 
+    private final static String REGEX_MOVIE = ".*\\/(.*)\\((\\d{4})\\)[a-zA-Z-]*\\.[a-zA-Z]+";
     private final static String REGEX_SHOW = ".*\\/(.*)\\((\\d{4})\\)*";
     private final static String REGEX_SEASON = "season\\s+(\\d{1,4})";
     private final static String REGEX_EPISODE = "s(\\d{1,4})e(\\d{1,4}).*";
@@ -23,15 +24,17 @@ public class PathObject {
     private final static List<String> NFO_FILE_TYPES = List.of("nfo");
     private final static List<String> MEDIA_FILES_FILE_TYPES = List.of("mkv", "mp4");
     private final static List<String> SUBTITLE_FILES_FILE_TYPES = List.of("srt");
-    private String show;
-    private int showYear;
+    private String name;
+    private int year;
     private int season;
     private int episode;
     private DirType dirType;
     private FileType fileType;
 
     public PathObject(String path) {
-        if (setShow(path)) {
+        if (setMovie(path)) {
+            setFileType(path);
+        } else if (setName(path)) {
             setSeason(path);
             setEpisode(path);
             setFileType(path);
@@ -42,11 +45,23 @@ public class PathObject {
         }
     }
 
-    private Boolean setShow(String path) {
+    private Boolean setMovie(String path) {
+        var matches = regex(REGEX_MOVIE, path);
+        if (matches.isPresent()) {
+            name = matches.get().group(1).trim();
+            year = Integer.parseInt(matches.get().group(2));
+            dirType = DirType.MOVIE;
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private Boolean setName(String path) {
         var matches = regex(REGEX_SHOW, path);
         if (matches.isPresent()) {
-            show = matches.get().group(1).trim();
-            showYear = Integer.parseInt(matches.get().group(2));
+            name = matches.get().group(1).trim();
+            year = Integer.parseInt(matches.get().group(2));
             dirType = DirType.SHOW;
             return true;
         } else {

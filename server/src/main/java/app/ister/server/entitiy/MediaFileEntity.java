@@ -26,7 +26,11 @@ import java.util.List;
 public class MediaFileEntity extends FileFromPathEntity {
 
     @Getter(onMethod = @__(@JsonBackReference))
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = true)
+    private MovieEntity movieEntity;
+
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne(optional = true)
     private EpisodeEntity episodeEntity;
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "mediaFileEntity")

@@ -4,6 +4,7 @@ import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.entitiy.EpisodeEntity;
 import app.ister.server.entitiy.ImageEntity;
 import app.ister.server.entitiy.MediaFileEntity;
+import app.ister.server.entitiy.MovieEntity;
 import app.ister.server.entitiy.NodeEntity;
 import app.ister.server.enums.DirectoryType;
 import app.ister.server.enums.EventType;
@@ -15,6 +16,7 @@ import app.ister.server.repository.EpisodeRepository;
 import app.ister.server.repository.ImageRepository;
 import app.ister.server.repository.MediaFileRepository;
 import app.ister.server.repository.MediaFileStreamRepository;
+import app.ister.server.repository.MovieRepository;
 import app.ister.server.service.NodeService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,6 +33,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     private final DirectoryRepository directoryRepository;
     private final MediaFileRepository mediaFileRepository;
     private final EpisodeRepository episodeRepository;
+    private final MovieRepository movieRepository;
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final ImageRepository imageRepository;
 
@@ -43,7 +46,9 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
 
     public HandleMediaFileFound(NodeService nodeService,
                                 DirectoryRepository directoryRepository,
-                                MediaFileRepository mediaFileRepository, EpisodeRepository episodeRepository,
+                                MediaFileRepository mediaFileRepository,
+                                EpisodeRepository episodeRepository,
+                                MovieRepository movieRepository,
                                 MediaFileStreamRepository mediaFileStreamRepository,
                                 ImageRepository imageRepository,
                                 MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams,
@@ -53,11 +58,22 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
         this.directoryRepository = directoryRepository;
         this.mediaFileRepository = mediaFileRepository;
         this.episodeRepository = episodeRepository;
+        this.movieRepository = movieRepository;
         this.mediaFileStreamRepository = mediaFileStreamRepository;
         this.imageRepository = imageRepository;
         this.mediaFileFoundCheckForStreams = mediaFileFoundCheckForStreams;
         this.mediaFileFoundCreateBackground = mediaFileFoundCreateBackground;
         this.mediaFileFoundGetDuration = mediaFileFoundGetDuration;
+    }
+
+    private static String getPathString(DirectoryEntity cacheDisk, Optional<EpisodeEntity> episodeEntity, Optional<MovieEntity> movieEntity) {
+        String id = null;
+        if (episodeEntity.isPresent()) {
+            id = episodeEntity.get().getId().toString();
+        } else if (movieEntity.isPresent()) {
+            id = movieEntity.get().getId().toString();
+        }
+        return cacheDisk.getPath() + id + ".jpg";
     }
 
     @Override
@@ -82,14 +98,15 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     @Override
     public Boolean handle(MediaFileFoundData mediaFileFoundData) {
         DirectoryEntity directoryEntity = directoryRepository.findById(mediaFileFoundData.getDirectoryEntityUUID()).orElseThrow();
-        EpisodeEntity episodeEntity = episodeRepository.findById(mediaFileFoundData.getEpisodeEntityUUID()).orElseThrow();
-        var mediaFile = checkMediaFile(directoryEntity, episodeEntity, mediaFileFoundData.getPath());
-        mediaFile.ifPresent(mediaFileEntity -> createBackgroundImage(episodeEntity, mediaFileFoundData.getPath(), mediaFileEntity.getDurationInMilliseconds()));
+        Optional<EpisodeEntity> episodeEntity = mediaFileFoundData.getEpisodeEntityUUID() != null ? episodeRepository.findById(mediaFileFoundData.getEpisodeEntityUUID()) : Optional.empty();
+        Optional<MovieEntity> movieEntity = mediaFileFoundData.getMovieEntityUUID() != null ? movieRepository.findById(mediaFileFoundData.getMovieEntityUUID()) : Optional.empty();
+        var mediaFile = checkMediaFile(directoryEntity, mediaFileFoundData.getPath());
+        mediaFile.ifPresent(mediaFileEntity -> createBackgroundImage(episodeEntity, movieEntity, mediaFileFoundData.getPath(), mediaFileEntity.getDurationInMilliseconds()));
         return true;
     }
 
-    private Optional<MediaFileEntity> checkMediaFile(DirectoryEntity directoryEntity, EpisodeEntity episode, String file) {
-        Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndEpisodeEntityAndPath(directoryEntity, episode, file);
+    private Optional<MediaFileEntity> checkMediaFile(DirectoryEntity directoryEntity, String file) {
+        Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, file);
         mediaFile.ifPresent(mediaFileEntity -> {
             // Get duration.
             mediaFileEntity.setDurationInMilliseconds(mediaFileFoundGetDuration.getDuration(mediaFileEntity.getPath()));
@@ -102,13 +119,15 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     }
 
     /**
+     * Check if the given {@link EpisodeEntity} or {@link MovieEntity} has image entities if not:
      * Create background image for media file and save a reference to it in the database.
      */
-    private void createBackgroundImage(EpisodeEntity episode, String mediaFilePath, Long durationInMilliseconds) {
-        if (episode.getImagesEntities().isEmpty()) {
+    private void createBackgroundImage(Optional<EpisodeEntity> episodeEntity, Optional<MovieEntity> movieEntity, String mediaFilePath, long durationInMilliseconds) {
+        if ((episodeEntity.isPresent() && episodeEntity.get().getImagesEntities().isEmpty()) ||
+                (movieEntity.isPresent() && movieEntity.get().getImagesEntities().isEmpty())) {
             NodeEntity nodeEntity = nodeService.getOrCreateNodeEntityForThisNode();
             DirectoryEntity cacheDisk = directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity).stream().findFirst().orElseThrow();
-            String toPath = cacheDisk.getPath() + episode.getId() + ".jpg";
+            String toPath = getPathString(cacheDisk, episodeEntity, movieEntity);
             mediaFileFoundCreateBackground.createBackground(Path.of(toPath), Path.of(mediaFilePath), dirOfFFmpeg, durationInMilliseconds / 2);
 
             ImageEntity imageEntity = ImageEntity.builder()
@@ -116,7 +135,8 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
                     .path(toPath)
                     .sourceUri("file://" + mediaFilePath)
                     .type(ImageType.BACKGROUND)
-                    .episodeEntity(episode)
+                    .episodeEntity(episodeEntity.orElse(null))
+                    .movieEntity(movieEntity.orElse(null))
                     .build();
 
             imageRepository.save(imageEntity);

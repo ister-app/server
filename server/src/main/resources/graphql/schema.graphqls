@@ -3,6 +3,7 @@ type Query {
     episodeById(id: ID): Episode
     seasonById(id: ID): Season
     showsRecentAdded: [Show!]
+    moviesRecentAdded: [Movie!]
     showById(id: ID): Show
 }
 
@@ -61,6 +62,16 @@ type Metadata {
     language: String
     title: String
     description: String
+}
+
+type Movie {
+    id: ID!
+    name: String!
+    releaseYear: Int!
+    images: [Image!]
+    metadata: [Metadata!]
+    watchStatus: [WatchStatus!]
+    mediaFile: [MediaFile!]
 }
 
 type PlayQueue {

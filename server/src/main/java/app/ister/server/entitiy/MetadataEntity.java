@@ -18,6 +18,10 @@ import java.time.LocalDate;
 public class MetadataEntity extends BaseEntity {
     @Getter(onMethod = @__(@JsonBackReference))
     @ManyToOne
+    private MovieEntity movieEntity;
+
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne
     private ShowEntity showEntity;
 
     @Getter(onMethod = @__(@JsonBackReference))

@@ -24,6 +24,7 @@ class MediaFileScannerTest {
 
     @Test
     void analyzable() {
+        assertTrue(subject.analyzable(Path.of("/disk/movies/Movie (2024).mkv"), true, 0));
         assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/s01e01.mkv"), true, 0));
         assertTrue(subject.analyzable(Path.of("/disk/shows/SHOW (2024)/s01e01.mkv"), true, 0));
         assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/s02E03.mkv"), true, 0));

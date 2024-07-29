@@ -1,4 +1,4 @@
-package app.ister.server.events.mediafilefound;
+package app.ister.server.events.moviefound;
 
 import app.ister.server.events.MessageData;
 import lombok.AccessLevel;
@@ -13,9 +13,6 @@ import java.util.UUID;
 @Getter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
-public class MediaFileFoundData extends MessageData {
-    private UUID directoryEntityUUID;
-    private UUID episodeEntityUUID;
-    private UUID movieEntityUUID;
-    private String path;
+public class MovieFoundData extends MessageData {
+    private UUID movieId;
 }

@@ -58,7 +58,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
     }
 
     private void analyzeShow(DirectoryEntity directoryEntity, String path, PathObject pathObject) {
-        var show = scannerHelperService.getOrCreateShow(directoryEntity.getLibraryEntity(), pathObject.getShow(), pathObject.getShowYear());
+        var show = scannerHelperService.getOrCreateShow(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear());
         try {
             var parsed = Parser.parseShow(path).orElseThrow();
             metadataRepository.save(MetadataEntity.builder()
@@ -72,7 +72,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
     }
 
     private void analyzeEpisode(DirectoryEntity directoryEntity, String path, PathObject pathObject) {
-        var episode = scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getShow(), pathObject.getShowYear(), pathObject.getSeason(), pathObject.getEpisode());
+        var episode = scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear(), pathObject.getSeason(), pathObject.getEpisode());
         try {
             var parsed = Parser.parseEpisode(path).orElseThrow();
             metadataRepository.save(MetadataEntity.builder()

@@ -1,6 +1,7 @@
 package app.ister.server.repository;
 
 import app.ister.server.entitiy.EpisodeEntity;
+import app.ister.server.entitiy.MovieEntity;
 import app.ister.server.entitiy.UserEntity;
 import app.ister.server.entitiy.WatchStatusEntity;
 import org.springframework.data.domain.Sort;
@@ -16,6 +17,8 @@ public interface WatchStatusRepository extends CrudRepository<WatchStatusEntity,
     Optional<WatchStatusEntity> findByUserEntityAndPlayQueueItemIdAndEpisodeEntity(UserEntity userEntity, UUID playQueueItemId, EpisodeEntity episodeEntity);
 
     List<WatchStatusEntity> findByUserEntityExternalIdAndEpisodeEntity(String userEntityExternalId, EpisodeEntity episodeEntity, Sort sort);
+
+    List<WatchStatusEntity> findByUserEntityExternalIdAndMovieEntity(String userEntityExternalId, MovieEntity movieEntity, Sort sort);
 
     @Query(
             value = "WITH added_row_number AS (\n" +

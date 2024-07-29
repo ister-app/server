@@ -2,9 +2,11 @@ package app.ister.server.service;
 
 import app.ister.server.entitiy.EpisodeEntity;
 import app.ister.server.entitiy.LibraryEntity;
+import app.ister.server.entitiy.MovieEntity;
 import app.ister.server.entitiy.SeasonEntity;
 import app.ister.server.entitiy.ShowEntity;
 import app.ister.server.repository.EpisodeRepository;
+import app.ister.server.repository.MovieRepository;
 import app.ister.server.repository.SeasonRepository;
 import app.ister.server.repository.ShowRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +19,8 @@ import java.util.Optional;
 @Slf4j
 public class ScannerHelperService {
     @Autowired
+    private MovieRepository movieRepository;
+    @Autowired
     private ShowRepository showRepository;
     @Autowired
     private SeasonRepository seasonRepository;
@@ -25,6 +29,28 @@ public class ScannerHelperService {
     @Autowired
     private ServerEventService serverEventService;
 
+    /**
+     * Check if the database contains a show wit the given parameters.
+     * - If it exists return it.
+     * - Else create and return it.
+     */
+    public MovieEntity getOrCreateMovie(LibraryEntity libraryEntity, String movieName, int releaseYear) {
+        Optional<MovieEntity> movie = movieRepository.findByLibraryEntityAndNameAndReleaseYear(libraryEntity, movieName, releaseYear);
+        if (movie.isPresent()) {
+            // The movie exist
+            return movie.get();
+        } else {
+            // The movie doesn't exist
+            MovieEntity movieEntity = MovieEntity.builder()
+                    .libraryEntity(libraryEntity)
+                    .name(movieName)
+                    .releaseYear(releaseYear).build();
+            movieRepository.save(movieEntity);
+            serverEventService.createMovieFoundEvent(movieEntity.getId());
+            return movieEntity;
+        }
+    }
+
 
     /**
      * Check if the database contains a show wit the given parameters.
@@ -32,7 +58,7 @@ public class ScannerHelperService {
      * - Else create and return it.
      */
     public ShowEntity getOrCreateShow(LibraryEntity libraryEntity, String showName, int releaseYear) {
-        Optional<ShowEntity> show = showRepository.findByNameAndReleaseYear(showName, releaseYear);
+        Optional<ShowEntity> show = showRepository.findByLibraryEntityAndNameAndReleaseYear(libraryEntity, showName, releaseYear);
         if (show.isPresent()) {
             // The show exist
             return show.get();
@@ -48,6 +74,11 @@ public class ScannerHelperService {
         }
     }
 
+    /**
+     * Check if the database contains a season wit the given parameters.
+     * - If it exists return it.
+     * - Else create and return it.
+     */
     public SeasonEntity getOrCreateSeason(LibraryEntity libraryEntity, String showName, int releaseYear, int seasonNumber) {
         ShowEntity showEntity = getOrCreateShow(libraryEntity, showName, releaseYear);
         Optional<SeasonEntity> season = seasonRepository.findByShowEntityAndNumber(showEntity, seasonNumber);

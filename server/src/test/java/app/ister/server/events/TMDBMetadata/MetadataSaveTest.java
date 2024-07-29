@@ -42,7 +42,7 @@ class MetadataSaveTest {
                 .sourceUri("URI")
                 .description("DESCRIPTION")
                 .build();
-        subject.save(tmdbResult, showEntity, episodeEntity);
+        subject.save(tmdbResult, null, showEntity, episodeEntity);
         verify(metadataRepositoryMock).save(build);
     }
 }

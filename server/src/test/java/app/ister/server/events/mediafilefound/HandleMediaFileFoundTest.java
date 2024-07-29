@@ -11,6 +11,7 @@ import app.ister.server.repository.EpisodeRepository;
 import app.ister.server.repository.ImageRepository;
 import app.ister.server.repository.MediaFileRepository;
 import app.ister.server.repository.MediaFileStreamRepository;
+import app.ister.server.repository.MovieRepository;
 import app.ister.server.service.NodeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,8 @@ class HandleMediaFileFoundTest {
     private MediaFileRepository mediaFileRepositoryMock;
     @Mock
     private EpisodeRepository episodeRepositoryMock;
+    @Mock
+    private MovieRepository movieRepositoryMock;
     @Mock
     private MediaFileStreamRepository mediaFileStreamRepositoryMock;
     @Mock
@@ -61,6 +64,7 @@ class HandleMediaFileFoundTest {
                 directoryRepositoryMock,
                 mediaFileRepositoryMock,
                 episodeRepositoryMock,
+                movieRepositoryMock,
                 mediaFileStreamRepositoryMock,
                 imageRepositoryMock,
                 mediaFileFoundCheckForStreamsMock,
@@ -88,7 +92,7 @@ class HandleMediaFileFoundTest {
 
         when(directoryRepositoryMock.findById(directoryEntity.getId())).thenReturn(Optional.of(directoryEntity));
         when(episodeRepositoryMock.findById(episodeEntity.getId())).thenReturn(Optional.of(episodeEntity));
-        when(mediaFileRepositoryMock.findByDirectoryEntityAndEpisodeEntityAndPath(directoryEntity, episodeEntity, filePath)).thenReturn(Optional.of(mediaFileEntity));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directoryEntity, filePath)).thenReturn(Optional.of(mediaFileEntity));
         when(mediaFileFoundGetDurationMock.getDuration(filePath)).thenReturn(10L);
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(mediaFileEntity, null)).thenReturn(List.of(mediaFileStreamEntity));
 
