@@ -75,7 +75,7 @@ public class HandleShowFound implements Handle<ShowFoundData> {
             for (String language : supportLanguages) {
                 Optional<TMDBResult> TMDBResult = showMetadata.getMetadata(showEntity.getName(), showEntity.getReleaseYear(), language);
                 if (TMDBResult.isPresent()) {
-                    metaDataSave.save(TMDBResult.get(), showEntity, null);
+                    metaDataSave.save(TMDBResult.get(), null, showEntity, null);
                     if (TMDBResult.get().getBackgroundUrl() != null) {
                         getAndSaveImage(TMDBResult.get().getBackgroundUrl(), ImageType.BACKGROUND, TMDBResult.get().getLanguage(), showEntity);
                     }
@@ -103,6 +103,6 @@ public class HandleShowFound implements Handle<ShowFoundData> {
 
         String toPath = cacheDisk.getPath() + UUID.randomUUID() + ".jpg";
         imageDownload.download(imageUrl, toPath);
-        imageSave.save(cacheDisk, toPath, imageType, language, "TMDB://" + imageUrl, showEntity, null);
+        imageSave.save(cacheDisk, toPath, imageType, language, "TMDB://" + imageUrl, null, showEntity, null);
     }
 }

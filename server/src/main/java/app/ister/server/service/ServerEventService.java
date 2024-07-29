@@ -2,6 +2,7 @@ package app.ister.server.service;
 
 import app.ister.server.enums.EventType;
 import app.ister.server.events.episodefound.EpisodeFoundData;
+import app.ister.server.events.moviefound.MovieFoundData;
 import app.ister.server.events.showfound.ShowFoundData;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +15,13 @@ import java.util.UUID;
 public class ServerEventService {
     @Autowired
     private MessageSender messageSender;
+
+    public void createMovieFoundEvent(UUID movieId) {
+        messageSender.sendMovieFound(MovieFoundData.builder()
+                .eventType(EventType.MOVIE_FOUND)
+                .movieId(movieId)
+                .build());
+    }
 
     public void createShowFoundEvent(UUID showId) {
         messageSender.sendShowFound(ShowFoundData.builder()

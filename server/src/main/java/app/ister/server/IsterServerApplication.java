@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Bean;
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_EPISODE_FOUND;
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_FILE_SCAN_REQUESTED;
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_MEDIA_FILE_FOUND;
+import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_MOVIE_FOUND;
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_NEW_DIRECTORIES_SCAN_REQUESTED;
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_NFO_FILE_FOUND;
 import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_SHOW_FOUND;
@@ -32,6 +33,11 @@ public class IsterServerApplication {
         Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter();
         converter.setNullAsOptionalEmpty(true);
         return converter;
+    }
+
+    @Bean
+    public Queue queueMovieFound() {
+        return new Queue(APP_ISTER_SERVER_MOVIE_FOUND);
     }
 
     @Bean

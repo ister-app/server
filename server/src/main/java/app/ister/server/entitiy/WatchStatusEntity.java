@@ -15,7 +15,7 @@ import lombok.experimental.SuperBuilder;
 import java.util.UUID;
 
 @Entity
-@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"playQueueItemId", "userEntityId", "episodeEntityId"}))
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"playQueueItemId", "userEntityId", "movieEntityId", "episodeEntityId"}))
 @Getter
 @Setter
 @SuperBuilder
@@ -33,7 +33,11 @@ public class WatchStatusEntity extends BaseEntity {
     private UserEntity userEntity;
 
     @Getter(onMethod = @__(@JsonBackReference))
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = true)
+    private MovieEntity movieEntity;
+
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne(optional = true)
     private EpisodeEntity episodeEntity;
 
     @Column(nullable = false)

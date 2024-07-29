@@ -28,6 +28,10 @@ public class ImageEntity extends FileFromPathEntity {
 
     @Getter(onMethod = @__(@JsonBackReference))
     @ManyToOne
+    private MovieEntity movieEntity;
+
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne
     private ShowEntity showEntity;
 
     @Getter(onMethod = @__(@JsonBackReference))

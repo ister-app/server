@@ -12,8 +12,8 @@ class PathObjectTest {
     @Test
     void notCorrectPath() {
         var subject = new PathObject("/disk/shows");
-        assertEquals(0, subject.getShowYear());
-        assertNull(subject.getShow());
+        assertEquals(0, subject.getYear());
+        assertNull(subject.getName());
         assertEquals(0, subject.getSeason());
         assertEquals(0, subject.getEpisode());
         assertEquals(DirType.NONE, subject.getDirType());
@@ -23,8 +23,8 @@ class PathObjectTest {
     @Test
     void notCorrectMissingShowPath() {
         var subject = new PathObject("/disk/shows/Season 08/s08e08.mkv");
-        assertEquals(0, subject.getShowYear());
-        assertNull(subject.getShow());
+        assertEquals(0, subject.getYear());
+        assertNull(subject.getName());
         assertEquals(0, subject.getSeason());
         assertEquals(0, subject.getEpisode());
         assertEquals(DirType.NONE, subject.getDirType());
@@ -32,10 +32,32 @@ class PathObjectTest {
     }
 
     @Test
+    void movieTest() {
+        var subject = new PathObject("/disk/movies/Movie (2024).mkv");
+        assertEquals(2024, subject.getYear());
+        assertEquals("Movie", subject.getName());
+        assertEquals(0, subject.getSeason());
+        assertEquals(0, subject.getEpisode());
+        assertEquals(DirType.MOVIE, subject.getDirType());
+        assertEquals(FileType.MEDIA, subject.getFileType());
+    }
+
+    @Test
+    void imageFileFormovieTest() {
+        var subject = new PathObject("/disk/movies/Movie (2024)-thumb.jpg");
+        assertEquals(2024, subject.getYear());
+        assertEquals("Movie", subject.getName());
+        assertEquals(0, subject.getSeason());
+        assertEquals(0, subject.getEpisode());
+        assertEquals(DirType.MOVIE, subject.getDirType());
+        assertEquals(FileType.IMAGE, subject.getFileType());
+    }
+
+    @Test
     void showTest() {
         var subject = new PathObject("/disk/shows/Show (2024)");
-        assertEquals(2024, subject.getShowYear());
-        assertEquals("Show", subject.getShow());
+        assertEquals(2024, subject.getYear());
+        assertEquals("Show", subject.getName());
         assertEquals(0, subject.getSeason());
         assertEquals(0, subject.getEpisode());
         assertEquals(DirType.SHOW, subject.getDirType());
@@ -45,8 +67,8 @@ class PathObjectTest {
     @Test
     void coverShowTest() {
         var subject = new PathObject("/disk/shows/Show (2024)/cover.png");
-        assertEquals(2024, subject.getShowYear());
-        assertEquals("Show", subject.getShow());
+        assertEquals(2024, subject.getYear());
+        assertEquals("Show", subject.getName());
         assertEquals(0, subject.getSeason());
         assertEquals(0, subject.getEpisode());
         assertEquals(DirType.SHOW, subject.getDirType());
@@ -56,8 +78,8 @@ class PathObjectTest {
     @Test
     void nfoFileForShowTest() {
         var subject = new PathObject("/disk/shows/Show (2024)/tvshow.nfo");
-        assertEquals(2024, subject.getShowYear());
-        assertEquals("Show", subject.getShow());
+        assertEquals(2024, subject.getYear());
+        assertEquals("Show", subject.getName());
         assertEquals(0, subject.getSeason());
         assertEquals(0, subject.getEpisode());
         assertEquals(DirType.SHOW, subject.getDirType());
@@ -67,8 +89,8 @@ class PathObjectTest {
     @Test
     void seasonTest() {
         var subject = new PathObject("/disk/shows/Show (2024)/Season 01");
-        assertEquals(2024, subject.getShowYear());
-        assertEquals("Show", subject.getShow());
+        assertEquals(2024, subject.getYear());
+        assertEquals("Show", subject.getName());
         assertEquals(1, subject.getSeason());
         assertEquals(0, subject.getEpisode());
         assertEquals(DirType.SEASON, subject.getDirType());
@@ -78,8 +100,8 @@ class PathObjectTest {
     @Test
     void imageSeasonTest() {
         var subject = new PathObject("/disk/shows/Show (2024)/Season 01/cover.png");
-        assertEquals(2024, subject.getShowYear());
-        assertEquals("Show", subject.getShow());
+        assertEquals(2024, subject.getYear());
+        assertEquals("Show", subject.getName());
         assertEquals(1, subject.getSeason());
         assertEquals(0, subject.getEpisode());
         assertEquals(DirType.SEASON, subject.getDirType());
@@ -89,8 +111,8 @@ class PathObjectTest {
     @Test
     void episodeTest() {
         var subject = new PathObject("/disk/shows/Show (2024)/s01e12.mkv");
-        assertEquals(2024, subject.getShowYear());
-        assertEquals("Show", subject.getShow());
+        assertEquals(2024, subject.getYear());
+        assertEquals("Show", subject.getName());
         assertEquals(1, subject.getSeason());
         assertEquals(12, subject.getEpisode());
         assertEquals(DirType.EPISODE, subject.getDirType());
@@ -100,8 +122,8 @@ class PathObjectTest {
     @Test
     void episodeInSeasonDirTest() {
         var subject = new PathObject("/disk/shows/Show (2024)/Season 02/s02e99.mkv");
-        assertEquals(2024, subject.getShowYear());
-        assertEquals("Show", subject.getShow());
+        assertEquals(2024, subject.getYear());
+        assertEquals("Show", subject.getName());
         assertEquals(2, subject.getSeason());
         assertEquals(99, subject.getEpisode());
         assertEquals(DirType.EPISODE, subject.getDirType());
@@ -111,8 +133,8 @@ class PathObjectTest {
     @Test
     void episodeWithCapitolInSeasonDirTest() {
         var subject = new PathObject("/disk/shows/Show (2024)/Season 05/S05E05.mkv");
-        assertEquals(2024, subject.getShowYear());
-        assertEquals("Show", subject.getShow());
+        assertEquals(2024, subject.getYear());
+        assertEquals("Show", subject.getName());
         assertEquals(5, subject.getSeason());
         assertEquals(5, subject.getEpisode());
         assertEquals(DirType.EPISODE, subject.getDirType());
@@ -122,8 +144,8 @@ class PathObjectTest {
     @Test
     void nfoFileForEpisodeTest() {
         var subject = new PathObject("/disk/shows/Show (2024)/Season 02/s02e13.nfo");
-        assertEquals(2024, subject.getShowYear());
-        assertEquals("Show", subject.getShow());
+        assertEquals(2024, subject.getYear());
+        assertEquals("Show", subject.getName());
         assertEquals(2, subject.getSeason());
         assertEquals(13, subject.getEpisode());
         assertEquals(DirType.EPISODE, subject.getDirType());
@@ -133,8 +155,8 @@ class PathObjectTest {
     @Test
     void imageFileForEpisodeTest() {
         var subject = new PathObject("/disk/shows/Show (2024)/Season 01/s01e12-thumb.jpg");
-        assertEquals(2024, subject.getShowYear());
-        assertEquals("Show", subject.getShow());
+        assertEquals(2024, subject.getYear());
+        assertEquals("Show", subject.getName());
         assertEquals(1, subject.getSeason());
         assertEquals(12, subject.getEpisode());
         assertEquals(DirType.EPISODE, subject.getDirType());
@@ -144,8 +166,8 @@ class PathObjectTest {
     @Test
     void subtitleFileForEpisodeTest() {
         var subject = new PathObject("/disk/shows/Show (2024)/Season 01/s01e12.en.srt");
-        assertEquals(2024, subject.getShowYear());
-        assertEquals("Show", subject.getShow());
+        assertEquals(2024, subject.getYear());
+        assertEquals("Show", subject.getName());
         assertEquals(1, subject.getSeason());
         assertEquals(12, subject.getEpisode());
         assertEquals(DirType.EPISODE, subject.getDirType());
