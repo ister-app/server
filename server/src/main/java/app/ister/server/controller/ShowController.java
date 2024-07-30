@@ -17,7 +17,6 @@ import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,9 +40,7 @@ public class ShowController {
     @PreAuthorize("hasRole('user')")
     @QueryMapping
     public List<ShowEntity> showsRecentAdded() {
-        List<ShowEntity> result = new ArrayList<>();
-        showRepository.findAll().forEach(result::add);
-        return result;
+        return showRepository.findAll(Sort.by("dateCreated").descending());
     }
 
     @SchemaMapping(typeName = "Show", field = "episodes")

@@ -16,7 +16,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -31,9 +30,7 @@ public class MovieController {
     @PreAuthorize("hasRole('user')")
     @QueryMapping
     public List<MovieEntity> moviesRecentAdded() {
-        List<MovieEntity> result = new ArrayList<>();
-        movieRepository.findAll().forEach(result::add);
-        return result;
+        return movieRepository.findAll(Sort.by("dateCreated").descending());
     }
 
     @SchemaMapping(typeName = "Movie", field = "metadata")
