@@ -1,19 +1,21 @@
 {
   "resources":{
   "includes":[{
-    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.13.0/favicon-16x16.png\\E"
+    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.17.14/favicon-16x16.png\\E"
   }, {
-    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.13.0/index.css\\E"
+    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.17.14/index.css\\E"
   }, {
-    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.13.0/index.html\\E"
+    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.17.14/index.html\\E"
   }, {
-    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.13.0/swagger-initializer.js\\E"
+    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.17.14/oauth2-redirect.html\\E"
   }, {
-    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.13.0/swagger-ui-bundle.js\\E"
+    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.17.14/swagger-initializer.js\\E"
   }, {
-    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.13.0/swagger-ui-standalone-preset.js\\E"
+    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.17.14/swagger-ui-bundle.js\\E"
   }, {
-    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.13.0/swagger-ui.css\\E"
+    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.17.14/swagger-ui-standalone-preset.js\\E"
+  }, {
+    "pattern":"\\QMETA-INF/resources/webjars/swagger-ui/5.17.14/swagger-ui.css\\E"
   }, {
     "pattern":"\\QMETA-INF/resources/webjars/swagger-ui\\E"
   }, {
@@ -79,6 +81,8 @@
   }, {
     "pattern":"\\Qapp/ister/server/controller/FileController.class\\E"
   }, {
+    "pattern":"\\Qapp/ister/server/controller/MovieController.class\\E"
+  }, {
     "pattern":"\\Qapp/ister/server/controller/PlayQueueController.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/controller/ScannerController.class\\E"
@@ -101,6 +105,8 @@
   }, {
     "pattern":"\\Qapp/ister/server/entitiy/EpisodeEntity.class\\E"
   }, {
+    "pattern":"\\Qapp/ister/server/entitiy/FileFromPathEntity$FileFromPathEntityBuilder.class\\E"
+  }, {
     "pattern":"\\Qapp/ister/server/entitiy/FileFromPathEntity.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/entitiy/ImageEntity$ImageEntityBuilder.class\\E"
@@ -122,6 +128,10 @@
     "pattern":"\\Qapp/ister/server/entitiy/MetadataEntity$MetadataEntityBuilder.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/entitiy/MetadataEntity.class\\E"
+  }, {
+    "pattern":"\\Qapp/ister/server/entitiy/MovieEntity$MovieEntityBuilder.class\\E"
+  }, {
+    "pattern":"\\Qapp/ister/server/entitiy/MovieEntity.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/entitiy/NodeEntity$NodeEntityBuilder.class\\E"
   }, {
@@ -175,11 +185,15 @@
   }, {
     "pattern":"\\Qapp/ister/server/events/TMDBMetadata/MetadataSave.class\\E"
   }, {
+    "pattern":"\\Qapp/ister/server/events/TMDBMetadata/MovieMetadata.class\\E"
+  }, {
     "pattern":"\\Qapp/ister/server/events/TMDBMetadata/ShowMetadata.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/events/episodefound/EpisodeFoundData$EpisodeFoundDataBuilder.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/events/episodefound/HandleEpisodeFound.class\\E"
+  }, {
+    "pattern":"\\Qapp/ister/server/events/filescanrequested/FileScanRequestedData$FileScanRequestedDataBuilder.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/events/filescanrequested/FileScanRequestedHandle.class\\E"
   }, {
@@ -192,6 +206,10 @@
     "pattern":"\\Qapp/ister/server/events/mediafilefound/MediaFileFoundData$MediaFileFoundDataBuilder.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/events/mediafilefound/MediaFileFoundGetDuration.class\\E"
+  }, {
+    "pattern":"\\Qapp/ister/server/events/moviefound/MovieFoundData$MovieFoundDataBuilder.class\\E"
+  }, {
+    "pattern":"\\Qapp/ister/server/events/moviefound/MovieFoundHandle.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/events/newdirectoriesscanrequested/HandleNewDirectoriesScanRequested.class\\E"
   }, {
@@ -224,6 +242,8 @@
     "pattern":"\\Qapp/ister/server/repository/MediaFileStreamRepository.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/repository/MetadataRepository.class\\E"
+  }, {
+    "pattern":"\\Qapp/ister/server/repository/MovieRepository.class\\E"
   }, {
     "pattern":"\\Qapp/ister/server/repository/NodeRepository.class\\E"
   }, {
@@ -397,14 +417,6 @@
   }, {
     "pattern":"\\Qjavax/sql/DataSource.class\\E"
   }, {
-    "pattern":"\\Qkotlin/Metadata.class\\E"
-  }, {
-    "pattern":"\\Qkotlin/annotation/MustBeDocumented.class\\E"
-  }, {
-    "pattern":"\\Qkotlin/annotation/Retention.class\\E"
-  }, {
-    "pattern":"\\Qkotlin/annotation/Target.class\\E"
-  }, {
     "pattern":"\\Qmockito-extensions/org.mockito.plugins.MockResolver\\E"
   }, {
     "pattern":"\\Qnfo/episode.nfo\\E"
@@ -461,6 +473,8 @@
   }, {
     "pattern":"\\Qorg/springdoc/core/conditions/MultipleOpenApiGroupsCondition$OnGroupedOpenApiBean.class\\E"
   }, {
+    "pattern":"\\Qorg/springdoc/core/conditions/MultipleOpenApiGroupsCondition$OnListGroupedOpenApiBean.class\\E"
+  }, {
     "pattern":"\\Qorg/springdoc/core/conditions/MultipleOpenApiGroupsCondition.class\\E"
   }, {
     "pattern":"\\Qorg/springdoc/core/conditions/MultipleOpenApiSupportCondition$OnActuatorDifferentPort.class\\E"
@@ -505,6 +519,8 @@
   }, {
     "pattern":"\\Qorg/springdoc/core/configuration/SpringDocPageableConfiguration.class\\E"
   }, {
+    "pattern":"\\Qorg/springdoc/core/configuration/SpringDocSecurityConfiguration$SpringDocSecurityOAuth2ClientConfiguration.class\\E"
+  }, {
     "pattern":"\\Qorg/springdoc/core/configuration/SpringDocSecurityConfiguration$SpringDocSecurityOAuth2Configuration.class\\E"
   }, {
     "pattern":"\\Qorg/springdoc/core/configuration/SpringDocSecurityConfiguration$SpringSecurityLoginEndpointConfiguration.class\\E"
@@ -523,6 +539,8 @@
   }, {
     "pattern":"\\Qorg/springdoc/core/converters/ModelConverterRegistrar.class\\E"
   }, {
+    "pattern":"\\Qorg/springdoc/core/converters/PageOpenAPIConverter.class\\E"
+  }, {
     "pattern":"\\Qorg/springdoc/core/converters/PageableOpenAPIConverter.class\\E"
   }, {
     "pattern":"\\Qorg/springdoc/core/converters/PolymorphicModelConverter.class\\E"
@@ -540,8 +558,6 @@
     "pattern":"\\Qorg/springdoc/core/customizers/SpringDocCustomizers.class\\E"
   }, {
     "pattern":"\\Qorg/springdoc/core/discoverer/SpringDocParameterNameDiscoverer.class\\E"
-  }, {
-    "pattern":"\\Qorg/springdoc/core/parsers/KotlinCoroutinesReturnTypeParser.class\\E"
   }, {
     "pattern":"\\Qorg/springdoc/core/parsers/ReturnTypeParser.class\\E"
   }, {
@@ -2548,6 +2564,6 @@
     "locales":["", "und"]
   }, {
     "name":"org.springframework.security.messages",
-    "locales":["nl", "und"]
+    "locales":["", "nl"]
   }]
 }

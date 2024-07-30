@@ -81,9 +81,6 @@
   "name":"[Ljavax.management.openmbean.CompositeData;"
 },
 {
-  "name":"[Lkotlin.annotation.AnnotationTarget;"
-},
-{
   "name":"[Lnet.bytebuddy.description.enumeration.EnumerationDescription;"
 },
 {
@@ -208,7 +205,7 @@
   "allDeclaredClasses":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"converter","parameterTypes":[] }, {"name":"queueEpisodeFound","parameterTypes":[] }, {"name":"queueFileScanRequested","parameterTypes":[] }, {"name":"queueMediaFileFound","parameterTypes":[] }, {"name":"queueNewDirectoriesScanRequested","parameterTypes":[] }, {"name":"queueNfoFileFound","parameterTypes":[] }, {"name":"queueShowFound","parameterTypes":[] }, {"name":"queueSubtitleFileFound","parameterTypes":[] }, {"name":"setBeanFactory","parameterTypes":["org.springframework.beans.factory.BeanFactory"] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"converter","parameterTypes":[] }, {"name":"queueEpisodeFound","parameterTypes":[] }, {"name":"queueFileScanRequested","parameterTypes":[] }, {"name":"queueMediaFileFound","parameterTypes":[] }, {"name":"queueMovieFound","parameterTypes":[] }, {"name":"queueNewDirectoriesScanRequested","parameterTypes":[] }, {"name":"queueNfoFileFound","parameterTypes":[] }, {"name":"queueShowFound","parameterTypes":[] }, {"name":"queueSubtitleFileFound","parameterTypes":[] }, {"name":"setBeanFactory","parameterTypes":["org.springframework.beans.factory.BeanFactory"] }]
 },
 {
   "name":"app.ister.server.IsterServerApplication$$SpringCGLIB$$0",
@@ -372,6 +369,18 @@
   "queryAllDeclaredMethods":true
 },
 {
+  "name":"app.ister.server.controller.MovieController",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"images","parameterTypes":["app.ister.server.entitiy.MovieEntity"] }, {"name":"metadata","parameterTypes":["app.ister.server.entitiy.MovieEntity"] }, {"name":"moviesRecentAdded","parameterTypes":[] }]
+},
+{
+  "name":"app.ister.server.controller.MovieController$$SpringCGLIB$$0",
+  "fields":[{"name":"CGLIB$CALLBACK_FILTER"}, {"name":"CGLIB$FACTORY_DATA"}],
+  "methods":[{"name":"CGLIB$SET_THREAD_CALLBACKS","parameterTypes":["org.springframework.cglib.proxy.Callback[]"] }]
+},
+{
   "name":"app.ister.server.controller.PlayQueueController",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
@@ -445,42 +454,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateAccessOptimizer$RhlPK3Ck",
-  "fields":[{"name":"invocationTarget$aqiu2i1"}],
+  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateAccessOptimizer$3hvUy3RX",
+  "fields":[{"name":"invocationTarget$ehqcni1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateAccessOptimizer$ZOHxlzLt",
-  "fields":[{"name":"invocationTarget$s5q23v1"}],
+  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateAccessOptimizer$IX4m4oj1",
+  "fields":[{"name":"invocationTarget$u3imer0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateAccessOptimizer$zCxji2WF",
-  "fields":[{"name":"invocationTarget$0cjv4q0"}],
+  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateInstantiator$dvQ7A3Ky",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateInstantiator$3r4uRQ5M",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateInstantiator$ILHy53eH",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateInstantiator$XPhTDHUY",
+  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateInstantiator$x9U2nPi3",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.DirectoryEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.DirectoryEntity_Accessor_ipp791",
-  "queryAllPublicConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.DirectoryEntity"] }]
-},
-{
-  "name":"app.ister.server.entitiy.DirectoryEntity_Accessor_swp35e",
+  "name":"app.ister.server.entitiy.DirectoryEntity_Accessor_a3cha2",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.DirectoryEntity"] }]
 },
@@ -493,42 +488,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getNumber","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateAccessOptimizer$3va9lXKE",
-  "fields":[{"name":"invocationTarget$5pvr990"}],
+  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateAccessOptimizer$J1XNV63C",
+  "fields":[{"name":"invocationTarget$c15c4i0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateAccessOptimizer$Z4H5wS83",
-  "fields":[{"name":"invocationTarget$hhbjc50"}],
+  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateAccessOptimizer$Oii6qCu9",
+  "fields":[{"name":"invocationTarget$uond8j1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateAccessOptimizer$vcq55Hsp",
-  "fields":[{"name":"invocationTarget$anhjup1"}],
+  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateInstantiator$2dYn2lLM",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateInstantiator$ajwbSePn",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateInstantiator$btIVPl2g",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateInstantiator$ouYsHhwW",
+  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateInstantiator$uYYPudRS",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.EpisodeEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.EpisodeEntity_Accessor_7k702d",
-  "queryAllPublicConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.EpisodeEntity"] }]
-},
-{
-  "name":"app.ister.server.entitiy.EpisodeEntity_Accessor_sawjid",
+  "name":"app.ister.server.entitiy.EpisodeEntity_Accessor_u4udsi",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.EpisodeEntity"] }]
 },
@@ -551,42 +532,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getLanguage","parameterTypes":[] }, {"name":"getPath","parameterTypes":[] }, {"name":"getSourceUri","parameterTypes":[] }, {"name":"getType","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ImageEntity$HibernateAccessOptimizer$BFjlwR8F",
-  "fields":[{"name":"invocationTarget$q9pmt70"}],
+  "name":"app.ister.server.entitiy.ImageEntity$HibernateAccessOptimizer$4ECUAEmZ",
+  "fields":[{"name":"invocationTarget$14ffg51"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ImageEntity$HibernateAccessOptimizer$Ew7pc1AY",
-  "fields":[{"name":"invocationTarget$tqi1651"}],
+  "name":"app.ister.server.entitiy.ImageEntity$HibernateAccessOptimizer$7RUUkD0u",
+  "fields":[{"name":"invocationTarget$04jp0g1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ImageEntity$HibernateAccessOptimizer$pdvSN2zm",
-  "fields":[{"name":"invocationTarget$n7k1ko1"}],
+  "name":"app.ister.server.entitiy.ImageEntity$HibernateInstantiator$8pBb0rJ1",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ImageEntity$HibernateInstantiator$5GlOpx13",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.ImageEntity$HibernateInstantiator$bmfjMYm6",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.ImageEntity$HibernateInstantiator$yjWrGjva",
+  "name":"app.ister.server.entitiy.ImageEntity$HibernateInstantiator$MaeTtqap",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.ImageEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.ImageEntity_Accessor_6jqicr",
-  "queryAllPublicConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.ImageEntity"] }]
-},
-{
-  "name":"app.ister.server.entitiy.ImageEntity_Accessor_oexich",
+  "name":"app.ister.server.entitiy.ImageEntity_Accessor_lh4ffx",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.ImageEntity"] }]
 },
@@ -599,42 +566,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.LibraryEntity$HibernateAccessOptimizer$0UzgW1Qt",
-  "fields":[{"name":"invocationTarget$jlekhp0"}],
+  "name":"app.ister.server.entitiy.LibraryEntity$HibernateAccessOptimizer$XKWMKToS",
+  "fields":[{"name":"invocationTarget$sk1qio1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.LibraryEntity$HibernateAccessOptimizer$hfcirjIY",
-  "fields":[{"name":"invocationTarget$p60lu40"}],
+  "name":"app.ister.server.entitiy.LibraryEntity$HibernateAccessOptimizer$YJ29iY2m",
+  "fields":[{"name":"invocationTarget$hsjvpr1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.LibraryEntity$HibernateAccessOptimizer$scTzekrl",
-  "fields":[{"name":"invocationTarget$gb373o0"}],
+  "name":"app.ister.server.entitiy.LibraryEntity$HibernateInstantiator$BcjujI2b",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.LibraryEntity$HibernateInstantiator$7I8ry62r",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.LibraryEntity$HibernateInstantiator$Mxqh7vxU",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.LibraryEntity$HibernateInstantiator$jeChu5H4",
+  "name":"app.ister.server.entitiy.LibraryEntity$HibernateInstantiator$fuJitQ5y",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.LibraryEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.LibraryEntity_Accessor_bbbxte",
-  "queryAllPublicConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.LibraryEntity"] }]
-},
-{
-  "name":"app.ister.server.entitiy.LibraryEntity_Accessor_q1jb0b",
+  "name":"app.ister.server.entitiy.LibraryEntity_Accessor_8g8gis",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.LibraryEntity"] }]
 },
@@ -647,42 +600,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getDurationInMilliseconds","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getPath","parameterTypes":[] }, {"name":"getSize","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateAccessOptimizer$olRrTxKM",
-  "fields":[{"name":"invocationTarget$scd1560"}],
+  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateAccessOptimizer$NHGMBYyk",
+  "fields":[{"name":"invocationTarget$na2sm51"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateAccessOptimizer$qtJKLt7j",
-  "fields":[{"name":"invocationTarget$0gdcbc0"}],
+  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateAccessOptimizer$u2JGuu8T",
+  "fields":[{"name":"invocationTarget$fvu1kg1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateAccessOptimizer$xJMfz2TA",
-  "fields":[{"name":"invocationTarget$5oh54c1"}],
+  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateInstantiator$7xoqijc1",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateInstantiator$2nvifqcR",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateInstantiator$a56tynPC",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateInstantiator$gNbFuwuG",
+  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateInstantiator$cD7hGjOW",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.MediaFileEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileEntity_Accessor_1c0m2t",
-  "queryAllPublicConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.MediaFileEntity"] }]
-},
-{
-  "name":"app.ister.server.entitiy.MediaFileEntity_Accessor_lixuob",
+  "name":"app.ister.server.entitiy.MediaFileEntity_Accessor_4jlbjg",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.MediaFileEntity"] }]
 },
@@ -695,42 +634,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getCodecName","parameterTypes":[] }, {"name":"getCodecType","parameterTypes":[] }, {"name":"getHeight","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getLanguage","parameterTypes":[] }, {"name":"getPath","parameterTypes":[] }, {"name":"getStreamIndex","parameterTypes":[] }, {"name":"getTitle","parameterTypes":[] }, {"name":"getWidth","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateAccessOptimizer$DdcmfgSD",
-  "fields":[{"name":"invocationTarget$4bt8a51"}],
+  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateAccessOptimizer$N7mh2f5n",
+  "fields":[{"name":"invocationTarget$4ood4f1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateAccessOptimizer$K71TlvqR",
-  "fields":[{"name":"invocationTarget$d8387h0"}],
+  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateAccessOptimizer$VsfKFFST",
+  "fields":[{"name":"invocationTarget$183f9i1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateAccessOptimizer$wQDrmiCw",
-  "fields":[{"name":"invocationTarget$qfm80s0"}],
+  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateInstantiator$26toqVT0",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateInstantiator$W2zEXbvm",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateInstantiator$Y93GvsSr",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateInstantiator$cAS5j9Bm",
+  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateInstantiator$hamMWdE2",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.MediaFileStreamEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileStreamEntity_Accessor_ctqi2s",
-  "queryAllPublicConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.MediaFileStreamEntity"] }]
-},
-{
-  "name":"app.ister.server.entitiy.MediaFileStreamEntity_Accessor_r33ykr",
+  "name":"app.ister.server.entitiy.MediaFileStreamEntity_Accessor_w5n6in",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.MediaFileStreamEntity"] }]
 },
@@ -743,44 +668,64 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getDescription","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getLanguage","parameterTypes":[] }, {"name":"getSourceUri","parameterTypes":[] }, {"name":"getTitle","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MetadataEntity$HibernateAccessOptimizer$89pXBNh1",
-  "fields":[{"name":"invocationTarget$ghs7lt1"}],
+  "name":"app.ister.server.entitiy.MetadataEntity$HibernateAccessOptimizer$bhiX9lNY",
+  "fields":[{"name":"invocationTarget$i874hl1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MetadataEntity$HibernateAccessOptimizer$Pgq3zBn8",
-  "fields":[{"name":"invocationTarget$a905mt1"}],
+  "name":"app.ister.server.entitiy.MetadataEntity$HibernateAccessOptimizer$ovfDRiHh",
+  "fields":[{"name":"invocationTarget$762v011"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MetadataEntity$HibernateAccessOptimizer$vZOrWWvI",
-  "fields":[{"name":"invocationTarget$3srrb20"}],
+  "name":"app.ister.server.entitiy.MetadataEntity$HibernateInstantiator$cwitghjN",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MetadataEntity$HibernateInstantiator$EgmjYB2d",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.MetadataEntity$HibernateInstantiator$uNA2u9a6",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.MetadataEntity$HibernateInstantiator$yBXkKMzK",
+  "name":"app.ister.server.entitiy.MetadataEntity$HibernateInstantiator$vW8WboIJ",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.MetadataEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.MetadataEntity_Accessor_h3eyzh",
+  "name":"app.ister.server.entitiy.MetadataEntity_Accessor_2vuiub",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.MetadataEntity"] }]
 },
 {
-  "name":"app.ister.server.entitiy.MetadataEntity_Accessor_kzyk0j",
+  "name":"app.ister.server.entitiy.MovieEntity",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllPublicMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getName","parameterTypes":[] }, {"name":"getReleaseYear","parameterTypes":[] }]
+},
+{
+  "name":"app.ister.server.entitiy.MovieEntity$HibernateAccessOptimizer$phvSD8WT",
+  "fields":[{"name":"invocationTarget$nbo7041"}],
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"app.ister.server.entitiy.MovieEntity$HibernateAccessOptimizer$pyWakTKH",
+  "fields":[{"name":"invocationTarget$283ejs0"}],
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"app.ister.server.entitiy.MovieEntity$HibernateInstantiator$NGdgmv5y",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"app.ister.server.entitiy.MovieEntity$HibernateInstantiator$UWQu3ATK",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"app.ister.server.entitiy.MovieEntity_"
+},
+{
+  "name":"app.ister.server.entitiy.MovieEntity_Accessor_bw9snz",
   "queryAllPublicConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.MetadataEntity"] }]
+  "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.MovieEntity"] }]
 },
 {
   "name":"app.ister.server.entitiy.NodeEntity",
@@ -791,42 +736,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.NodeEntity$HibernateAccessOptimizer$WmHAs0TR",
-  "fields":[{"name":"invocationTarget$pfm48o0"}],
+  "name":"app.ister.server.entitiy.NodeEntity$HibernateAccessOptimizer$Ai4gLrGH",
+  "fields":[{"name":"invocationTarget$1793sd0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.NodeEntity$HibernateAccessOptimizer$oSKkdg3p",
-  "fields":[{"name":"invocationTarget$qjqh240"}],
+  "name":"app.ister.server.entitiy.NodeEntity$HibernateAccessOptimizer$wbHCRS2f",
+  "fields":[{"name":"invocationTarget$7g0ucs0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.NodeEntity$HibernateAccessOptimizer$pz8Vnnfw",
-  "fields":[{"name":"invocationTarget$rljqii1"}],
+  "name":"app.ister.server.entitiy.NodeEntity$HibernateInstantiator$FkVpoDIF",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.NodeEntity$HibernateInstantiator$7w3fVEym",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.NodeEntity$HibernateInstantiator$9AlvyJcW",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.NodeEntity$HibernateInstantiator$SYUMEZ5X",
+  "name":"app.ister.server.entitiy.NodeEntity$HibernateInstantiator$ZckFjBT8",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.NodeEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.NodeEntity_Accessor_11ag8i",
-  "queryAllPublicConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.NodeEntity"] }]
-},
-{
-  "name":"app.ister.server.entitiy.NodeEntity_Accessor_v1mflj",
+  "name":"app.ister.server.entitiy.NodeEntity_Accessor_eqzaxb",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.NodeEntity"] }]
 },
@@ -839,42 +770,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateAccessOptimizer$38h0qtCd",
-  "fields":[{"name":"invocationTarget$s4ffrs0"}],
+  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateAccessOptimizer$UIUCBf7p",
+  "fields":[{"name":"invocationTarget$fvejor1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateAccessOptimizer$MaBZ6z5m",
-  "fields":[{"name":"invocationTarget$03l4qb1"}],
+  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateAccessOptimizer$eCROv2jW",
+  "fields":[{"name":"invocationTarget$hi71731"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateAccessOptimizer$kGuETELK",
-  "fields":[{"name":"invocationTarget$849sv40"}],
+  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateInstantiator$KUg2OzAS",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateInstantiator$Cw4bhuM7",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateInstantiator$ESZUmJrk",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateInstantiator$i5pjc2Gi",
+  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateInstantiator$ZPZX9a0W",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.OtherPathFileEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.OtherPathFileEntity_Accessor_avu4o3",
-  "queryAllPublicConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.OtherPathFileEntity"] }]
-},
-{
-  "name":"app.ister.server.entitiy.OtherPathFileEntity_Accessor_edj8g",
+  "name":"app.ister.server.entitiy.OtherPathFileEntity_Accessor_petdzn",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.OtherPathFileEntity"] }]
 },
@@ -887,30 +804,21 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getCurrentItem","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateAccessOptimizer$18Ixx0Jm",
-  "fields":[{"name":"invocationTarget$5q4qgg1"}],
+  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateAccessOptimizer$NafzYKiI",
+  "fields":[{"name":"invocationTarget$6l6a1p1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateAccessOptimizer$BsyMuNwY",
-  "fields":[{"name":"invocationTarget$9klf6j1"}],
+  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateAccessOptimizer$O5dsU8KN",
+  "fields":[{"name":"invocationTarget$7dc41o0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateAccessOptimizer$OzTl3lew",
-  "fields":[{"name":"invocationTarget$pjtu850"}],
+  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateInstantiator$1usG2O0b",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateInstantiator$1ltwBr3A",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateInstantiator$2OOhx9za",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateInstantiator$enypCM8o",
+  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateInstantiator$vtO7Thgo",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
@@ -925,7 +833,7 @@
   "name":"app.ister.server.entitiy.PlayQueueEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueEntity_Accessor_w5l49t",
+  "name":"app.ister.server.entitiy.PlayQueueEntity_Accessor_7zqfct",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.PlayQueueEntity"] }]
 },
@@ -938,30 +846,21 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getItemId","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateAccessOptimizer$HOdQMwD1",
-  "fields":[{"name":"invocationTarget$njfv9k1"}],
+  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateAccessOptimizer$NT47fj7i",
+  "fields":[{"name":"invocationTarget$uskrj41"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateAccessOptimizer$XsBlVFC0",
-  "fields":[{"name":"invocationTarget$3p12gp1"}],
+  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateAccessOptimizer$opolZIs4",
+  "fields":[{"name":"invocationTarget$i77d4i1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateAccessOptimizer$jw8yAwDn",
-  "fields":[{"name":"invocationTarget$o5dpko0"}],
+  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateInstantiator$0AGln8KB",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateInstantiator$HQvuPP3U",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateInstantiator$iKWQ3UR8",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateInstantiator$pWJTveJO",
+  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateInstantiator$7fTfUyRc",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
@@ -976,42 +875,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getNumber","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.SeasonEntity$HibernateAccessOptimizer$0ReXiJrP",
-  "fields":[{"name":"invocationTarget$4pfski1"}],
+  "name":"app.ister.server.entitiy.SeasonEntity$HibernateAccessOptimizer$EQFoZmD9",
+  "fields":[{"name":"invocationTarget$5l5qfk1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.SeasonEntity$HibernateAccessOptimizer$RYcHUlal",
-  "fields":[{"name":"invocationTarget$629ev51"}],
+  "name":"app.ister.server.entitiy.SeasonEntity$HibernateAccessOptimizer$dyR4jCDG",
+  "fields":[{"name":"invocationTarget$5ht4jp0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.SeasonEntity$HibernateAccessOptimizer$cYVhKc8M",
-  "fields":[{"name":"invocationTarget$dr7h8v0"}],
+  "name":"app.ister.server.entitiy.SeasonEntity$HibernateInstantiator$haGwTea5",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.SeasonEntity$HibernateInstantiator$ef36Jr3v",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.SeasonEntity$HibernateInstantiator$jHqOaCCn",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.SeasonEntity$HibernateInstantiator$vvhvq3Jo",
+  "name":"app.ister.server.entitiy.SeasonEntity$HibernateInstantiator$qw6CTZiE",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.SeasonEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.SeasonEntity_Accessor_8ygs6j",
-  "queryAllPublicConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.SeasonEntity"] }]
-},
-{
-  "name":"app.ister.server.entitiy.SeasonEntity_Accessor_jl4jhw",
+  "name":"app.ister.server.entitiy.SeasonEntity_Accessor_r6qp8n",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.SeasonEntity"] }]
 },
@@ -1023,30 +908,21 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateAccessOptimizer$DJj5Nesv",
-  "fields":[{"name":"invocationTarget$ud8vlk0"}],
+  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateAccessOptimizer$GQLd9X1i",
+  "fields":[{"name":"invocationTarget$tr5unr1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateAccessOptimizer$G5VDddnF",
-  "fields":[{"name":"invocationTarget$0ii38j1"}],
+  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateAccessOptimizer$Io0LpOwW",
+  "fields":[{"name":"invocationTarget$okhofq0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateAccessOptimizer$YD80ZUMA",
-  "fields":[{"name":"invocationTarget$099gk40"}],
+  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateInstantiator$6JOgbB42",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateInstantiator$1Wurw9Mf",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateInstantiator$UMh5GhSF",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateInstantiator$mnXqBigA",
+  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateInstantiator$MaeTMUD1",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
@@ -1061,42 +937,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getName","parameterTypes":[] }, {"name":"getReleaseYear","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ShowEntity$HibernateAccessOptimizer$19mcEkm8",
-  "fields":[{"name":"invocationTarget$7dnlej1"}],
+  "name":"app.ister.server.entitiy.ShowEntity$HibernateAccessOptimizer$g13LuWhC",
+  "fields":[{"name":"invocationTarget$rphqvn0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ShowEntity$HibernateAccessOptimizer$5IEKZY6z",
-  "fields":[{"name":"invocationTarget$8n95i11"}],
+  "name":"app.ister.server.entitiy.ShowEntity$HibernateAccessOptimizer$wXXNMmVA",
+  "fields":[{"name":"invocationTarget$0ede5b1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ShowEntity$HibernateAccessOptimizer$bLLzfkkz",
-  "fields":[{"name":"invocationTarget$2fpk1l0"}],
+  "name":"app.ister.server.entitiy.ShowEntity$HibernateInstantiator$3NgFcvcw",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ShowEntity$HibernateInstantiator$8dTHTL0Y",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.ShowEntity$HibernateInstantiator$K3TUjorM",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.ShowEntity$HibernateInstantiator$WvNJengb",
+  "name":"app.ister.server.entitiy.ShowEntity$HibernateInstantiator$Z0jlBJET",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.ShowEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.ShowEntity_Accessor_5zzntn",
-  "queryAllPublicConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.ShowEntity"] }]
-},
-{
-  "name":"app.ister.server.entitiy.ShowEntity_Accessor_kecmwj",
+  "name":"app.ister.server.entitiy.ShowEntity_Accessor_omhrt9",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.ShowEntity"] }]
 },
@@ -1109,42 +971,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.UserEntity$HibernateAccessOptimizer$BxSzZJnV",
-  "fields":[{"name":"invocationTarget$9f1eht1"}],
+  "name":"app.ister.server.entitiy.UserEntity$HibernateAccessOptimizer$COBqm5oe",
+  "fields":[{"name":"invocationTarget$mig0g90"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.UserEntity$HibernateAccessOptimizer$OBrBqjRo",
-  "fields":[{"name":"invocationTarget$hlv8t81"}],
+  "name":"app.ister.server.entitiy.UserEntity$HibernateAccessOptimizer$JAsyLJH6",
+  "fields":[{"name":"invocationTarget$j8kovu0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.UserEntity$HibernateAccessOptimizer$w1sMYpwr",
-  "fields":[{"name":"invocationTarget$0t2rnj1"}],
+  "name":"app.ister.server.entitiy.UserEntity$HibernateInstantiator$9NfkGA2N",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.UserEntity$HibernateInstantiator$CXCEL9Ha",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.UserEntity$HibernateInstantiator$PtX6H9m1",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.UserEntity$HibernateInstantiator$nEw7wlyk",
+  "name":"app.ister.server.entitiy.UserEntity$HibernateInstantiator$eYrEhsvY",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.UserEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.UserEntity_Accessor_tll9sg",
-  "queryAllPublicConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.UserEntity"] }]
-},
-{
-  "name":"app.ister.server.entitiy.UserEntity_Accessor_wbvix6",
+  "name":"app.ister.server.entitiy.UserEntity_Accessor_ahugug",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.UserEntity"] }]
 },
@@ -1157,37 +1005,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateAccessOptimizer$jVTMCyoM",
-  "fields":[{"name":"invocationTarget$fecdj71"}],
+  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateAccessOptimizer$78ZVOhgR",
+  "fields":[{"name":"invocationTarget$fh3har1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateAccessOptimizer$lv7DJU8K",
-  "fields":[{"name":"invocationTarget$0o6i6u1"}],
+  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateAccessOptimizer$HnwsWk4N",
+  "fields":[{"name":"invocationTarget$l2djk50"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateAccessOptimizer$rlCsJMWi",
-  "fields":[{"name":"invocationTarget$f4kehf1"}],
+  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateInstantiator$c3CY9Ive",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateInstantiator$KTQcpxYi",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateInstantiator$Y8ifhEUT",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateInstantiator$vEM7R7Dc",
+  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateInstantiator$wUwG7P4d",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.WatchStatusEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.WatchStatusEntity_Accessor_tlezf7",
+  "name":"app.ister.server.entitiy.WatchStatusEntity_Accessor_3szo3z",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.WatchStatusEntity"] }]
 },
@@ -1273,6 +1112,13 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"save","parameterTypes":[] }]
 },
 {
+  "name":"app.ister.server.events.TMDBMetadata.MovieMetadata",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
   "name":"app.ister.server.events.TMDBMetadata.ShowMetadata",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
@@ -1332,11 +1178,20 @@
   "methods":[{"name":"CGLIB$SET_THREAD_CALLBACKS","parameterTypes":["org.springframework.cglib.proxy.Callback[]"] }]
 },
 {
+  "name":"app.ister.server.events.filescanrequested.FileScanRequestedHandleTest",
+  "allDeclaredFields":true,
+  "allDeclaredClasses":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllPublicMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"handle","parameterTypes":[] }, {"name":"handles","parameterTypes":[] }, {"name":"listenerThrowNotSupported","parameterTypes":[] }, {"name":"setUp","parameterTypes":[] }]
+},
+{
   "name":"app.ister.server.events.mediafilefound.HandleMediaFileFound",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":["app.ister.server.service.NodeService","app.ister.server.repository.DirectoryRepository","app.ister.server.repository.MediaFileRepository","app.ister.server.repository.EpisodeRepository","app.ister.server.repository.MediaFileStreamRepository","app.ister.server.repository.ImageRepository","app.ister.server.events.mediafilefound.MediaFileFoundCheckForStreams","app.ister.server.events.mediafilefound.MediaFileFoundCreateBackground","app.ister.server.events.mediafilefound.MediaFileFoundGetDuration"] }, {"name":"handle","parameterTypes":["app.ister.server.events.MessageData"] }, {"name":"handles","parameterTypes":[] }, {"name":"listener","parameterTypes":["app.ister.server.events.MessageData"] }, {"name":"listener","parameterTypes":["app.ister.server.events.mediafilefound.MediaFileFoundData"] }]
+  "methods":[{"name":"<init>","parameterTypes":["app.ister.server.service.NodeService","app.ister.server.repository.DirectoryRepository","app.ister.server.repository.MediaFileRepository","app.ister.server.repository.EpisodeRepository","app.ister.server.repository.MovieRepository","app.ister.server.repository.MediaFileStreamRepository","app.ister.server.repository.ImageRepository","app.ister.server.events.mediafilefound.MediaFileFoundCheckForStreams","app.ister.server.events.mediafilefound.MediaFileFoundCreateBackground","app.ister.server.events.mediafilefound.MediaFileFoundGetDuration"] }, {"name":"handle","parameterTypes":["app.ister.server.events.MessageData"] }, {"name":"handles","parameterTypes":[] }, {"name":"listener","parameterTypes":["app.ister.server.events.MessageData"] }, {"name":"listener","parameterTypes":["app.ister.server.events.mediafilefound.MediaFileFoundData"] }]
 },
 {
   "name":"app.ister.server.events.mediafilefound.HandleMediaFileFound$$SpringCGLIB$$0",
@@ -1391,7 +1246,7 @@
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getDirectoryEntityUUID","parameterTypes":[] }, {"name":"getEpisodeEntityUUID","parameterTypes":[] }, {"name":"getPath","parameterTypes":[] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getDirectoryEntityUUID","parameterTypes":[] }, {"name":"getEpisodeEntityUUID","parameterTypes":[] }, {"name":"getMovieEntityUUID","parameterTypes":[] }, {"name":"getPath","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.events.mediafilefound.MediaFileFoundGetDuration",
@@ -1409,6 +1264,25 @@
   "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getDurationFromStreamTag","parameterTypes":[] }, {"name":"getDurationFromStreams","parameterTypes":[] }, {"name":"getDurationWithFFmpegBecauseStreamAreEmpty","parameterTypes":[] }, {"name":"setup","parameterTypes":[] }]
+},
+{
+  "name":"app.ister.server.events.moviefound.MovieFoundData",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getMovieId","parameterTypes":[] }]
+},
+{
+  "name":"app.ister.server.events.moviefound.MovieFoundHandle",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"handle","parameterTypes":["app.ister.server.events.MessageData"] }, {"name":"handles","parameterTypes":[] }, {"name":"listener","parameterTypes":["app.ister.server.events.MessageData"] }, {"name":"listener","parameterTypes":["app.ister.server.events.moviefound.MovieFoundData"] }]
+},
+{
+  "name":"app.ister.server.events.moviefound.MovieFoundHandle$$SpringCGLIB$$0",
+  "fields":[{"name":"CGLIB$CALLBACK_FILTER"}, {"name":"CGLIB$FACTORY_DATA"}],
+  "methods":[{"name":"CGLIB$SET_THREAD_CALLBACKS","parameterTypes":["org.springframework.cglib.proxy.Callback[]"] }]
 },
 {
   "name":"app.ister.server.events.newdirectoriesscanrequested.HandleNewDirectoriesScanRequested",
@@ -1575,7 +1449,7 @@
   "methods":[{"name":"findByDirectoryTypeAndNodeEntity","parameterTypes":["app.ister.server.enums.DirectoryType","app.ister.server.entitiy.NodeEntity"] }, {"name":"findByName","parameterTypes":["java.lang.String"] }]
 },
 {
-  "name":"app.ister.server.repository.DirectoryRepository$MockitoMock$uqk8yHrx",
+  "name":"app.ister.server.repository.DirectoryRepository$MockitoMock$JiCSaSTN",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -1594,7 +1468,7 @@
   "queryAllPublicMethods":true
 },
 {
-  "name":"app.ister.server.repository.EpisodeRepository$MockitoMock$0nvPGpsr",
+  "name":"app.ister.server.repository.EpisodeRepository$MockitoMock$p8VDGkf4",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -1605,10 +1479,10 @@
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"findAll","parameterTypes":["org.springframework.data.domain.Pageable"] }, {"name":"findByDirectoryEntityAndPath","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.lang.String"] }, {"name":"findByShowEntityId","parameterTypes":["java.util.UUID"] }]
+  "methods":[{"name":"findAll","parameterTypes":["org.springframework.data.domain.Pageable"] }, {"name":"findByDirectoryEntity","parameterTypes":["app.ister.server.entitiy.DirectoryEntity"] }, {"name":"findByDirectoryEntityAndPath","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.lang.String"] }, {"name":"findByShowEntityId","parameterTypes":["java.util.UUID"] }]
 },
 {
-  "name":"app.ister.server.repository.ImageRepository$MockitoMock$qFGW9Vhn",
+  "name":"app.ister.server.repository.ImageRepository$MockitoMock$OdCAXcI5",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -1624,10 +1498,10 @@
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"findByDirectoryEntityAndEpisodeEntityAndPath","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","app.ister.server.entitiy.EpisodeEntity","java.lang.String"] }]
+  "methods":[{"name":"findByDirectoryEntity","parameterTypes":["app.ister.server.entitiy.DirectoryEntity"] }, {"name":"findByDirectoryEntityAndPath","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.lang.String"] }]
 },
 {
-  "name":"app.ister.server.repository.MediaFileRepository$MockitoMock$rr44Mbim",
+  "name":"app.ister.server.repository.MediaFileRepository$MockitoMock$zlCe7tUg",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -1641,7 +1515,7 @@
   "methods":[{"name":"findByMediaFileEntity","parameterTypes":["app.ister.server.entitiy.MediaFileEntity"] }]
 },
 {
-  "name":"app.ister.server.repository.MediaFileStreamRepository$MockitoMock$I0rTetyd",
+  "name":"app.ister.server.repository.MediaFileStreamRepository$MockitoMock$xs5Te5sQ",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -1654,7 +1528,21 @@
   "queryAllDeclaredConstructors":true
 },
 {
-  "name":"app.ister.server.repository.MetadataRepository$MockitoMock$1hN0OW47",
+  "name":"app.ister.server.repository.MetadataRepository$MockitoMock$TiVAHTI9",
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"app.ister.server.repository.MovieRepository",
+  "allDeclaredFields":true,
+  "allDeclaredClasses":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllPublicMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"findAll","parameterTypes":["org.springframework.data.domain.Pageable"] }, {"name":"findByLibraryEntityAndNameAndReleaseYear","parameterTypes":["app.ister.server.entitiy.LibraryEntity","java.lang.String","int"] }]
+},
+{
+  "name":"app.ister.server.repository.MovieRepository$MockitoMock$505aEzfp",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -1665,8 +1553,17 @@
 },
 {
   "name":"app.ister.server.repository.OtherPathFileRepository",
+  "allDeclaredFields":true,
+  "allDeclaredClasses":true,
   "queryAllDeclaredMethods":true,
-  "queryAllPublicMethods":true
+  "queryAllPublicMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"findByDirectoryEntity","parameterTypes":["app.ister.server.entitiy.DirectoryEntity"] }, {"name":"findByDirectoryEntityAndPath","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.lang.String"] }]
+},
+{
+  "name":"app.ister.server.repository.OtherPathFileRepository$MockitoMock$d9IJn1b7",
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.repository.PlayQueueRepository",
@@ -1685,10 +1582,10 @@
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"findAll","parameterTypes":["org.springframework.data.domain.Pageable"] }, {"name":"findByNameAndReleaseYear","parameterTypes":["java.lang.String","int"] }]
+  "methods":[{"name":"findAll","parameterTypes":["org.springframework.data.domain.Pageable"] }, {"name":"findByLibraryEntityAndNameAndReleaseYear","parameterTypes":["app.ister.server.entitiy.LibraryEntity","java.lang.String","int"] }]
 },
 {
-  "name":"app.ister.server.repository.ShowRepository$MockitoMock$Mc7Z9Lyb",
+  "name":"app.ister.server.repository.ShowRepository$MockitoMock$9RJJEPsh",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -1707,7 +1604,7 @@
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"setImageScanner","parameterTypes":["app.ister.server.scanner.scanners.ImageScanner"] }, {"name":"setMediaFileScanner","parameterTypes":["app.ister.server.scanner.scanners.MediaFileScanner"] }, {"name":"setNfoScanner","parameterTypes":["app.ister.server.scanner.scanners.NfoScanner"] }, {"name":"setSubtitleScanner","parameterTypes":["app.ister.server.scanner.scanners.SubtitleScanner"] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"setImageRepository","parameterTypes":["app.ister.server.repository.ImageRepository"] }, {"name":"setImageScanner","parameterTypes":["app.ister.server.scanner.scanners.ImageScanner"] }, {"name":"setMediaFileRepository","parameterTypes":["app.ister.server.repository.MediaFileRepository"] }, {"name":"setMediaFileScanner","parameterTypes":["app.ister.server.scanner.scanners.MediaFileScanner"] }, {"name":"setMessageSender","parameterTypes":["app.ister.server.service.MessageSender"] }, {"name":"setNfoScanner","parameterTypes":["app.ister.server.scanner.scanners.NfoScanner"] }, {"name":"setOtherPathFileRepository","parameterTypes":["app.ister.server.repository.OtherPathFileRepository"] }, {"name":"setSubtitleScanner","parameterTypes":["app.ister.server.scanner.scanners.SubtitleScanner"] }]
 },
 {
   "name":"app.ister.server.scanner.PathObject"
@@ -1719,7 +1616,24 @@
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"coverShowTest","parameterTypes":[] }, {"name":"episodeInSeasonDirTest","parameterTypes":[] }, {"name":"episodeTest","parameterTypes":[] }, {"name":"episodeWithCapitolInSeasonDirTest","parameterTypes":[] }, {"name":"imageFileForEpisodeTest","parameterTypes":[] }, {"name":"imageSeasonTest","parameterTypes":[] }, {"name":"nfoFileForEpisodeTest","parameterTypes":[] }, {"name":"nfoFileForShowTest","parameterTypes":[] }, {"name":"notCorrectMissingShowPath","parameterTypes":[] }, {"name":"notCorrectPath","parameterTypes":[] }, {"name":"seasonTest","parameterTypes":[] }, {"name":"showTest","parameterTypes":[] }, {"name":"subtitleFileForEpisodeTest","parameterTypes":[] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"coverShowTest","parameterTypes":[] }, {"name":"episodeInSeasonDirTest","parameterTypes":[] }, {"name":"episodeTest","parameterTypes":[] }, {"name":"episodeWithCapitolInSeasonDirTest","parameterTypes":[] }, {"name":"imageFileForEpisodeTest","parameterTypes":[] }, {"name":"imageFileFormovieTest","parameterTypes":[] }, {"name":"imageSeasonTest","parameterTypes":[] }, {"name":"movieTest","parameterTypes":[] }, {"name":"nfoFileForEpisodeTest","parameterTypes":[] }, {"name":"nfoFileForShowTest","parameterTypes":[] }, {"name":"notCorrectMissingShowPath","parameterTypes":[] }, {"name":"notCorrectPath","parameterTypes":[] }, {"name":"seasonTest","parameterTypes":[] }, {"name":"showTest","parameterTypes":[] }, {"name":"subtitleFileForEpisodeTest","parameterTypes":[] }]
+},
+{
+  "name":"app.ister.server.scanner.ScannedCache",
+  "allDeclaredFields":true,
+  "allDeclaredClasses":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","app.ister.server.repository.ImageRepository","app.ister.server.repository.MediaFileRepository","app.ister.server.repository.OtherPathFileRepository"] }, {"name":"foundPath","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"app.ister.server.scanner.ScannedCacheTest",
+  "allDeclaredFields":true,
+  "allDeclaredClasses":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllPublicMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"happyFlow","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.scanner.ScannerSimpleFileVisitorTest",
@@ -1728,7 +1642,7 @@
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"setUp","parameterTypes":[] }, {"name":"tearDown","parameterTypes":[] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"setUp","parameterTypes":[] }, {"name":"tearDown","parameterTypes":[] }, {"name":"visitFile","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.scanner.ScannerSimpleFileVisitorTest$PreVisitDirectory",
@@ -1745,7 +1659,7 @@
   "allDeclaredClasses":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"analyzable","parameterTypes":["java.nio.file.Path","java.lang.Boolean","long"] }, {"name":"analyzable","parameterTypes":["java.nio.file.Path","java.nio.file.attribute.BasicFileAttributes"] }, {"name":"analyze","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.nio.file.Path","java.lang.Boolean","long"] }, {"name":"analyze","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.nio.file.Path","java.nio.file.attribute.BasicFileAttributes"] }, {"name":"setImageRepository","parameterTypes":["app.ister.server.repository.ImageRepository"] }, {"name":"setScannerHelperService","parameterTypes":["app.ister.server.service.ScannerHelperService"] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"analyzable","parameterTypes":["java.nio.file.Path","java.lang.Boolean","long"] }, {"name":"analyze","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.nio.file.Path","java.lang.Boolean","long"] }, {"name":"setImageRepository","parameterTypes":["app.ister.server.repository.ImageRepository"] }, {"name":"setScannerHelperService","parameterTypes":["app.ister.server.service.ScannerHelperService"] }]
 },
 {
   "name":"app.ister.server.scanner.scanners.ImageScanner$$SpringCGLIB$$0",
@@ -1776,7 +1690,7 @@
   "allDeclaredClasses":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"analyzable","parameterTypes":["java.nio.file.Path","java.lang.Boolean","long"] }, {"name":"analyzable","parameterTypes":["java.nio.file.Path","java.nio.file.attribute.BasicFileAttributes"] }, {"name":"analyze","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.nio.file.Path","java.lang.Boolean","long"] }, {"name":"analyze","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.nio.file.Path","java.nio.file.attribute.BasicFileAttributes"] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"analyzable","parameterTypes":["java.nio.file.Path","java.lang.Boolean","long"] }, {"name":"analyze","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.nio.file.Path","java.lang.Boolean","long"] }]
 },
 {
   "name":"app.ister.server.scanner.scanners.MediaFileScanner$$SpringCGLIB$$0",
@@ -1798,7 +1712,7 @@
   "allDeclaredClasses":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"analyzable","parameterTypes":["java.nio.file.Path","java.lang.Boolean","long"] }, {"name":"analyzable","parameterTypes":["java.nio.file.Path","java.nio.file.attribute.BasicFileAttributes"] }, {"name":"analyze","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.nio.file.Path","java.lang.Boolean","long"] }, {"name":"analyze","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.nio.file.Path","java.nio.file.attribute.BasicFileAttributes"] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"analyzable","parameterTypes":["java.nio.file.Path","java.lang.Boolean","long"] }, {"name":"analyze","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.nio.file.Path","java.lang.Boolean","long"] }, {"name":"setMessageSender","parameterTypes":["app.ister.server.service.MessageSender"] }, {"name":"setOtherPathFileRepository","parameterTypes":["app.ister.server.repository.OtherPathFileRepository"] }]
 },
 {
   "name":"app.ister.server.scanner.scanners.NfoScanner$$SpringCGLIB$$0",
@@ -1812,7 +1726,7 @@
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"analyzable","parameterTypes":[] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"analyzable","parameterTypes":[] }, {"name":"analyzeExistingFile","parameterTypes":[] }, {"name":"analyzeNoneExistingFile","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.scanner.scanners.Scanner",
@@ -1828,7 +1742,7 @@
   "allDeclaredClasses":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"analyzable","parameterTypes":["java.nio.file.Path","java.lang.Boolean","long"] }, {"name":"analyzable","parameterTypes":["java.nio.file.Path","java.nio.file.attribute.BasicFileAttributes"] }, {"name":"analyze","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.nio.file.Path","java.lang.Boolean","long"] }, {"name":"analyze","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.nio.file.Path","java.nio.file.attribute.BasicFileAttributes"] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"analyzable","parameterTypes":["java.nio.file.Path","java.lang.Boolean","long"] }, {"name":"analyze","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.nio.file.Path","java.lang.Boolean","long"] }]
 },
 {
   "name":"app.ister.server.scanner.scanners.SubtitleScanner$$SpringCGLIB$$0",
@@ -1838,9 +1752,10 @@
 {
   "name":"app.ister.server.service.MessageSender",
   "allDeclaredFields":true,
+  "allDeclaredClasses":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":["org.springframework.amqp.rabbit.core.RabbitTemplate"] }]
+  "methods":[{"name":"<init>","parameterTypes":["org.springframework.amqp.rabbit.core.RabbitTemplate"] }, {"name":"sendFileScanRequested","parameterTypes":["app.ister.server.events.filescanrequested.FileScanRequestedData"] }, {"name":"sendNfoFileFound","parameterTypes":["app.ister.server.events.nfofilefound.NfoFileFoundData"] }]
 },
 {
   "name":"app.ister.server.service.MessageSenderTest",
@@ -1849,7 +1764,7 @@
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"sendEpisodeFound","parameterTypes":[] }, {"name":"sendMediaFileFound","parameterTypes":[] }, {"name":"sendNewDirectoriesScanRequested","parameterTypes":[] }, {"name":"sendNfoFileFound","parameterTypes":[] }, {"name":"sendShowFound","parameterTypes":[] }, {"name":"sendSubtitleFileFound","parameterTypes":[] }, {"name":"setUp","parameterTypes":[] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"sendEpisodeFound","parameterTypes":[] }, {"name":"sendFileScanRequested","parameterTypes":[] }, {"name":"sendMediaFileFound","parameterTypes":[] }, {"name":"sendNewDirectoriesScanRequested","parameterTypes":[] }, {"name":"sendNfoFileFound","parameterTypes":[] }, {"name":"sendShowFound","parameterTypes":[] }, {"name":"sendSubtitleFileFound","parameterTypes":[] }, {"name":"setUp","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.service.NodeService",
@@ -2679,38 +2594,10 @@
   "queryAllDeclaredMethods":true
 },
 {
-  "name":"graphql.com.google.common.collect.ImmutableCollection",
-  "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true
-},
-{
-  "name":"graphql.com.google.common.collect.ImmutableList",
-  "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true
-},
-{
-  "name":"graphql.com.google.common.collect.SingletonImmutableList",
-  "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true,
-  "queryAllDeclaredConstructors":true
-},
-{
-  "name":"graphql.execution.Async"
-},
-{
-  "name":"graphql.execution.AsyncSerialExecutionStrategy"
-},
-{
   "name":"graphql.execution.DataFetcherExceptionHandler"
 },
 {
-  "name":"graphql.execution.Execution"
-},
-{
   "name":"graphql.execution.ExecutionContext"
-},
-{
-  "name":"graphql.execution.ExecutionStrategy"
 },
 {
   "name":"graphql.execution.instrumentation.DocumentAndVariables"
@@ -2722,10 +2609,13 @@
   "name":"graphql.execution.instrumentation.ExecutionStrategyInstrumentationContext"
 },
 {
+  "name":"graphql.execution.instrumentation.FieldFetchingInstrumentationContext"
+},
+{
   "name":"graphql.execution.instrumentation.Instrumentation",
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
-  "methods":[{"name":"beginDeferredField","parameterTypes":["graphql.execution.instrumentation.InstrumentationState"] }]
+  "methods":[{"name":"beginDeferredField","parameterTypes":["graphql.execution.instrumentation.InstrumentationState"] }, {"name":"beginFieldFetching","parameterTypes":["graphql.execution.instrumentation.parameters.InstrumentationFieldFetchParameters","graphql.execution.instrumentation.InstrumentationState"] }]
 },
 {
   "name":"graphql.execution.instrumentation.InstrumentationContext"
@@ -2951,6 +2841,20 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"setEnglishName","parameterTypes":["java.lang.String"] }, {"name":"setIso6391","parameterTypes":["java.lang.String"] }, {"name":"setName","parameterTypes":["java.lang.String"] }]
 },
 {
+  "name":"info.movito.themoviedbapi.model.core.Movie",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"setAdult","parameterTypes":["java.lang.Boolean"] }, {"name":"setBackdropPath","parameterTypes":["java.lang.String"] }, {"name":"setGenreIds","parameterTypes":["java.util.List"] }, {"name":"setOriginalLanguage","parameterTypes":["java.lang.String"] }, {"name":"setOriginalTitle","parameterTypes":["java.lang.String"] }, {"name":"setOverview","parameterTypes":["java.lang.String"] }, {"name":"setPopularity","parameterTypes":["java.lang.Double"] }, {"name":"setPosterPath","parameterTypes":["java.lang.String"] }, {"name":"setReleaseDate","parameterTypes":["java.lang.String"] }, {"name":"setTitle","parameterTypes":["java.lang.String"] }, {"name":"setVideo","parameterTypes":["java.lang.Boolean"] }, {"name":"setVoteAverage","parameterTypes":["java.lang.Double"] }, {"name":"setVoteCount","parameterTypes":["java.lang.Integer"] }]
+},
+{
+  "name":"info.movito.themoviedbapi.model.core.MovieResultsPage",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
   "name":"info.movito.themoviedbapi.model.core.NamedElement",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true
@@ -3079,6 +2983,134 @@
 },
 {
   "name":"info.movito.themoviedbapi.model.keywords.Keyword",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.AlternativeTitles",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.BelongsToCollection",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"setBackdropPath","parameterTypes":["java.lang.String"] }, {"name":"setPosterPath","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.Cast",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.Credits",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.Crew",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.Data",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.ExternalIds",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.Images",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.KeywordResults",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.MovieDb",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"setAdult","parameterTypes":["java.lang.Boolean"] }, {"name":"setBackdropPath","parameterTypes":["java.lang.String"] }, {"name":"setBelongsToCollection","parameterTypes":["info.movito.themoviedbapi.model.movies.BelongsToCollection"] }, {"name":"setBudget","parameterTypes":["java.lang.Integer"] }, {"name":"setGenres","parameterTypes":["java.util.List"] }, {"name":"setHomepage","parameterTypes":["java.lang.String"] }, {"name":"setImdbID","parameterTypes":["java.lang.String"] }, {"name":"setOriginalLanguage","parameterTypes":["java.lang.String"] }, {"name":"setOriginalTitle","parameterTypes":["java.lang.String"] }, {"name":"setOverview","parameterTypes":["java.lang.String"] }, {"name":"setPopularity","parameterTypes":["java.lang.Double"] }, {"name":"setPosterPath","parameterTypes":["java.lang.String"] }, {"name":"setProductionCompanies","parameterTypes":["java.util.List"] }, {"name":"setProductionCountries","parameterTypes":["java.util.List"] }, {"name":"setReleaseDate","parameterTypes":["java.lang.String"] }, {"name":"setRevenue","parameterTypes":["java.lang.Long"] }, {"name":"setRuntime","parameterTypes":["java.lang.Integer"] }, {"name":"setSpokenLanguages","parameterTypes":["java.util.List"] }, {"name":"setStatus","parameterTypes":["java.lang.String"] }, {"name":"setTagline","parameterTypes":["java.lang.String"] }, {"name":"setTitle","parameterTypes":["java.lang.String"] }, {"name":"setVideo","parameterTypes":["java.lang.Boolean"] }, {"name":"setVoteAverage","parameterTypes":["java.lang.Double"] }, {"name":"setVoteCount","parameterTypes":["java.lang.Integer"] }]
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.MovieList",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.MovieListResultsPage",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.ReleaseDate",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.ReleaseDateResults",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.ReleaseInfo",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.ReleaseType",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "methods":[{"name":"toValue","parameterTypes":[] }]
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.Translation",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.Translations",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.changes.Change",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.changes.ChangeItem",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"info.movito.themoviedbapi.model.movies.changes.ChangeResults",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true
@@ -4054,12 +4086,6 @@
   "methods":[{"name":"getCallbacks","parameterTypes":[] }, {"name":"getExamples","parameterTypes":[] }, {"name":"getExtensions","parameterTypes":[] }, {"name":"getHeaders","parameterTypes":[] }, {"name":"getLinks","parameterTypes":[] }, {"name":"getParameters","parameterTypes":[] }, {"name":"getRequestBodies","parameterTypes":[] }, {"name":"getResponses","parameterTypes":[] }, {"name":"getSchemas","parameterTypes":[] }, {"name":"getSecuritySchemes","parameterTypes":[] }]
 },
 {
-  "name":"io.swagger.v3.oas.models.ExternalDocumentation",
-  "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true,
-  "queryAllDeclaredConstructors":true
-},
-{
   "name":"io.swagger.v3.oas.models.OpenAPI",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
@@ -4090,21 +4116,7 @@
   "name":"io.swagger.v3.oas.models.SpecVersion"
 },
 {
-  "name":"io.swagger.v3.oas.models.examples.Example",
-  "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true,
-  "queryAllDeclaredConstructors":true
-},
-{
-  "name":"io.swagger.v3.oas.models.headers.Header",
-  "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true,
-  "queryAllDeclaredConstructors":true
-},
-{
-  "name":"io.swagger.v3.oas.models.headers.Header$StyleEnum",
-  "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true
+  "name":"io.swagger.v3.oas.models.examples.Example"
 },
 {
   "name":"io.swagger.v3.oas.models.info.Info",
@@ -4114,12 +4126,6 @@
   "methods":[{"name":"getContact","parameterTypes":[] }, {"name":"getDescription","parameterTypes":[] }, {"name":"getExtensions","parameterTypes":[] }, {"name":"getLicense","parameterTypes":[] }, {"name":"getTermsOfService","parameterTypes":[] }, {"name":"getTitle","parameterTypes":[] }, {"name":"getVersion","parameterTypes":[] }]
 },
 {
-  "name":"io.swagger.v3.oas.models.links.Link",
-  "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true,
-  "queryAllDeclaredConstructors":true
-},
-{
   "name":"io.swagger.v3.oas.models.media.ComposedSchema"
 },
 {
@@ -4127,23 +4133,6 @@
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true
-},
-{
-  "name":"io.swagger.v3.oas.models.media.Discriminator",
-  "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true,
-  "queryAllDeclaredConstructors":true
-},
-{
-  "name":"io.swagger.v3.oas.models.media.Encoding",
-  "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true,
-  "queryAllDeclaredConstructors":true
-},
-{
-  "name":"io.swagger.v3.oas.models.media.Encoding$StyleEnum",
-  "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true
 },
 {
   "name":"io.swagger.v3.oas.models.media.FileSchema",
@@ -4162,7 +4151,6 @@
   "name":"io.swagger.v3.oas.models.media.Schema",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
-  "queryAllDeclaredConstructors":true,
   "methods":[{"name":"get$dynamicAnchor","parameterTypes":[] }, {"name":"get$ref","parameterTypes":[] }, {"name":"get$vocabulary","parameterTypes":[] }, {"name":"getAdditionalProperties","parameterTypes":[] }, {"name":"getAllOf","parameterTypes":[] }, {"name":"getAnyOf","parameterTypes":[] }, {"name":"getDefault","parameterTypes":[] }, {"name":"getDeprecated","parameterTypes":[] }, {"name":"getDescription","parameterTypes":[] }, {"name":"getDiscriminator","parameterTypes":[] }, {"name":"getEnum","parameterTypes":[] }, {"name":"getExample","parameterTypes":[] }, {"name":"getExclusiveMaximum","parameterTypes":[] }, {"name":"getExclusiveMinimum","parameterTypes":[] }, {"name":"getExtensions","parameterTypes":[] }, {"name":"getExternalDocs","parameterTypes":[] }, {"name":"getFormat","parameterTypes":[] }, {"name":"getItems","parameterTypes":[] }, {"name":"getMaxItems","parameterTypes":[] }, {"name":"getMaxLength","parameterTypes":[] }, {"name":"getMaxProperties","parameterTypes":[] }, {"name":"getMaximum","parameterTypes":[] }, {"name":"getMinItems","parameterTypes":[] }, {"name":"getMinLength","parameterTypes":[] }, {"name":"getMinProperties","parameterTypes":[] }, {"name":"getMinimum","parameterTypes":[] }, {"name":"getMultipleOf","parameterTypes":[] }, {"name":"getNot","parameterTypes":[] }, {"name":"getNullable","parameterTypes":[] }, {"name":"getOneOf","parameterTypes":[] }, {"name":"getPattern","parameterTypes":[] }, {"name":"getProperties","parameterTypes":[] }, {"name":"getReadOnly","parameterTypes":[] }, {"name":"getRequired","parameterTypes":[] }, {"name":"getTitle","parameterTypes":[] }, {"name":"getType","parameterTypes":[] }, {"name":"getUniqueItems","parameterTypes":[] }, {"name":"getWriteOnly","parameterTypes":[] }, {"name":"getXml","parameterTypes":[] }]
 },
 {
@@ -4173,12 +4161,6 @@
 },
 {
   "name":"io.swagger.v3.oas.models.media.UUIDSchema",
-  "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true,
-  "queryAllDeclaredConstructors":true
-},
-{
-  "name":"io.swagger.v3.oas.models.media.XML",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true
@@ -4209,8 +4191,7 @@
   "name":"io.swagger.v3.oas.models.responses.ApiResponses",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
-  "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }]
+  "queryAllDeclaredConstructors":true
 },
 {
   "name":"io.swagger.v3.oas.models.security.Scopes"
@@ -4359,13 +4340,13 @@
   "name":"jakarta.persistence.EntityManager",
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
-  "methods":[{"name":"<init>","parameterTypes":["jdk.proxy2.$Proxy175"] }, {"name":"clear","parameterTypes":[] }, {"name":"close","parameterTypes":[] }, {"name":"contains","parameterTypes":["java.lang.Object"] }, {"name":"createEntityGraph","parameterTypes":["java.lang.Class"] }, {"name":"createEntityGraph","parameterTypes":["java.lang.String"] }, {"name":"createNamedQuery","parameterTypes":["java.lang.String"] }, {"name":"createNamedQuery","parameterTypes":["java.lang.String","java.lang.Class"] }, {"name":"createNamedStoredProcedureQuery","parameterTypes":["java.lang.String"] }, {"name":"createNativeQuery","parameterTypes":["java.lang.String"] }, {"name":"createNativeQuery","parameterTypes":["java.lang.String","java.lang.Class"] }, {"name":"createNativeQuery","parameterTypes":["java.lang.String","java.lang.String"] }, {"name":"createQuery","parameterTypes":["jakarta.persistence.criteria.CriteriaDelete"] }, {"name":"createQuery","parameterTypes":["jakarta.persistence.criteria.CriteriaQuery"] }, {"name":"createQuery","parameterTypes":["jakarta.persistence.criteria.CriteriaUpdate"] }, {"name":"createQuery","parameterTypes":["java.lang.String"] }, {"name":"createQuery","parameterTypes":["java.lang.String","java.lang.Class"] }, {"name":"createStoredProcedureQuery","parameterTypes":["java.lang.String"] }, {"name":"createStoredProcedureQuery","parameterTypes":["java.lang.String","java.lang.Class[]"] }, {"name":"createStoredProcedureQuery","parameterTypes":["java.lang.String","java.lang.String[]"] }, {"name":"detach","parameterTypes":["java.lang.Object"] }, {"name":"find","parameterTypes":["java.lang.Class","java.lang.Object"] }, {"name":"find","parameterTypes":["java.lang.Class","java.lang.Object","jakarta.persistence.LockModeType"] }, {"name":"find","parameterTypes":["java.lang.Class","java.lang.Object","jakarta.persistence.LockModeType","java.util.Map"] }, {"name":"find","parameterTypes":["java.lang.Class","java.lang.Object","java.util.Map"] }, {"name":"flush","parameterTypes":[] }, {"name":"from","parameterTypes":["jdk.proxy2.$Proxy175"] }, {"name":"getCriteriaBuilder","parameterTypes":[] }, {"name":"getDelegate","parameterTypes":[] }, {"name":"getEntityGraph","parameterTypes":["java.lang.String"] }, {"name":"getEntityGraphs","parameterTypes":["java.lang.Class"] }, {"name":"getEntityManagerFactory","parameterTypes":[] }, {"name":"getFlushMode","parameterTypes":[] }, {"name":"getLockMode","parameterTypes":["java.lang.Object"] }, {"name":"getMetamodel","parameterTypes":[] }, {"name":"getProperties","parameterTypes":[] }, {"name":"getReference","parameterTypes":["java.lang.Class","java.lang.Object"] }, {"name":"getTransaction","parameterTypes":[] }, {"name":"isJoinedToTransaction","parameterTypes":[] }, {"name":"isOpen","parameterTypes":[] }, {"name":"joinTransaction","parameterTypes":[] }, {"name":"lock","parameterTypes":["java.lang.Object","jakarta.persistence.LockModeType"] }, {"name":"lock","parameterTypes":["java.lang.Object","jakarta.persistence.LockModeType","java.util.Map"] }, {"name":"merge","parameterTypes":["java.lang.Object"] }, {"name":"of","parameterTypes":["jdk.proxy2.$Proxy175"] }, {"name":"persist","parameterTypes":["java.lang.Object"] }, {"name":"refresh","parameterTypes":["java.lang.Object"] }, {"name":"refresh","parameterTypes":["java.lang.Object","jakarta.persistence.LockModeType"] }, {"name":"refresh","parameterTypes":["java.lang.Object","jakarta.persistence.LockModeType","java.util.Map"] }, {"name":"refresh","parameterTypes":["java.lang.Object","java.util.Map"] }, {"name":"remove","parameterTypes":["java.lang.Object"] }, {"name":"setFlushMode","parameterTypes":["jakarta.persistence.FlushModeType"] }, {"name":"setProperty","parameterTypes":["java.lang.String","java.lang.Object"] }, {"name":"unwrap","parameterTypes":["java.lang.Class"] }, {"name":"valueOf","parameterTypes":["jdk.proxy2.$Proxy175"] }]
+  "methods":[{"name":"<init>","parameterTypes":["jdk.proxy2.$Proxy171"] }, {"name":"clear","parameterTypes":[] }, {"name":"close","parameterTypes":[] }, {"name":"contains","parameterTypes":["java.lang.Object"] }, {"name":"createEntityGraph","parameterTypes":["java.lang.Class"] }, {"name":"createEntityGraph","parameterTypes":["java.lang.String"] }, {"name":"createNamedQuery","parameterTypes":["java.lang.String"] }, {"name":"createNamedQuery","parameterTypes":["java.lang.String","java.lang.Class"] }, {"name":"createNamedStoredProcedureQuery","parameterTypes":["java.lang.String"] }, {"name":"createNativeQuery","parameterTypes":["java.lang.String"] }, {"name":"createNativeQuery","parameterTypes":["java.lang.String","java.lang.Class"] }, {"name":"createNativeQuery","parameterTypes":["java.lang.String","java.lang.String"] }, {"name":"createQuery","parameterTypes":["jakarta.persistence.criteria.CriteriaDelete"] }, {"name":"createQuery","parameterTypes":["jakarta.persistence.criteria.CriteriaQuery"] }, {"name":"createQuery","parameterTypes":["jakarta.persistence.criteria.CriteriaUpdate"] }, {"name":"createQuery","parameterTypes":["java.lang.String"] }, {"name":"createQuery","parameterTypes":["java.lang.String","java.lang.Class"] }, {"name":"createStoredProcedureQuery","parameterTypes":["java.lang.String"] }, {"name":"createStoredProcedureQuery","parameterTypes":["java.lang.String","java.lang.Class[]"] }, {"name":"createStoredProcedureQuery","parameterTypes":["java.lang.String","java.lang.String[]"] }, {"name":"detach","parameterTypes":["java.lang.Object"] }, {"name":"find","parameterTypes":["java.lang.Class","java.lang.Object"] }, {"name":"find","parameterTypes":["java.lang.Class","java.lang.Object","jakarta.persistence.LockModeType"] }, {"name":"find","parameterTypes":["java.lang.Class","java.lang.Object","jakarta.persistence.LockModeType","java.util.Map"] }, {"name":"find","parameterTypes":["java.lang.Class","java.lang.Object","java.util.Map"] }, {"name":"flush","parameterTypes":[] }, {"name":"from","parameterTypes":["jdk.proxy2.$Proxy171"] }, {"name":"getCriteriaBuilder","parameterTypes":[] }, {"name":"getDelegate","parameterTypes":[] }, {"name":"getEntityGraph","parameterTypes":["java.lang.String"] }, {"name":"getEntityGraphs","parameterTypes":["java.lang.Class"] }, {"name":"getEntityManagerFactory","parameterTypes":[] }, {"name":"getFlushMode","parameterTypes":[] }, {"name":"getLockMode","parameterTypes":["java.lang.Object"] }, {"name":"getMetamodel","parameterTypes":[] }, {"name":"getProperties","parameterTypes":[] }, {"name":"getReference","parameterTypes":["java.lang.Class","java.lang.Object"] }, {"name":"getTransaction","parameterTypes":[] }, {"name":"isJoinedToTransaction","parameterTypes":[] }, {"name":"isOpen","parameterTypes":[] }, {"name":"joinTransaction","parameterTypes":[] }, {"name":"lock","parameterTypes":["java.lang.Object","jakarta.persistence.LockModeType"] }, {"name":"lock","parameterTypes":["java.lang.Object","jakarta.persistence.LockModeType","java.util.Map"] }, {"name":"merge","parameterTypes":["java.lang.Object"] }, {"name":"of","parameterTypes":["jdk.proxy2.$Proxy171"] }, {"name":"persist","parameterTypes":["java.lang.Object"] }, {"name":"refresh","parameterTypes":["java.lang.Object"] }, {"name":"refresh","parameterTypes":["java.lang.Object","jakarta.persistence.LockModeType"] }, {"name":"refresh","parameterTypes":["java.lang.Object","jakarta.persistence.LockModeType","java.util.Map"] }, {"name":"refresh","parameterTypes":["java.lang.Object","java.util.Map"] }, {"name":"remove","parameterTypes":["java.lang.Object"] }, {"name":"setFlushMode","parameterTypes":["jakarta.persistence.FlushModeType"] }, {"name":"setProperty","parameterTypes":["java.lang.String","java.lang.Object"] }, {"name":"unwrap","parameterTypes":["java.lang.Class"] }, {"name":"valueOf","parameterTypes":["jdk.proxy2.$Proxy171"] }]
 },
 {
   "name":"jakarta.persistence.EntityManagerFactory",
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
-  "methods":[{"name":"<init>","parameterTypes":["jdk.proxy2.$Proxy170"] }, {"name":"addNamedEntityGraph","parameterTypes":["java.lang.String","jakarta.persistence.EntityGraph"] }, {"name":"addNamedQuery","parameterTypes":["java.lang.String","jakarta.persistence.Query"] }, {"name":"createEntityManager","parameterTypes":[] }, {"name":"createEntityManager","parameterTypes":["jakarta.persistence.SynchronizationType"] }, {"name":"createEntityManager","parameterTypes":["jakarta.persistence.SynchronizationType","java.util.Map"] }, {"name":"createEntityManager","parameterTypes":["java.util.Map"] }, {"name":"from","parameterTypes":["jdk.proxy2.$Proxy170"] }, {"name":"getCriteriaBuilder","parameterTypes":[] }, {"name":"getMetamodel","parameterTypes":[] }, {"name":"getPersistenceUnitUtil","parameterTypes":[] }, {"name":"getProperties","parameterTypes":[] }, {"name":"isOpen","parameterTypes":[] }, {"name":"of","parameterTypes":["jdk.proxy2.$Proxy170"] }, {"name":"unwrap","parameterTypes":["java.lang.Class"] }, {"name":"valueOf","parameterTypes":["jdk.proxy2.$Proxy170"] }]
+  "methods":[{"name":"<init>","parameterTypes":["jdk.proxy2.$Proxy166"] }, {"name":"addNamedEntityGraph","parameterTypes":["java.lang.String","jakarta.persistence.EntityGraph"] }, {"name":"addNamedQuery","parameterTypes":["java.lang.String","jakarta.persistence.Query"] }, {"name":"createEntityManager","parameterTypes":[] }, {"name":"createEntityManager","parameterTypes":["jakarta.persistence.SynchronizationType"] }, {"name":"createEntityManager","parameterTypes":["jakarta.persistence.SynchronizationType","java.util.Map"] }, {"name":"createEntityManager","parameterTypes":["java.util.Map"] }, {"name":"from","parameterTypes":["jdk.proxy2.$Proxy166"] }, {"name":"getCriteriaBuilder","parameterTypes":[] }, {"name":"getMetamodel","parameterTypes":[] }, {"name":"getPersistenceUnitUtil","parameterTypes":[] }, {"name":"getProperties","parameterTypes":[] }, {"name":"isOpen","parameterTypes":[] }, {"name":"of","parameterTypes":["jdk.proxy2.$Proxy166"] }, {"name":"unwrap","parameterTypes":["java.lang.Class"] }, {"name":"valueOf","parameterTypes":["jdk.proxy2.$Proxy166"] }]
 },
 {
   "name":"jakarta.persistence.FlushModeType"
@@ -4483,7 +4464,7 @@
   "name":"jakarta.servlet.Filter",
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
-  "methods":[{"name":"<init>","parameterTypes":["org.springframework.security.web.FilterChainProxy"] }, {"name":"<init>","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2135/0x00007f639cbe5808"] }, {"name":"<init>","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2135/0x00007fae00be6120"] }, {"name":"<init>","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2139/0x00007fd220beabe0"] }, {"name":"from","parameterTypes":["org.springframework.security.web.FilterChainProxy"] }, {"name":"from","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2135/0x00007f639cbe5808"] }, {"name":"from","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2135/0x00007fae00be6120"] }, {"name":"from","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2139/0x00007fd220beabe0"] }, {"name":"of","parameterTypes":["org.springframework.security.web.FilterChainProxy"] }, {"name":"of","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2135/0x00007f639cbe5808"] }, {"name":"of","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2135/0x00007fae00be6120"] }, {"name":"of","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2139/0x00007fd220beabe0"] }, {"name":"valueOf","parameterTypes":["org.springframework.security.web.FilterChainProxy"] }, {"name":"valueOf","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2135/0x00007f639cbe5808"] }, {"name":"valueOf","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2135/0x00007fae00be6120"] }, {"name":"valueOf","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2139/0x00007fd220beabe0"] }]
+  "methods":[{"name":"<init>","parameterTypes":["org.springframework.security.web.FilterChainProxy"] }, {"name":"<init>","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2163/0x00007f86b8bdc8f0"] }, {"name":"<init>","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2167/0x00007feb74bdda30"] }, {"name":"from","parameterTypes":["org.springframework.security.web.FilterChainProxy"] }, {"name":"from","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2163/0x00007f86b8bdc8f0"] }, {"name":"from","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2167/0x00007feb74bdda30"] }, {"name":"of","parameterTypes":["org.springframework.security.web.FilterChainProxy"] }, {"name":"of","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2163/0x00007f86b8bdc8f0"] }, {"name":"of","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2167/0x00007feb74bdda30"] }, {"name":"valueOf","parameterTypes":["org.springframework.security.web.FilterChainProxy"] }, {"name":"valueOf","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2163/0x00007f86b8bdc8f0"] }, {"name":"valueOf","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2167/0x00007feb74bdda30"] }]
 },
 {
   "name":"jakarta.servlet.FilterChain"
@@ -5355,11 +5336,6 @@
   "queryAllDeclaredMethods":true
 },
 {
-  "name":"java.util.AbstractCollection",
-  "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true
-},
-{
   "name":"java.util.AbstractMap",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true
@@ -5369,8 +5345,7 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"java.util.Collection",
-  "queryAllDeclaredMethods":true
+  "name":"java.util.Collection"
 },
 {
   "name":"java.util.Comparator"
@@ -5415,8 +5390,7 @@
   "name":"java.util.LinkedHashSet"
 },
 {
-  "name":"java.util.List",
-  "queryAllDeclaredMethods":true
+  "name":"java.util.List"
 },
 {
   "name":"java.util.Locale"
@@ -5437,10 +5411,6 @@
 {
   "name":"java.util.PropertyPermission",
   "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.lang.String"] }]
-},
-{
-  "name":"java.util.RandomAccess",
-  "queryAllDeclaredMethods":true
 },
 {
   "name":"java.util.ServiceLoader"
@@ -5488,17 +5458,11 @@
   "name":"java.util.concurrent.ExecutorService"
 },
 {
-  "name":"java.util.concurrent.Executors$RunnableAdapter"
-},
-{
   "name":"java.util.concurrent.ForkJoinTask",
   "fields":[{"name":"aux"}, {"name":"status"}]
 },
 {
   "name":"java.util.concurrent.Future"
-},
-{
-  "name":"java.util.concurrent.FutureTask"
 },
 {
   "name":"java.util.concurrent.RejectedExecutionHandler"
@@ -5513,9 +5477,6 @@
   "name":"java.util.concurrent.ScheduledThreadPoolExecutor"
 },
 {
-  "name":"java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask"
-},
-{
   "name":"java.util.concurrent.Semaphore"
 },
 {
@@ -5525,9 +5486,6 @@
 },
 {
   "name":"java.util.concurrent.ThreadPoolExecutor"
-},
-{
-  "name":"java.util.concurrent.ThreadPoolExecutor$Worker"
 },
 {
   "name":"java.util.concurrent.TimeUnit"
@@ -5764,19 +5722,7 @@
   "name":"jdk.internal.reflect.DelegatingMethodAccessorImpl"
 },
 {
-  "name":"jdk.internal.reflect.GeneratedMethodAccessor142"
-},
-{
-  "name":"jdk.internal.reflect.GeneratedMethodAccessor171"
-},
-{
-  "name":"jdk.internal.reflect.GeneratedMethodAccessor172"
-},
-{
-  "name":"jdk.internal.reflect.GeneratedMethodAccessor56"
-},
-{
-  "name":"jdk.internal.reflect.GeneratedMethodAccessor57"
+  "name":"jdk.internal.reflect.GeneratedMethodAccessor58"
 },
 {
   "name":"jdk.internal.reflect.NativeMethodAccessorImpl"
@@ -5810,41 +5756,16 @@
   "queryAllPublicMethods":true
 },
 {
-  "name":"kotlin.Metadata",
-  "queryAllDeclaredMethods":true
+  "name":"kotlin.Metadata"
 },
 {
   "name":"kotlin.Unit"
-},
-{
-  "name":"kotlin.annotation.AnnotationRetention"
-},
-{
-  "name":"kotlin.annotation.AnnotationTarget"
-},
-{
-  "name":"kotlin.annotation.MustBeDocumented",
-  "queryAllDeclaredMethods":true
-},
-{
-  "name":"kotlin.annotation.Retention",
-  "queryAllDeclaredMethods":true
-},
-{
-  "name":"kotlin.annotation.Target",
-  "queryAllDeclaredMethods":true
 },
 {
   "name":"kotlin.coroutines.Continuation"
 },
 {
   "name":"kotlin.jvm.JvmInline"
-},
-{
-  "name":"kotlin.reflect.KParameter"
-},
-{
-  "name":"kotlin.reflect.full.KClasses"
 },
 {
   "name":"kotlinx.coroutines.flow.Flow"
@@ -6234,33 +6155,12 @@
   "name":"org.apache.catalina.Valve"
 },
 {
-  "name":"org.apache.catalina.authenticator.AuthenticatorBase"
-},
-{
   "name":"org.apache.catalina.connector.Connector"
-},
-{
-  "name":"org.apache.catalina.connector.CoyoteAdapter"
 },
 {
   "name":"org.apache.catalina.core.ApplicationContextFacade",
   "queryAllDeclaredMethods":true,
   "methods":[{"name":"addFilter","parameterTypes":["java.lang.String","jakarta.servlet.Filter"] }, {"name":"addFilter","parameterTypes":["java.lang.String","java.lang.Class"] }, {"name":"addFilter","parameterTypes":["java.lang.String","java.lang.String"] }, {"name":"addJspFile","parameterTypes":["java.lang.String","java.lang.String"] }, {"name":"addListener","parameterTypes":["java.lang.Class"] }, {"name":"addListener","parameterTypes":["java.lang.String"] }, {"name":"addListener","parameterTypes":["java.util.EventListener"] }, {"name":"addServlet","parameterTypes":["java.lang.String","jakarta.servlet.Servlet"] }, {"name":"addServlet","parameterTypes":["java.lang.String","java.lang.Class"] }, {"name":"addServlet","parameterTypes":["java.lang.String","java.lang.String"] }, {"name":"createFilter","parameterTypes":["java.lang.Class"] }, {"name":"createListener","parameterTypes":["java.lang.Class"] }, {"name":"createServlet","parameterTypes":["java.lang.Class"] }, {"name":"declareRoles","parameterTypes":["java.lang.String[]"] }, {"name":"getAttribute","parameterTypes":["java.lang.String"] }, {"name":"getAttributeNames","parameterTypes":[] }, {"name":"getClassLoader","parameterTypes":[] }, {"name":"getContext","parameterTypes":["java.lang.String"] }, {"name":"getContextPath","parameterTypes":[] }, {"name":"getDefaultSessionTrackingModes","parameterTypes":[] }, {"name":"getEffectiveMajorVersion","parameterTypes":[] }, {"name":"getEffectiveMinorVersion","parameterTypes":[] }, {"name":"getEffectiveSessionTrackingModes","parameterTypes":[] }, {"name":"getFilterRegistration","parameterTypes":["java.lang.String"] }, {"name":"getFilterRegistrations","parameterTypes":[] }, {"name":"getInitParameter","parameterTypes":["java.lang.String"] }, {"name":"getInitParameterNames","parameterTypes":[] }, {"name":"getJspConfigDescriptor","parameterTypes":[] }, {"name":"getMajorVersion","parameterTypes":[] }, {"name":"getMimeType","parameterTypes":["java.lang.String"] }, {"name":"getMinorVersion","parameterTypes":[] }, {"name":"getNamedDispatcher","parameterTypes":["java.lang.String"] }, {"name":"getRealPath","parameterTypes":["java.lang.String"] }, {"name":"getRequestCharacterEncoding","parameterTypes":[] }, {"name":"getRequestDispatcher","parameterTypes":["java.lang.String"] }, {"name":"getResource","parameterTypes":["java.lang.String"] }, {"name":"getResourceAsStream","parameterTypes":["java.lang.String"] }, {"name":"getResourcePaths","parameterTypes":["java.lang.String"] }, {"name":"getResponseCharacterEncoding","parameterTypes":[] }, {"name":"getServerInfo","parameterTypes":[] }, {"name":"getServletContextName","parameterTypes":[] }, {"name":"getServletRegistration","parameterTypes":["java.lang.String"] }, {"name":"getServletRegistrations","parameterTypes":[] }, {"name":"getSessionCookieConfig","parameterTypes":[] }, {"name":"getSessionTimeout","parameterTypes":[] }, {"name":"getVirtualServerName","parameterTypes":[] }, {"name":"log","parameterTypes":["java.lang.String"] }, {"name":"log","parameterTypes":["java.lang.String","java.lang.Throwable"] }, {"name":"removeAttribute","parameterTypes":["java.lang.String"] }, {"name":"setAttribute","parameterTypes":["java.lang.String","java.lang.Object"] }, {"name":"setInitParameter","parameterTypes":["java.lang.String","java.lang.String"] }, {"name":"setRequestCharacterEncoding","parameterTypes":["java.lang.String"] }, {"name":"setResponseCharacterEncoding","parameterTypes":["java.lang.String"] }, {"name":"setSessionTimeout","parameterTypes":["int"] }, {"name":"setSessionTrackingModes","parameterTypes":["java.util.Set"] }]
-},
-{
-  "name":"org.apache.catalina.core.ApplicationFilterChain"
-},
-{
-  "name":"org.apache.catalina.core.StandardContextValve"
-},
-{
-  "name":"org.apache.catalina.core.StandardEngineValve"
-},
-{
-  "name":"org.apache.catalina.core.StandardHostValve"
-},
-{
-  "name":"org.apache.catalina.core.StandardWrapperValve"
 },
 {
   "name":"org.apache.catalina.loader.JdbcLeakPrevention",
@@ -6277,23 +6177,14 @@
   "name":"org.apache.catalina.valves.AccessLogValve"
 },
 {
-  "name":"org.apache.catalina.valves.ErrorReportValve"
-},
-{
   "name":"org.apache.commons.dbcp2.BasicDataSource"
 },
 {
   "name":"org.apache.commons.logging.Log"
 },
 {
-  "name":"org.apache.coyote.AbstractProcessorLight"
-},
-{
   "name":"org.apache.coyote.AbstractProtocol",
   "methods":[{"name":"getAddress","parameterTypes":[] }, {"name":"getLocalPort","parameterTypes":[] }, {"name":"getProperty","parameterTypes":["java.lang.String"] }, {"name":"setPort","parameterTypes":["int"] }, {"name":"setProperty","parameterTypes":["java.lang.String","java.lang.String"] }]
-},
-{
-  "name":"org.apache.coyote.AbstractProtocol$ConnectionHandler"
 },
 {
   "name":"org.apache.coyote.ProtocolHandler"
@@ -6308,9 +6199,6 @@
 {
   "name":"org.apache.coyote.http11.Http11NioProtocol",
   "queryAllPublicMethods":true
-},
-{
-  "name":"org.apache.coyote.http11.Http11Processor"
 },
 {
   "name":"org.apache.hc.client5.http.impl.async.HttpAsyncClients"
@@ -6355,21 +6243,6 @@
 {
   "name":"org.apache.tomcat.util.net.NioEndpoint",
   "queryAllPublicMethods":true
-},
-{
-  "name":"org.apache.tomcat.util.net.NioEndpoint$SocketProcessor"
-},
-{
-  "name":"org.apache.tomcat.util.net.SocketProcessorBase"
-},
-{
-  "name":"org.apache.tomcat.util.threads.TaskThread$WrappingRunnable"
-},
-{
-  "name":"org.apache.tomcat.util.threads.ThreadPoolExecutor"
-},
-{
-  "name":"org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker"
 },
 {
   "name":"org.apache.tomcat.websocket.server.WsFilter",
@@ -7222,7 +7095,7 @@
   "name":"org.mockito.MockSettings"
 },
 {
-  "name":"org.mockito.codegen.BasicFileAttributes$MockitoMock$uJH5aw8L",
+  "name":"org.mockito.codegen.BasicFileAttributes$MockitoMock$r2aSbhrO",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -7333,7 +7206,7 @@
   "queryAllDeclaredConstructors":true
 },
 {
-  "name":"org.mockito.internal.util.reflection.InstrumentationMemberAccessor$Dispatcher$ByteBuddy$bLMzp72m",
+  "name":"org.mockito.internal.util.reflection.InstrumentationMemberAccessor$Dispatcher$ByteBuddy$zFtBQLBl",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
@@ -7468,18 +7341,11 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"webConversionServiceProvider","parameterTypes":[] }]
 },
 {
-  "name":"org.springdoc.core.configuration.SpringDocKotlinConfiguration",
-  "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true,
-  "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"kotlinCoroutinesReturnTypeParser","parameterTypes":[] }, {"name":"nullableKotlinRequestParameterCustomizer","parameterTypes":[] }]
-},
-{
   "name":"org.springdoc.core.configuration.SpringDocPageableConfiguration",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"delegatingMethodParameterCustomizer","parameterTypes":["java.util.Optional","java.util.Optional"] }, {"name":"pageableOpenAPIConverter","parameterTypes":["org.springdoc.core.providers.ObjectMapperProvider"] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"delegatingMethodParameterCustomizer","parameterTypes":["java.util.Optional","java.util.Optional"] }, {"name":"pageOpenAPIConverter","parameterTypes":["java.util.Optional","org.springdoc.core.providers.ObjectMapperProvider"] }, {"name":"pageableOpenAPIConverter","parameterTypes":["org.springdoc.core.providers.ObjectMapperProvider"] }]
 },
 {
   "name":"org.springdoc.core.configuration.SpringDocSecurityConfiguration",
@@ -7529,6 +7395,12 @@
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "methods":[{"name":"close","parameterTypes":[] }, {"name":"shutdown","parameterTypes":[] }]
+},
+{
+  "name":"org.springdoc.core.converters.PageOpenAPIConverter",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "methods":[{"name":"close","parameterTypes":[] }, {"name":"resolve","parameterTypes":["io.swagger.v3.core.converter.AnnotatedType","io.swagger.v3.core.converter.ModelConverterContext","java.util.Iterator"] }, {"name":"shutdown","parameterTypes":[] }]
 },
 {
   "name":"org.springdoc.core.converters.PageableOpenAPIConverter",
@@ -7606,11 +7478,6 @@
   "queryAllPublicMethods":true
 },
 {
-  "name":"org.springdoc.core.customizers.ParameterCustomizer",
-  "queryAllDeclaredMethods":true,
-  "queryAllPublicMethods":true
-},
-{
   "name":"org.springdoc.core.customizers.PropertyCustomizer"
 },
 {
@@ -7659,12 +7526,6 @@
 },
 {
   "name":"org.springdoc.core.models.RequestBodyInfo"
-},
-{
-  "name":"org.springdoc.core.parsers.KotlinCoroutinesReturnTypeParser",
-  "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true,
-  "methods":[{"name":"close","parameterTypes":[] }, {"name":"getReturnType","parameterTypes":["org.springframework.core.MethodParameter"] }, {"name":"shutdown","parameterTypes":[] }]
 },
 {
   "name":"org.springdoc.core.parsers.ReturnTypeParser",
@@ -7787,7 +7648,7 @@
   "name":"org.springdoc.core.service.AbstractRequestService",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
-  "methods":[{"name":"applyBeanValidatorAnnotations","parameterTypes":["io.swagger.v3.oas.models.parameters.Parameter","java.util.List"] }, {"name":"applyBeanValidatorAnnotations","parameterTypes":["io.swagger.v3.oas.models.parameters.RequestBody","java.util.List","boolean"] }, {"name":"build","parameterTypes":["org.springframework.web.method.HandlerMethod","org.springframework.web.bind.annotation.RequestMethod","io.swagger.v3.oas.models.Operation","org.springdoc.core.models.MethodAttributes","io.swagger.v3.oas.models.OpenAPI"] }, {"name":"buildParam","parameterTypes":["org.springdoc.core.models.ParameterInfo","io.swagger.v3.oas.models.Components","com.fasterxml.jackson.annotation.JsonView"] }, {"name":"buildParams","parameterTypes":["org.springdoc.core.models.ParameterInfo","io.swagger.v3.oas.models.Components","org.springframework.web.bind.annotation.RequestMethod","com.fasterxml.jackson.annotation.JsonView","java.lang.String"] }, {"name":"getRequestBodyBuilder","parameterTypes":[] }, {"name":"isDefaultFlatParamObject","parameterTypes":[] }, {"name":"isParamToIgnore","parameterTypes":["org.springframework.core.MethodParameter"] }, {"name":"isValidParameter","parameterTypes":["io.swagger.v3.oas.models.parameters.Parameter"] }]
+  "methods":[{"name":"applyBeanValidatorAnnotations","parameterTypes":["io.swagger.v3.oas.models.parameters.Parameter","java.util.List"] }, {"name":"applyBeanValidatorAnnotations","parameterTypes":["io.swagger.v3.oas.models.parameters.RequestBody","java.util.List","boolean"] }, {"name":"build","parameterTypes":["org.springframework.web.method.HandlerMethod","org.springframework.web.bind.annotation.RequestMethod","io.swagger.v3.oas.models.Operation","org.springdoc.core.models.MethodAttributes","io.swagger.v3.oas.models.OpenAPI"] }, {"name":"buildParam","parameterTypes":["org.springdoc.core.models.ParameterInfo","io.swagger.v3.oas.models.Components","com.fasterxml.jackson.annotation.JsonView"] }, {"name":"buildParams","parameterTypes":["org.springdoc.core.models.ParameterInfo","io.swagger.v3.oas.models.Components","org.springframework.web.bind.annotation.RequestMethod","org.springdoc.core.models.MethodAttributes","java.lang.String"] }, {"name":"getRequestBodyBuilder","parameterTypes":[] }, {"name":"isDefaultFlatParamObject","parameterTypes":[] }, {"name":"isParamToIgnore","parameterTypes":["org.springframework.core.MethodParameter"] }, {"name":"isValidParameter","parameterTypes":["io.swagger.v3.oas.models.parameters.Parameter"] }]
 },
 {
   "name":"org.springdoc.core.service.GenericParameterService",
@@ -12679,6 +12540,12 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
+  "name":"org.springframework.boot.test.web.reactor.netty.DisableReactorResourceFactoryGlobalResourcesContextCustomizerFactory",
+  "queryAllDeclaredConstructors":true,
+  "queryAllPublicConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
   "name":"org.springframework.boot.type.classreading.ConcurrentReferenceCachingMetadataReaderFactory",
   "methods":[{"name":"toMetadataReaderFactory","parameterTypes":[] }]
 },
@@ -13626,7 +13493,7 @@
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":["org.springframework.data.jpa.repository.support.JpaEntityInformation","jakarta.persistence.EntityManager"] }, {"name":"count","parameterTypes":[] }, {"name":"count","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"count","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"delete","parameterTypes":["java.lang.Object"] }, {"name":"delete","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"deleteAll","parameterTypes":[] }, {"name":"deleteAll","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteAllById","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteAllByIdInBatch","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteAllInBatch","parameterTypes":[] }, {"name":"deleteAllInBatch","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteById","parameterTypes":["java.lang.Object"] }, {"name":"exists","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"exists","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"existsById","parameterTypes":["java.lang.Object"] }, {"name":"findAll","parameterTypes":[] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Example","org.springframework.data.domain.Pageable"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Example","org.springframework.data.domain.Sort"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Pageable"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Sort"] }, {"name":"findAll","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"findAll","parameterTypes":["org.springframework.data.jpa.domain.Specification","org.springframework.data.domain.Pageable"] }, {"name":"findAll","parameterTypes":["org.springframework.data.jpa.domain.Specification","org.springframework.data.domain.Sort"] }, {"name":"findAllById","parameterTypes":["java.lang.Iterable"] }, {"name":"findBy","parameterTypes":["org.springframework.data.domain.Example","java.util.function.Function"] }, {"name":"findBy","parameterTypes":["org.springframework.data.jpa.domain.Specification","java.util.function.Function"] }, {"name":"findByDirectoryEntity","parameterTypes":["app.ister.server.entitiy.DirectoryEntity"] }, {"name":"findByDirectoryEntityAndEpisodeEntityAndPath","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","app.ister.server.entitiy.EpisodeEntity","java.lang.String"] }, {"name":"findByDirectoryEntityAndPath","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.lang.String"] }, {"name":"findByDirectoryTypeAndNodeEntity","parameterTypes":["app.ister.server.enums.DirectoryType","app.ister.server.entitiy.NodeEntity"] }, {"name":"findByExternalId","parameterTypes":["java.lang.String"] }, {"name":"findById","parameterTypes":["java.lang.Object"] }, {"name":"findByName","parameterTypes":["java.lang.String"] }, {"name":"findByNameAndReleaseYear","parameterTypes":["java.lang.String","int"] }, {"name":"findByShowEntityAndNumber","parameterTypes":["app.ister.server.entitiy.ShowEntity","int"] }, {"name":"findByShowEntityAndSeasonEntityAndNumber","parameterTypes":["app.ister.server.entitiy.ShowEntity","app.ister.server.entitiy.SeasonEntity","int"] }, {"name":"findByShowEntityId","parameterTypes":["java.util.UUID"] }, {"name":"findByShowEntityId","parameterTypes":["java.util.UUID","org.springframework.data.domain.Sort"] }, {"name":"findByUserEntityAndPlayQueueItemIdAndEpisodeEntity","parameterTypes":["app.ister.server.entitiy.UserEntity","java.util.UUID","app.ister.server.entitiy.EpisodeEntity"] }, {"name":"findByUserEntityExternalIdAndEpisodeEntity","parameterTypes":["java.lang.String","app.ister.server.entitiy.EpisodeEntity","org.springframework.data.domain.Sort"] }, {"name":"findIdsOnlyByShowEntityId","parameterTypes":["java.util.UUID","org.springframework.data.domain.Sort"] }, {"name":"findOne","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"findOne","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"findRecentEpisodesAndShowIdsByUserId","parameterTypes":["java.util.UUID"] }, {"name":"flush","parameterTypes":[] }, {"name":"getById","parameterTypes":["java.lang.Object"] }, {"name":"getOne","parameterTypes":["java.lang.Object"] }, {"name":"getReferenceById","parameterTypes":["java.lang.Object"] }, {"name":"save","parameterTypes":["java.lang.Object"] }, {"name":"saveAll","parameterTypes":["java.lang.Iterable"] }, {"name":"saveAllAndFlush","parameterTypes":["java.lang.Iterable"] }, {"name":"saveAndFlush","parameterTypes":["java.lang.Object"] }, {"name":"setEscapeCharacter","parameterTypes":["org.springframework.data.jpa.repository.query.EscapeCharacter"] }, {"name":"setProjectionFactory","parameterTypes":["org.springframework.data.projection.ProjectionFactory"] }, {"name":"setRepositoryMethodMetadata","parameterTypes":["org.springframework.data.jpa.repository.support.CrudMethodMetadata"] }]
+  "methods":[{"name":"<init>","parameterTypes":["org.springframework.data.jpa.repository.support.JpaEntityInformation","jakarta.persistence.EntityManager"] }, {"name":"count","parameterTypes":[] }, {"name":"count","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"count","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"delete","parameterTypes":["java.lang.Object"] }, {"name":"delete","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"deleteAll","parameterTypes":[] }, {"name":"deleteAll","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteAllById","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteAllByIdInBatch","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteAllInBatch","parameterTypes":[] }, {"name":"deleteAllInBatch","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteById","parameterTypes":["java.lang.Object"] }, {"name":"exists","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"exists","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"existsById","parameterTypes":["java.lang.Object"] }, {"name":"findAll","parameterTypes":[] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Example","org.springframework.data.domain.Pageable"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Example","org.springframework.data.domain.Sort"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Pageable"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Sort"] }, {"name":"findAll","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"findAll","parameterTypes":["org.springframework.data.jpa.domain.Specification","org.springframework.data.domain.Pageable"] }, {"name":"findAll","parameterTypes":["org.springframework.data.jpa.domain.Specification","org.springframework.data.domain.Sort"] }, {"name":"findAllById","parameterTypes":["java.lang.Iterable"] }, {"name":"findBy","parameterTypes":["org.springframework.data.domain.Example","java.util.function.Function"] }, {"name":"findBy","parameterTypes":["org.springframework.data.jpa.domain.Specification","java.util.function.Function"] }, {"name":"findByDirectoryEntity","parameterTypes":["app.ister.server.entitiy.DirectoryEntity"] }, {"name":"findByDirectoryEntityAndPath","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.lang.String"] }, {"name":"findByDirectoryTypeAndNodeEntity","parameterTypes":["app.ister.server.enums.DirectoryType","app.ister.server.entitiy.NodeEntity"] }, {"name":"findByExternalId","parameterTypes":["java.lang.String"] }, {"name":"findById","parameterTypes":["java.lang.Object"] }, {"name":"findByLibraryEntityAndNameAndReleaseYear","parameterTypes":["app.ister.server.entitiy.LibraryEntity","java.lang.String","int"] }, {"name":"findByName","parameterTypes":["java.lang.String"] }, {"name":"findByShowEntityAndNumber","parameterTypes":["app.ister.server.entitiy.ShowEntity","int"] }, {"name":"findByShowEntityAndSeasonEntityAndNumber","parameterTypes":["app.ister.server.entitiy.ShowEntity","app.ister.server.entitiy.SeasonEntity","int"] }, {"name":"findByShowEntityId","parameterTypes":["java.util.UUID"] }, {"name":"findByShowEntityId","parameterTypes":["java.util.UUID","org.springframework.data.domain.Sort"] }, {"name":"findByUserEntityAndPlayQueueItemIdAndEpisodeEntity","parameterTypes":["app.ister.server.entitiy.UserEntity","java.util.UUID","app.ister.server.entitiy.EpisodeEntity"] }, {"name":"findByUserEntityExternalIdAndEpisodeEntity","parameterTypes":["java.lang.String","app.ister.server.entitiy.EpisodeEntity","org.springframework.data.domain.Sort"] }, {"name":"findIdsOnlyByShowEntityId","parameterTypes":["java.util.UUID","org.springframework.data.domain.Sort"] }, {"name":"findOne","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"findOne","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"findRecentEpisodesAndShowIdsByUserId","parameterTypes":["java.util.UUID"] }, {"name":"flush","parameterTypes":[] }, {"name":"getById","parameterTypes":["java.lang.Object"] }, {"name":"getOne","parameterTypes":["java.lang.Object"] }, {"name":"getReferenceById","parameterTypes":["java.lang.Object"] }, {"name":"save","parameterTypes":["java.lang.Object"] }, {"name":"saveAll","parameterTypes":["java.lang.Iterable"] }, {"name":"saveAllAndFlush","parameterTypes":["java.lang.Iterable"] }, {"name":"saveAndFlush","parameterTypes":["java.lang.Object"] }, {"name":"setEscapeCharacter","parameterTypes":["org.springframework.data.jpa.repository.query.EscapeCharacter"] }, {"name":"setProjectionFactory","parameterTypes":["org.springframework.data.projection.ProjectionFactory"] }, {"name":"setRepositoryMethodMetadata","parameterTypes":["org.springframework.data.jpa.repository.support.CrudMethodMetadata"] }]
 },
 {
   "name":"org.springframework.data.jpa.util.HibernateProxyDetector",
@@ -13996,6 +13863,9 @@
   "methods":[{"name":"isFallbackPageable","parameterTypes":["org.springframework.data.domain.Pageable"] }, {"name":"setFallbackPageable","parameterTypes":["org.springframework.data.domain.Pageable"] }, {"name":"setMaxPageSize","parameterTypes":["int"] }, {"name":"setOneIndexedParameters","parameterTypes":["boolean"] }, {"name":"setPageParameterName","parameterTypes":["java.lang.String"] }, {"name":"setPrefix","parameterTypes":["java.lang.String"] }, {"name":"setQualifierDelimiter","parameterTypes":["java.lang.String"] }, {"name":"setSizeParameterName","parameterTypes":["java.lang.String"] }]
 },
 {
+  "name":"org.springframework.data.web.PagedModel"
+},
+{
   "name":"org.springframework.data.web.SortArgumentResolver",
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true
@@ -14153,9 +14023,6 @@
   "name":"org.springframework.graphql.data.method.HandlerMethodArgumentResolverComposite"
 },
 {
-  "name":"org.springframework.graphql.data.method.InvocableHandlerMethodSupport"
-},
-{
   "name":"org.springframework.graphql.data.method.annotation.Argument",
   "queryAllDeclaredMethods":true
 },
@@ -14181,9 +14048,6 @@
   "methods":[{"name":"afterPropertiesSet","parameterTypes":[] }, {"name":"close","parameterTypes":[] }, {"name":"configure","parameterTypes":["graphql.schema.idl.RuntimeWiring$Builder"] }, {"name":"setTypeDefinitionRegistry","parameterTypes":["graphql.schema.idl.TypeDefinitionRegistry"] }, {"name":"shutdown","parameterTypes":[] }]
 },
 {
-  "name":"org.springframework.graphql.data.method.annotation.support.AnnotatedControllerConfigurer$SchemaMappingDataFetcher"
-},
-{
   "name":"org.springframework.graphql.data.method.annotation.support.AnnotatedControllerDetectionSupport",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
@@ -14196,14 +14060,11 @@
   "methods":[{"name":"close","parameterTypes":[] }, {"name":"resolveException","parameterTypes":["java.lang.Throwable","graphql.schema.DataFetchingEnvironment","java.lang.Object"] }, {"name":"shutdown","parameterTypes":[] }]
 },
 {
-  "name":"org.springframework.graphql.data.method.annotation.support.AnnotatedControllerExceptionResolver$MethodHolder"
-},
-{
   "name":"org.springframework.graphql.data.method.annotation.support.AnnotatedControllerExceptionResolver$MethodResolver",
   "queryAllDeclaredMethods":true
 },
 {
-  "name":"org.springframework.graphql.data.method.annotation.support.DataFetcherHandlerMethod"
+  "name":"org.springframework.graphql.data.method.annotation.support.AnnotatedControllerExceptionResolver$MethodReturnValueAdapter"
 },
 {
   "name":"org.springframework.graphql.data.method.annotation.support.DataFetcherMappingInfo"
@@ -14249,9 +14110,6 @@
   "name":"org.springframework.graphql.execution.BatchLoaderRegistry$RegistrationSpec"
 },
 {
-  "name":"org.springframework.graphql.execution.ContextDataFetcherDecorator"
-},
-{
   "name":"org.springframework.graphql.execution.DataFetcherExceptionResolver",
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true
@@ -14271,7 +14129,7 @@
   "name":"org.springframework.graphql.execution.DefaultBatchLoaderRegistry",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
-  "methods":[{"name":"close","parameterTypes":[] }, {"name":"forName","parameterTypes":["java.lang.String"] }, {"name":"forTypePair","parameterTypes":["java.lang.Class","java.lang.Class"] }, {"name":"registerDataLoaders","parameterTypes":["org.dataloader.DataLoaderRegistry","graphql.GraphQLContext"] }, {"name":"shutdown","parameterTypes":[] }]
+  "methods":[{"name":"close","parameterTypes":[] }, {"name":"forName","parameterTypes":["java.lang.String"] }, {"name":"forTypePair","parameterTypes":["java.lang.Class","java.lang.Class"] }, {"name":"hasRegistrations","parameterTypes":[] }, {"name":"registerDataLoaders","parameterTypes":["org.dataloader.DataLoaderRegistry","graphql.GraphQLContext"] }, {"name":"shutdown","parameterTypes":[] }]
 },
 {
   "name":"org.springframework.graphql.execution.DefaultExecutionGraphQlService",
@@ -14394,6 +14252,9 @@
 },
 {
   "name":"org.springframework.http.HttpOutputMessage"
+},
+{
+  "name":"org.springframework.http.HttpRequest"
 },
 {
   "name":"org.springframework.http.HttpStatus"
@@ -14929,9 +14790,6 @@
   "methods":[{"name":"afterPropertiesSet","parameterTypes":[] }, {"name":"destroy","parameterTypes":[] }, {"name":"getPhase","parameterTypes":[] }, {"name":"initialize","parameterTypes":[] }, {"name":"initiateShutdown","parameterTypes":[] }, {"name":"isRunning","parameterTypes":[] }, {"name":"onApplicationEvent","parameterTypes":["org.springframework.context.ApplicationEvent"] }, {"name":"onApplicationEvent","parameterTypes":["org.springframework.context.event.ContextClosedEvent"] }, {"name":"setAcceptTasksAfterContextClose","parameterTypes":["boolean"] }, {"name":"setApplicationContext","parameterTypes":["org.springframework.context.ApplicationContext"] }, {"name":"setAwaitTerminationMillis","parameterTypes":["long"] }, {"name":"setAwaitTerminationSeconds","parameterTypes":["int"] }, {"name":"setBeanName","parameterTypes":["java.lang.String"] }, {"name":"setPhase","parameterTypes":["int"] }, {"name":"setRejectedExecutionHandler","parameterTypes":["java.util.concurrent.RejectedExecutionHandler"] }, {"name":"setThreadFactory","parameterTypes":["java.util.concurrent.ThreadFactory"] }, {"name":"setThreadNamePrefix","parameterTypes":["java.lang.String"] }, {"name":"setWaitForTasksToCompleteOnShutdown","parameterTypes":["boolean"] }, {"name":"shutdown","parameterTypes":[] }, {"name":"start","parameterTypes":[] }, {"name":"stop","parameterTypes":[] }, {"name":"stop","parameterTypes":["java.lang.Runnable"] }]
 },
 {
-  "name":"org.springframework.scheduling.concurrent.ReschedulingRunnable"
-},
-{
   "name":"org.springframework.scheduling.concurrent.SimpleAsyncTaskScheduler"
 },
 {
@@ -14952,12 +14810,6 @@
 },
 {
   "name":"org.springframework.scheduling.config.ScheduledTaskRegistrar"
-},
-{
-  "name":"org.springframework.scheduling.support.DelegatingErrorHandlingRunnable"
-},
-{
-  "name":"org.springframework.scheduling.support.ScheduledMethodRunnable"
 },
 {
   "name":"org.springframework.security.access.AccessDeniedException"
@@ -15487,6 +15339,9 @@
   "name":"org.springframework.security.data.repository.query.SecurityEvaluationContextExtension"
 },
 {
+  "name":"org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient"
+},
+{
   "name":"org.springframework.security.oauth2.client.registration.ClientRegistration"
 },
 {
@@ -15590,21 +15445,6 @@
   "name":"org.springframework.security.web.FilterChainProxy$FilterChainValidator"
 },
 {
-  "name":"org.springframework.security.web.ObservationFilterChainDecorator"
-},
-{
-  "name":"org.springframework.security.web.ObservationFilterChainDecorator$AroundFilterObservation$SimpleAroundFilterObservation"
-},
-{
-  "name":"org.springframework.security.web.ObservationFilterChainDecorator$FilterObservation$SimpleFilterObservation"
-},
-{
-  "name":"org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter"
-},
-{
-  "name":"org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain"
-},
-{
   "name":"org.springframework.security.web.SecurityFilterChain",
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true
@@ -15661,9 +15501,6 @@
 },
 {
   "name":"org.springframework.security.web.access.intercept.RequestMatcherDelegatingAuthorizationManager$Builder"
-},
-{
-  "name":"org.springframework.security.web.authentication.AnonymousAuthenticationFilter"
 },
 {
   "name":"org.springframework.security.web.authentication.AuthenticationFailureHandler"
@@ -15723,9 +15560,6 @@
   "name":"org.springframework.security.web.context.SecurityContextRepository"
 },
 {
-  "name":"org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter"
-},
-{
   "name":"org.springframework.security.web.firewall.FirewalledRequest"
 },
 {
@@ -15768,9 +15602,6 @@
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "methods":[{"name":"afterPropertiesSet","parameterTypes":[] }, {"name":"doFilter","parameterTypes":["jakarta.servlet.ServletRequest","jakarta.servlet.ServletResponse","jakarta.servlet.FilterChain"] }]
-},
-{
-  "name":"org.springframework.security.web.session.DisableEncodeUrlFilter"
 },
 {
   "name":"org.springframework.security.web.session.InvalidSessionStrategy"
@@ -16031,9 +15862,6 @@
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "methods":[{"name":"close","parameterTypes":[] }, {"name":"invoke","parameterTypes":["org.aopalliance.intercept.MethodInvocation"] }, {"name":"shutdown","parameterTypes":[] }]
-},
-{
-  "name":"org.springframework.transaction.interceptor.TransactionInterceptor$1"
 },
 {
   "name":"org.springframework.transaction.interceptor.TransactionalProxy",
@@ -16340,15 +16168,6 @@
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "methods":[{"name":"getEncoding","parameterTypes":[] }, {"name":"isForceRequestEncoding","parameterTypes":[] }, {"name":"isForceResponseEncoding","parameterTypes":[] }, {"name":"setEncoding","parameterTypes":["java.lang.String"] }, {"name":"setForceEncoding","parameterTypes":["boolean"] }, {"name":"setForceRequestEncoding","parameterTypes":["boolean"] }, {"name":"setForceResponseEncoding","parameterTypes":["boolean"] }]
-},
-{
-  "name":"org.springframework.web.filter.CompositeFilter"
-},
-{
-  "name":"org.springframework.web.filter.CompositeFilter$VirtualFilterChain"
-},
-{
-  "name":"org.springframework.web.filter.CorsFilter"
 },
 {
   "name":"org.springframework.web.filter.DelegatingFilterProxy",
@@ -16939,23 +16758,7 @@
   "name":"reactor.core.CoreSubscriber"
 },
 {
-  "name":"reactor.core.publisher.FlatMapTracker",
-  "fields":[{"name":"size"}]
-},
-{
   "name":"reactor.core.publisher.Flux"
-},
-{
-  "name":"reactor.core.publisher.FluxFlatMap$FlatMapInner",
-  "fields":[{"name":"s"}]
-},
-{
-  "name":"reactor.core.publisher.FluxFlatMap$FlatMapMain",
-  "fields":[{"name":"error"}, {"name":"requested"}, {"name":"wip"}]
-},
-{
-  "name":"reactor.core.publisher.FluxIterable$IterableSubscription",
-  "fields":[{"name":"requested"}]
 },
 {
   "name":"reactor.core.publisher.Hooks"
@@ -16968,19 +16771,8 @@
   "fields":[{"name":"state"}]
 },
 {
-  "name":"reactor.core.publisher.MonoCallable$MonoCallableSubscription",
-  "fields":[{"name":"requestedOnce"}]
-},
-{
   "name":"reactor.core.publisher.MonoCompletionStage$MonoCompletionStageSubscription",
   "fields":[{"name":"requestedOnce"}]
-},
-{
-  "name":"reactor.core.publisher.MonoDeferContextual"
-},
-{
-  "name":"reactor.core.publisher.MonoNext$NextSubscriber",
-  "fields":[{"name":"wip"}]
 },
 {
   "name":"reactor.core.publisher.MonoWhen$WhenCoordinator",
@@ -16989,10 +16781,6 @@
 {
   "name":"reactor.core.publisher.MonoWhen$WhenInner",
   "fields":[{"name":"s"}]
-},
-{
-  "name":"reactor.core.publisher.Operators$MultiSubscriptionSubscriber",
-  "fields":[{"name":"missedProduced"}, {"name":"missedRequested"}, {"name":"missedSubscription"}, {"name":"wip"}]
 },
 {
   "name":"reactor.core.scheduler.BoundedElasticScheduler",
@@ -17175,10 +16963,6 @@
 },
 {
   "name":"sun.security.ssl.SSLContextImpl$DefaultSSLContext",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-},
-{
-  "name":"sun.security.ssl.SSLContextImpl$TLSContext",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {

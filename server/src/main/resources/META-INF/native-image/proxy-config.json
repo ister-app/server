@@ -24,6 +24,9 @@
     "interfaces":["app.ister.server.repository.MetadataRepository","org.springframework.data.repository.Repository","org.springframework.transaction.interceptor.TransactionalProxy","org.springframework.aop.framework.Advised","org.springframework.core.DecoratingProxy"]
   },
   {
+    "interfaces":["app.ister.server.repository.MovieRepository","org.springframework.data.repository.Repository","org.springframework.transaction.interceptor.TransactionalProxy","org.springframework.aop.framework.Advised","org.springframework.core.DecoratingProxy"]
+  },
+  {
     "interfaces":["app.ister.server.repository.NodeRepository","org.springframework.data.repository.Repository","org.springframework.transaction.interceptor.TransactionalProxy","org.springframework.aop.framework.Advised","org.springframework.core.DecoratingProxy"]
   },
   {
