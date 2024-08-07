@@ -1,6 +1,7 @@
 package app.ister.server.service;
 
 import app.ister.server.entitiy.EpisodeEntity;
+import app.ister.server.entitiy.MovieEntity;
 import app.ister.server.entitiy.UserEntity;
 import app.ister.server.entitiy.WatchStatusEntity;
 import app.ister.server.repository.WatchStatusRepository;
@@ -20,7 +21,7 @@ public class WatchStatusService {
     @Autowired
     private WatchStatusRepository watchStatusRepository;
 
-    public WatchStatusEntity getOrCreate(Authentication authentication, UUID playQueueItemId, EpisodeEntity episodeEntity) {
+    public WatchStatusEntity getOrCreate(Authentication authentication, UUID playQueueItemId, EpisodeEntity episodeEntity, MovieEntity movieEntity) {
         UserEntity userEntity = userService.getOrCreateUser(authentication);
         Optional<WatchStatusEntity> user = watchStatusRepository.findByUserEntityAndPlayQueueItemIdAndEpisodeEntity(userEntity, playQueueItemId, episodeEntity);
         if (user.isPresent()) {
@@ -30,6 +31,7 @@ public class WatchStatusService {
                     .userEntity(userEntity)
                     .playQueueItemId(playQueueItemId)
                     .episodeEntity(episodeEntity)
+                    .movieEntity(movieEntity)
                     .watched(false).build();
             watchStatusRepository.save(watchStatusEntity);
             return watchStatusEntity;

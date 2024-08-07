@@ -10,6 +10,7 @@ import app.ister.server.repository.WatchStatusRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
+import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,6 +18,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Controller
@@ -31,6 +34,12 @@ public class MovieController {
     @QueryMapping
     public List<MovieEntity> moviesRecentAdded() {
         return movieRepository.findAll(Sort.by("dateCreated").descending());
+    }
+
+    @PreAuthorize("hasRole('user')")
+    @QueryMapping
+    public Optional<MovieEntity> movieById(@Argument UUID id) {
+        return movieRepository.findById(id);
     }
 
     @SchemaMapping(typeName = "Movie", field = "metadata")

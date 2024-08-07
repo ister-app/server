@@ -1,10 +1,13 @@
 package app.ister.server.service;
 
+import app.ister.server.entitiy.MediaFileEntity;
 import app.ister.server.entitiy.PlayQueueEntity;
 import app.ister.server.entitiy.PlayQueueItemEntity;
 import app.ister.server.entitiy.UserEntity;
 import app.ister.server.entitiy.WatchStatusEntity;
+import app.ister.server.enums.MediaType;
 import app.ister.server.repository.EpisodeRepository;
+import app.ister.server.repository.MovieRepository;
 import app.ister.server.repository.PlayQueueRepository;
 import app.ister.server.repository.WatchStatusRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +30,9 @@ public class PlayQueueService {
     private EpisodeRepository episodeRepository;
 
     @Autowired
+    private MovieRepository movieRepository;
+
+    @Autowired
     private UserService userService;
 
     @Autowired
@@ -35,19 +41,35 @@ public class PlayQueueService {
     @Autowired
     private WatchStatusService watchStatusService;
 
-    public PlayQueueEntity createPlayQueue(UUID showId, UUID episodeId, Authentication authentication) {
+    public PlayQueueEntity createPlayQueueForShow(UUID showId, UUID episodeId, Authentication authentication) {
         log.debug("Creating play queue for user: {}, show: {}", authentication.getName(), showId);
         List<PlayQueueItemEntity> items = episodeRepository.findIdsOnlyByShowEntityId(
                         UUID.fromString(showId.toString()),
                         Sort.by("SeasonEntityNumber").ascending().and(
                                 Sort.by("number").ascending())).stream()
-                .map(idOnly -> PlayQueueItemEntity.builder().id(UUID.randomUUID()).itemId(idOnly.getId()).build()).collect(Collectors.toList());
+                .map(idOnly -> PlayQueueItemEntity.builder()
+                        .id(UUID.randomUUID())
+                        .itemId(idOnly.getId())
+                        .type(MediaType.EPISODE).build())
+                .collect(Collectors.toList());
         UserEntity userEntity = userService.getOrCreateUser(authentication);
         PlayQueueItemEntity playQueueItemEntity = items.stream().filter(item -> item.getItemId().equals(episodeId)).findAny().get();
         var playQueueEntity = PlayQueueEntity.builder()
                 .userEntity(userEntity)
                 .items(items)
                 .currentItem(playQueueItemEntity.getId()).build();
+        playQueueRepository.save(playQueueEntity);
+        return playQueueEntity;
+    }
+
+    public PlayQueueEntity createPlayQueueForMovie(UUID movieId, Authentication authentication) {
+        log.debug("Creating play queue for user: {}, movie: {}", authentication.getName(), movieId);
+        PlayQueueItemEntity playQueueItemEntity = PlayQueueItemEntity.builder().id(UUID.randomUUID()).type(MediaType.MOVIE).itemId(movieId).build();
+        List<PlayQueueItemEntity> playQueueItemEntities = List.of(playQueueItemEntity);
+        var playQueueEntity = PlayQueueEntity.builder()
+                .userEntity(userService.getOrCreateUser(authentication))
+                .currentItem(playQueueItemEntity.getId())
+                .items(playQueueItemEntities).build();
         playQueueRepository.save(playQueueEntity);
         return playQueueEntity;
     }
@@ -66,18 +88,37 @@ public class PlayQueueService {
             playQueueRepository.save(playQueueEntity);
             // Update the watch status of an episode if it's played for more then one minute
             if (progressInMilliseconds > 60000) {
-                episodeRepository.findById(playQueueItemEntity.getItemId()).ifPresent(episodeEntity -> {
-                    WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreate(authentication, playQueueItemId, episodeEntity);
-                    watchStatusEntity.setProgressInMilliseconds(progressInMilliseconds);
-                    if (!episodeEntity.getMediaFileEntities().isEmpty()) {
-                        long durationOfMediaFile = episodeEntity.getMediaFileEntities().get(0).getDurationInMilliseconds();
-                        boolean durationIsLessThenOneMinute = durationOfMediaFile - progressInMilliseconds < 60000;
-                        watchStatusEntity.setWatched(durationIsLessThenOneMinute);
-                    }
-                    watchStatusRepository.save(watchStatusEntity);
-                });
+                switch (playQueueItemEntity.getType()) {
+                    case EPISODE -> updateEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
+                    case MOVIE -> updateMovieWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
+                }
+
             }
         });
+    }
+
+    private void updateEpisodeWatchStatus(long progressInMilliseconds, UUID playQueueItemId, Authentication authentication, PlayQueueItemEntity playQueueItemEntity) {
+        episodeRepository.findById(playQueueItemEntity.getItemId()).ifPresent(episodeEntity -> {
+            WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreate(authentication, playQueueItemId, episodeEntity, null);
+            updateWatchStatus(progressInMilliseconds, watchStatusEntity, episodeEntity.getMediaFileEntities());
+        });
+    }
+
+    private void updateMovieWatchStatus(long progressInMilliseconds, UUID playQueueItemId, Authentication authentication, PlayQueueItemEntity playQueueItemEntity) {
+        movieRepository.findById(playQueueItemEntity.getItemId()).ifPresent(movieEntity -> {
+            WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreate(authentication, playQueueItemId, null, movieEntity);
+            updateWatchStatus(progressInMilliseconds, watchStatusEntity, movieEntity.getMediaFileEntities());
+        });
+    }
+
+    private void updateWatchStatus(long progressInMilliseconds, WatchStatusEntity watchStatusEntity, List<MediaFileEntity> mediaFileEntities) {
+        watchStatusEntity.setProgressInMilliseconds(progressInMilliseconds);
+        if (!mediaFileEntities.isEmpty()) {
+            long durationOfMediaFile = mediaFileEntities.get(0).getDurationInMilliseconds();
+            boolean durationIsLessThenOneMinute = durationOfMediaFile - progressInMilliseconds < 60000;
+            watchStatusEntity.setWatched(durationIsLessThenOneMinute);
+        }
+        watchStatusRepository.save(watchStatusEntity);
     }
 
 }

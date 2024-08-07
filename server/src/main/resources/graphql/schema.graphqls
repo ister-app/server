@@ -4,11 +4,13 @@ type Query {
     seasonById(id: ID): Season
     showsRecentAdded: [Show!]
     moviesRecentAdded: [Movie!]
+    movieById(id: ID): Movie
     showById(id: ID): Show
 }
 
 type Mutation {
-    createPlayQueue(showId: ID!, episodeId: ID!): PlayQueue
+    createPlayQueueForShow(showId: ID!, episodeId: ID!): PlayQueue
+    createPlayQueueForMovie(movieId: ID!): PlayQueue
     updatePlayQueue(id: ID!, progressInMilliseconds: Int!, playQueueItemId: ID!): Boolean
     startTranscoding(playQueueId: ID!, mediaFileId: ID!, startTimeInSeconds: Int!, audioId: ID, subtitleId: ID): ID!
     readyTranscoding(id: ID!): Boolean!
@@ -83,6 +85,7 @@ type PlayQueue {
 type PlayQueueItem {
     id: ID!
     itemId: String!
+    type: String!
 }
 
 type Season {
@@ -105,7 +108,8 @@ type Show {
 type WatchStatus {
     id: ID!
     playQueueItemId: String!
-    episodes: [Episode!]
+    episode: Episode
+    movie: Movie
     watched: Boolean!
     progressInMilliseconds: Int!
 }

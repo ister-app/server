@@ -23,8 +23,14 @@ public class PlayQueueController {
 
     @PreAuthorize("hasRole('user')")
     @MutationMapping
-    public PlayQueueEntity createPlayQueue(@Argument UUID showId, @Argument UUID episodeId, Authentication authentication) {
-        return playQueueService.createPlayQueue(showId, episodeId, authentication);
+    public PlayQueueEntity createPlayQueueForShow(@Argument UUID showId, @Argument UUID episodeId, Authentication authentication) {
+        return playQueueService.createPlayQueueForShow(showId, episodeId, authentication);
+    }
+
+    @PreAuthorize("hasRole('user')")
+    @MutationMapping
+    public PlayQueueEntity createPlayQueueForMovie(@Argument UUID movieId, Authentication authentication) {
+        return playQueueService.createPlayQueueForMovie(movieId, authentication);
     }
 
     @PreAuthorize("hasRole('user')")

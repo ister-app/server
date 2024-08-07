@@ -27,7 +27,7 @@ public interface WatchStatusRepository extends CrudRepository<WatchStatusEntity,
                     "    ROW_NUMBER() OVER(PARTITION BY ee.show_entity_id ORDER BY wse.date_updated DESC) AS row_number\n" +
                     "  FROM watch_status_entity wse\n" +
                     "  LEFT JOIN episode_entity ee ON wse.episode_entity_id  = ee.id\n" +
-                    "  WHERE user_entity_id = :userId\n" +
+                    "  WHERE user_entity_id = :userId and episode_entity_id is not null\n" +
                     "  order by wse.date_updated desc \n" +
                     ")\n" +
                     "SELECT\n" +
