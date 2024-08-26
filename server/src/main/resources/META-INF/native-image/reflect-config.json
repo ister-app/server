@@ -373,7 +373,7 @@
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"images","parameterTypes":["app.ister.server.entitiy.MovieEntity"] }, {"name":"metadata","parameterTypes":["app.ister.server.entitiy.MovieEntity"] }, {"name":"moviesRecentAdded","parameterTypes":[] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"images","parameterTypes":["app.ister.server.entitiy.MovieEntity"] }, {"name":"mediaFile","parameterTypes":["app.ister.server.entitiy.MovieEntity"] }, {"name":"metadata","parameterTypes":["app.ister.server.entitiy.MovieEntity"] }, {"name":"movieById","parameterTypes":["java.util.UUID"] }, {"name":"moviesRecentAdded","parameterTypes":[] }, {"name":"watchStatus","parameterTypes":["app.ister.server.entitiy.MovieEntity","org.springframework.security.core.Authentication"] }]
 },
 {
   "name":"app.ister.server.controller.MovieController$$SpringCGLIB$$0",
@@ -385,7 +385,7 @@
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"createPlayQueue","parameterTypes":["java.util.UUID","java.util.UUID","org.springframework.security.core.Authentication"] }, {"name":"playQueueItems","parameterTypes":["app.ister.server.entitiy.PlayQueueEntity"] }, {"name":"updatePlayQueue","parameterTypes":["java.util.UUID","long","java.util.UUID","org.springframework.security.core.Authentication"] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"createPlayQueueForMovie","parameterTypes":["java.util.UUID","org.springframework.security.core.Authentication"] }, {"name":"createPlayQueueForShow","parameterTypes":["java.util.UUID","java.util.UUID","org.springframework.security.core.Authentication"] }, {"name":"playQueueItems","parameterTypes":["app.ister.server.entitiy.PlayQueueEntity"] }, {"name":"updatePlayQueue","parameterTypes":["java.util.UUID","long","java.util.UUID","org.springframework.security.core.Authentication"] }]
 },
 {
   "name":"app.ister.server.controller.PlayQueueController$$SpringCGLIB$$0",
@@ -454,28 +454,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateAccessOptimizer$3hvUy3RX",
-  "fields":[{"name":"invocationTarget$ehqcni1"}],
+  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateAccessOptimizer$j019Pk4G",
+  "fields":[{"name":"invocationTarget$kspu3t1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateAccessOptimizer$IX4m4oj1",
-  "fields":[{"name":"invocationTarget$u3imer0"}],
+  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateAccessOptimizer$sZflXw6K",
+  "fields":[{"name":"invocationTarget$kspu3t1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateInstantiator$dvQ7A3Ky",
+  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateInstantiator$ofU9MTH6",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateInstantiator$x9U2nPi3",
+  "name":"app.ister.server.entitiy.DirectoryEntity$HibernateInstantiator$zPPCaNo9",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.DirectoryEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.DirectoryEntity_Accessor_a3cha2",
+  "name":"app.ister.server.entitiy.DirectoryEntity_Accessor_oon5k8",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.DirectoryEntity"] }]
 },
@@ -488,28 +488,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getNumber","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateAccessOptimizer$J1XNV63C",
-  "fields":[{"name":"invocationTarget$c15c4i0"}],
+  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateAccessOptimizer$hZvFENPf",
+  "fields":[{"name":"invocationTarget$hip91o1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateAccessOptimizer$Oii6qCu9",
-  "fields":[{"name":"invocationTarget$uond8j1"}],
+  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateAccessOptimizer$pIOl0bW1",
+  "fields":[{"name":"invocationTarget$hip91o1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateInstantiator$2dYn2lLM",
+  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateInstantiator$LOhuIooW",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateInstantiator$uYYPudRS",
+  "name":"app.ister.server.entitiy.EpisodeEntity$HibernateInstantiator$YYsSnd1B",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.EpisodeEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.EpisodeEntity_Accessor_u4udsi",
+  "name":"app.ister.server.entitiy.EpisodeEntity_Accessor_ayp8yz",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.EpisodeEntity"] }]
 },
@@ -532,28 +532,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getLanguage","parameterTypes":[] }, {"name":"getPath","parameterTypes":[] }, {"name":"getSourceUri","parameterTypes":[] }, {"name":"getType","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ImageEntity$HibernateAccessOptimizer$4ECUAEmZ",
-  "fields":[{"name":"invocationTarget$14ffg51"}],
+  "name":"app.ister.server.entitiy.ImageEntity$HibernateAccessOptimizer$J2DWVvCz",
+  "fields":[{"name":"invocationTarget$ch3p3k0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ImageEntity$HibernateAccessOptimizer$7RUUkD0u",
-  "fields":[{"name":"invocationTarget$04jp0g1"}],
+  "name":"app.ister.server.entitiy.ImageEntity$HibernateAccessOptimizer$O9P1SZuD",
+  "fields":[{"name":"invocationTarget$ch3p3k0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ImageEntity$HibernateInstantiator$8pBb0rJ1",
+  "name":"app.ister.server.entitiy.ImageEntity$HibernateInstantiator$4zDhQRzl",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ImageEntity$HibernateInstantiator$MaeTtqap",
+  "name":"app.ister.server.entitiy.ImageEntity$HibernateInstantiator$5rq7vnnf",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.ImageEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.ImageEntity_Accessor_lh4ffx",
+  "name":"app.ister.server.entitiy.ImageEntity_Accessor_d1p9eg",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.ImageEntity"] }]
 },
@@ -566,28 +566,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.LibraryEntity$HibernateAccessOptimizer$XKWMKToS",
-  "fields":[{"name":"invocationTarget$sk1qio1"}],
+  "name":"app.ister.server.entitiy.LibraryEntity$HibernateAccessOptimizer$7PLgSJxd",
+  "fields":[{"name":"invocationTarget$crdchl1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.LibraryEntity$HibernateAccessOptimizer$YJ29iY2m",
-  "fields":[{"name":"invocationTarget$hsjvpr1"}],
+  "name":"app.ister.server.entitiy.LibraryEntity$HibernateAccessOptimizer$eJE3lXoe",
+  "fields":[{"name":"invocationTarget$crdchl1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.LibraryEntity$HibernateInstantiator$BcjujI2b",
+  "name":"app.ister.server.entitiy.LibraryEntity$HibernateInstantiator$bY193DDZ",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.LibraryEntity$HibernateInstantiator$fuJitQ5y",
+  "name":"app.ister.server.entitiy.LibraryEntity$HibernateInstantiator$tRKPhz2U",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.LibraryEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.LibraryEntity_Accessor_8g8gis",
+  "name":"app.ister.server.entitiy.LibraryEntity_Accessor_kdjxtn",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.LibraryEntity"] }]
 },
@@ -600,28 +600,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getDurationInMilliseconds","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getPath","parameterTypes":[] }, {"name":"getSize","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateAccessOptimizer$NHGMBYyk",
-  "fields":[{"name":"invocationTarget$na2sm51"}],
+  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateAccessOptimizer$bgCDCV0E",
+  "fields":[{"name":"invocationTarget$hufql50"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateAccessOptimizer$u2JGuu8T",
-  "fields":[{"name":"invocationTarget$fvu1kg1"}],
+  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateAccessOptimizer$lxfHMUT8",
+  "fields":[{"name":"invocationTarget$hufql50"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateInstantiator$7xoqijc1",
+  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateInstantiator$6F1FnJ7L",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateInstantiator$cD7hGjOW",
+  "name":"app.ister.server.entitiy.MediaFileEntity$HibernateInstantiator$JDiVSwZo",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.MediaFileEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileEntity_Accessor_4jlbjg",
+  "name":"app.ister.server.entitiy.MediaFileEntity_Accessor_zuril",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.MediaFileEntity"] }]
 },
@@ -634,28 +634,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getCodecName","parameterTypes":[] }, {"name":"getCodecType","parameterTypes":[] }, {"name":"getHeight","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getLanguage","parameterTypes":[] }, {"name":"getPath","parameterTypes":[] }, {"name":"getStreamIndex","parameterTypes":[] }, {"name":"getTitle","parameterTypes":[] }, {"name":"getWidth","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateAccessOptimizer$N7mh2f5n",
-  "fields":[{"name":"invocationTarget$4ood4f1"}],
+  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateAccessOptimizer$7bGiGs1p",
+  "fields":[{"name":"invocationTarget$6vmeb60"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateAccessOptimizer$VsfKFFST",
-  "fields":[{"name":"invocationTarget$183f9i1"}],
+  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateAccessOptimizer$JSZIwszu",
+  "fields":[{"name":"invocationTarget$6vmeb60"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateInstantiator$26toqVT0",
+  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateInstantiator$T1DOU1W2",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateInstantiator$hamMWdE2",
+  "name":"app.ister.server.entitiy.MediaFileStreamEntity$HibernateInstantiator$vPAdLVQB",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.MediaFileStreamEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.MediaFileStreamEntity_Accessor_w5n6in",
+  "name":"app.ister.server.entitiy.MediaFileStreamEntity_Accessor_f1n9w8",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.MediaFileStreamEntity"] }]
 },
@@ -668,28 +668,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getDescription","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getLanguage","parameterTypes":[] }, {"name":"getSourceUri","parameterTypes":[] }, {"name":"getTitle","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MetadataEntity$HibernateAccessOptimizer$bhiX9lNY",
-  "fields":[{"name":"invocationTarget$i874hl1"}],
+  "name":"app.ister.server.entitiy.MetadataEntity$HibernateAccessOptimizer$WV9e0JfO",
+  "fields":[{"name":"invocationTarget$4je85t0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MetadataEntity$HibernateAccessOptimizer$ovfDRiHh",
-  "fields":[{"name":"invocationTarget$762v011"}],
+  "name":"app.ister.server.entitiy.MetadataEntity$HibernateAccessOptimizer$wmE4QkEX",
+  "fields":[{"name":"invocationTarget$4je85t0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MetadataEntity$HibernateInstantiator$cwitghjN",
+  "name":"app.ister.server.entitiy.MetadataEntity$HibernateInstantiator$7pzi1V9D",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MetadataEntity$HibernateInstantiator$vW8WboIJ",
+  "name":"app.ister.server.entitiy.MetadataEntity$HibernateInstantiator$AEeneRTq",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.MetadataEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.MetadataEntity_Accessor_2vuiub",
+  "name":"app.ister.server.entitiy.MetadataEntity_Accessor_z3cej",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.MetadataEntity"] }]
 },
@@ -702,28 +702,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getName","parameterTypes":[] }, {"name":"getReleaseYear","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MovieEntity$HibernateAccessOptimizer$phvSD8WT",
-  "fields":[{"name":"invocationTarget$nbo7041"}],
+  "name":"app.ister.server.entitiy.MovieEntity$HibernateAccessOptimizer$SgafndHp",
+  "fields":[{"name":"invocationTarget$n16in80"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MovieEntity$HibernateAccessOptimizer$pyWakTKH",
-  "fields":[{"name":"invocationTarget$283ejs0"}],
+  "name":"app.ister.server.entitiy.MovieEntity$HibernateAccessOptimizer$mnv5o49A",
+  "fields":[{"name":"invocationTarget$n16in80"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MovieEntity$HibernateInstantiator$NGdgmv5y",
+  "name":"app.ister.server.entitiy.MovieEntity$HibernateInstantiator$gDJFYZwi",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.MovieEntity$HibernateInstantiator$UWQu3ATK",
+  "name":"app.ister.server.entitiy.MovieEntity$HibernateInstantiator$lzE0J25I",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.MovieEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.MovieEntity_Accessor_bw9snz",
+  "name":"app.ister.server.entitiy.MovieEntity_Accessor_2ctwx3",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.MovieEntity"] }]
 },
@@ -736,28 +736,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.NodeEntity$HibernateAccessOptimizer$Ai4gLrGH",
-  "fields":[{"name":"invocationTarget$1793sd0"}],
+  "name":"app.ister.server.entitiy.NodeEntity$HibernateAccessOptimizer$GxHIWlBB",
+  "fields":[{"name":"invocationTarget$4utsjp1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.NodeEntity$HibernateAccessOptimizer$wbHCRS2f",
-  "fields":[{"name":"invocationTarget$7g0ucs0"}],
+  "name":"app.ister.server.entitiy.NodeEntity$HibernateAccessOptimizer$z302oACm",
+  "fields":[{"name":"invocationTarget$4utsjp1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.NodeEntity$HibernateInstantiator$FkVpoDIF",
+  "name":"app.ister.server.entitiy.NodeEntity$HibernateInstantiator$1P0kDrHP",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.NodeEntity$HibernateInstantiator$ZckFjBT8",
+  "name":"app.ister.server.entitiy.NodeEntity$HibernateInstantiator$UcTktkBQ",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.NodeEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.NodeEntity_Accessor_eqzaxb",
+  "name":"app.ister.server.entitiy.NodeEntity_Accessor_u4kmj8",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.NodeEntity"] }]
 },
@@ -770,28 +770,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateAccessOptimizer$UIUCBf7p",
-  "fields":[{"name":"invocationTarget$fvejor1"}],
+  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateAccessOptimizer$AhEgzA7y",
+  "fields":[{"name":"invocationTarget$98l97i0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateAccessOptimizer$eCROv2jW",
-  "fields":[{"name":"invocationTarget$hi71731"}],
+  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateAccessOptimizer$LddU8jSG",
+  "fields":[{"name":"invocationTarget$98l97i0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateInstantiator$KUg2OzAS",
+  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateInstantiator$7mtqtdYX",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateInstantiator$ZPZX9a0W",
+  "name":"app.ister.server.entitiy.OtherPathFileEntity$HibernateInstantiator$Ep1mERTi",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.OtherPathFileEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.OtherPathFileEntity_Accessor_petdzn",
+  "name":"app.ister.server.entitiy.OtherPathFileEntity_Accessor_jq1o9o",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.OtherPathFileEntity"] }]
 },
@@ -804,21 +804,21 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getCurrentItem","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateAccessOptimizer$NafzYKiI",
-  "fields":[{"name":"invocationTarget$6l6a1p1"}],
+  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateAccessOptimizer$EX1de5bt",
+  "fields":[{"name":"invocationTarget$0nroed1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateAccessOptimizer$O5dsU8KN",
-  "fields":[{"name":"invocationTarget$7dc41o0"}],
+  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateAccessOptimizer$wcAoCn42",
+  "fields":[{"name":"invocationTarget$0nroed1"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateInstantiator$1usG2O0b",
+  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateInstantiator$kzsoAfbC",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateInstantiator$vtO7Thgo",
+  "name":"app.ister.server.entitiy.PlayQueueEntity$HibernateInstantiator$rmryTCk8",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
@@ -833,7 +833,7 @@
   "name":"app.ister.server.entitiy.PlayQueueEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueEntity_Accessor_7zqfct",
+  "name":"app.ister.server.entitiy.PlayQueueEntity_Accessor_au995k",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.PlayQueueEntity"] }]
 },
@@ -843,24 +843,24 @@
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getItemId","parameterTypes":[] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getItemId","parameterTypes":[] }, {"name":"getType","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateAccessOptimizer$NT47fj7i",
-  "fields":[{"name":"invocationTarget$uskrj41"}],
+  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateAccessOptimizer$CbUp9xI6",
+  "fields":[{"name":"invocationTarget$n3ogmb0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateAccessOptimizer$opolZIs4",
-  "fields":[{"name":"invocationTarget$i77d4i1"}],
+  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateAccessOptimizer$wLuWLJTO",
+  "fields":[{"name":"invocationTarget$n3ogmb0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateInstantiator$0AGln8KB",
+  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateInstantiator$0BdJZzbk",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateInstantiator$7fTfUyRc",
+  "name":"app.ister.server.entitiy.PlayQueueItemEntity$HibernateInstantiator$p3mjmeZK",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
@@ -875,28 +875,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getNumber","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.SeasonEntity$HibernateAccessOptimizer$EQFoZmD9",
-  "fields":[{"name":"invocationTarget$5l5qfk1"}],
+  "name":"app.ister.server.entitiy.SeasonEntity$HibernateAccessOptimizer$8q58QACw",
+  "fields":[{"name":"invocationTarget$gso28l0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.SeasonEntity$HibernateAccessOptimizer$dyR4jCDG",
-  "fields":[{"name":"invocationTarget$5ht4jp0"}],
+  "name":"app.ister.server.entitiy.SeasonEntity$HibernateAccessOptimizer$ORlooJyV",
+  "fields":[{"name":"invocationTarget$gso28l0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.SeasonEntity$HibernateInstantiator$haGwTea5",
+  "name":"app.ister.server.entitiy.SeasonEntity$HibernateInstantiator$00dyjiVL",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.SeasonEntity$HibernateInstantiator$qw6CTZiE",
+  "name":"app.ister.server.entitiy.SeasonEntity$HibernateInstantiator$XYGZRyoB",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.SeasonEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.SeasonEntity_Accessor_r6qp8n",
+  "name":"app.ister.server.entitiy.SeasonEntity_Accessor_y56sp8",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.SeasonEntity"] }]
 },
@@ -908,21 +908,21 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateAccessOptimizer$GQLd9X1i",
-  "fields":[{"name":"invocationTarget$tr5unr1"}],
+  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateAccessOptimizer$0qKgeQSD",
+  "fields":[{"name":"invocationTarget$2q9a330"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateAccessOptimizer$Io0LpOwW",
-  "fields":[{"name":"invocationTarget$okhofq0"}],
+  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateAccessOptimizer$ITphAer6",
+  "fields":[{"name":"invocationTarget$2q9a330"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateInstantiator$6JOgbB42",
+  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateInstantiator$684s6p9T",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateInstantiator$MaeTMUD1",
+  "name":"app.ister.server.entitiy.ServerEventEntity$HibernateInstantiator$ZLmYfhwq",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
@@ -937,28 +937,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"getId","parameterTypes":[] }, {"name":"getName","parameterTypes":[] }, {"name":"getReleaseYear","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ShowEntity$HibernateAccessOptimizer$g13LuWhC",
-  "fields":[{"name":"invocationTarget$rphqvn0"}],
+  "name":"app.ister.server.entitiy.ShowEntity$HibernateAccessOptimizer$EtbsXuoz",
+  "fields":[{"name":"invocationTarget$bea7j40"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ShowEntity$HibernateAccessOptimizer$wXXNMmVA",
-  "fields":[{"name":"invocationTarget$0ede5b1"}],
+  "name":"app.ister.server.entitiy.ShowEntity$HibernateAccessOptimizer$cU45Y936",
+  "fields":[{"name":"invocationTarget$bea7j40"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ShowEntity$HibernateInstantiator$3NgFcvcw",
+  "name":"app.ister.server.entitiy.ShowEntity$HibernateInstantiator$RRAm6k9m",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.ShowEntity$HibernateInstantiator$Z0jlBJET",
+  "name":"app.ister.server.entitiy.ShowEntity$HibernateInstantiator$dPhb9kUE",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.ShowEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.ShowEntity_Accessor_omhrt9",
+  "name":"app.ister.server.entitiy.ShowEntity_Accessor_e5gq5c",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.ShowEntity"] }]
 },
@@ -971,28 +971,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.UserEntity$HibernateAccessOptimizer$COBqm5oe",
-  "fields":[{"name":"invocationTarget$mig0g90"}],
+  "name":"app.ister.server.entitiy.UserEntity$HibernateAccessOptimizer$UBGrs8Sf",
+  "fields":[{"name":"invocationTarget$qddjhm0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.UserEntity$HibernateAccessOptimizer$JAsyLJH6",
-  "fields":[{"name":"invocationTarget$j8kovu0"}],
+  "name":"app.ister.server.entitiy.UserEntity$HibernateAccessOptimizer$UGnlLWQ0",
+  "fields":[{"name":"invocationTarget$qddjhm0"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.UserEntity$HibernateInstantiator$9NfkGA2N",
+  "name":"app.ister.server.entitiy.UserEntity$HibernateInstantiator$cv0lXoFb",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.UserEntity$HibernateInstantiator$eYrEhsvY",
+  "name":"app.ister.server.entitiy.UserEntity$HibernateInstantiator$l2yCn0M2",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.UserEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.UserEntity_Accessor_ahugug",
+  "name":"app.ister.server.entitiy.UserEntity_Accessor_1sv3a",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.UserEntity"] }]
 },
@@ -1005,28 +1005,28 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateAccessOptimizer$78ZVOhgR",
-  "fields":[{"name":"invocationTarget$fh3har1"}],
+  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateAccessOptimizer$Eft3QxxQ",
+  "fields":[{"name":"invocationTarget$g3duc01"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateAccessOptimizer$HnwsWk4N",
-  "fields":[{"name":"invocationTarget$l2djk50"}],
+  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateAccessOptimizer$JyXhLEuU",
+  "fields":[{"name":"invocationTarget$g3duc01"}],
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateInstantiator$c3CY9Ive",
+  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateInstantiator$JVHTIIWk",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
-  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateInstantiator$wUwG7P4d",
+  "name":"app.ister.server.entitiy.WatchStatusEntity$HibernateInstantiator$OMuxouwg",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
   "name":"app.ister.server.entitiy.WatchStatusEntity_"
 },
 {
-  "name":"app.ister.server.entitiy.WatchStatusEntity_Accessor_3szo3z",
+  "name":"app.ister.server.entitiy.WatchStatusEntity_Accessor_wg70wd",
   "queryAllPublicConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["app.ister.server.entitiy.WatchStatusEntity"] }]
 },
@@ -1046,6 +1046,11 @@
 },
 {
   "name":"app.ister.server.enums.LibraryType"
+},
+{
+  "name":"app.ister.server.enums.MediaType",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true
 },
 {
   "name":"app.ister.server.enums.PathFileType"
@@ -1449,7 +1454,7 @@
   "methods":[{"name":"findByDirectoryTypeAndNodeEntity","parameterTypes":["app.ister.server.enums.DirectoryType","app.ister.server.entitiy.NodeEntity"] }, {"name":"findByName","parameterTypes":["java.lang.String"] }]
 },
 {
-  "name":"app.ister.server.repository.DirectoryRepository$MockitoMock$JiCSaSTN",
+  "name":"app.ister.server.repository.DirectoryRepository$MockitoMock$FqWF3A8u",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -1468,7 +1473,7 @@
   "queryAllPublicMethods":true
 },
 {
-  "name":"app.ister.server.repository.EpisodeRepository$MockitoMock$p8VDGkf4",
+  "name":"app.ister.server.repository.EpisodeRepository$MockitoMock$l4KyOLXJ",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -1482,7 +1487,7 @@
   "methods":[{"name":"findAll","parameterTypes":["org.springframework.data.domain.Pageable"] }, {"name":"findByDirectoryEntity","parameterTypes":["app.ister.server.entitiy.DirectoryEntity"] }, {"name":"findByDirectoryEntityAndPath","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.lang.String"] }, {"name":"findByShowEntityId","parameterTypes":["java.util.UUID"] }]
 },
 {
-  "name":"app.ister.server.repository.ImageRepository$MockitoMock$OdCAXcI5",
+  "name":"app.ister.server.repository.ImageRepository$MockitoMock$9JF5XDqx",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -1501,7 +1506,7 @@
   "methods":[{"name":"findByDirectoryEntity","parameterTypes":["app.ister.server.entitiy.DirectoryEntity"] }, {"name":"findByDirectoryEntityAndPath","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.lang.String"] }]
 },
 {
-  "name":"app.ister.server.repository.MediaFileRepository$MockitoMock$zlCe7tUg",
+  "name":"app.ister.server.repository.MediaFileRepository$MockitoMock$7BUl3i0m",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -1515,7 +1520,7 @@
   "methods":[{"name":"findByMediaFileEntity","parameterTypes":["app.ister.server.entitiy.MediaFileEntity"] }]
 },
 {
-  "name":"app.ister.server.repository.MediaFileStreamRepository$MockitoMock$xs5Te5sQ",
+  "name":"app.ister.server.repository.MediaFileStreamRepository$MockitoMock$kw6NagWW",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -1528,7 +1533,7 @@
   "queryAllDeclaredConstructors":true
 },
 {
-  "name":"app.ister.server.repository.MetadataRepository$MockitoMock$TiVAHTI9",
+  "name":"app.ister.server.repository.MetadataRepository$MockitoMock$I1jI9HBL",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -1539,10 +1544,10 @@
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"findAll","parameterTypes":["org.springframework.data.domain.Pageable"] }, {"name":"findByLibraryEntityAndNameAndReleaseYear","parameterTypes":["app.ister.server.entitiy.LibraryEntity","java.lang.String","int"] }]
+  "methods":[{"name":"findByLibraryEntityAndNameAndReleaseYear","parameterTypes":["app.ister.server.entitiy.LibraryEntity","java.lang.String","int"] }]
 },
 {
-  "name":"app.ister.server.repository.MovieRepository$MockitoMock$505aEzfp",
+  "name":"app.ister.server.repository.MovieRepository$MockitoMock$d2V2A0z5",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -1561,7 +1566,7 @@
   "methods":[{"name":"findByDirectoryEntity","parameterTypes":["app.ister.server.entitiy.DirectoryEntity"] }, {"name":"findByDirectoryEntityAndPath","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.lang.String"] }]
 },
 {
-  "name":"app.ister.server.repository.OtherPathFileRepository$MockitoMock$d9IJn1b7",
+  "name":"app.ister.server.repository.OtherPathFileRepository$MockitoMock$zqSGSUAb",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -1582,10 +1587,10 @@
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"findAll","parameterTypes":["org.springframework.data.domain.Pageable"] }, {"name":"findByLibraryEntityAndNameAndReleaseYear","parameterTypes":["app.ister.server.entitiy.LibraryEntity","java.lang.String","int"] }]
+  "methods":[{"name":"findByLibraryEntityAndNameAndReleaseYear","parameterTypes":["app.ister.server.entitiy.LibraryEntity","java.lang.String","int"] }]
 },
 {
-  "name":"app.ister.server.repository.ShowRepository$MockitoMock$9RJJEPsh",
+  "name":"app.ister.server.repository.ShowRepository$MockitoMock$qUItQQjf",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -2949,7 +2954,7 @@
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"setStatusCode","parameterTypes":["info.movito.themoviedbapi.tools.TmdbResponseCode"] }, {"name":"setStatusMessage","parameterTypes":["java.lang.String"] }]
 },
 {
   "name":"info.movito.themoviedbapi.model.core.video.Video",
@@ -3369,7 +3374,11 @@
 {
   "name":"info.movito.themoviedbapi.tools.TmdbResponseCode",
   "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods": [
+    {"name": "fromCode", "parameterTypes":["int"]}
+  ]
 },
 {
   "name":"info.movito.themoviedbapi.tools.TmdbUrlReader"
@@ -4464,7 +4473,7 @@
   "name":"jakarta.servlet.Filter",
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
-  "methods":[{"name":"<init>","parameterTypes":["org.springframework.security.web.FilterChainProxy"] }, {"name":"<init>","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2163/0x00007f86b8bdc8f0"] }, {"name":"<init>","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2167/0x00007feb74bdda30"] }, {"name":"from","parameterTypes":["org.springframework.security.web.FilterChainProxy"] }, {"name":"from","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2163/0x00007f86b8bdc8f0"] }, {"name":"from","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2167/0x00007feb74bdda30"] }, {"name":"of","parameterTypes":["org.springframework.security.web.FilterChainProxy"] }, {"name":"of","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2163/0x00007f86b8bdc8f0"] }, {"name":"of","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2167/0x00007feb74bdda30"] }, {"name":"valueOf","parameterTypes":["org.springframework.security.web.FilterChainProxy"] }, {"name":"valueOf","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2163/0x00007f86b8bdc8f0"] }, {"name":"valueOf","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2167/0x00007feb74bdda30"] }]
+  "methods":[{"name":"<init>","parameterTypes":["org.springframework.security.web.FilterChainProxy"] }, {"name":"<init>","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2159/0x00007f684cbdae18"] }, {"name":"<init>","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2163/0x00007f3e7cbdfcc8"] }, {"name":"from","parameterTypes":["org.springframework.security.web.FilterChainProxy"] }, {"name":"from","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2159/0x00007f684cbdae18"] }, {"name":"from","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2163/0x00007f3e7cbdfcc8"] }, {"name":"of","parameterTypes":["org.springframework.security.web.FilterChainProxy"] }, {"name":"of","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2159/0x00007f684cbdae18"] }, {"name":"of","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2163/0x00007f3e7cbdfcc8"] }, {"name":"valueOf","parameterTypes":["org.springframework.security.web.FilterChainProxy"] }, {"name":"valueOf","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2159/0x00007f684cbdae18"] }, {"name":"valueOf","parameterTypes":["org.springframework.web.servlet.handler.HandlerMappingIntrospector$$Lambda$2163/0x00007f3e7cbdfcc8"] }]
 },
 {
   "name":"jakarta.servlet.FilterChain"
@@ -4637,6 +4646,9 @@
 },
 {
   "name":"java.io.File"
+},
+{
+  "name":"java.io.FileInputStream"
 },
 {
   "name":"java.io.FilePermission"
@@ -5351,7 +5363,10 @@
   "name":"java.util.Comparator"
 },
 {
-  "name":"java.util.Date"
+  "name":"java.util.Date",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
 },
 {
   "name":"java.util.Deque"
@@ -5620,6 +5635,9 @@
   "name":"javax.inject.Named"
 },
 {
+  "name":"javax.inject.Qualifier"
+},
+{
   "name":"javax.management.MBeanOperationInfo",
   "queryAllPublicMethods":true,
   "methods":[{"name":"getSignature","parameterTypes":[] }]
@@ -5722,7 +5740,7 @@
   "name":"jdk.internal.reflect.DelegatingMethodAccessorImpl"
 },
 {
-  "name":"jdk.internal.reflect.GeneratedMethodAccessor58"
+  "name":"jdk.internal.reflect.GeneratedMethodAccessor57"
 },
 {
   "name":"jdk.internal.reflect.NativeMethodAccessorImpl"
@@ -6155,12 +6173,33 @@
   "name":"org.apache.catalina.Valve"
 },
 {
+  "name":"org.apache.catalina.authenticator.AuthenticatorBase"
+},
+{
   "name":"org.apache.catalina.connector.Connector"
+},
+{
+  "name":"org.apache.catalina.connector.CoyoteAdapter"
 },
 {
   "name":"org.apache.catalina.core.ApplicationContextFacade",
   "queryAllDeclaredMethods":true,
   "methods":[{"name":"addFilter","parameterTypes":["java.lang.String","jakarta.servlet.Filter"] }, {"name":"addFilter","parameterTypes":["java.lang.String","java.lang.Class"] }, {"name":"addFilter","parameterTypes":["java.lang.String","java.lang.String"] }, {"name":"addJspFile","parameterTypes":["java.lang.String","java.lang.String"] }, {"name":"addListener","parameterTypes":["java.lang.Class"] }, {"name":"addListener","parameterTypes":["java.lang.String"] }, {"name":"addListener","parameterTypes":["java.util.EventListener"] }, {"name":"addServlet","parameterTypes":["java.lang.String","jakarta.servlet.Servlet"] }, {"name":"addServlet","parameterTypes":["java.lang.String","java.lang.Class"] }, {"name":"addServlet","parameterTypes":["java.lang.String","java.lang.String"] }, {"name":"createFilter","parameterTypes":["java.lang.Class"] }, {"name":"createListener","parameterTypes":["java.lang.Class"] }, {"name":"createServlet","parameterTypes":["java.lang.Class"] }, {"name":"declareRoles","parameterTypes":["java.lang.String[]"] }, {"name":"getAttribute","parameterTypes":["java.lang.String"] }, {"name":"getAttributeNames","parameterTypes":[] }, {"name":"getClassLoader","parameterTypes":[] }, {"name":"getContext","parameterTypes":["java.lang.String"] }, {"name":"getContextPath","parameterTypes":[] }, {"name":"getDefaultSessionTrackingModes","parameterTypes":[] }, {"name":"getEffectiveMajorVersion","parameterTypes":[] }, {"name":"getEffectiveMinorVersion","parameterTypes":[] }, {"name":"getEffectiveSessionTrackingModes","parameterTypes":[] }, {"name":"getFilterRegistration","parameterTypes":["java.lang.String"] }, {"name":"getFilterRegistrations","parameterTypes":[] }, {"name":"getInitParameter","parameterTypes":["java.lang.String"] }, {"name":"getInitParameterNames","parameterTypes":[] }, {"name":"getJspConfigDescriptor","parameterTypes":[] }, {"name":"getMajorVersion","parameterTypes":[] }, {"name":"getMimeType","parameterTypes":["java.lang.String"] }, {"name":"getMinorVersion","parameterTypes":[] }, {"name":"getNamedDispatcher","parameterTypes":["java.lang.String"] }, {"name":"getRealPath","parameterTypes":["java.lang.String"] }, {"name":"getRequestCharacterEncoding","parameterTypes":[] }, {"name":"getRequestDispatcher","parameterTypes":["java.lang.String"] }, {"name":"getResource","parameterTypes":["java.lang.String"] }, {"name":"getResourceAsStream","parameterTypes":["java.lang.String"] }, {"name":"getResourcePaths","parameterTypes":["java.lang.String"] }, {"name":"getResponseCharacterEncoding","parameterTypes":[] }, {"name":"getServerInfo","parameterTypes":[] }, {"name":"getServletContextName","parameterTypes":[] }, {"name":"getServletRegistration","parameterTypes":["java.lang.String"] }, {"name":"getServletRegistrations","parameterTypes":[] }, {"name":"getSessionCookieConfig","parameterTypes":[] }, {"name":"getSessionTimeout","parameterTypes":[] }, {"name":"getVirtualServerName","parameterTypes":[] }, {"name":"log","parameterTypes":["java.lang.String"] }, {"name":"log","parameterTypes":["java.lang.String","java.lang.Throwable"] }, {"name":"removeAttribute","parameterTypes":["java.lang.String"] }, {"name":"setAttribute","parameterTypes":["java.lang.String","java.lang.Object"] }, {"name":"setInitParameter","parameterTypes":["java.lang.String","java.lang.String"] }, {"name":"setRequestCharacterEncoding","parameterTypes":["java.lang.String"] }, {"name":"setResponseCharacterEncoding","parameterTypes":["java.lang.String"] }, {"name":"setSessionTimeout","parameterTypes":["int"] }, {"name":"setSessionTrackingModes","parameterTypes":["java.util.Set"] }]
+},
+{
+  "name":"org.apache.catalina.core.ApplicationFilterChain"
+},
+{
+  "name":"org.apache.catalina.core.StandardContextValve"
+},
+{
+  "name":"org.apache.catalina.core.StandardEngineValve"
+},
+{
+  "name":"org.apache.catalina.core.StandardHostValve"
+},
+{
+  "name":"org.apache.catalina.core.StandardWrapperValve"
 },
 {
   "name":"org.apache.catalina.loader.JdbcLeakPrevention",
@@ -6177,14 +6216,23 @@
   "name":"org.apache.catalina.valves.AccessLogValve"
 },
 {
+  "name":"org.apache.catalina.valves.ErrorReportValve"
+},
+{
   "name":"org.apache.commons.dbcp2.BasicDataSource"
 },
 {
   "name":"org.apache.commons.logging.Log"
 },
 {
+  "name":"org.apache.coyote.AbstractProcessorLight"
+},
+{
   "name":"org.apache.coyote.AbstractProtocol",
   "methods":[{"name":"getAddress","parameterTypes":[] }, {"name":"getLocalPort","parameterTypes":[] }, {"name":"getProperty","parameterTypes":["java.lang.String"] }, {"name":"setPort","parameterTypes":["int"] }, {"name":"setProperty","parameterTypes":["java.lang.String","java.lang.String"] }]
+},
+{
+  "name":"org.apache.coyote.AbstractProtocol$ConnectionHandler"
 },
 {
   "name":"org.apache.coyote.ProtocolHandler"
@@ -6199,6 +6247,9 @@
 {
   "name":"org.apache.coyote.http11.Http11NioProtocol",
   "queryAllPublicMethods":true
+},
+{
+  "name":"org.apache.coyote.http11.Http11Processor"
 },
 {
   "name":"org.apache.hc.client5.http.impl.async.HttpAsyncClients"
@@ -6243,6 +6294,21 @@
 {
   "name":"org.apache.tomcat.util.net.NioEndpoint",
   "queryAllPublicMethods":true
+},
+{
+  "name":"org.apache.tomcat.util.net.NioEndpoint$SocketProcessor"
+},
+{
+  "name":"org.apache.tomcat.util.net.SocketProcessorBase"
+},
+{
+  "name":"org.apache.tomcat.util.threads.TaskThread$WrappingRunnable"
+},
+{
+  "name":"org.apache.tomcat.util.threads.ThreadPoolExecutor"
+},
+{
+  "name":"org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker"
 },
 {
   "name":"org.apache.tomcat.websocket.server.WsFilter",
@@ -6452,7 +6518,7 @@
 {
   "name":"org.gradle.internal.logging.services.LoggingServiceRegistry",
   "queryAllDeclaredMethods":true,
-  "methods":[{"name":"createLoggingManagerFactory","parameterTypes":[] }, {"name":"createOutputEventListenerManager","parameterTypes":[] }, {"name":"createTimeProvider","parameterTypes":[] }]
+  "methods":[{"name":"createLoggingManagerFactory","parameterTypes":["org.gradle.internal.time.Clock"] }, {"name":"createTimeProvider","parameterTypes":[] }]
 },
 {
   "name":"org.gradle.internal.logging.services.LoggingServiceRegistry$CommandLineLogging",
@@ -6461,7 +6527,7 @@
 {
   "name":"org.gradle.internal.nativeintegration.filesystem.services.FileSystemServices",
   "queryAllDeclaredMethods":true,
-  "methods":[{"name":"configure","parameterTypes":["org.gradle.internal.service.ServiceRegistration"] }, {"name":"createFileCanonicalizer","parameterTypes":[] }, {"name":"createFileSystem","parameterTypes":["org.gradle.internal.nativeintegration.filesystem.services.GenericFileSystem$Factory","org.gradle.internal.os.OperatingSystem","net.rubygrapefruit.platform.file.PosixFiles","org.gradle.internal.nativeintegration.filesystem.FileMetadataAccessor","org.gradle.api.internal.file.temp.TemporaryFileProvider"] }]
+  "methods":[{"name":"configure","parameterTypes":["org.gradle.internal.service.ServiceRegistration"] }]
 },
 {
   "name":"org.gradle.internal.nativeintegration.filesystem.services.GenericFileSystem$Factory",
@@ -6469,7 +6535,13 @@
 },
 {
   "name":"org.gradle.internal.nativeintegration.services.NativeServices",
-  "queryAllDeclaredMethods":true
+  "queryAllDeclaredMethods":true,
+  "methods":[{"name":"createNativeCapabilities","parameterTypes":[] }, {"name":"createSystemInfo","parameterTypes":["org.gradle.internal.os.OperatingSystem"] }]
+},
+{
+  "name":"org.gradle.internal.nativeintegration.services.NativeServices$1",
+  "queryAllDeclaredMethods":true,
+  "methods":[{"name":"configure","parameterTypes":["org.gradle.internal.service.ServiceRegistration"] }]
 },
 {
   "name":"org.gradle.internal.remote.services.MessagingServices",
@@ -6485,14 +6557,14 @@
   "methods":[{"name":"<init>","parameterTypes":["java.io.DataInputStream"] }]
 },
 {
-  "name":"org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker$WorkerServices",
+  "name":"org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker$2",
   "queryAllDeclaredMethods":true,
-  "methods":[{"name":"createWorkerDirectoryProvider","parameterTypes":["org.gradle.initialization.GradleUserHomeDirProvider"] }]
+  "methods":[{"name":"configure","parameterTypes":["org.gradle.internal.service.ServiceRegistration"] }]
 },
 {
-  "name":"org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker$WorkerServices$1",
+  "name":"org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker$WorkerServices",
   "queryAllDeclaredMethods":true,
-  "methods":[{"name":"createGradleUserHomeDirProvider","parameterTypes":[] }]
+  "methods":[{"name":"createGradleUserHomeDirProvider","parameterTypes":[] }, {"name":"createWorkerDirectoryProvider","parameterTypes":["org.gradle.initialization.GradleUserHomeDirProvider"] }, {"name":"createWorkerLogEventListener","parameterTypes":[] }]
 },
 {
   "name":"org.h2.Driver"
@@ -7095,7 +7167,7 @@
   "name":"org.mockito.MockSettings"
 },
 {
-  "name":"org.mockito.codegen.BasicFileAttributes$MockitoMock$r2aSbhrO",
+  "name":"org.mockito.codegen.BasicFileAttributes$MockitoMock$m7hb4wy8",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -7206,7 +7278,7 @@
   "queryAllDeclaredConstructors":true
 },
 {
-  "name":"org.mockito.internal.util.reflection.InstrumentationMemberAccessor$Dispatcher$ByteBuddy$zFtBQLBl",
+  "name":"org.mockito.internal.util.reflection.InstrumentationMemberAccessor$Dispatcher$ByteBuddy$9O3iNJ10",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
@@ -11848,7 +11920,7 @@
   "name":"org.springframework.boot.autoconfigure.web.servlet.error.BasicErrorController",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
-  "methods":[{"name":"close","parameterTypes":[] }, {"name":"shutdown","parameterTypes":[] }]
+  "methods":[{"name":"close","parameterTypes":[] }, {"name":"error","parameterTypes":["jakarta.servlet.http.HttpServletRequest"] }, {"name":"shutdown","parameterTypes":[] }]
 },
 {
   "name":"org.springframework.boot.autoconfigure.web.servlet.error.DefaultErrorViewResolver",
@@ -13399,7 +13471,7 @@
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"deleteAllByIdInBatch","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteAllInBatch","parameterTypes":[] }, {"name":"deleteAllInBatch","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteInBatch","parameterTypes":["java.lang.Iterable"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Example","org.springframework.data.domain.Sort"] }, {"name":"flush","parameterTypes":[] }, {"name":"getById","parameterTypes":["java.lang.Object"] }, {"name":"getOne","parameterTypes":["java.lang.Object"] }, {"name":"getReferenceById","parameterTypes":["java.lang.Object"] }, {"name":"saveAllAndFlush","parameterTypes":["java.lang.Iterable"] }, {"name":"saveAndFlush","parameterTypes":["java.lang.Object"] }]
+  "methods":[{"name":"deleteAllByIdInBatch","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteAllInBatch","parameterTypes":[] }, {"name":"deleteAllInBatch","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteInBatch","parameterTypes":["java.lang.Iterable"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Example","org.springframework.data.domain.Sort"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Sort"] }, {"name":"flush","parameterTypes":[] }, {"name":"getById","parameterTypes":["java.lang.Object"] }, {"name":"getOne","parameterTypes":["java.lang.Object"] }, {"name":"getReferenceById","parameterTypes":["java.lang.Object"] }, {"name":"saveAllAndFlush","parameterTypes":["java.lang.Iterable"] }, {"name":"saveAndFlush","parameterTypes":["java.lang.Object"] }]
 },
 {
   "name":"org.springframework.data.jpa.repository.JpaSpecificationExecutor",
@@ -13486,14 +13558,15 @@
 {
   "name":"org.springframework.data.jpa.repository.support.JpaRepositoryImplementation",
   "queryAllDeclaredMethods":true,
-  "queryAllPublicMethods":true
+  "queryAllPublicMethods":true,
+  "methods":[{"name":"findAll","parameterTypes":["org.springframework.data.domain.Sort"] }]
 },
 {
   "name":"org.springframework.data.jpa.repository.support.SimpleJpaRepository",
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":["org.springframework.data.jpa.repository.support.JpaEntityInformation","jakarta.persistence.EntityManager"] }, {"name":"count","parameterTypes":[] }, {"name":"count","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"count","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"delete","parameterTypes":["java.lang.Object"] }, {"name":"delete","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"deleteAll","parameterTypes":[] }, {"name":"deleteAll","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteAllById","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteAllByIdInBatch","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteAllInBatch","parameterTypes":[] }, {"name":"deleteAllInBatch","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteById","parameterTypes":["java.lang.Object"] }, {"name":"exists","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"exists","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"existsById","parameterTypes":["java.lang.Object"] }, {"name":"findAll","parameterTypes":[] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Example","org.springframework.data.domain.Pageable"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Example","org.springframework.data.domain.Sort"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Pageable"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Sort"] }, {"name":"findAll","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"findAll","parameterTypes":["org.springframework.data.jpa.domain.Specification","org.springframework.data.domain.Pageable"] }, {"name":"findAll","parameterTypes":["org.springframework.data.jpa.domain.Specification","org.springframework.data.domain.Sort"] }, {"name":"findAllById","parameterTypes":["java.lang.Iterable"] }, {"name":"findBy","parameterTypes":["org.springframework.data.domain.Example","java.util.function.Function"] }, {"name":"findBy","parameterTypes":["org.springframework.data.jpa.domain.Specification","java.util.function.Function"] }, {"name":"findByDirectoryEntity","parameterTypes":["app.ister.server.entitiy.DirectoryEntity"] }, {"name":"findByDirectoryEntityAndPath","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.lang.String"] }, {"name":"findByDirectoryTypeAndNodeEntity","parameterTypes":["app.ister.server.enums.DirectoryType","app.ister.server.entitiy.NodeEntity"] }, {"name":"findByExternalId","parameterTypes":["java.lang.String"] }, {"name":"findById","parameterTypes":["java.lang.Object"] }, {"name":"findByLibraryEntityAndNameAndReleaseYear","parameterTypes":["app.ister.server.entitiy.LibraryEntity","java.lang.String","int"] }, {"name":"findByName","parameterTypes":["java.lang.String"] }, {"name":"findByShowEntityAndNumber","parameterTypes":["app.ister.server.entitiy.ShowEntity","int"] }, {"name":"findByShowEntityAndSeasonEntityAndNumber","parameterTypes":["app.ister.server.entitiy.ShowEntity","app.ister.server.entitiy.SeasonEntity","int"] }, {"name":"findByShowEntityId","parameterTypes":["java.util.UUID"] }, {"name":"findByShowEntityId","parameterTypes":["java.util.UUID","org.springframework.data.domain.Sort"] }, {"name":"findByUserEntityAndPlayQueueItemIdAndEpisodeEntity","parameterTypes":["app.ister.server.entitiy.UserEntity","java.util.UUID","app.ister.server.entitiy.EpisodeEntity"] }, {"name":"findByUserEntityExternalIdAndEpisodeEntity","parameterTypes":["java.lang.String","app.ister.server.entitiy.EpisodeEntity","org.springframework.data.domain.Sort"] }, {"name":"findIdsOnlyByShowEntityId","parameterTypes":["java.util.UUID","org.springframework.data.domain.Sort"] }, {"name":"findOne","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"findOne","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"findRecentEpisodesAndShowIdsByUserId","parameterTypes":["java.util.UUID"] }, {"name":"flush","parameterTypes":[] }, {"name":"getById","parameterTypes":["java.lang.Object"] }, {"name":"getOne","parameterTypes":["java.lang.Object"] }, {"name":"getReferenceById","parameterTypes":["java.lang.Object"] }, {"name":"save","parameterTypes":["java.lang.Object"] }, {"name":"saveAll","parameterTypes":["java.lang.Iterable"] }, {"name":"saveAllAndFlush","parameterTypes":["java.lang.Iterable"] }, {"name":"saveAndFlush","parameterTypes":["java.lang.Object"] }, {"name":"setEscapeCharacter","parameterTypes":["org.springframework.data.jpa.repository.query.EscapeCharacter"] }, {"name":"setProjectionFactory","parameterTypes":["org.springframework.data.projection.ProjectionFactory"] }, {"name":"setRepositoryMethodMetadata","parameterTypes":["org.springframework.data.jpa.repository.support.CrudMethodMetadata"] }]
+  "methods":[{"name":"<init>","parameterTypes":["org.springframework.data.jpa.repository.support.JpaEntityInformation","jakarta.persistence.EntityManager"] }, {"name":"count","parameterTypes":[] }, {"name":"count","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"count","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"delete","parameterTypes":["java.lang.Object"] }, {"name":"delete","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"deleteAll","parameterTypes":[] }, {"name":"deleteAll","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteAllById","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteAllByIdInBatch","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteAllInBatch","parameterTypes":[] }, {"name":"deleteAllInBatch","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteById","parameterTypes":["java.lang.Object"] }, {"name":"exists","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"exists","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"existsById","parameterTypes":["java.lang.Object"] }, {"name":"findAll","parameterTypes":[] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Example","org.springframework.data.domain.Pageable"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Example","org.springframework.data.domain.Sort"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Pageable"] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Sort"] }, {"name":"findAll","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"findAll","parameterTypes":["org.springframework.data.jpa.domain.Specification","org.springframework.data.domain.Pageable"] }, {"name":"findAll","parameterTypes":["org.springframework.data.jpa.domain.Specification","org.springframework.data.domain.Sort"] }, {"name":"findAllById","parameterTypes":["java.lang.Iterable"] }, {"name":"findBy","parameterTypes":["org.springframework.data.domain.Example","java.util.function.Function"] }, {"name":"findBy","parameterTypes":["org.springframework.data.jpa.domain.Specification","java.util.function.Function"] }, {"name":"findByDirectoryEntity","parameterTypes":["app.ister.server.entitiy.DirectoryEntity"] }, {"name":"findByDirectoryEntityAndPath","parameterTypes":["app.ister.server.entitiy.DirectoryEntity","java.lang.String"] }, {"name":"findByDirectoryTypeAndNodeEntity","parameterTypes":["app.ister.server.enums.DirectoryType","app.ister.server.entitiy.NodeEntity"] }, {"name":"findByExternalId","parameterTypes":["java.lang.String"] }, {"name":"findById","parameterTypes":["java.lang.Object"] }, {"name":"findByLibraryEntityAndNameAndReleaseYear","parameterTypes":["app.ister.server.entitiy.LibraryEntity","java.lang.String","int"] }, {"name":"findByName","parameterTypes":["java.lang.String"] }, {"name":"findByShowEntityAndNumber","parameterTypes":["app.ister.server.entitiy.ShowEntity","int"] }, {"name":"findByShowEntityAndSeasonEntityAndNumber","parameterTypes":["app.ister.server.entitiy.ShowEntity","app.ister.server.entitiy.SeasonEntity","int"] }, {"name":"findByShowEntityId","parameterTypes":["java.util.UUID"] }, {"name":"findByShowEntityId","parameterTypes":["java.util.UUID","org.springframework.data.domain.Sort"] }, {"name":"findByUserEntityAndPlayQueueItemIdAndEpisodeEntity","parameterTypes":["app.ister.server.entitiy.UserEntity","java.util.UUID","app.ister.server.entitiy.EpisodeEntity"] }, {"name":"findByUserEntityExternalIdAndEpisodeEntity","parameterTypes":["java.lang.String","app.ister.server.entitiy.EpisodeEntity","org.springframework.data.domain.Sort"] }, {"name":"findByUserEntityExternalIdAndMovieEntity","parameterTypes":["java.lang.String","app.ister.server.entitiy.MovieEntity","org.springframework.data.domain.Sort"] }, {"name":"findIdsOnlyByShowEntityId","parameterTypes":["java.util.UUID","org.springframework.data.domain.Sort"] }, {"name":"findOne","parameterTypes":["org.springframework.data.domain.Example"] }, {"name":"findOne","parameterTypes":["org.springframework.data.jpa.domain.Specification"] }, {"name":"findRecentEpisodesAndShowIdsByUserId","parameterTypes":["java.util.UUID"] }, {"name":"flush","parameterTypes":[] }, {"name":"getById","parameterTypes":["java.lang.Object"] }, {"name":"getOne","parameterTypes":["java.lang.Object"] }, {"name":"getReferenceById","parameterTypes":["java.lang.Object"] }, {"name":"save","parameterTypes":["java.lang.Object"] }, {"name":"saveAll","parameterTypes":["java.lang.Iterable"] }, {"name":"saveAllAndFlush","parameterTypes":["java.lang.Iterable"] }, {"name":"saveAndFlush","parameterTypes":["java.lang.Object"] }, {"name":"setEscapeCharacter","parameterTypes":["org.springframework.data.jpa.repository.query.EscapeCharacter"] }, {"name":"setProjectionFactory","parameterTypes":["org.springframework.data.projection.ProjectionFactory"] }, {"name":"setRepositoryMethodMetadata","parameterTypes":["org.springframework.data.jpa.repository.support.CrudMethodMetadata"] }]
 },
 {
   "name":"org.springframework.data.jpa.util.HibernateProxyDetector",
@@ -13603,7 +13676,7 @@
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"count","parameterTypes":[] }, {"name":"delete","parameterTypes":["java.lang.Object"] }, {"name":"deleteAll","parameterTypes":[] }, {"name":"deleteAll","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteAllById","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteById","parameterTypes":["java.lang.Object"] }, {"name":"existsById","parameterTypes":["java.lang.Object"] }, {"name":"findAll","parameterTypes":[] }, {"name":"findAllById","parameterTypes":["java.lang.Iterable"] }, {"name":"findById","parameterTypes":["java.lang.Object"] }, {"name":"save","parameterTypes":["java.lang.Object"] }, {"name":"saveAll","parameterTypes":["java.lang.Iterable"] }]
+  "methods":[{"name":"count","parameterTypes":[] }, {"name":"delete","parameterTypes":["java.lang.Object"] }, {"name":"deleteAll","parameterTypes":[] }, {"name":"deleteAll","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteAllById","parameterTypes":["java.lang.Iterable"] }, {"name":"deleteById","parameterTypes":["java.lang.Object"] }, {"name":"existsById","parameterTypes":["java.lang.Object"] }, {"name":"findAll","parameterTypes":[] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Sort"] }, {"name":"findAllById","parameterTypes":["java.lang.Iterable"] }, {"name":"findById","parameterTypes":["java.lang.Object"] }, {"name":"save","parameterTypes":["java.lang.Object"] }, {"name":"saveAll","parameterTypes":["java.lang.Iterable"] }]
 },
 {
   "name":"org.springframework.data.repository.ListCrudRepository",
@@ -13612,7 +13685,7 @@
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"findAll","parameterTypes":[] }, {"name":"findAllById","parameterTypes":["java.lang.Iterable"] }, {"name":"saveAll","parameterTypes":["java.lang.Iterable"] }]
+  "methods":[{"name":"findAll","parameterTypes":[] }, {"name":"findAll","parameterTypes":["org.springframework.data.domain.Sort"] }, {"name":"findAllById","parameterTypes":["java.lang.Iterable"] }, {"name":"saveAll","parameterTypes":["java.lang.Iterable"] }]
 },
 {
   "name":"org.springframework.data.repository.ListPagingAndSortingRepository",
@@ -13642,7 +13715,8 @@
   "allDeclaredClasses":true,
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true,
-  "queryAllDeclaredConstructors":true
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"findAll","parameterTypes":["org.springframework.data.domain.Sort"] }]
 },
 {
   "name":"org.springframework.data.repository.config.AotRepositoryContext"
@@ -14937,7 +15011,8 @@
 {
   "name":"org.springframework.security.authorization.method.AuthorizationAdvisor",
   "queryAllDeclaredMethods":true,
-  "queryAllPublicMethods":true
+  "queryAllPublicMethods":true,
+  "methods":[{"name":"<init>","parameterTypes":["org.springframework.security.authorization.method.AuthorizeReturnObjectMethodInterceptor"] }, {"name":"<init>","parameterTypes":["org.springframework.security.config.annotation.method.configuration.DeferringMethodInterceptor"] }, {"name":"from","parameterTypes":["org.springframework.security.authorization.method.AuthorizeReturnObjectMethodInterceptor"] }, {"name":"from","parameterTypes":["org.springframework.security.config.annotation.method.configuration.DeferringMethodInterceptor"] }, {"name":"of","parameterTypes":["org.springframework.security.authorization.method.AuthorizeReturnObjectMethodInterceptor"] }, {"name":"of","parameterTypes":["org.springframework.security.config.annotation.method.configuration.DeferringMethodInterceptor"] }, {"name":"valueOf","parameterTypes":["org.springframework.security.authorization.method.AuthorizeReturnObjectMethodInterceptor"] }, {"name":"valueOf","parameterTypes":["org.springframework.security.config.annotation.method.configuration.DeferringMethodInterceptor"] }]
 },
 {
   "name":"org.springframework.security.authorization.method.AuthorizationAdvisorProxyFactory",
@@ -14949,16 +15024,10 @@
   "name":"org.springframework.security.authorization.method.AuthorizationAdvisorProxyFactory$TargetVisitor"
 },
 {
-  "name":"org.springframework.security.authorization.method.AuthorizationManagerBeforeMethodInterceptor",
-  "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true,
-  "methods":[{"name":"close","parameterTypes":[] }, {"name":"shutdown","parameterTypes":[] }]
-},
-{
   "name":"org.springframework.security.authorization.method.AuthorizeReturnObjectMethodInterceptor",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
-  "methods":[{"name":"close","parameterTypes":[] }, {"name":"shutdown","parameterTypes":[] }]
+  "methods":[{"name":"close","parameterTypes":[] }, {"name":"shutdown","parameterTypes":[] }, {"name":"toAuthorizationAdvisor","parameterTypes":[] }]
 },
 {
   "name":"org.springframework.security.config.Customizer"
@@ -15086,6 +15155,12 @@
   "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"authorizationProxyFactory","parameterTypes":["org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider"] }, {"name":"authorizeReturnObjectMethodInterceptor","parameterTypes":["org.springframework.beans.factory.ObjectProvider","org.springframework.security.authorization.method.AuthorizationAdvisorProxyFactory"] }]
 },
 {
+  "name":"org.springframework.security.config.annotation.method.configuration.DeferringMethodInterceptor",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "methods":[{"name":"close","parameterTypes":[] }, {"name":"shutdown","parameterTypes":[] }, {"name":"toAuthorizationAdvisor","parameterTypes":[] }]
+},
+{
   "name":"org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity",
   "queryAllDeclaredMethods":true
 },
@@ -15093,6 +15168,12 @@
   "name":"org.springframework.security.config.annotation.method.configuration.MethodSecurityAdvisorRegistrar",
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"org.springframework.security.config.annotation.method.configuration.MethodSecurityAdvisorRegistrar$AdvisorWrapper",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "methods":[{"name":"of","parameterTypes":["org.springframework.security.authorization.method.AuthorizationAdvisor"] }]
 },
 {
   "name":"org.springframework.security.config.annotation.method.configuration.MethodSecuritySelector",
@@ -15103,21 +15184,17 @@
   "name":"org.springframework.security.config.annotation.method.configuration.PrePostMethodSecurityConfiguration",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
+  "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"postAuthorizeAuthorizationMethodInterceptor","parameterTypes":["org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.security.config.annotation.method.configuration.PrePostMethodSecurityConfiguration","org.springframework.context.ApplicationContext"] }, {"name":"postFilterAuthorizationMethodInterceptor","parameterTypes":["org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.security.config.annotation.method.configuration.PrePostMethodSecurityConfiguration","org.springframework.context.ApplicationContext"] }, {"name":"preAuthorizeAuthorizationMethodInterceptor","parameterTypes":["org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.security.config.annotation.method.configuration.PrePostMethodSecurityConfiguration","org.springframework.context.ApplicationContext"] }, {"name":"preFilterAuthorizationMethodInterceptor","parameterTypes":["org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.security.config.annotation.method.configuration.PrePostMethodSecurityConfiguration","org.springframework.context.ApplicationContext"] }, {"name":"setImportMetadata","parameterTypes":["org.springframework.core.type.AnnotationMetadata"] }]
-},
-{
-  "name":"org.springframework.security.config.annotation.method.configuration.PrePostMethodSecurityConfiguration$DeferringMethodInterceptor",
-  "allDeclaredFields":true,
-  "queryAllDeclaredMethods":true,
-  "methods":[{"name":"close","parameterTypes":[] }, {"name":"shutdown","parameterTypes":[] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"postAuthorizeAuthorizationMethodInterceptor","parameterTypes":["org.springframework.beans.factory.ObjectProvider"] }, {"name":"postFilterAuthorizationMethodInterceptor","parameterTypes":["org.springframework.beans.factory.ObjectProvider"] }, {"name":"preAuthorizeAuthorizationMethodInterceptor","parameterTypes":["org.springframework.beans.factory.ObjectProvider"] }, {"name":"preFilterAuthorizationMethodInterceptor","parameterTypes":["org.springframework.beans.factory.ObjectProvider"] }, {"name":"setApplicationContext","parameterTypes":["org.springframework.context.ApplicationContext"] }, {"name":"setImportMetadata","parameterTypes":["org.springframework.core.type.AnnotationMetadata"] }, {"name":"setObservationRegistry","parameterTypes":["io.micrometer.observation.ObservationRegistry"] }]
 },
 {
   "name":"org.springframework.security.config.annotation.method.configuration.SecuredMethodSecurityConfiguration",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
+  "queryAllPublicMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"securedAuthorizationMethodInterceptor","parameterTypes":["org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.beans.factory.ObjectProvider","org.springframework.security.config.annotation.method.configuration.SecuredMethodSecurityConfiguration"] }, {"name":"setImportMetadata","parameterTypes":["org.springframework.core.type.AnnotationMetadata"] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"securedAuthorizationMethodInterceptor","parameterTypes":["org.springframework.beans.factory.ObjectProvider"] }, {"name":"setImportMetadata","parameterTypes":["org.springframework.core.type.AnnotationMetadata"] }, {"name":"setObservationRegistry","parameterTypes":["io.micrometer.observation.ObservationRegistry"] }]
 },
 {
   "name":"org.springframework.security.config.annotation.web.HttpSecurityBuilder",
@@ -15445,6 +15522,21 @@
   "name":"org.springframework.security.web.FilterChainProxy$FilterChainValidator"
 },
 {
+  "name":"org.springframework.security.web.ObservationFilterChainDecorator"
+},
+{
+  "name":"org.springframework.security.web.ObservationFilterChainDecorator$AroundFilterObservation$SimpleAroundFilterObservation"
+},
+{
+  "name":"org.springframework.security.web.ObservationFilterChainDecorator$FilterObservation$SimpleFilterObservation"
+},
+{
+  "name":"org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter"
+},
+{
+  "name":"org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain"
+},
+{
   "name":"org.springframework.security.web.SecurityFilterChain",
   "queryAllDeclaredMethods":true,
   "queryAllPublicMethods":true
@@ -15501,6 +15593,9 @@
 },
 {
   "name":"org.springframework.security.web.access.intercept.RequestMatcherDelegatingAuthorizationManager$Builder"
+},
+{
+  "name":"org.springframework.security.web.authentication.AnonymousAuthenticationFilter"
 },
 {
   "name":"org.springframework.security.web.authentication.AuthenticationFailureHandler"
@@ -15560,6 +15655,9 @@
   "name":"org.springframework.security.web.context.SecurityContextRepository"
 },
 {
+  "name":"org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter"
+},
+{
   "name":"org.springframework.security.web.firewall.FirewalledRequest"
 },
 {
@@ -15602,6 +15700,9 @@
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "methods":[{"name":"afterPropertiesSet","parameterTypes":[] }, {"name":"doFilter","parameterTypes":["jakarta.servlet.ServletRequest","jakarta.servlet.ServletResponse","jakarta.servlet.FilterChain"] }]
+},
+{
+  "name":"org.springframework.security.web.session.DisableEncodeUrlFilter"
 },
 {
   "name":"org.springframework.security.web.session.InvalidSessionStrategy"
@@ -16168,6 +16269,15 @@
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "methods":[{"name":"getEncoding","parameterTypes":[] }, {"name":"isForceRequestEncoding","parameterTypes":[] }, {"name":"isForceResponseEncoding","parameterTypes":[] }, {"name":"setEncoding","parameterTypes":["java.lang.String"] }, {"name":"setForceEncoding","parameterTypes":["boolean"] }, {"name":"setForceRequestEncoding","parameterTypes":["boolean"] }, {"name":"setForceResponseEncoding","parameterTypes":["boolean"] }]
+},
+{
+  "name":"org.springframework.web.filter.CompositeFilter"
+},
+{
+  "name":"org.springframework.web.filter.CompositeFilter$VirtualFilterChain"
+},
+{
+  "name":"org.springframework.web.filter.CorsFilter"
 },
 {
   "name":"org.springframework.web.filter.DelegatingFilterProxy",
@@ -16865,7 +16975,7 @@
 {
   "name":"sun.misc.Unsafe",
   "fields":[{"name":"theUnsafe"}],
-  "methods":[{"name":"addressSize","parameterTypes":[] }, {"name":"allocateInstance","parameterTypes":["java.lang.Class"] }, {"name":"allocateMemory","parameterTypes":["long"] }, {"name":"arrayBaseOffset","parameterTypes":["java.lang.Class"] }, {"name":"arrayIndexScale","parameterTypes":["java.lang.Class"] }, {"name":"copyMemory","parameterTypes":["java.lang.Object","long","java.lang.Object","long","long"] }, {"name":"defineClass","parameterTypes":["java.lang.String","byte[]","int","int","java.lang.ClassLoader","java.security.ProtectionDomain"] }, {"name":"freeMemory","parameterTypes":["long"] }, {"name":"getBoolean","parameterTypes":["java.lang.Object","long"] }, {"name":"getByte","parameterTypes":["long"] }, {"name":"getByte","parameterTypes":["java.lang.Object","long"] }, {"name":"getInt","parameterTypes":["long"] }, {"name":"getInt","parameterTypes":["java.lang.Object","long"] }, {"name":"getLong","parameterTypes":["long"] }, {"name":"getLong","parameterTypes":["java.lang.Object","long"] }, {"name":"invokeCleaner","parameterTypes":["java.nio.ByteBuffer"] }, {"name":"objectFieldOffset","parameterTypes":["java.lang.reflect.Field"] }, {"name":"putBoolean","parameterTypes":["java.lang.Object","long","boolean"] }, {"name":"putByte","parameterTypes":["long","byte"] }, {"name":"putByte","parameterTypes":["java.lang.Object","long","byte"] }, {"name":"putInt","parameterTypes":["long","int"] }, {"name":"putInt","parameterTypes":["java.lang.Object","long","int"] }, {"name":"putLong","parameterTypes":["long","long"] }, {"name":"putLong","parameterTypes":["java.lang.Object","long","long"] }, {"name":"reallocateMemory","parameterTypes":["long","long"] }, {"name":"setMemory","parameterTypes":["long","long","byte"] }, {"name":"setMemory","parameterTypes":["java.lang.Object","long","long","byte"] }, {"name":"staticFieldBase","parameterTypes":["java.lang.reflect.Field"] }, {"name":"staticFieldOffset","parameterTypes":["java.lang.reflect.Field"] }, {"name":"storeFence","parameterTypes":[] }]
+  "methods":[{"name":"allocateInstance","parameterTypes":["java.lang.Class"] }, {"name":"copyMemory","parameterTypes":["java.lang.Object","long","java.lang.Object","long","long"] }, {"name":"defineClass","parameterTypes":["java.lang.String","byte[]","int","int","java.lang.ClassLoader","java.security.ProtectionDomain"] }, {"name":"invokeCleaner","parameterTypes":["java.nio.ByteBuffer"] }, {"name":"objectFieldOffset","parameterTypes":["java.lang.reflect.Field"] }, {"name":"putBoolean","parameterTypes":["java.lang.Object","long","boolean"] }, {"name":"storeFence","parameterTypes":[] }]
 },
 {
   "name":"sun.nio.fs.UnixPath",

@@ -2175,8 +2175,6 @@
   }, {
     "pattern":"\\Qorg/springframework/security/config/annotation/method/configuration/MethodSecuritySelector.class\\E"
   }, {
-    "pattern":"\\Qorg/springframework/security/config/annotation/method/configuration/PrePostMethodSecurityConfiguration$DeferringMethodInterceptor.class\\E"
-  }, {
     "pattern":"\\Qorg/springframework/security/config/annotation/method/configuration/PrePostMethodSecurityConfiguration.class\\E"
   }, {
     "pattern":"\\Qorg/springframework/security/config/annotation/method/configuration/SecuredMethodSecurityConfiguration.class\\E"
@@ -2564,6 +2562,6 @@
     "locales":["", "und"]
   }, {
     "name":"org.springframework.security.messages",
-    "locales":["", "nl"]
+    "locales":["nl", "und"]
   }]
 }
