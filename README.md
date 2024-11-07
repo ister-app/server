@@ -1,8 +1,23 @@
 # Ister server
 
+## Run local for development
+
+Start the database and rabbitmq with:
+
+```shell
+podman-compose -f docker-compose-local.yml up database rabbitMQ
+```
+
+Then you can run the application:
+
+```shell
+./gradlew bootRun
+```
+
 ## Update reflection files
 
 - Delete JSON files from: `server/src/main/resources/META-INF/native-image`. 
+- Run unit test without jacoco
 - Start the app with `./gradlew bootRun`
 - In the frontend start rescan
 - Go to the folowing urls:
