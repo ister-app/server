@@ -216,6 +216,9 @@
     "interfaces":["org.springframework.web.bind.annotation.ControllerAdvice"]
   },
   {
+    "interfaces":["org.springframework.web.bind.annotation.ExceptionHandler"]
+  },
+  {
     "interfaces":["org.springframework.web.bind.annotation.GetMapping"]
   },
   {
