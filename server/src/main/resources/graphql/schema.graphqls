@@ -1,4 +1,5 @@
 type Query {
+    getServerInfo: ServerInfo
     episodesRecentWatched: [Episode!]
     episodeById(id: ID): Episode
     seasonById(id: ID): Season
@@ -6,6 +7,13 @@ type Query {
     moviesRecentAdded: [Movie!]
     movieById(id: ID): Movie
     showById(id: ID): Show
+}
+
+type ServerInfo {
+    name: String!
+    url: String!
+    version: String!
+    openIdUrl: String!
 }
 
 type Mutation {
