@@ -1,4 +1,4 @@
-FROM ghcr.io/graalvm/native-image-community:17 AS graalvm
+FROM ghcr.io/graalvm/native-image-community:24 AS graalvm
 WORKDIR /home/app
 RUN microdnf install -y xz jq zip findutils \
     && microdnf clean all
