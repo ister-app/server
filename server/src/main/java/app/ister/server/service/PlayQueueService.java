@@ -17,6 +17,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -40,6 +41,10 @@ public class PlayQueueService {
 
     @Autowired
     private WatchStatusService watchStatusService;
+
+    public Optional<PlayQueueEntity> getPlayQueue(UUID id) {
+        return playQueueRepository.findById(id);
+    }
 
     public PlayQueueEntity createPlayQueueForShow(UUID showId, UUID episodeId, Authentication authentication) {
         log.debug("Creating play queue for user: {}, show: {}", authentication.getName(), showId);
@@ -74,11 +79,15 @@ public class PlayQueueService {
         return playQueueEntity;
     }
 
-    public Boolean updatePlayQueue(UUID id, long progressInMilliseconds, UUID playQueueItemId, Authentication authentication) {
+    /**
+     * Find the PlayQueue and then update it.
+     */
+    public Optional<PlayQueueEntity> updatePlayQueue(UUID id, long progressInMilliseconds, UUID playQueueItemId, Authentication authentication) {
         log.debug("Updating play queue for user: {}", authentication.getName());
         // Update the current playing episode
-        playQueueRepository.findById(id).ifPresent(playQueueEntity -> updatePlayQueueItemWithProgress(progressInMilliseconds, playQueueItemId, authentication, playQueueEntity));
-        return true;
+        Optional<PlayQueueEntity> playQueueEntityOptional = playQueueRepository.findById(id);
+        playQueueEntityOptional.ifPresent(playQueueEntity -> updatePlayQueueItemWithProgress(progressInMilliseconds, playQueueItemId, authentication, playQueueEntity));
+        return playQueueEntityOptional;
     }
 
     private void updatePlayQueueItemWithProgress(long progressInMilliseconds, UUID playQueueItemId, Authentication authentication, PlayQueueEntity playQueueEntity) {
@@ -89,8 +98,10 @@ public class PlayQueueService {
             // Update the watch status of an episode if it's played for more then one minute
             if (progressInMilliseconds > 60000) {
                 switch (playQueueItemEntity.getType()) {
-                    case EPISODE -> updateEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
-                    case MOVIE -> updateMovieWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
+                    case EPISODE ->
+                            updateEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
+                    case MOVIE ->
+                            updateMovieWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
                 }
 
             }

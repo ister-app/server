@@ -3,21 +3,19 @@ package app.ister.server.controller;
 import app.ister.server.enums.EventType;
 import app.ister.server.events.newdirectoriesscanrequested.NewDirectoriesScanRequestedData;
 import app.ister.server.service.MessageSender;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.graphql.data.method.annotation.MutationMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Controller;
 
-@RestController
-@RequestMapping("scanner")
-@SecurityRequirement(name = "oidc_auth")
+@Controller
 public class ScannerController {
     @Autowired
     private MessageSender messageSender;
 
-    @GetMapping(value = "/scan")
-    public void scan() {
+    @PreAuthorize("hasRole('user')")
+    @MutationMapping
+    public void scanLibrary() {
         messageSender.sendNewDirectoriesScanRequested(
                 NewDirectoriesScanRequestedData.builder()
                         .eventType(EventType.NEW_DIRECTORIES_SCAN_REQUEST).build());

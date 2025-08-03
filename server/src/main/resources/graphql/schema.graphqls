@@ -7,6 +7,17 @@ type Query {
     moviesRecentAdded: [Movie!]
     movieById(id: ID): Movie
     showById(id: ID): Show
+    getPlayQueue(id: ID!): PlayQueue
+}
+
+type Mutation {
+    scanLibrary: Boolean
+    createPlayQueueForShow(showId: ID!, episodeId: ID!): PlayQueue!
+    createPlayQueueForMovie(movieId: ID!): PlayQueue!
+    updatePlayQueue(id: ID!, progressInMilliseconds: Int!, playQueueItemId: ID!): PlayQueue
+    startTranscoding(playQueueId: ID!, mediaFileId: ID!, startTimeInSeconds: Int!, audioId: ID, subtitleId: ID): ID!
+    readyTranscoding(id: ID!): Boolean!
+    stopTranscoding(id: ID!): Boolean!
 }
 
 type ServerInfo {
@@ -14,15 +25,6 @@ type ServerInfo {
     url: String!
     version: String!
     openIdUrl: String!
-}
-
-type Mutation {
-    createPlayQueueForShow(showId: ID!, episodeId: ID!): PlayQueue
-    createPlayQueueForMovie(movieId: ID!): PlayQueue
-    updatePlayQueue(id: ID!, progressInMilliseconds: Int!, playQueueItemId: ID!): Boolean
-    startTranscoding(playQueueId: ID!, mediaFileId: ID!, startTimeInSeconds: Int!, audioId: ID, subtitleId: ID): ID!
-    readyTranscoding(id: ID!): Boolean!
-    stopTranscoding(id: ID!): Boolean!
 }
 
 type Episode {
@@ -86,7 +88,9 @@ type Movie {
 
 type PlayQueue {
     id: ID!
-    currentItem: String
+    currentItemId: String
+    currentItemEpisode: Episode
+    currentItemMovie: Movie
     playQueueItems: [PlayQueueItem!]
 }
 
