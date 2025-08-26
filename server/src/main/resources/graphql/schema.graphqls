@@ -3,7 +3,7 @@ type Query {
     episodesRecentWatched: [Episode!]
     episodeById(id: ID): Episode
     seasonById(id: ID): Season
-    showsRecentAdded: [Show!]
+    showsRecentAdded(page: Int, size: Int): ShowPage
     moviesRecentAdded: [Movie!]
     movieById(id: ID): Movie
     showById(id: ID): Show
@@ -105,6 +105,14 @@ type Season {
     episodes: [Episode!]
     show: Show!
     number: Int!
+}
+
+type ShowPage {
+    content: [Show!]!
+    totalPages: Int!
+    totalElements: Int!
+    number: Int!
+    size: Int!
 }
 
 type Show {

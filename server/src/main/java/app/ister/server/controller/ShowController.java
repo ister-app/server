@@ -1,15 +1,14 @@
 package app.ister.server.controller;
 
-import app.ister.server.entitiy.EpisodeEntity;
-import app.ister.server.entitiy.ImageEntity;
-import app.ister.server.entitiy.MetadataEntity;
-import app.ister.server.entitiy.SeasonEntity;
-import app.ister.server.entitiy.ShowEntity;
+import app.ister.server.entitiy.*;
 import app.ister.server.repository.EpisodeRepository;
 import app.ister.server.repository.ImageRepository;
 import app.ister.server.repository.ShowRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
@@ -39,8 +38,11 @@ public class ShowController {
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public List<ShowEntity> showsRecentAdded() {
-        return showRepository.findAll(Sort.by("dateCreated").descending());
+    public Page<ShowEntity> showsRecentAdded(
+            @Argument Optional<Integer> page,
+            @Argument Optional<Integer> size) {
+        Pageable pageable = PageRequest.of(page.orElse(0), size.orElse(10), Sort.by("dateCreated").descending());
+        return showRepository.findAll(pageable);
     }
 
     @SchemaMapping(typeName = "Show", field = "episodes")
@@ -57,7 +59,6 @@ public class ShowController {
     public List<MetadataEntity> metadata(ShowEntity showEntity) {
         return showEntity.getMetadataEntities();
     }
-
 
     @SchemaMapping(typeName = "Show", field = "images")
     public List<ImageEntity> images(ShowEntity showEntity) {
