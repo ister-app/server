@@ -1,19 +1,10 @@
 package app.ister.server.controller;
 
-import app.ister.server.entitiy.EpisodeEntity;
-import app.ister.server.entitiy.ImageEntity;
-import app.ister.server.entitiy.MediaFileEntity;
-import app.ister.server.entitiy.MediaFileStreamEntity;
-import app.ister.server.entitiy.MetadataEntity;
-import app.ister.server.entitiy.SeasonEntity;
-import app.ister.server.entitiy.ShowEntity;
-import app.ister.server.entitiy.UserEntity;
-import app.ister.server.entitiy.WatchStatusEntity;
+import app.ister.server.entitiy.*;
 import app.ister.server.repository.EpisodeRepository;
 import app.ister.server.repository.WatchStatusRepository;
 import app.ister.server.service.UserService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
@@ -22,56 +13,76 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
-import java.util.ArrayList;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Controller
 public class EpisodeController {
-    @Autowired
-    private EpisodeRepository episodeRepository;
+    private final EpisodeRepository episodeRepository;
+    private final WatchStatusRepository watchStatusRepository;
+    private final UserService userService;
 
-    @Autowired
-    private WatchStatusRepository watchStatusRepository;
-
-    @Autowired
-    private UserService userService;
+    public EpisodeController(EpisodeRepository episodeRepository,
+                             WatchStatusRepository watchStatusRepository,
+                             UserService userService) {
+        this.episodeRepository = episodeRepository;
+        this.watchStatusRepository = watchStatusRepository;
+        this.userService = userService;
+    }
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
     public List<EpisodeEntity> episodesRecentWatched(Authentication authentication) {
         log.debug("Getting recent episode list for user: {}", authentication.getName());
         UserEntity userEntity = userService.getOrCreateUser(authentication);
-        List<EpisodeEntity> result = new ArrayList<>();
-        for (String[] strings : watchStatusRepository.findRecentEpisodesAndShowIdsByUserId(userEntity.getId())) {
-            List<EpisodeEntity> seasonEpisodes = episodeRepository.findByShowEntityId(
-                    UUID.fromString(strings[1]),
-                    Sort.by("SeasonEntityNumber").ascending().and(
-                            Sort.by("number").ascending()));
-            Optional<EpisodeEntity> optionalEpisodeEntity = seasonEpisodes.stream().filter(episodeEntityInline -> episodeEntityInline.getId().equals(UUID.fromString(strings[0]))).findFirst();
-            optionalEpisodeEntity.flatMap(episodeEntity -> getFirstUnwatchedEpisode(seasonEpisodes, episodeEntity)).ifPresent(result::add);
-        }
-        return result;
+
+        return watchStatusRepository.findRecentEpisodesAndShowIdsByUserId(userEntity.getId())
+                .stream()
+                .flatMap(strings -> getUnwatchedEpisodes(UUID.fromString(strings[1]), UUID.fromString(strings[0])).stream())
+                .collect(Collectors.toList());
     }
 
-    private Optional<EpisodeEntity> getFirstUnwatchedEpisode(List<EpisodeEntity> seasonEpisodes, EpisodeEntity episodeEntity) {
-        if (!episodeEntity.getWatchStatusEntities().get(0).isWatched()) {
+    private List<EpisodeEntity> getUnwatchedEpisodes(UUID showId, UUID episodeId) {
+        List<EpisodeEntity> seasonEpisodes = episodeRepository.findByShowEntityId(showId,
+                Sort.by("SeasonEntityNumber").ascending().and(Sort.by("number").ascending()));
+
+        return seasonEpisodes.stream()
+                .filter(episode -> episode.getId().equals(episodeId))
+                .map(episodeEntity -> getFirstUnwatchedEpisodeFrom(episodeEntity, seasonEpisodes))
+                .flatMap(Optional::stream)
+                .collect(Collectors.toList());
+    }
+
+    private Optional<EpisodeEntity> getFirstUnwatchedEpisodeFrom(EpisodeEntity episodeEntity, List<EpisodeEntity> seasonEpisodes) {
+        if (!episodeEntity.getWatchStatusEntities().getFirst().isWatched()) {
             return Optional.of(episodeEntity);
-        } else {
-            int indexOfNextOne = seasonEpisodes.indexOf(episodeEntity) + 1;
-            if (seasonEpisodes.size() > indexOfNextOne) {
-                EpisodeEntity nextEpisodeEntity = seasonEpisodes.get(indexOfNextOne);
-                if (nextEpisodeEntity.getWatchStatusEntities().isEmpty() || !nextEpisodeEntity.getWatchStatusEntities().get(0).isWatched()) {
-                    return Optional.of(nextEpisodeEntity);
-                } else {
-                    return getFirstUnwatchedEpisode(seasonEpisodes, nextEpisodeEntity);
-                }
-            } else {
-                return Optional.empty();
-            }
         }
+
+        return findNextUnwatchedEpisode(episodeEntity, seasonEpisodes);
+    }
+
+    private Optional<EpisodeEntity> findNextUnwatchedEpisode(EpisodeEntity episodeEntity, List<EpisodeEntity> seasonEpisodes) {
+        int indexOfNextOne = seasonEpisodes.indexOf(episodeEntity) + 1;
+
+        if (seasonEpisodes.size() > indexOfNextOne) {
+            EpisodeEntity nextEpisodeEntity = seasonEpisodes.get(indexOfNextOne);
+            if (isUnwatchedOrOld(nextEpisodeEntity)) {
+                return Optional.of(nextEpisodeEntity);
+            }
+            return findNextUnwatchedEpisode(nextEpisodeEntity, seasonEpisodes);
+        }
+        return Optional.empty();
+    }
+
+    private boolean isUnwatchedOrOld(EpisodeEntity episodeEntity) {
+        return episodeEntity.getWatchStatusEntities().isEmpty() ||
+                !episodeEntity.getWatchStatusEntities().getFirst().isWatched() ||
+                episodeEntity.getWatchStatusEntities().getFirst().getDateUpdated().isBefore(Instant.now().minus(Duration.ofDays(30)));
     }
 
     @PreAuthorize("hasRole('user')")

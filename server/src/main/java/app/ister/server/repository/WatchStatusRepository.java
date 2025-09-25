@@ -20,6 +20,22 @@ public interface WatchStatusRepository extends CrudRepository<WatchStatusEntity,
 
     List<WatchStatusEntity> findByUserEntityExternalIdAndMovieEntity(String userEntityExternalId, MovieEntity movieEntity, Sort sort);
 
+    /**
+     * Retrieves the most recent episode IDs and their corresponding show IDs
+     * for a specified user.
+     *
+     * This method executes a native SQL query that utilizes a Common Table
+     * Expression (CTE) to assign a row number to each episode based on the
+     * last updated date. It partitions the results by show ID and orders them
+     * by the date updated in descending order. The method returns only the
+     * most recent episode for each show that the user has watched.
+     *
+     * @param userId the unique identifier of the user whose recent episodes
+     *                are to be retrieved. This should not be null.
+     * @return a list of string arrays, where each array contains two elements:
+     *         the episode entity ID and the corresponding show entity ID.
+     *         The list may be empty if the user has not watched any episodes.
+     */
     @Query(
             value = "WITH added_row_number AS (\n" +
                     "  SELECT\n" +
