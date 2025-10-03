@@ -82,7 +82,7 @@ public class EpisodeController {
     private boolean isUnwatchedOrOld(EpisodeEntity episodeEntity) {
         return episodeEntity.getWatchStatusEntities().isEmpty() ||
                 !episodeEntity.getWatchStatusEntities().getFirst().isWatched() ||
-                episodeEntity.getWatchStatusEntities().getFirst().getDateUpdated().isBefore(Instant.now().minus(Duration.ofDays(30)));
+                episodeEntity.getWatchStatusEntities().getFirst().getDateUpdated().isBefore(Instant.now().minus(Duration.ofDays(300)));
     }
 
     @PreAuthorize("hasRole('user')")
