@@ -3,7 +3,7 @@ type Query {
     episodesRecentWatched: [Episode!]
     episodeById(id: ID): Episode
     seasonById(id: ID): Season
-    showsRecentAdded(page: Int, size: Int): ShowPage
+    shows(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder): ShowPage
     moviesRecentAdded: [Movie!]
     movieById(id: ID): Movie
     showById(id: ID): Show
@@ -18,6 +18,16 @@ type Mutation {
     startTranscoding(playQueueId: ID!, mediaFileId: ID!, startTimeInSeconds: Int!, audioId: ID, subtitleId: ID): ID!
     readyTranscoding(id: ID!): Boolean!
     stopTranscoding(id: ID!): Boolean!
+}
+
+enum SortingEnum {
+    DATE_CREATED
+    NAME
+}
+
+enum SortingOrder {
+    DESCENDING
+    ASCENDING
 }
 
 type ServerInfo {

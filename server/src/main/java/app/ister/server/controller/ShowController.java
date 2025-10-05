@@ -1,6 +1,8 @@
 package app.ister.server.controller;
 
 import app.ister.server.entitiy.*;
+import app.ister.server.enums.SortingEnum;
+import app.ister.server.enums.SortingOrder;
 import app.ister.server.repository.EpisodeRepository;
 import app.ister.server.repository.ImageRepository;
 import app.ister.server.repository.ShowRepository;
@@ -38,10 +40,17 @@ public class ShowController {
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public Page<ShowEntity> showsRecentAdded(
+    public Page<ShowEntity> shows(
             @Argument Optional<Integer> page,
-            @Argument Optional<Integer> size) {
-        Pageable pageable = PageRequest.of(page.orElse(0), size.orElse(10), Sort.by("dateCreated").descending());
+            @Argument Optional<Integer> size,
+            @Argument Optional<SortingEnum> sorting,
+            @Argument Optional<SortingOrder> sortingOrder) {
+        String sortingString = sorting.orElse(SortingEnum.NAME).getDatabaseString();
+        Sort sortBy = Sort.by(sortingString);
+        if (sortingOrder.isPresent()) {
+            sortBy = sortingOrder.get() == SortingOrder.ASCENDING ? sortBy.ascending() : sortBy.descending();
+        }
+        Pageable pageable = PageRequest.of(page.orElse(0), size.orElse(10), sortBy);
         return showRepository.findAll(pageable);
     }
 
