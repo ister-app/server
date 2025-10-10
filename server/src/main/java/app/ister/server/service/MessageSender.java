@@ -1,7 +1,9 @@
 package app.ister.server.service;
 
+import app.ister.server.events.analyzelibraryrequested.AnalyzeLibraryRequestedData;
 import app.ister.server.events.episodefound.EpisodeFoundData;
 import app.ister.server.events.filescanrequested.FileScanRequestedData;
+import app.ister.server.events.imagefound.ImageFoundData;
 import app.ister.server.events.mediafilefound.MediaFileFoundData;
 import app.ister.server.events.moviefound.MovieFoundData;
 import app.ister.server.events.newdirectoriesscanrequested.NewDirectoriesScanRequestedData;
@@ -12,14 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
-import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_EPISODE_FOUND;
-import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_FILE_SCAN_REQUESTED;
-import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_MEDIA_FILE_FOUND;
-import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_MOVIE_FOUND;
-import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_NEW_DIRECTORIES_SCAN_REQUESTED;
-import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_NFO_FILE_FOUND;
-import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_SHOW_FOUND;
-import static app.ister.server.events.MessageQueue.APP_ISTER_SERVER_SUBTITLE_FILE_FOUND;
+import static app.ister.server.events.MessageQueue.*;
 
 @Service
 @Slf4j
@@ -56,6 +51,11 @@ public class MessageSender {
         rabbitTemplate.convertAndSend(APP_ISTER_SERVER_NEW_DIRECTORIES_SCAN_REQUESTED, newDirectoriesScanRequestedData);
     }
 
+    public void sendAnalyzeLibraryRequested(AnalyzeLibraryRequestedData analyzeLibraryRequestedData) {
+        log.info("Sending message for queue: {} and analyzeLibraryRequestedData: {}", APP_ISTER_SERVER_ANALYZE_LIBRARY_REQUESTED, analyzeLibraryRequestedData);
+        rabbitTemplate.convertAndSend(APP_ISTER_SERVER_ANALYZE_LIBRARY_REQUESTED, analyzeLibraryRequestedData);
+    }
+
     public void sendNfoFileFound(NfoFileFoundData nfoFileFoundData) {
         log.info("Sending message for queue: {} and nfoFileFoundData: {}", APP_ISTER_SERVER_NFO_FILE_FOUND, nfoFileFoundData);
         rabbitTemplate.convertAndSend(APP_ISTER_SERVER_NFO_FILE_FOUND, nfoFileFoundData);
@@ -69,5 +69,10 @@ public class MessageSender {
     public void sendSubtitleFileFound(SubtitleFileFoundData subtitleFileFoundData) {
         log.info("Sending message for queue: {} and subtitleFileFoundData: {}", APP_ISTER_SERVER_SUBTITLE_FILE_FOUND, subtitleFileFoundData);
         rabbitTemplate.convertAndSend(APP_ISTER_SERVER_SUBTITLE_FILE_FOUND, subtitleFileFoundData);
+    }
+
+    public void sendImageFound(ImageFoundData imageFoundData) {
+        log.info("Sending message for queue: {} and showImageData: {}", APP_ISTER_SERVER_IMAGE_FOUND, imageFoundData);
+        rabbitTemplate.convertAndSend(APP_ISTER_SERVER_IMAGE_FOUND, imageFoundData);
     }
 }

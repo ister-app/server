@@ -4,6 +4,7 @@ import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.entitiy.ImageEntity;
 import app.ister.server.enums.ImageType;
 import app.ister.server.repository.ImageRepository;
+import app.ister.server.service.MessageSender;
 import app.ister.server.service.ScannerHelperService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +30,8 @@ class ImageScannerTest {
     private ImageRepository imageRepository;
     @Mock
     private BasicFileAttributes basicFileAttributes;
+    @Mock
+    private MessageSender messageSender;
 
     @Test
     void analyzable() {

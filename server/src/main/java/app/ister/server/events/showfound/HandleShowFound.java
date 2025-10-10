@@ -101,8 +101,8 @@ public class HandleShowFound implements Handle<ShowFoundData> {
         NodeEntity nodeEntity = nodeService.getOrCreateNodeEntityForThisNode();
         var cacheDisk = directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity).stream().findFirst().orElseThrow();
 
-        String toPath = cacheDisk.getPath() + UUID.randomUUID() + ".jpg";
-        imageDownload.download(imageUrl, toPath);
-        imageSave.save(cacheDisk, toPath, imageType, language, "TMDB://" + imageUrl, null, showEntity, null);
+        String path = cacheDisk.getPath() + UUID.randomUUID() + ".jpg";
+        imageDownload.download(imageUrl, path);
+        imageSave.save(cacheDisk, path, imageType, language, "TMDB://" + imageUrl, null, showEntity, null);
     }
 }

@@ -1,22 +1,14 @@
 package app.ister.server.events.mediafilefound;
 
-import app.ister.server.entitiy.DirectoryEntity;
-import app.ister.server.entitiy.EpisodeEntity;
-import app.ister.server.entitiy.ImageEntity;
-import app.ister.server.entitiy.MediaFileEntity;
-import app.ister.server.entitiy.MovieEntity;
-import app.ister.server.entitiy.NodeEntity;
+import app.ister.server.entitiy.*;
 import app.ister.server.enums.DirectoryType;
 import app.ister.server.enums.EventType;
 import app.ister.server.enums.ImageType;
 import app.ister.server.events.Handle;
 import app.ister.server.events.MessageQueue;
-import app.ister.server.repository.DirectoryRepository;
-import app.ister.server.repository.EpisodeRepository;
-import app.ister.server.repository.ImageRepository;
-import app.ister.server.repository.MediaFileRepository;
-import app.ister.server.repository.MediaFileStreamRepository;
-import app.ister.server.repository.MovieRepository;
+import app.ister.server.events.imagefound.ImageFoundData;
+import app.ister.server.repository.*;
+import app.ister.server.service.MessageSender;
 import app.ister.server.service.NodeService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,11 +27,11 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     private final EpisodeRepository episodeRepository;
     private final MovieRepository movieRepository;
     private final MediaFileStreamRepository mediaFileStreamRepository;
-    private final ImageRepository imageRepository;
 
     private final MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams;
     private final MediaFileFoundCreateBackground mediaFileFoundCreateBackground;
     private final MediaFileFoundGetDuration mediaFileFoundGetDuration;
+    private final MessageSender messageSender;
 
     @Value("${app.ister.server.ffmpeg-dir}")
     private String dirOfFFmpeg;
@@ -50,20 +42,20 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
                                 EpisodeRepository episodeRepository,
                                 MovieRepository movieRepository,
                                 MediaFileStreamRepository mediaFileStreamRepository,
-                                ImageRepository imageRepository,
                                 MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams,
                                 MediaFileFoundCreateBackground mediaFileFoundCreateBackground,
-                                MediaFileFoundGetDuration mediaFileFoundGetDuration) {
+                                MediaFileFoundGetDuration mediaFileFoundGetDuration,
+                                MessageSender messageSender) {
         this.nodeService = nodeService;
         this.directoryRepository = directoryRepository;
         this.mediaFileRepository = mediaFileRepository;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
         this.mediaFileStreamRepository = mediaFileStreamRepository;
-        this.imageRepository = imageRepository;
         this.mediaFileFoundCheckForStreams = mediaFileFoundCheckForStreams;
         this.mediaFileFoundCreateBackground = mediaFileFoundCreateBackground;
         this.mediaFileFoundGetDuration = mediaFileFoundGetDuration;
+        this.messageSender = messageSender;
     }
 
     private static String getPathString(DirectoryEntity cacheDisk, Optional<EpisodeEntity> episodeEntity, Optional<MovieEntity> movieEntity) {
@@ -138,8 +130,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
                     .episodeEntity(episodeEntity.orElse(null))
                     .movieEntity(movieEntity.orElse(null))
                     .build();
-
-            imageRepository.save(imageEntity);
+            messageSender.sendImageFound(ImageFoundData.fromImageEntity(imageEntity));
         }
     }
 }

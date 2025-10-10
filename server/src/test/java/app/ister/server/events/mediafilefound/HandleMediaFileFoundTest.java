@@ -1,17 +1,9 @@
 package app.ister.server.events.mediafilefound;
 
-import app.ister.server.entitiy.DirectoryEntity;
-import app.ister.server.entitiy.EpisodeEntity;
-import app.ister.server.entitiy.ImageEntity;
-import app.ister.server.entitiy.MediaFileEntity;
-import app.ister.server.entitiy.MediaFileStreamEntity;
+import app.ister.server.entitiy.*;
 import app.ister.server.enums.EventType;
-import app.ister.server.repository.DirectoryRepository;
-import app.ister.server.repository.EpisodeRepository;
-import app.ister.server.repository.ImageRepository;
-import app.ister.server.repository.MediaFileRepository;
-import app.ister.server.repository.MediaFileStreamRepository;
-import app.ister.server.repository.MovieRepository;
+import app.ister.server.repository.*;
+import app.ister.server.service.MessageSender;
 import app.ister.server.service.NodeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,14 +33,13 @@ class HandleMediaFileFoundTest {
     @Mock
     private MediaFileStreamRepository mediaFileStreamRepositoryMock;
     @Mock
-    private ImageRepository imageRepositoryMock;
-
-    @Mock
     private MediaFileFoundCheckForStreams mediaFileFoundCheckForStreamsMock;
     @Mock
     private MediaFileFoundCreateBackground mediaFileFoundCreateBackgroundMock;
     @Mock
     private MediaFileFoundGetDuration mediaFileFoundGetDurationMock;
+    @Mock
+    private MessageSender messageSenderMock;
 
     private HandleMediaFileFound subject;
 
@@ -66,10 +57,10 @@ class HandleMediaFileFoundTest {
                 episodeRepositoryMock,
                 movieRepositoryMock,
                 mediaFileStreamRepositoryMock,
-                imageRepositoryMock,
                 mediaFileFoundCheckForStreamsMock,
                 mediaFileFoundCreateBackgroundMock,
-                mediaFileFoundGetDurationMock);
+                mediaFileFoundGetDurationMock,
+                messageSenderMock);
     }
 
     @Test

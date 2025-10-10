@@ -4,10 +4,12 @@ import app.ister.server.entitiy.BaseEntity;
 import app.ister.server.entitiy.DirectoryEntity;
 import app.ister.server.entitiy.ImageEntity;
 import app.ister.server.enums.ImageType;
+import app.ister.server.events.imagefound.ImageFoundData;
 import app.ister.server.repository.ImageRepository;
 import app.ister.server.scanner.PathObject;
 import app.ister.server.scanner.enums.DirType;
 import app.ister.server.scanner.enums.FileType;
+import app.ister.server.service.MessageSender;
 import app.ister.server.service.ScannerHelperService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +31,8 @@ public class ImageScanner implements Scanner {
     private ScannerHelperService scannerHelperService;
     @Autowired
     private ImageRepository imageRepository;
+    @Autowired
+    private MessageSender messageSender;
 
     @Override
     public boolean analyzable(Path path, Boolean isRegularFile, long size) {
@@ -60,7 +64,7 @@ public class ImageScanner implements Scanner {
             }
 
             ImageEntity build = imageEntity.build();
-            imageRepository.save(build);
+            messageSender.sendImageFound(ImageFoundData.fromImageEntity(build));
             return Optional.of(build);
         } else {
             return Optional.empty();
