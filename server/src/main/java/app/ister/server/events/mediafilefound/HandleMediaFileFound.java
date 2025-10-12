@@ -123,7 +123,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             mediaFileFoundCreateBackground.createBackground(Path.of(toPath), Path.of(mediaFilePath), dirOfFFmpeg, durationInMilliseconds / 2);
 
             ImageEntity imageEntity = ImageEntity.builder()
-                    .directoryEntity(cacheDisk)
+                    .directoryEntityId(cacheDisk.getId())
                     .path(toPath)
                     .sourceUri("file://" + mediaFilePath)
                     .type(ImageType.BACKGROUND)

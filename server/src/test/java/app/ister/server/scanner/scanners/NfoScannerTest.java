@@ -66,7 +66,7 @@ class NfoScannerTest {
         Path path = Path.of("/path");
 
         OtherPathFileEntity expected = OtherPathFileEntity.builder()
-                .directoryEntity(directoryEntity)
+                .directoryEntityId(directoryEntity.getId())
                 .pathFileType(PathFileType.NFO)
                 .path(path.toString()).build();
 

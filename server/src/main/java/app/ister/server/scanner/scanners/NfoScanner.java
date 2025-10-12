@@ -44,7 +44,7 @@ public class NfoScanner implements Scanner {
         Optional<OtherPathFileEntity> otherPathFileEntity = otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString());
         if (otherPathFileEntity.isEmpty()) {
             var entity = OtherPathFileEntity.builder()
-                    .directoryEntity(directoryEntity)
+                    .directoryEntityId(directoryEntity.getId())
                     .pathFileType(PathFileType.NFO)
                     .path(path.toString()).build();
             otherPathFileRepository.save(entity);

@@ -1,5 +1,6 @@
 package app.ister.server.events.imagefound;
 
+import app.ister.server.entitiy.BaseEntity;
 import app.ister.server.entitiy.ImageEntity;
 import app.ister.server.enums.EventType;
 import app.ister.server.events.Handle;
@@ -18,6 +19,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.Optional;
 
 @Service
 @Slf4j
@@ -49,7 +51,11 @@ public class HandleImageFound implements Handle<ImageFoundData> {
             BufferedImage image = ImageIO.read(file);
             String blurHash = BlurHash.encode(image);
 
+            Optional<ImageEntity> oldImageEntity = imageRepository.findByDirectoryEntityIdAndPath(messageData.getDirectoryEntityId(), messageData.getPath());
+
             ImageEntity imageEntity = ImageEntity.builder()
+                    .id(oldImageEntity.map(BaseEntity::getId).orElse(null))
+                    .dateCreated(oldImageEntity.map(BaseEntity::getDateCreated).orElse(null))
                     .directoryEntityId(messageData.getDirectoryEntityId())
                     .blurHash(blurHash)
                     .path(messageData.getPath())

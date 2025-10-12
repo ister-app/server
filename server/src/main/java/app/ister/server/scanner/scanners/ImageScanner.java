@@ -45,7 +45,7 @@ public class ImageScanner implements Scanner {
             PathObject pathObject = new PathObject(path.toString());
 
             var imageEntity = ImageEntity.builder()
-                    .directoryEntity(directoryEntity)
+                    .directoryEntityId(directoryEntity.getId())
                     .sourceUri("file://" + path)
                     .path(path.toString());
 

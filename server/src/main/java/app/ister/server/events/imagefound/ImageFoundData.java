@@ -33,7 +33,7 @@ public class ImageFoundData extends MessageData {
     public static ImageFoundData fromImageEntity(ImageEntity imageEntity) {
         return ImageFoundData.builder()
                 .eventType(EventType.IMAGE_FOUND)
-                .directoryEntityId(imageEntity.getDirectoryEntity().getId())
+                .directoryEntityId(imageEntity.getDirectoryEntity() == null ? imageEntity.getDirectoryEntityId() : imageEntity.getDirectoryEntity().getId())
                 .path(imageEntity.getPath())
                 .imageType(imageEntity.getType())
                 .language(imageEntity.getLanguage())

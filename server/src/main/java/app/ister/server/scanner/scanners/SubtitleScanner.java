@@ -26,8 +26,6 @@ import java.util.Optional;
 @Transactional(propagation = Propagation.REQUIRES_NEW)
 public class SubtitleScanner implements Scanner {
     @Autowired
-    private ScannerHelperService scannerHelperService;
-    @Autowired
     private OtherPathFileRepository otherPathFileRepository;
     @Autowired
     private MessageSender messageSender;
@@ -44,7 +42,7 @@ public class SubtitleScanner implements Scanner {
         Optional<OtherPathFileEntity> otherPathFileEntity = otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString());
         if (otherPathFileEntity.isEmpty()) {
             var entity = OtherPathFileEntity.builder()
-                    .directoryEntity(directoryEntity)
+                    .directoryEntityId(directoryEntity.getId())
                     .pathFileType(PathFileType.SUBTITLE)
                     .path(path.toString()).build();
             otherPathFileRepository.save(entity);

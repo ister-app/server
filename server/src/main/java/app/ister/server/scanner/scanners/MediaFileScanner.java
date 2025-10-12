@@ -1,10 +1,6 @@
 package app.ister.server.scanner.scanners;
 
-import app.ister.server.entitiy.BaseEntity;
-import app.ister.server.entitiy.DirectoryEntity;
-import app.ister.server.entitiy.EpisodeEntity;
-import app.ister.server.entitiy.MediaFileEntity;
-import app.ister.server.entitiy.MovieEntity;
+import app.ister.server.entitiy.*;
 import app.ister.server.enums.EventType;
 import app.ister.server.events.mediafilefound.MediaFileFoundData;
 import app.ister.server.repository.MediaFileRepository;
@@ -67,7 +63,7 @@ public class MediaFileScanner implements Scanner {
         Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString());
         if (mediaFile.isEmpty()) {
             MediaFileEntity entity = MediaFileEntity.builder()
-                    .directoryEntity(directoryEntity)
+                    .directoryEntityId(directoryEntity.getId())
                     .episodeEntity(episodeEntity.orElse(null))
                     .movieEntity(movieEntity.orElse(null))
                     .path(path.toString())

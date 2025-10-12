@@ -15,6 +15,8 @@ public interface ImageRepository extends CrudRepository<ImageEntity, UUID> {
 
     Optional<ImageEntity> findByDirectoryEntityAndPath(DirectoryEntity directoryEntity, String path);
 
+    Optional<ImageEntity> findByDirectoryEntityIdAndPath(UUID directoryEntityId, String path);
+
     List<ImageEntity> findByDirectoryEntity(DirectoryEntity directoryEntity);
 
     List<ImageEntity> findByShowEntityId(UUID showEntityId);
