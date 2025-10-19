@@ -8,7 +8,6 @@ import app.ister.server.repository.EpisodeRepository;
 import app.ister.server.repository.MovieRepository;
 import app.ister.server.service.PlayQueueService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
@@ -24,14 +23,17 @@ import java.util.UUID;
 @Controller
 @Slf4j
 public class PlayQueueController {
-    @Autowired
-    private PlayQueueService playQueueService;
+    private final PlayQueueService playQueueService;
 
-    @Autowired
-    private EpisodeRepository episodeRepository;
+    private final EpisodeRepository episodeRepository;
 
-    @Autowired
-    private MovieRepository movieRepository;
+    private final MovieRepository movieRepository;
+
+    public PlayQueueController(PlayQueueService playQueueService, EpisodeRepository episodeRepository, MovieRepository movieRepository) {
+        this.playQueueService = playQueueService;
+        this.episodeRepository = episodeRepository;
+        this.movieRepository = movieRepository;
+    }
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -78,5 +80,19 @@ public class PlayQueueController {
     public Optional<MovieEntity> currentItemMovie(PlayQueueEntity playQueueEntity) {
         UUID currentItem = playQueueEntity.getCurrentItem();
         return currentItem != null ? movieRepository.findById(currentItem) : Optional.empty();
+    }
+
+    @SchemaMapping(typeName = "PlayQueueItem", field = "episode")
+    public Optional<EpisodeEntity> playQueueItemEpisode(PlayQueueItemEntity playQueueItemEntity) {
+        if (playQueueItemEntity.getEpisodeEntityId() != null) {
+            return episodeRepository.findById(playQueueItemEntity.getEpisodeEntityId());
+        } else return Optional.empty();
+    }
+
+    @SchemaMapping(typeName = "PlayQueueItem", field = "movie")
+    public Optional<MovieEntity> playQueueItemMovie(PlayQueueItemEntity playQueueItemEntity) {
+        if (playQueueItemEntity.getMovieEntityId() != null) {
+            return movieRepository.findById(playQueueItemEntity.getMovieEntityId());
+        } else return Optional.empty();
     }
 }

@@ -108,8 +108,10 @@ type PlayQueue {
 
 type PlayQueueItem {
     id: ID!
-    itemId: String!
+    position: Int!
     type: String!
+    movie: Movie
+    episode: Episode
 }
 
 type Season {

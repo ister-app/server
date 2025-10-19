@@ -3,7 +3,6 @@ package app.ister.server.service;
 import app.ister.server.entitiy.MediaFileEntity;
 import app.ister.server.entitiy.PlayQueueEntity;
 import app.ister.server.entitiy.PlayQueueItemEntity;
-import app.ister.server.entitiy.UserEntity;
 import app.ister.server.entitiy.WatchStatusEntity;
 import app.ister.server.enums.MediaType;
 import app.ister.server.repository.EpisodeRepository;
@@ -11,72 +10,123 @@ import app.ister.server.repository.MovieRepository;
 import app.ister.server.repository.PlayQueueRepository;
 import app.ister.server.repository.WatchStatusRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class PlayQueueService {
-    @Autowired
-    private PlayQueueRepository playQueueRepository;
+    private final PlayQueueRepository playQueueRepository;
 
-    @Autowired
-    private EpisodeRepository episodeRepository;
+    private final EpisodeRepository episodeRepository;
 
-    @Autowired
-    private MovieRepository movieRepository;
+    private final MovieRepository movieRepository;
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
 
-    @Autowired
-    private WatchStatusRepository watchStatusRepository;
+    private final WatchStatusRepository watchStatusRepository;
 
-    @Autowired
-    private WatchStatusService watchStatusService;
+    private final WatchStatusService watchStatusService;
+
+    private static final BigDecimal GAP = new BigDecimal("1000");
+
+    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService) {
+        this.playQueueRepository = playQueueRepository;
+        this.episodeRepository = episodeRepository;
+        this.movieRepository = movieRepository;
+        this.userService = userService;
+        this.watchStatusRepository = watchStatusRepository;
+        this.watchStatusService = watchStatusService;
+    }
 
     public Optional<PlayQueueEntity> getPlayQueue(UUID id) {
         return playQueueRepository.findById(id);
     }
 
-    public PlayQueueEntity createPlayQueueForShow(UUID showId, UUID episodeId, Authentication authentication) {
-        log.debug("Creating play queue for user: {}, show: {}", authentication.getName(), showId);
-        List<PlayQueueItemEntity> items = episodeRepository.findIdsOnlyByShowEntityId(
-                        UUID.fromString(showId.toString()),
-                        Sort.by("SeasonEntityNumber").ascending().and(
-                                Sort.by("number").ascending())).stream()
-                .map(idOnly -> PlayQueueItemEntity.builder()
-                        .id(UUID.randomUUID())
-                        .itemId(idOnly.getId())
-                        .type(MediaType.EPISODE).build())
-                .collect(Collectors.toList());
-        UserEntity userEntity = userService.getOrCreateUser(authentication);
-        PlayQueueItemEntity playQueueItemEntity = items.stream().filter(item -> item.getItemId().equals(episodeId)).findAny().get();
-        var playQueueEntity = PlayQueueEntity.builder()
-                .userEntity(userEntity)
-                .items(items)
-                .currentItem(playQueueItemEntity.getId()).build();
-        playQueueRepository.save(playQueueEntity);
-        return playQueueEntity;
+    /**
+     * Returns the next position value given the previous one (or null for the first item).
+     */
+    private BigDecimal nextPosition(BigDecimal previous) {
+        return (previous == null) ? GAP : previous.add(GAP);
     }
 
-    public PlayQueueEntity createPlayQueueForMovie(UUID movieId, Authentication authentication) {
-        log.debug("Creating play queue for user: {}, movie: {}", authentication.getName(), movieId);
-        PlayQueueItemEntity playQueueItemEntity = PlayQueueItemEntity.builder().id(UUID.randomUUID()).type(MediaType.MOVIE).itemId(movieId).build();
-        List<PlayQueueItemEntity> playQueueItemEntities = List.of(playQueueItemEntity);
-        var playQueueEntity = PlayQueueEntity.builder()
+    public PlayQueueEntity createPlayQueueForShow(UUID showId,
+                                                  UUID episodeId,
+                                                  Authentication authentication) {
+        log.debug("Creating play queue for user: {}, show: {}", authentication.getName(), showId);
+
+        List<UUID> episodeIds = episodeRepository
+                .findIdsOnlyByShowEntityId(
+                        showId,
+                        Sort.by("SeasonEntityNumber").ascending()
+                                .and(Sort.by("number").ascending()))
+                .stream()
+                .map(EpisodeRepository.IdOnly::getId)
+                .toList();
+
+        List<PlayQueueItemEntity> items = new ArrayList<>();
+        BigDecimal pos = null;
+        for (UUID epId : episodeIds) {
+            pos = nextPosition(pos);
+            PlayQueueItemEntity item = PlayQueueItemEntity.builder()
+                    .position(pos)
+                    .type(MediaType.EPISODE)
+                    .episodeEntityId(epId)
+                    .build();
+            items.add(item);
+        }
+
+        PlayQueueEntity queue = PlayQueueEntity.builder()
                 .userEntity(userService.getOrCreateUser(authentication))
-                .currentItem(playQueueItemEntity.getId())
-                .items(playQueueItemEntities).build();
-        playQueueRepository.save(playQueueEntity);
-        return playQueueEntity;
+                .items(items)
+                .build();
+        playQueueRepository.save(queue);
+
+        UUID currentItemId = queue.getItems().stream()
+                .filter(i -> i.getEpisodeEntityId().equals(episodeId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Episode not in queue"))
+                .getId();
+        queue.setCurrentItem(currentItemId);
+        playQueueRepository.save(queue);
+
+        return queue;
+    }
+
+
+    public PlayQueueEntity createPlayQueueForMovie(UUID movieId,
+                                                   Authentication authentication) {
+        log.debug("Creating play queue for user: {}, movie: {}", authentication.getName(), movieId);
+
+        PlayQueueItemEntity item = PlayQueueItemEntity.builder()
+                .position(GAP)
+                .type(MediaType.MOVIE)
+                .movieEntityId(movieId)
+                .build();
+
+        PlayQueueEntity queue = PlayQueueEntity.builder()
+                .userEntity(userService.getOrCreateUser(authentication))
+                .items(List.of(item))
+                .currentItem(item.getId())
+                .build();
+        playQueueRepository.save(queue);
+
+        UUID currentItemId = queue.getItems().stream()
+                .filter(i -> i.getMovieEntityId().equals(movieId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Movie not in queue"))
+                .getId();
+        queue.setCurrentItem(currentItemId);
+        playQueueRepository.save(queue);
+
+        return queue;
     }
 
     /**
@@ -109,14 +159,14 @@ public class PlayQueueService {
     }
 
     private void updateEpisodeWatchStatus(long progressInMilliseconds, UUID playQueueItemId, Authentication authentication, PlayQueueItemEntity playQueueItemEntity) {
-        episodeRepository.findById(playQueueItemEntity.getItemId()).ifPresent(episodeEntity -> {
+        episodeRepository.findById(playQueueItemEntity.getEpisodeEntityId()).ifPresent(episodeEntity -> {
             WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreate(authentication, playQueueItemId, episodeEntity, null);
             updateWatchStatus(progressInMilliseconds, watchStatusEntity, episodeEntity.getMediaFileEntities());
         });
     }
 
     private void updateMovieWatchStatus(long progressInMilliseconds, UUID playQueueItemId, Authentication authentication, PlayQueueItemEntity playQueueItemEntity) {
-        movieRepository.findById(playQueueItemEntity.getItemId()).ifPresent(movieEntity -> {
+        movieRepository.findById(playQueueItemEntity.getMovieEntityId()).ifPresent(movieEntity -> {
             WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreate(authentication, playQueueItemId, null, movieEntity);
             updateWatchStatus(progressInMilliseconds, watchStatusEntity, movieEntity.getMediaFileEntities());
         });
