@@ -24,6 +24,6 @@ public class PlayQueueEntity extends BaseEntity {
     private long progressInMilliseconds;
 
     @OneToMany(cascade = {CascadeType.ALL}, mappedBy = "playQueueEntity")
-    @OrderBy("dateUpdated ASC")
+    @OrderBy("position ASC")
     private List<PlayQueueItemEntity> items;
 }

@@ -19,6 +19,7 @@ import org.springframework.stereotype.Controller;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Controller
 @Slf4j
@@ -65,9 +66,38 @@ public class PlayQueueController {
         return playQueueEntity.getCurrentItem();
     }
 
+    // Return only the 10 items that precede the current item, the current item itself, and the 10 items that follow it (max 21 items).
     @SchemaMapping(typeName = "PlayQueue", field = "playQueueItems")
     public List<PlayQueueItemEntity> playQueueItems(PlayQueueEntity playQueueEntity) {
-        return playQueueEntity.getItems();
+        List<PlayQueueItemEntity> all = playQueueEntity.getItems();
+
+        UUID currentId = playQueueEntity.getCurrentItem();
+        if (currentId == null) {
+            // no current item – return the first 21 items (or less)
+            return all.stream()
+                    .limit(21)
+                    .collect(Collectors.toList());
+        }
+
+        // locate the index of the current item
+        int currentIdx = -1;
+        for (int i = 0; i < all.size(); i++) {
+            if (all.get(i).getId().equals(currentId)) {
+                currentIdx = i;
+                break;
+            }
+        }
+        if (currentIdx == -1) {
+            // currentItem points to a non‑existent row – behave like “no current”
+            return all.stream()
+                    .limit(21)
+                    .collect(Collectors.toList());
+        }
+
+        int from = Math.max(0, currentIdx - 10);
+        int to   = Math.min(all.size(), currentIdx + 11); // exclusive upper bound
+
+        return all.subList(from, to);
     }
 
     @SchemaMapping(typeName = "PlayQueue", field = "currentItemEpisode")
