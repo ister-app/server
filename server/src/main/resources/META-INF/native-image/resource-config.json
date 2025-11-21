@@ -1,6 +1,0 @@
-{
-  "resources":{
-  "includes":[{
-    "pattern":"\\Qorg/springframework/web/servlet/DispatcherServlet.properties\\E"
-  }]}
-}
