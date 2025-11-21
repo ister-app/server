@@ -62,6 +62,7 @@ public class PlayQueueService {
                                                   Authentication authentication) {
         log.debug("Creating play queue for user: {}, show: {}", authentication.getName(), showId);
 
+        // Fetch episode IDs
         List<UUID> episodeIds = episodeRepository
                 .findIdsOnlyByShowEntityId(
                         showId,
@@ -73,22 +74,25 @@ public class PlayQueueService {
 
         List<PlayQueueItemEntity> items = new ArrayList<>();
         BigDecimal pos = null;
+        PlayQueueEntity queue = PlayQueueEntity.builder()
+                .userEntity(userService.getOrCreateUser(authentication))
+                .build();
+
         for (UUID epId : episodeIds) {
             pos = nextPosition(pos);
             PlayQueueItemEntity item = PlayQueueItemEntity.builder()
                     .position(pos)
                     .type(MediaType.EPISODE)
                     .episodeEntityId(epId)
+                    .playQueueEntity(queue) // Set the PlayQueueEntity reference
                     .build();
             items.add(item);
         }
 
-        PlayQueueEntity queue = PlayQueueEntity.builder()
-                .userEntity(userService.getOrCreateUser(authentication))
-                .items(items)
-                .build();
-        playQueueRepository.save(queue);
+        queue.setItems(items);
+        playQueueRepository.save(queue); // Save the queue with its items now properly linked
 
+        // Set current item
         UUID currentItemId = queue.getItems().stream()
                 .filter(i -> i.getEpisodeEntityId().equals(episodeId))
                 .findFirst()
