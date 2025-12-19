@@ -8,17 +8,12 @@ import app.ister.server.enums.EventType;
 import app.ister.server.enums.ImageType;
 import app.ister.server.events.Handle;
 import app.ister.server.events.MessageQueue;
-import app.ister.server.events.TMDBMetadata.EpisodeMetadata;
-import app.ister.server.events.TMDBMetadata.ImageDownload;
-import app.ister.server.events.TMDBMetadata.ImageSave;
-import app.ister.server.events.TMDBMetadata.MetadataSave;
-import app.ister.server.events.TMDBMetadata.TMDBResult;
+import app.ister.server.events.TMDBMetadata.*;
 import app.ister.server.repository.DirectoryRepository;
 import app.ister.server.repository.EpisodeRepository;
 import app.ister.server.service.NodeService;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import info.movito.themoviedbapi.model.core.responses.TmdbResponseException;
-import info.movito.themoviedbapi.tools.TmdbException;
+import feign.FeignException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -89,9 +84,7 @@ public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
         } catch (JsonProcessingException jpe) {
             log.error("Cannot convert JSON into ShowFoundData", jpe);
             return false;
-        } catch (TmdbResponseException e) {
-            log.error("Cannot get TMDB data response", e);
-        } catch (TmdbException e) {
+        } catch (FeignException e) {
             log.error("Cannot get TMDB data", e);
             return false;
         } catch (IOException e) {

@@ -16,7 +16,7 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class FileScanRequestedData extends MessageData {
     private Path path;
-    private boolean regularFile;
+    private Boolean regularFile;
     private long size;
     private UUID directoryEntityUUID;
 }

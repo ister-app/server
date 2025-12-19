@@ -54,7 +54,7 @@ public class MovieController {
 
     @SchemaMapping(typeName = "Movie", field = "watchStatus")
     public List<WatchStatusEntity> watchStatus(MovieEntity movieEntity, Authentication authentication) {
-        return watchStatusRepository.findByUserEntityExternalIdAndMovieEntity(authentication.getName(), movieEntity, Sort.by("DateUpdated").descending());
+        return watchStatusRepository.findByUserEntityExternalIdAndMovieEntity(authentication.getName(), movieEntity, Sort.by("dateUpdated").descending());
     }
 
     @SchemaMapping(typeName = "Movie", field = "mediaFile")

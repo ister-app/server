@@ -1,21 +1,21 @@
 package app.ister.server;
 
-import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
-import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.annotation.Bean;
 
 import static app.ister.server.events.MessageQueue.*;
 
 @SpringBootApplication(scanBasePackages = "app.ister.server")
-@SecurityScheme(
-        name = "oidc_auth",
-        type = SecuritySchemeType.OPENIDCONNECT,
-        openIdConnectUrl = "${springdoc.oAuthFlow.openIdConnectUrl}"
-)
+@EnableFeignClients
+//@SecurityScheme(
+//        name = "oidc_auth",
+//        type = SecuritySchemeType.OPENIDCONNECT,
+//        openIdConnectUrl = "${springdoc.oAuthFlow.openIdConnectUrl}"
+//)
 public class IsterServerApplication {
     static void main(String[] args) {
         SpringApplication.run(IsterServerApplication.class, args);

@@ -49,7 +49,7 @@ public class EpisodeController {
 
     private List<EpisodeEntity> getUnwatchedEpisodes(UUID showId, UUID episodeId) {
         List<EpisodeEntity> seasonEpisodes = episodeRepository.findByShowEntityId(showId,
-                Sort.by("SeasonEntityNumber").ascending().and(Sort.by("number").ascending()));
+                Sort.by("seasonEntity.number").ascending().and(Sort.by("number").ascending()));
 
         return seasonEpisodes.stream()
                 .filter(episode -> episode.getId().equals(episodeId))
@@ -113,7 +113,7 @@ public class EpisodeController {
 
     @SchemaMapping(typeName = "Episode", field = "watchStatus")
     public List<WatchStatusEntity> watchStatus(EpisodeEntity episodeEntity, Authentication authentication) {
-        return watchStatusRepository.findByUserEntityExternalIdAndEpisodeEntity(authentication.getName(), episodeEntity, Sort.by("DateUpdated").descending());
+        return watchStatusRepository.findByUserEntityExternalIdAndEpisodeEntity(authentication.getName(), episodeEntity, Sort.by("dateUpdated").descending());
     }
 
     @SchemaMapping(typeName = "Episode", field = "mediaFile")

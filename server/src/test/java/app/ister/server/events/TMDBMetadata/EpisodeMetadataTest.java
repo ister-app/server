@@ -1,17 +1,16 @@
 package app.ister.server.events.TMDBMetadata;
 
-import info.movito.themoviedbapi.TmdbApi;
-import info.movito.themoviedbapi.TmdbSearch;
-import info.movito.themoviedbapi.TmdbTvEpisodes;
-import info.movito.themoviedbapi.model.core.TvSeries;
-import info.movito.themoviedbapi.model.core.TvSeriesResultsPage;
-import info.movito.themoviedbapi.model.tv.episode.TvEpisodeDb;
-import info.movito.themoviedbapi.tools.TmdbException;
+import app.ister.server.clients.TmdbClient;
+import app.ister.tmdbapi.model.SearchTv200Response;
+import app.ister.tmdbapi.model.SearchTv200ResponseResultsInner;
+import app.ister.tmdbapi.model.TvEpisodeDetails200Response;
+import feign.FeignException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -23,38 +22,33 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class EpisodeMetadataTest {
-    TvSeries tvSeries = new TvSeries();
-    TvEpisodeDb tvEpisode = new TvEpisodeDb();
     @Mock
-    private TmdbApi tmdbApiMock;
+    private TmdbClient tmdbClientMock;
     @Mock
-    private TmdbSearch tmdbSearchMock;
+    private SearchTv200Response searchTv200ResponseMock;
     @Mock
-    private TvSeriesResultsPage tvSeriesResultsPageMock;
+    private SearchTv200ResponseResultsInner searchTv200ResponseResultsInnerMock;
     @Mock
-    private TmdbTvEpisodes tmdbTvEpisodesMock;
+    private TvEpisodeDetails200Response tvEpisodeDetails200ResponseMock;
     private EpisodeMetadata subject;
 
     @BeforeEach
     void setUp() {
-        subject = new EpisodeMetadata(tmdbApiMock);
-        tvSeries.setId(1);
-        tvEpisode.setEpisodeNumber(1);
-        tvEpisode.setName("name");
-        tvEpisode.setAirDate("2024-04-01");
-        tvEpisode.setId(1);
-        tvEpisode.setOverview("overview");
-        tvEpisode.setStillPath("/still-path");
+        subject = new EpisodeMetadata(tmdbClientMock);
     }
 
     @Test
-    void happyFlow() throws TmdbException {
-        when(tmdbApiMock.getSearch()).thenReturn(tmdbSearchMock);
-        when(tmdbSearchMock.searchTv("Showname", null, null, null, null, 2024)).thenReturn(tvSeriesResultsPageMock);
-        when(tvSeriesResultsPageMock.getResults()).thenReturn(List.of(tvSeries));
-
-        when(tmdbApiMock.getTvEpisodes()).thenReturn(tmdbTvEpisodesMock);
-        when(tmdbTvEpisodesMock.getDetails(1, 1, 1, "en")).thenReturn(tvEpisode);
+    void happyFlow() throws FeignException {
+        when(tmdbClientMock._searchTv("Showname", null, null, null, null, 2024)).thenReturn(ResponseEntity.ok(searchTv200ResponseMock));
+        when(searchTv200ResponseMock.getResults()).thenReturn(List.of(searchTv200ResponseResultsInnerMock));
+        when(searchTv200ResponseResultsInnerMock.getId()).thenReturn(1);
+        when(tmdbClientMock._tvEpisodeDetails(1, 1, 1, "", "en")).thenReturn(ResponseEntity.ok(tvEpisodeDetails200ResponseMock));
+        when(tvEpisodeDetails200ResponseMock.getAirDate()).thenReturn("2024-04-01");
+        when(tvEpisodeDetails200ResponseMock.getOverview()).thenReturn("overview");
+        when(tvEpisodeDetails200ResponseMock.getEpisodeNumber()).thenReturn(1);
+        when(tvEpisodeDetails200ResponseMock.getName()).thenReturn("name");
+        when(tvEpisodeDetails200ResponseMock.getId()).thenReturn(1);
+        when(tvEpisodeDetails200ResponseMock.getStillPath()).thenReturn("/still-path");
 
         TMDBResult expected = TMDBResult.builder()
                 .language("eng")
@@ -70,10 +64,9 @@ class EpisodeMetadataTest {
     }
 
     @Test
-    void returnsNullWhenNoResults() throws TmdbException {
-        when(tmdbApiMock.getSearch()).thenReturn(tmdbSearchMock);
-        when(tmdbSearchMock.searchTv("Showname", null, null, null, null, 2024)).thenReturn(tvSeriesResultsPageMock);
-        when(tvSeriesResultsPageMock.getResults()).thenReturn(List.of());
+    void returnsNullWhenNoResults() throws FeignException {
+        when(tmdbClientMock._searchTv("Showname", null, null, null, null, 2024)).thenReturn(ResponseEntity.ok(searchTv200ResponseMock));
+        when(searchTv200ResponseMock.getResults()).thenReturn(List.of());
         Optional<TMDBResult> result = subject.getMetadata("Showname", 2024, 1, 1, "en");
         assertTrue(result.isEmpty());
     }

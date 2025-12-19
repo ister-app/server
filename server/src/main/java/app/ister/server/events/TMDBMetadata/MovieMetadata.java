@@ -1,15 +1,16 @@
 package app.ister.server.events.TMDBMetadata;
 
-import info.movito.themoviedbapi.TmdbApi;
-import info.movito.themoviedbapi.model.core.Movie;
-import info.movito.themoviedbapi.model.movies.MovieDb;
-import info.movito.themoviedbapi.tools.TmdbException;
+import app.ister.server.clients.TmdbClient;
+import app.ister.tmdbapi.model.MovieDetails200Response;
+import app.ister.tmdbapi.model.SearchMovie200Response;
+import app.ister.tmdbapi.model.SearchMovie200ResponseResultsInner;
+import feign.FeignException;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -23,20 +24,20 @@ import java.util.Optional;
 @Component
 public class MovieMetadata {
     @Autowired
-    private TmdbApi tmdbApi;
+    private TmdbClient tmdbClient;
 
-    public Optional<TMDBResult> getMetadata(String name, int releaseYear, String language) throws TmdbException {
+    public Optional<TMDBResult> getMetadata(String name, int releaseYear, String language) {
         log.debug("Starting task executing.");
-        List<Movie> tvSeriesResultsPage = tmdbApi.getSearch().searchMovie(name, null, null, String.valueOf(releaseYear), null, null, null).getResults();
-        if (!tvSeriesResultsPage.isEmpty()) {
-            return Optional.of(getInfoForShow(tvSeriesResultsPage.get(0), language));
+        SearchMovie200Response tvSeriesResultsPage = tmdbClient._searchMovie(name, null, null, String.valueOf(releaseYear), null, null, null).getBody();
+        if (tvSeriesResultsPage != null && !tvSeriesResultsPage.getResults().isEmpty()) {
+            return Optional.of(getInfoForShow(tvSeriesResultsPage.getResults().getFirst(), language));
         }
         return Optional.empty();
     }
 
-    private TMDBResult getInfoForShow(Movie movieResultsPage, String language) {
-        try {
-            MovieDb movieDb = tmdbApi.getMovies().getDetails(movieResultsPage.getId(), language);
+    private TMDBResult getInfoForShow(@Valid SearchMovie200ResponseResultsInner movieResultsPage, String language) throws FeignException {
+        MovieDetails200Response movieDb = tmdbClient._movieDetails(movieResultsPage.getId(), "", language).getBody();
+        if (movieDb != null && movieDb.getReleaseDate() != null && movieDb.getOverview() != null) {
             return TMDBResult.builder()
                     .language(Locale.forLanguageTag(language).getISO3Language())
                     .title(movieDb.getTitle())
@@ -46,8 +47,8 @@ public class MovieMetadata {
                     .posterUrl(movieDb.getPosterPath() == null ? null : "https://image.tmdb.org/t/p/original" + movieDb.getPosterPath())
                     .backgroundUrl(movieDb.getBackdropPath() == null ? null : "https://image.tmdb.org/t/p/original" + movieDb.getBackdropPath())
                     .build();
-        } catch (TmdbException e) {
-            throw new RuntimeException(e);
+        } else {
+            throw new RuntimeException("TMDB response is null");
         }
     }
 }

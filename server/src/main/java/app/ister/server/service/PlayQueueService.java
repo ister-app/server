@@ -66,7 +66,7 @@ public class PlayQueueService {
         List<UUID> episodeIds = episodeRepository
                 .findIdsOnlyByShowEntityId(
                         showId,
-                        Sort.by("SeasonEntityNumber").ascending()
+                        Sort.by("seasonEntity.number").ascending()
                                 .and(Sort.by("number").ascending()))
                 .stream()
                 .map(EpisodeRepository.IdOnly::getId)

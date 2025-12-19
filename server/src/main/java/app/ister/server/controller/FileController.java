@@ -2,7 +2,6 @@ package app.ister.server.controller;
 
 import app.ister.server.repository.ImageRepository;
 import app.ister.server.repository.MediaFileRepository;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
@@ -18,7 +17,7 @@ import java.nio.file.Paths;
 import java.util.UUID;
 
 @RestController
-@SecurityRequirement(name = "oidc_auth")
+//@SecurityRequirement(name = "oidc_auth")
 public class FileController {
     @Autowired
     private ImageRepository imageRepository;

@@ -52,9 +52,9 @@ public class FileScanRequestedHandle implements Handle<FileScanRequestedData> {
     public Boolean handle(FileScanRequestedData messageData) {
         DirectoryEntity directoryEntity = directoryRepository.findById(messageData.getDirectoryEntityUUID()).orElseThrow();
         for (Scanner scanner : List.of(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner)) {
-            if (scanner.analyzable(messageData.getPath(), messageData.isRegularFile(), messageData.getSize())) {
+            if (scanner.analyzable(messageData.getPath(), messageData.getRegularFile(), messageData.getSize())) {
                 log.debug("Scanning file: {}, with scanner: {}", messageData.getPath(), scanner);
-                scanner.analyze(directoryEntity, messageData.getPath(), messageData.isRegularFile(), messageData.getSize());
+                scanner.analyze(directoryEntity, messageData.getPath(), messageData.getRegularFile(), messageData.getSize());
             }
         }
         return true;

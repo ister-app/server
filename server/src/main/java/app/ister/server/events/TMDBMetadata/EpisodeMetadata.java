@@ -1,14 +1,15 @@
 package app.ister.server.events.TMDBMetadata;
 
-import info.movito.themoviedbapi.TmdbApi;
-import info.movito.themoviedbapi.model.core.TvSeries;
-import info.movito.themoviedbapi.model.tv.episode.TvEpisodeDb;
-import info.movito.themoviedbapi.tools.TmdbException;
+import app.ister.server.clients.TmdbClient;
+import app.ister.tmdbapi.model.SearchTv200Response;
+import app.ister.tmdbapi.model.SearchTv200ResponseResultsInner;
+import app.ister.tmdbapi.model.TvEpisodeDetails200Response;
+import feign.FeignException;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -22,7 +23,7 @@ import java.util.Optional;
 @Slf4j
 @Component
 public class EpisodeMetadata {
-    private final TmdbApi tmdbApi;
+    private final TmdbClient tmdbClient;
 
     /**
      * The movie database will give a default name if none is specified, for example "Episode 1".
@@ -32,29 +33,33 @@ public class EpisodeMetadata {
             "en", "Episode %d",
             "nl", "Aflevering %d");
 
-    public EpisodeMetadata(TmdbApi tmdbApi) {
-        this.tmdbApi = tmdbApi;
+    public EpisodeMetadata(TmdbClient tmdbClient) {
+        this.tmdbClient = tmdbClient;
     }
 
-    public Optional<TMDBResult> getMetadata(String showName, int releaseYear, int seasonNumber, int episodeNumber, String language) throws TmdbException {
+    public Optional<TMDBResult> getMetadata(String showName, int releaseYear, int seasonNumber, int episodeNumber, String language) throws FeignException {
         log.debug("Getting metadate from tmdb for showName: {}, releaseYear: {}, seasonNumber: {}, episodeNumber: {}, language: {}", showName, releaseYear, seasonNumber, episodeNumber, language);
-        List<TvSeries> tvSeriesResultsPage = tmdbApi.getSearch().searchTv(showName, null, null, null, null, releaseYear).getResults();
-        if (!tvSeriesResultsPage.isEmpty()) {
-            return Optional.of(getMetadataForEpisode(tvSeriesResultsPage.get(0), seasonNumber, episodeNumber, language));
+        SearchTv200Response tvSeriesResultsPage = tmdbClient._searchTv(showName, null, null, null, null, releaseYear).getBody();
+        if (tvSeriesResultsPage != null && !tvSeriesResultsPage.getResults().isEmpty()) {
+            return Optional.of(getMetadataForEpisode(tvSeriesResultsPage.getResults().getFirst(), seasonNumber, episodeNumber, language));
         } else {
             return Optional.empty();
         }
     }
 
-    private TMDBResult getMetadataForEpisode(TvSeries tvSeriesResultsPage, int seasonNumber, int episodeNumber, String language) throws TmdbException {
-        TvEpisodeDb episode = tmdbApi.getTvEpisodes().getDetails(tvSeriesResultsPage.getId(), seasonNumber, episodeNumber, language);
-        return TMDBResult.builder()
-                .language(Locale.forLanguageTag(language).getISO3Language())
-                .title(String.format(noTitleSetMap.get(language), episode.getEpisodeNumber()).equals(episode.getName()) ? null : episode.getName())
-                .released(LocalDate.parse(episode.getAirDate()))
-                .sourceUri("TMDB://" + episode.getId())
-                .description(episode.getOverview().trim().isEmpty() ? null : episode.getOverview())
-                .backgroundUrl(episode.getStillPath() == null ? null : "https://image.tmdb.org/t/p/original" + episode.getStillPath())
-                .build();
+    private TMDBResult getMetadataForEpisode(@Valid SearchTv200ResponseResultsInner tvSeriesResultsPage, int seasonNumber, int episodeNumber, String language) throws FeignException {
+        TvEpisodeDetails200Response episode = tmdbClient._tvEpisodeDetails(tvSeriesResultsPage.getId(), seasonNumber, episodeNumber, "", language).getBody();
+        if (episode != null && episode.getAirDate() != null && episode.getOverview() != null) {
+            return TMDBResult.builder()
+                    .language(Locale.forLanguageTag(language).getISO3Language())
+                    .title(String.format(noTitleSetMap.get(language), episode.getEpisodeNumber()).equals(episode.getName()) ? null : episode.getName())
+                    .released(LocalDate.parse(episode.getAirDate()))
+                    .sourceUri("TMDB://" + episode.getId())
+                    .description(episode.getOverview().trim().isEmpty() ? null : episode.getOverview())
+                    .backgroundUrl(episode.getStillPath() == null ? null : "https://image.tmdb.org/t/p/original" + episode.getStillPath())
+                    .build();
+        } else {
+            throw new RuntimeException("Couldn't find Episode " + seasonNumber + " " + episodeNumber + " " + language);
+        }
     }
 }

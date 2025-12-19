@@ -1,0 +1,7 @@
+{
+  "resources": [
+    {
+      "pattern": "org/springframework/web/servlet/DispatcherServlet\\.properties"
+    }
+  ]
+}

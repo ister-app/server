@@ -14,5 +14,12 @@ sonar {
 subprojects {
 	repositories {
 		mavenCentral()
+		maven {
+			url = uri("https://maven.pkg.github.com/ister-app/blurhash-java")
+			credentials {
+				username = project.findProperty("gpr.user") ?: System.getenv("GITHUB_ACTOR")
+				password = project.findProperty("gpr.key") ?: System.getenv("GITHUB_TOKEN")
+			}
+		}
 	}
 }
