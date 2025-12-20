@@ -10,7 +10,6 @@ import app.ister.server.events.TMDBMetadata.*;
 import app.ister.server.repository.DirectoryRepository;
 import app.ister.server.repository.MovieRepository;
 import app.ister.server.service.NodeService;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import feign.FeignException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -18,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
 
 import java.io.IOException;
 import java.util.List;
@@ -81,7 +81,7 @@ public class MovieFoundHandle implements Handle<MovieFoundData> {
                     }
                 }
             }
-        } catch (JsonProcessingException jpe) {
+        } catch (JacksonException jpe) {
             log.error("Cannot convert JSON into MovieFoundData", jpe);
             return false;
         } catch (FeignException e) {

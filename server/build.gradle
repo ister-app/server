@@ -26,43 +26,49 @@ configurations {
 
 
 dependencies {
-	compileOnly 'org.projectlombok:lombok:1.18.42'
-	annotationProcessor 'org.projectlombok:lombok:1.18.42'
+	// Project Lombok
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
 
-	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-	implementation("org.springframework.boot:spring-boot-starter-security")
-	implementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server")
-	implementation("org.springframework.security:spring-security-oauth2-jose")
-	runtimeOnly("com.h2database:h2")
-	runtimeOnly 'org.postgresql:postgresql'
-
-	implementation('org.springframework.boot:spring-boot-starter-actuator')
-	implementation("io.micrometer:micrometer-registry-prometheus:1.16.1")
-
+	// Spring Boot Starters
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server'
+	implementation 'org.springframework.security:spring-security-oauth2-jose'
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'org.springframework.boot:spring-boot-starter-graphql'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
-	testImplementation 'io.projectreactor:reactor-test'
-
 	implementation 'org.springframework.boot:spring-boot-starter-amqp'
 
-//	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.0")
-//	implementation("org.springdoc:springdoc-openapi-starter-webflux-ui:3.0.0")
+	// Database Drivers
+	runtimeOnly 'com.h2database:h2'
+	runtimeOnly 'org.postgresql:postgresql'
 
+	// Monitoring
+	implementation 'io.micrometer:micrometer-registry-prometheus'
 
-    implementation("jakarta.xml.bind:jakarta.xml.bind-api:4.0.4")
-    implementation("com.fasterxml.jackson.core:jackson-core:2.20.1")
+	// XML and Validation APIs
+	implementation 'jakarta.xml.bind:jakarta.xml.bind-api'
+	implementation 'jakarta.validation:jakarta.validation-api'
 
-	// https://mvnrepository.com/artifact/com.github.kokorin.jaffree/jaffree
-	implementation("com.github.kokorin.jaffree:jaffree:2024.08.29")
+	// Spring Cloud
+	implementation 'org.springframework.cloud:spring-cloud-starter-openfeign:5.0.0'
 
-	// https://mvnrepository.com/artifact/com.google.jimfs/jimfs
-	testImplementation("com.google.jimfs:jimfs:1.3.1")
+	// Jaffree Library
+	implementation 'com.github.kokorin.jaffree:jaffree:2024.08.29'
 
-    implementation "app.ister:blurhash:1.1.0"
-    implementation 'jakarta.validation:jakarta.validation-api:3.1.1'
-    implementation("org.springframework.cloud:spring-cloud-starter-openfeign:5.0.0")
+	// SpringDoc (commented out)
+	// implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.0'
+	// implementation 'org.springdoc:springdoc-openapi-starter-webflux-ui:3.0.0'
+
+	// Blurhash
+	implementation "app.ister:blurhash:1.1.0"
+
+	// Testing Dependencies
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'io.projectreactor:reactor-test'
+	testImplementation 'com.google.jimfs:jimfs:1.3.1'
 }
 
 openApiGenerate {
