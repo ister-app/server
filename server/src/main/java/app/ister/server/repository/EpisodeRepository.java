@@ -1,12 +1,14 @@
 package app.ister.server.repository;
 
 import app.ister.server.entitiy.EpisodeEntity;
+import app.ister.server.entitiy.MetadataEntity;
 import app.ister.server.entitiy.SeasonEntity;
 import app.ister.server.entitiy.ShowEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -25,6 +27,13 @@ public interface EpisodeRepository extends JpaRepository<EpisodeEntity, UUID> {
     List<IdOnly> findIdsOnlyByShowEntityId(UUID season, Sort sort);
 
     List<EpisodeEntity> findByShowEntityId(UUID season, Sort sort);
+
+    /**
+     * Returns the IDs (UUID) of episodes that have no {@link MetadataEntity} linked to them.
+     */
+    @Query("SELECT s.id FROM EpisodeEntity s LEFT JOIN s.metadataEntities m " +
+            "WHERE m IS NULL")
+    List<UUID> findIdsOfEpisodesWithoutMetadata();
 
     interface IdOnly {
 
