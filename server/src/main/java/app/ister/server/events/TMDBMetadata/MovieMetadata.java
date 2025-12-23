@@ -30,15 +30,15 @@ public class MovieMetadata {
         log.debug("Starting task executing.");
         SearchMovie200Response tvSeriesResultsPage = tmdbClient._searchMovie(name, null, null, String.valueOf(releaseYear), null, null, null).getBody();
         if (tvSeriesResultsPage != null && !tvSeriesResultsPage.getResults().isEmpty()) {
-            return Optional.of(getInfoForShow(tvSeriesResultsPage.getResults().getFirst(), language));
+            return getInfoForShow(tvSeriesResultsPage.getResults().getFirst(), language);
         }
         return Optional.empty();
     }
 
-    private TMDBResult getInfoForShow(@Valid SearchMovie200ResponseResultsInner movieResultsPage, String language) throws FeignException {
+    private Optional<TMDBResult> getInfoForShow(@Valid SearchMovie200ResponseResultsInner movieResultsPage, String language) throws FeignException {
         MovieDetails200Response movieDb = tmdbClient._movieDetails(movieResultsPage.getId(), "", language).getBody();
         if (movieDb != null && movieDb.getReleaseDate() != null && movieDb.getOverview() != null) {
-            return TMDBResult.builder()
+            return Optional.of(TMDBResult.builder()
                     .language(Locale.forLanguageTag(language).getISO3Language())
                     .title(movieDb.getTitle())
                     .released(LocalDate.parse(movieDb.getReleaseDate()))
@@ -46,9 +46,10 @@ public class MovieMetadata {
                     .description(movieDb.getOverview().trim().isEmpty() ? null : movieDb.getOverview())
                     .posterUrl(movieDb.getPosterPath() == null ? null : "https://image.tmdb.org/t/p/original" + movieDb.getPosterPath())
                     .backgroundUrl(movieDb.getBackdropPath() == null ? null : "https://image.tmdb.org/t/p/original" + movieDb.getBackdropPath())
-                    .build();
+                    .build());
         } else {
-            throw new RuntimeException("TMDB response is null");
+            log.debug("Couldn't find Movie {} {} {}", movieResultsPage.getTitle(), movieResultsPage.getReleaseDate(), language);
+            return Optional.empty();
         }
     }
 }

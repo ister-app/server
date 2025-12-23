@@ -41,25 +41,26 @@ public class EpisodeMetadata {
         log.debug("Getting metadate from tmdb for showName: {}, releaseYear: {}, seasonNumber: {}, episodeNumber: {}, language: {}", showName, releaseYear, seasonNumber, episodeNumber, language);
         SearchTv200Response tvSeriesResultsPage = tmdbClient._searchTv(showName, null, null, null, null, releaseYear).getBody();
         if (tvSeriesResultsPage != null && !tvSeriesResultsPage.getResults().isEmpty()) {
-            return Optional.of(getMetadataForEpisode(tvSeriesResultsPage.getResults().getFirst(), seasonNumber, episodeNumber, language));
+            return getMetadataForEpisode(tvSeriesResultsPage.getResults().getFirst(), seasonNumber, episodeNumber, language);
         } else {
             return Optional.empty();
         }
     }
 
-    private TMDBResult getMetadataForEpisode(@Valid SearchTv200ResponseResultsInner tvSeriesResultsPage, int seasonNumber, int episodeNumber, String language) throws FeignException {
+    private Optional<TMDBResult> getMetadataForEpisode(@Valid SearchTv200ResponseResultsInner tvSeriesResultsPage, int seasonNumber, int episodeNumber, String language) throws FeignException {
         TvEpisodeDetails200Response episode = tmdbClient._tvEpisodeDetails(tvSeriesResultsPage.getId(), seasonNumber, episodeNumber, "", language).getBody();
         if (episode != null && episode.getAirDate() != null && episode.getOverview() != null) {
-            return TMDBResult.builder()
+            return Optional.of(TMDBResult.builder()
                     .language(Locale.forLanguageTag(language).getISO3Language())
                     .title(String.format(noTitleSetMap.get(language), episode.getEpisodeNumber()).equals(episode.getName()) ? null : episode.getName())
                     .released(LocalDate.parse(episode.getAirDate()))
                     .sourceUri("TMDB://" + episode.getId())
                     .description(episode.getOverview().trim().isEmpty() ? null : episode.getOverview())
                     .backgroundUrl(episode.getStillPath() == null ? null : "https://image.tmdb.org/t/p/original" + episode.getStillPath())
-                    .build();
+                    .build());
         } else {
-            throw new RuntimeException("Couldn't find Episode " + seasonNumber + " " + episodeNumber + " " + language);
+            log.debug("Couldn't find Episode {} {} {}", seasonNumber, episodeNumber, language);
+            return Optional.empty();
         }
     }
 }

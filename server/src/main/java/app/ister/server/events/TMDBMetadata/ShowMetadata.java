@@ -30,15 +30,15 @@ public class ShowMetadata {
         log.debug("Starting task executing.");
         SearchTv200Response tvSeriesResultsPage = tmdbClient._searchTv(name, null, null, null, null, releaseYear).getBody();
         if (tvSeriesResultsPage != null && !tvSeriesResultsPage.getResults().isEmpty()) {
-            return Optional.of(getInfoForShow(tvSeriesResultsPage.getResults().getFirst(), language));
+            return getInfoForShow(tvSeriesResultsPage.getResults().getFirst(), language);
         }
         return Optional.empty();
     }
 
-    private TMDBResult getInfoForShow(@Valid SearchTv200ResponseResultsInner tvSeriesResultsPage, String language) throws FeignException {
+    private Optional<TMDBResult> getInfoForShow(@Valid SearchTv200ResponseResultsInner tvSeriesResultsPage, String language) throws FeignException {
         TvSeriesDetails200Response tvSeries1 = tmdbClient._tvSeriesDetails(tvSeriesResultsPage.getId(), "", language).getBody();
         if (tvSeries1 != null && tvSeries1.getFirstAirDate() != null && tvSeries1.getOverview() != null) {
-            return TMDBResult.builder()
+            return Optional.of(TMDBResult.builder()
                     .language(Locale.forLanguageTag(language).getISO3Language())
                     .title(tvSeries1.getName())
                     .released(LocalDate.parse(tvSeries1.getFirstAirDate()))
@@ -46,9 +46,10 @@ public class ShowMetadata {
                     .description(tvSeries1.getOverview().trim().isEmpty() ? null : tvSeries1.getOverview())
                     .posterUrl(tvSeries1.getPosterPath() == null ? null : "https://image.tmdb.org/t/p/original" + tvSeries1.getPosterPath())
                     .backgroundUrl(tvSeries1.getBackdropPath() == null ? null : "https://image.tmdb.org/t/p/original" + tvSeries1.getBackdropPath())
-                    .build();
+                    .build());
         } else {
-            throw new RuntimeException("TvSeriesDetailsResponseResultsInner is null");
+            log.debug("Couldn't find Show {} {} {}", tvSeriesResultsPage.getName(), tvSeriesResultsPage.getFirstAirDate(), language);
+            return Optional.empty();
         }
     }
 }
