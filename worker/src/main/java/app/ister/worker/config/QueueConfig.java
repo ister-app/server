@@ -1,0 +1,69 @@
+package app.ister.worker.config;
+
+import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import static app.ister.core.MessageQueue.*;
+
+@Configuration
+public class QueueConfig {
+    @Bean
+    JacksonJsonMessageConverter converter() {
+        JacksonJsonMessageConverter converter = new JacksonJsonMessageConverter();
+        converter.setNullAsOptionalEmpty(true);
+        return converter;
+    }
+
+    @Bean
+    public Queue queueMovieFound() {
+        return new Queue(APP_ISTER_SERVER_MOVIE_FOUND);
+    }
+
+    @Bean
+    public Queue queueEpisodeFound() {
+        return new Queue(APP_ISTER_SERVER_EPISODE_FOUND);
+    }
+
+    @Bean
+    Queue queueFileScanRequested() {
+        return new Queue(APP_ISTER_SERVER_FILE_SCAN_REQUESTED);
+    }
+
+    @Bean
+    public Queue queueMediaFileFound() {
+        return new Queue(APP_ISTER_SERVER_MEDIA_FILE_FOUND);
+    }
+
+    @Bean
+    public Queue queueNewDirectoriesScanRequested() {
+        return new Queue(APP_ISTER_SERVER_NEW_DIRECTORIES_SCAN_REQUESTED);
+    }
+
+    @Bean
+    public Queue queueAnalyzeLibraryRequested() {
+        return new Queue(APP_ISTER_SERVER_ANALYZE_LIBRARY_REQUESTED);
+    }
+
+    @Bean
+    public Queue queueNfoFileFound() {
+        return new Queue(APP_ISTER_SERVER_NFO_FILE_FOUND);
+    }
+
+    @Bean
+    public Queue queueShowFound() {
+        return new Queue(APP_ISTER_SERVER_SHOW_FOUND);
+    }
+
+    @Bean
+    public Queue queueSubtitleFileFound() {
+        return new Queue(APP_ISTER_SERVER_SUBTITLE_FILE_FOUND);
+    }
+
+    @Bean
+    public Queue queueImageFound() {
+        return new Queue(APP_ISTER_SERVER_IMAGE_FOUND);
+    }
+
+}

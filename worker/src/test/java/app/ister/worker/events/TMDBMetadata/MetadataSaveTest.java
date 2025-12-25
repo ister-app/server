@@ -1,0 +1,48 @@
+package app.ister.worker.events.TMDBMetadata;
+
+import app.ister.core.entitiy.EpisodeEntity;
+import app.ister.core.entitiy.MetadataEntity;
+import app.ister.core.entitiy.ShowEntity;
+import app.ister.core.repository.MetadataRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+
+import static org.mockito.Mockito.verify;
+
+@ExtendWith(MockitoExtension.class)
+class MetadataSaveTest {
+    @Mock
+    private MetadataRepository metadataRepositoryMock;
+
+    @InjectMocks
+    private MetadataSave subject;
+
+    @Test
+    void save() {
+        TMDBResult tmdbResult = TMDBResult.builder().
+                language("NL")
+                .title("TITLE")
+                .released(LocalDate.EPOCH)
+                .sourceUri("URI")
+                .description("DESCRIPTION")
+                .build();
+        ShowEntity showEntity = ShowEntity.builder().build();
+        EpisodeEntity episodeEntity = EpisodeEntity.builder().build();
+        MetadataEntity build = MetadataEntity.builder()
+                .showEntity(showEntity)
+                .episodeEntity(episodeEntity)
+                .language("NL")
+                .title("TITLE")
+                .released(LocalDate.EPOCH)
+                .sourceUri("URI")
+                .description("DESCRIPTION")
+                .build();
+        subject.save(tmdbResult, null, showEntity, episodeEntity);
+        verify(metadataRepositoryMock).save(build);
+    }
+}

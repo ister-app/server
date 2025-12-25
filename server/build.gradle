@@ -1,143 +1,52 @@
-plugins {
-	id 'java'
-	id 'org.springframework.boot' version '4.0.1'
-	id 'io.spring.dependency-management' version '1.1.7'
-	id 'org.graalvm.buildtools.native' version '0.11.3'
-    id "org.hibernate.orm" version '7.2.0.Final'
-	id 'jacoco'
-    id 'org.openapi.generator' version '7.17.0'
-}
-
-group = 'app.ister'
-version = '0.0.1-SNAPSHOT'
-
-java {
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(25)
-	}
-}
-
-configurations {
-	compileOnly {
-		extendsFrom annotationProcessor
-	}
-}
-
-
 
 dependencies {
-	// Project Lombok
-	compileOnly 'org.projectlombok:lombok'
-	annotationProcessor 'org.projectlombok:lombok'
+    implementation project(':core')
+    implementation project(':api')
+    implementation project(':disk')
+    implementation project(':transcoder')
+    implementation project(':worker')
 
-	// Spring Boot Starters
-	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-	implementation 'org.springframework.boot:spring-boot-starter-security'
-	implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server'
-	implementation 'org.springframework.security:spring-security-oauth2-jose'
-	implementation 'org.springframework.boot:spring-boot-starter-actuator'
-	implementation 'org.springframework.boot:spring-boot-starter-graphql'
-	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-	implementation 'org.springframework.boot:spring-boot-starter-webflux'
-	implementation 'org.springframework.boot:spring-boot-starter-amqp'
+    // Spring Boot Starters
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
-	// Database Drivers
-	runtimeOnly 'com.h2database:h2'
-	runtimeOnly 'org.postgresql:postgresql'
+    // Project Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
 
-	// Monitoring
-	implementation 'io.micrometer:micrometer-registry-prometheus'
+    // Database Drivers
+    runtimeOnly 'com.h2database:h2'
+    runtimeOnly 'org.postgresql:postgresql'
 
-	// XML and Validation APIs
-	implementation 'jakarta.xml.bind:jakarta.xml.bind-api'
-	implementation 'jakarta.validation:jakarta.validation-api'
+    // Monitoring
+    implementation 'io.micrometer:micrometer-registry-prometheus'
 
-	// Spring Cloud
-	implementation 'org.springframework.cloud:spring-cloud-starter-openfeign:5.0.0'
+    // SpringDoc (commented out)
+    // implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.0'
+    // implementation 'org.springdoc:springdoc-openapi-starter-webflux-ui:3.0.0'
 
-	// Jaffree Library
-	implementation 'com.github.kokorin.jaffree:jaffree:2024.08.29'
 
-	// SpringDoc (commented out)
-	// implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.0'
-	// implementation 'org.springdoc:springdoc-openapi-starter-webflux-ui:3.0.0'
-
-	// Blurhash
-	implementation "app.ister:blurhash:1.1.0"
-
-	// Testing Dependencies
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
-	testImplementation 'io.projectreactor:reactor-test'
-	testImplementation 'com.google.jimfs:jimfs:1.3.1'
 }
 
-openApiGenerate {
-    generatorName.set('spring')
-    inputSpec.set("$projectDir/src/main/resources/openapi/tmdb-api.json") // Path to your OpenAPI spec
-    outputDir.set("${buildDir}/generated") // Output directory for generated code
-    validateSpec.set(true) // Validate the OpenAPI specification before generating
-
-    modelPackage.set('app.ister.tmdbapi.model') // Package for model classes
-    apiPackage.set('app.ister.tmdbapi.api') // Package for API classes
-    nameMappings.set(["_id": "underscoreId"])
-
-    configOptions.set([
-            library: 'spring-cloud',
-            delegatePattern: 'true',
-            interfaceOnly: 'true',
-            dateLibrary: 'java8', // Use java.time for date handling
-            useSpringBoot3: 'true', // Use Jakarta EE namespace
-            useRuntimeException: 'true', // Use unchecked exceptions
-            useTags: 'true',
-            annotationLibrary: 'none',
-            documentationProvider: 'none',
-            openApiNullable: "false"
-    ])
-}
-
-// Ensure generated code is included in the compile classpath
-sourceSets {
-    main {
-        java {
-            srcDirs += "${buildDir}/generated/src/main/java"
+graalvmNative {
+    binaries {
+        named("main") {
+            mainClass.set("app.ister.server.IsterServerApplication")   // optioneel
         }
     }
 }
 
-// Run OpenAPI generation before the Java compilation
-tasks.named('compileJava') {
-    dependsOn tasks.named('openApiGenerate')
-}
-
-tasks.named('test') {
-	useJUnitPlatform()
-	// When enable native image trace agent, disable jacoco.
-//	jvmArgs '-agentlib:native-image-agent=config-merge-dir=src/main/resources/META-INF/native-image'
-}
 
 tasks.named('bootRun') {
-	bootRun.systemProperty 'spring.profiles.active', "local"
+    bootRun.systemProperty 'spring.profiles.active', "local"
 //	jvmArgs '-agentlib:native-image-agent=config-merge-dir=src/main/resources/META-INF/native-image'
 }
 
 tasks.named("bootBuildImage") {
-	imageName.set("ghcr.io/ister-app/server")
-	builder = "docker.io/paketobuildpacks/builder-jammy-full:latest"
-	runImage = "docker.io/paketobuildpacks/run-jammy-full:latest"
-	docker {
-		host = "unix:///run/user/1000/podman/podman.sock"
-		bindHostToBuilder = true
-	}
-}
-
-hibernate {
-    enhancement {
-        enableAssociationManagement = true
+    imageName.set("ghcr.io/ister-app/server")
+    builder = "docker.io/paketobuildpacks/builder-jammy-full:latest"
+    runImage = "docker.io/paketobuildpacks/run-jammy-full:latest"
+    docker {
+        host = "unix:///run/user/1000/podman/podman.sock"
+        bindHostToBuilder = true
     }
-}
-
-jacocoTestReport {
-	reports {
-		xml.required = true
-	}
 }

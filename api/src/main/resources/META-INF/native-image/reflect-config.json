@@ -1,0 +1,12 @@
+[
+  {
+    "name" : "org.springframework.data.domain.PageImpl",
+    "allDeclaredMethods" : true,
+    "allPublicMethods" : true
+  },
+  {
+    "name" : "org.springframework.data.domain.Pageable",
+    "allDeclaredMethods" : true,
+    "allPublicMethods" : true
+  }
+]

@@ -1,0 +1,75 @@
+plugins {
+    id 'org.openapi.generator' version '7.17.0'
+}
+
+
+dependencies {
+    implementation project(':core')
+
+    // Spring Boot Starters
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'
+    implementation 'org.springframework.boot:spring-boot-starter-jackson'
+
+    // Spring Cloud
+    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign:5.0.0'
+
+    // XML and Validation APIs
+    implementation 'jakarta.xml.bind:jakarta.xml.bind-api'
+    implementation 'jakarta.validation:jakarta.validation-api'
+
+    // Project Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // Jaffree Library
+    implementation 'com.github.kokorin.jaffree:jaffree:2024.08.29'
+
+    // Blurhash
+    implementation "app.ister:blurhash:1.1.0"
+
+    // Testing Dependencies
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'io.projectreactor:reactor-test'
+    testImplementation 'com.google.jimfs:jimfs:1.3.1'
+}
+
+openApiGenerate {
+    generatorName.set('spring')
+    inputSpec.set("$projectDir/src/main/resources/openapi/tmdb-api.json") // Path to your OpenAPI spec
+    outputDir.set("${buildDir}/generated") // Output directory for generated code
+    validateSpec.set(true) // Validate the OpenAPI specification before generating
+
+    modelPackage.set('app.ister.tmdbapi.model') // Package for model classes
+    apiPackage.set('app.ister.tmdbapi.api') // Package for API classes
+    nameMappings.set(["_id": "underscoreId"])
+
+    configOptions.set([
+            library: 'spring-cloud',
+            delegatePattern: 'true',
+            interfaceOnly: 'true',
+            dateLibrary: 'java8', // Use java.time for date handling
+            useSpringBoot3: 'true', // Use Jakarta EE namespace
+            useRuntimeException: 'true', // Use unchecked exceptions
+            useTags: 'true',
+            annotationLibrary: 'none',
+            documentationProvider: 'none',
+            openApiNullable: "false"
+    ])
+}
+
+// Ensure generated code is included in the compile classpath
+sourceSets {
+    main {
+        java {
+            srcDirs += "${buildDir}/generated/src/main/java"
+        }
+    }
+}
+
+
+// Run OpenAPI generation before the Java compilation
+tasks.named('compileJava') {
+    dependsOn tasks.named('openApiGenerate')
+}

@@ -1,0 +1,12 @@
+dependencies {
+    implementation project(':core')
+
+    // Project Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+    // Jaffree Library
+    implementation 'com.github.kokorin.jaffree:jaffree:2024.08.29'
+}
