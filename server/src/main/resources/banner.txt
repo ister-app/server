@@ -1,0 +1,10 @@
+${AnsiColor.BRIGHT_BLACK}${AnsiColor.BRIGHT_WHITE}██╗ ██████╗████████╗███████╗██████╗ 
+${AnsiColor.BRIGHT_BLACK}██║██╔${AnsiColor.BRIGHT_WHITE}════╝╚══██╔══╝██╔════╝██${AnsiColor.BRIGHT_BLACK}╔══██╗
+${AnsiColor.BRIGHT_BLACK}██║███████╗ ${AnsiColor.BRIGHT_WHITE}  ██║   ████${AnsiColor.BRIGHT_BLACK}███╗██████╔╝
+${AnsiColor.BRIGHT_BLACK}██║╚════██║   ██║ ${AnsiColor.BRIGHT_WHITE}  ██╔════╝██╔══██╗
+${AnsiColor.BRIGHT_BLACK}██║██████╔╝ ${AnsiColor.BRIGHT_BLACK}  ██║   ████${AnsiColor.BRIGHT_WHITE}███╗██║  ██║
+${AnsiColor.BRIGHT_BLACK}╚═╝╚══${AnsiColor.BRIGHT_BLACK}═══╝    ╚═╝   ╚══════╝╚═${AnsiColor.BRIGHT_WHITE}╝  ╚═╝
+Powered by Spring Boot: ${spring-boot.version}, java: ${java.version}
+Ister: ${git.build.version}, branch: ${git.branch}, commit: ${git.commit.id}
+Server name: ${app.ister.server.name}, url: ${app.ister.server.url}
+---

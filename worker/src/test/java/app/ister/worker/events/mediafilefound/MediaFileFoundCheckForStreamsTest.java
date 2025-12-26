@@ -12,8 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @ExtendWith(SpringExtension.class)
 @TestPropertySource(locations = {
-        "classpath:application.properties",
-//        "classpath:application-local.properties"
+        "classpath:core.properties",
+//        "classpath:core-local.properties"
 })
 class MediaFileFoundCheckForStreamsTest {
     @Value("${app.ister.server.ffmpeg-dir}")
