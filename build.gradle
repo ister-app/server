@@ -47,16 +47,23 @@ subprojects {
 		}
 	}
 
-	tasks.named('test') {
-		useJUnitPlatform()
-		// When enable native image trace agent, disable jacoco.
-//		jvmArgs '-agentlib:native-image-agent=config-merge-dir=src/main/resources/META-INF/native-image'
-	}
-
 	configurations {
+		mockitoAgent
 		compileOnly {
 			extendsFrom annotationProcessor
 		}
+	}
+
+	dependencies {
+		testImplementation("org.mockito:mockito-core")
+		mockitoAgent("org.mockito:mockito-core") { transitive = false }
+	}
+
+	tasks.named('test') {
+		jvmArgs += "-javaagent:${configurations.mockitoAgent.asPath}"
+		useJUnitPlatform()
+		// When enable native image trace agent, disable jacoco.
+//		jvmArgs '-agentlib:native-image-agent=config-merge-dir=src/main/resources/META-INF/native-image'
 	}
 
 	tasks.withType(JavaCompile) {
