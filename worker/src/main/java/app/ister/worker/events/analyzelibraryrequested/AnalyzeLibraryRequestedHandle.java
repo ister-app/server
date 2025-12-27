@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -86,21 +85,10 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
     }
 
     /**
-     * Returns true when the file on disk is newer than the stored timestamps.
+     * Returns true when no blurhash exist.
      */
     private boolean needsRefresh(ImageEntity imageEntity) {
-        try {
-            BasicFileAttributes attrs = Files.readAttributes(
-                    Path.of(imageEntity.getPath()), BasicFileAttributes.class);
-
-            Instant fileMod = attrs.lastModifiedTime().toInstant();
-            Instant storedMod = imageEntity.getFileLastModifiedTime();
-
-            return !fileMod.equals(storedMod);
-        } catch (IOException e) {
-            log.error("Failed to read attributes for {}: {}", imageEntity.getPath(), e.getMessage());
-            return false;
-        }
+        return imageEntity.getBlurHash() == null;
     }
 
     /**
