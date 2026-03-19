@@ -4,8 +4,8 @@ import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.SeasonEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.repository.SeasonRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
@@ -18,9 +18,9 @@ import java.util.UUID;
 
 @Slf4j
 @Controller
+@RequiredArgsConstructor
 public class SeasonController {
-    @Autowired
-    private SeasonRepository seasonRepository;
+    private final SeasonRepository seasonRepository;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping

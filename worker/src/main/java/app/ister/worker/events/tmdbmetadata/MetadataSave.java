@@ -1,17 +1,17 @@
-package app.ister.worker.events.TMDBMetadata;
+package app.ister.worker.events.tmdbmetadata;
 
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.repository.MetadataRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class MetadataSave {
-    @Autowired
-    private MetadataRepository metadataRepository;
+    private final MetadataRepository metadataRepository;
 
     public void save(TMDBResult tmdbResult, MovieEntity movieEntity, ShowEntity showEntity, EpisodeEntity episodeEntity) {
         metadataRepository.save(MetadataEntity.builder()

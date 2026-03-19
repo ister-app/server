@@ -19,7 +19,6 @@ import org.springframework.stereotype.Controller;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Controller
 @Slf4j
@@ -76,7 +75,7 @@ public class PlayQueueController {
             // no current item – return the first 21 items (or less)
             return all.stream()
                     .limit(21)
-                    .collect(Collectors.toList());
+                    .toList();
         }
 
         // locate the index of the current item
@@ -91,7 +90,7 @@ public class PlayQueueController {
             // currentItem points to a non‑existent row – behave like “no current”
             return all.stream()
                     .limit(21)
-                    .collect(Collectors.toList());
+                    .toList();
         }
 
         int from = Math.max(0, currentIdx - 10);

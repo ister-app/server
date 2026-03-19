@@ -1,4 +1,4 @@
-package app.ister.worker.events.TMDBMetadata;
+package app.ister.worker.events.tmdbmetadata;
 
 import app.ister.tmdbapi.model.SearchTv200Response;
 import app.ister.tmdbapi.model.SearchTv200ResponseResultsInner;

@@ -1,4 +1,4 @@
-package app.ister.worker.events.TMDBMetadata;
+package app.ister.worker.events.tmdbmetadata;
 
 import lombok.Builder;
 import lombok.Getter;

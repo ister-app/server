@@ -3,8 +3,8 @@ package app.ister.api.controller;
 import app.ister.core.entity.*;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
@@ -19,12 +19,10 @@ import java.util.UUID;
 
 @Slf4j
 @Controller
+@RequiredArgsConstructor
 public class MovieController {
-    @Autowired
-    private MovieRepository movieRepository;
-
-    @Autowired
-    private WatchStatusRepository watchStatusRepository;
+    private final MovieRepository movieRepository;
+    private final WatchStatusRepository watchStatusRepository;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping

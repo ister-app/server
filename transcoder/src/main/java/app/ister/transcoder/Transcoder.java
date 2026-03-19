@@ -29,12 +29,13 @@ public class Transcoder {
                 TimeUnit.SECONDS.sleep(5);
             } catch (InterruptedException e) {
                 log.error("Error during deleting files: ", e);
+                Thread.currentThread().interrupt();
             }
         }
         try {
             Files.list(Path.of(toDir)).forEach(path -> {
                 if (path.toString().endsWith("vtt") || path.toString().endsWith("ts") || path.toString().endsWith("m3u8") || path.toString().endsWith("srt")) {
-                    log.debug("Deleting: " + path);
+                    log.debug("Deleting: {}", path);
                     try {
                         Files.deleteIfExists(path);
                     } catch (IOException e) {

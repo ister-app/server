@@ -6,8 +6,8 @@ import app.ister.core.enums.SortingOrder;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.ShowRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -24,13 +24,11 @@ import java.util.UUID;
 
 @Slf4j
 @Controller
+@RequiredArgsConstructor
 public class ShowController {
-    @Autowired
-    private ShowRepository showRepository;
-    @Autowired
-    private EpisodeRepository episodeRepository;
-    @Autowired
-    private ImageRepository imageRepository;
+    private final ShowRepository showRepository;
+    private final EpisodeRepository episodeRepository;
+    private final ImageRepository imageRepository;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping

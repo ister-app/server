@@ -6,7 +6,7 @@ import app.ister.core.enums.ImageType;
 import app.ister.core.eventdata.EpisodeFoundData;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.Handle;
-import app.ister.worker.events.TMDBMetadata.*;
+import app.ister.worker.events.tmdbmetadata.*;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

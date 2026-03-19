@@ -1,4 +1,4 @@
-package app.ister.worker.events.TMDBMetadata;
+package app.ister.worker.events.tmdbmetadata;
 
 import app.ister.tmdbapi.model.SearchTv200Response;
 import app.ister.tmdbapi.model.SearchTv200ResponseResultsInner;
@@ -6,8 +6,8 @@ import app.ister.tmdbapi.model.TvSeriesDetails200Response;
 import app.ister.worker.clients.TmdbClient;
 import feign.FeignException;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -22,9 +22,9 @@ import java.util.Optional;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class ShowMetadata {
-    @Autowired
-    private TmdbClient tmdbClient;
+    private final TmdbClient tmdbClient;
 
     public Optional<TMDBResult> getMetadata(String name, int releaseYear, String language) {
         log.debug("Starting task executing.");

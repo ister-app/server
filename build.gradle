@@ -85,5 +85,19 @@ subprojects {
 		reports {
 			xml.required = true
 		}
+		afterEvaluate {
+			classDirectories.setFrom(files(classDirectories.files.collect {
+				fileTree(dir: it, exclude: [
+					'app/ister/tmdbapi/**',
+					'app/ister/core/entity/**',
+					'app/ister/core/enums/**',
+					'app/ister/core/eventdata/**',
+					'app/ister/*/config/**',
+					'app/ister/server/**',
+					'app/ister/disk/StartupTasks*',
+					'app/ister/disk/FileController*',
+				])
+			}))
+		}
 	}
 }

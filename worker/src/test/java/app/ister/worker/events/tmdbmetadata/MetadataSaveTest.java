@@ -1,4 +1,4 @@
-package app.ister.worker.events.TMDBMetadata;
+package app.ister.worker.events.tmdbmetadata;
 
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MetadataEntity;

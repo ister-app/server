@@ -1,4 +1,4 @@
-package app.ister.worker.events.TMDBMetadata;
+package app.ister.worker.events.tmdbmetadata;
 
 import org.springframework.stereotype.Component;
 
@@ -13,8 +13,8 @@ import java.nio.channels.ReadableByteChannel;
 public class ImageDownload {
     public void download(String imageUrl, String toPath) throws IOException {
         URL url = new URL(imageUrl);
-        ReadableByteChannel readableByteChannel = Channels.newChannel(url.openStream());
-        try (FileOutputStream fileOutputStream = new FileOutputStream(toPath)) {
+        try (ReadableByteChannel readableByteChannel = Channels.newChannel(url.openStream());
+             FileOutputStream fileOutputStream = new FileOutputStream(toPath)) {
             FileChannel fileChannel = fileOutputStream.getChannel();
             fileChannel.transferFrom(readableByteChannel, 0, Long.MAX_VALUE);
         }

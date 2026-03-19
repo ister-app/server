@@ -18,7 +18,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Controller
@@ -44,7 +43,7 @@ public class EpisodeController {
         return watchStatusRepository.findRecentEpisodesAndShowIdsByUserId(userEntity.getId())
                 .stream()
                 .flatMap(strings -> getUnwatchedEpisodes(UUID.fromString(strings[1]), UUID.fromString(strings[0])).stream())
-                .collect(Collectors.toList());
+                .toList();
     }
 
     private List<EpisodeEntity> getUnwatchedEpisodes(UUID showId, UUID episodeId) {
@@ -55,7 +54,7 @@ public class EpisodeController {
                 .filter(episode -> episode.getId().equals(episodeId))
                 .map(episodeEntity -> getFirstUnwatchedEpisodeFrom(episodeEntity, seasonEpisodes))
                 .flatMap(Optional::stream)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     private Optional<EpisodeEntity> getFirstUnwatchedEpisodeFrom(EpisodeEntity episodeEntity, List<EpisodeEntity> seasonEpisodes) {

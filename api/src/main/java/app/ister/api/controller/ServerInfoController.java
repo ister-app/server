@@ -5,7 +5,6 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.stereotype.Controller;
@@ -17,17 +16,21 @@ import java.util.List;
 @Controller
 public class ServerInfoController {
 
-    @Value("${app.ister.server.name}")
-    private String serverName;
+    private final String serverName;
+    private final String serverUrl;
+    private final String openIdConnectUrl;
+    private final NodeRepository nodeRepository;
 
-    @Value("${app.ister.server.url}")
-    private String serverUrl;
-
-    @Value("${springdoc.oAuthFlow.openIdConnectUrl}")
-    private String openIdConnectUrl;
-
-    @Autowired
-    private NodeRepository nodeRepository;
+    public ServerInfoController(
+            @Value("${app.ister.server.name}") String serverName,
+            @Value("${app.ister.server.url}") String serverUrl,
+            @Value("${springdoc.oAuthFlow.openIdConnectUrl}") String openIdConnectUrl,
+            NodeRepository nodeRepository) {
+        this.serverName = serverName;
+        this.serverUrl = serverUrl;
+        this.openIdConnectUrl = openIdConnectUrl;
+        this.nodeRepository = nodeRepository;
+    }
 
     @QueryMapping
     public ServerInfo getServerInfo() {
