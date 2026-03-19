@@ -1,9 +1,9 @@
 package app.ister.core.service;
 
-import app.ister.core.entitiy.EpisodeEntity;
-import app.ister.core.entitiy.MovieEntity;
-import app.ister.core.entitiy.UserEntity;
-import app.ister.core.entitiy.WatchStatusEntity;
+import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.MovieEntity;
+import app.ister.core.entity.UserEntity;
+import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.repository.WatchStatusRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

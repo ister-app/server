@@ -1,14 +1,15 @@
 package app.ister.core.repository;
 
-import app.ister.core.entitiy.EpisodeEntity;
-import app.ister.core.entitiy.MetadataEntity;
-import app.ister.core.entitiy.SeasonEntity;
-import app.ister.core.entitiy.ShowEntity;
+import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.MetadataEntity;
+import app.ister.core.entity.SeasonEntity;
+import app.ister.core.entity.ShowEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -34,6 +35,15 @@ public interface EpisodeRepository extends JpaRepository<EpisodeEntity, UUID> {
     @Query("SELECT s.id FROM EpisodeEntity s LEFT JOIN s.metadataEntities m " +
             "WHERE m IS NULL")
     List<UUID> findIdsOfEpisodesWithoutMetadata();
+
+    /**
+     * Returns the IDs (UUID) of episodes that have no {@link MetadataEntity} linked to them
+     * and have a media file on the given node.
+     */
+    @Query("SELECT DISTINCT e.id FROM EpisodeEntity e LEFT JOIN e.metadataEntities m " +
+            "JOIN e.mediaFileEntities mf JOIN mf.directoryEntity d " +
+            "WHERE m IS NULL AND d.nodeEntity.name = :nodeName")
+    List<UUID> findIdsOfEpisodesWithoutMetadataForNode(@Param("nodeName") String nodeName);
 
     interface IdOnly {
 

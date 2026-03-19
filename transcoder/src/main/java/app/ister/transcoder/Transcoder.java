@@ -1,6 +1,6 @@
 package app.ister.transcoder;
 
-import app.ister.core.entitiy.MediaFileStreamEntity;
+import app.ister.core.entity.MediaFileStreamEntity;
 import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.ffmpeg.*;
 import lombok.extern.slf4j.Slf4j;

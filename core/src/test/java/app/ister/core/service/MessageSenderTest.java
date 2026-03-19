@@ -35,29 +35,29 @@ class MessageSenderTest {
     @Test
     void sendFileScanRequested() {
         FileScanRequestedData data = FileScanRequestedData.builder().build();
-        subject.sendFileScanRequested(data);
-        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_FILE_SCAN_REQUESTED, data);
+        subject.sendFileScanRequested(data, "disk1");
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_FILE_SCAN_REQUESTED + ".disk1", data);
     }
 
     @Test
     void sendMediaFileFound() {
         MediaFileFoundData data = MediaFileFoundData.builder().build();
-        subject.sendMediaFileFound(data);
-        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_MEDIA_FILE_FOUND, data);
+        subject.sendMediaFileFound(data, "disk1");
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_MEDIA_FILE_FOUND + ".disk1", data);
     }
 
     @Test
     void sendNewDirectoriesScanRequested() {
         NewDirectoriesScanRequestedData data = NewDirectoriesScanRequestedData.builder().build();
-        subject.sendNewDirectoriesScanRequested(data);
-        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_NEW_DIRECTORIES_SCAN_REQUESTED, data);
+        subject.sendNewDirectoriesScanRequested(data, "disk1");
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_NEW_DIRECTORIES_SCAN_REQUESTED + ".disk1", data);
     }
 
     @Test
     void sendNfoFileFound() {
         NfoFileFoundData data = NfoFileFoundData.builder().build();
-        subject.sendNfoFileFound(data);
-        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_NFO_FILE_FOUND, data);
+        subject.sendNfoFileFound(data, "disk1");
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_NFO_FILE_FOUND + ".disk1", data);
     }
 
     @Test
@@ -70,7 +70,35 @@ class MessageSenderTest {
     @Test
     void sendSubtitleFileFound() {
         SubtitleFileFoundData data = SubtitleFileFoundData.builder().build();
-        subject.sendSubtitleFileFound(data);
-        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_SUBTITLE_FILE_FOUND, data);
+        subject.sendSubtitleFileFound(data, "disk1");
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_SUBTITLE_FILE_FOUND + ".disk1", data);
+    }
+
+    @Test
+    void sendImageFound() {
+        ImageFoundData data = ImageFoundData.builder().build();
+        subject.sendImageFound(data, "disk1");
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_IMAGE_FOUND + ".disk1", data);
+    }
+
+    @Test
+    void sendMovieFound() {
+        MovieFoundData data = MovieFoundData.builder().build();
+        subject.sendMovieFound(data);
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_MOVIE_FOUND, data);
+    }
+
+    @Test
+    void sendAnalyzeLibraryRequested() {
+        AnalyzeLibraryRequestedData data = AnalyzeLibraryRequestedData.builder().build();
+        subject.sendAnalyzeLibraryRequested(data, "node1");
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_ANALYZE_LIBRARY_REQUESTED + ".node1", data);
+    }
+
+    @Test
+    void sendUpdateImagesRequested() {
+        UpdateImagesRequestedData data = UpdateImagesRequestedData.builder().build();
+        subject.sendUpdateImagesRequested(data, "disk1");
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_UPDATE_IMAGES_REQUESTED + ".disk1", data);
     }
 }

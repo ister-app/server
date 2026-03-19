@@ -1,9 +1,9 @@
 package app.ister.core.repository;
 
-import app.ister.core.entitiy.EpisodeEntity;
-import app.ister.core.entitiy.MovieEntity;
-import app.ister.core.entitiy.UserEntity;
-import app.ister.core.entitiy.WatchStatusEntity;
+import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.MovieEntity;
+import app.ister.core.entity.UserEntity;
+import app.ister.core.entity.WatchStatusEntity;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;

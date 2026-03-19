@@ -1,19 +1,14 @@
 package app.ister.worker.events.showfound;
 
-import app.ister.core.entitiy.NodeEntity;
-import app.ister.core.entitiy.ShowEntity;
-import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
-import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.ShowRepository;
-import app.ister.core.service.NodeService;
-import app.ister.worker.events.Handle;
+import app.ister.core.Handle;
 import app.ister.worker.events.TMDBMetadata.*;
 import feign.FeignException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,31 +17,23 @@ import tools.jackson.core.JacksonException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import static app.ister.core.MessageQueue.APP_ISTER_SERVER_SHOW_FOUND;
 
 @Service
 @Transactional
 @Slf4j
+@RequiredArgsConstructor
 public class HandleShowFound implements Handle<app.ister.core.eventdata.ShowFoundData> {
     // List of languages in https://en.wikipedia.org/wiki/ISO_639-1.
     private static final List<String> supportLanguages = List.of("en", "nl");
-    @Autowired
-    private NodeService nodeService;
-    @Autowired
-    private DirectoryRepository directoryRepository;
-    @Autowired
-    private ShowRepository showRepository;
-    @Autowired
-    private ShowMetadata showMetadata;
-    @Autowired
-    private MetadataSave metaDataSave;
-    @Autowired
-    private ImageDownload imageDownload;
-    @Autowired
-    private ImageSave imageSave;
-    @Value("${app.ister.server.TMDB.apikey:'No api key available'}")
+
+    private final ShowRepository showRepository;
+    private final ShowMetadata showMetadata;
+    private final MetadataSave metaDataSave;
+    private final ImageDownloadService imageDownloadService;
+
+    @Value("${app.ister.server.TMDB.apikey:}")
     private String apikey;
 
     @Override
@@ -63,20 +50,21 @@ public class HandleShowFound implements Handle<app.ister.core.eventdata.ShowFoun
     @Override
     public Boolean handle(app.ister.core.eventdata.ShowFoundData showFoundData) {
         // If no tmdb api key is set. Skip this event.
-        if (apikey.equals("'No api key available'")) {
+        if (apikey == null || apikey.isBlank()) {
+            log.warn("No TMDB API key configured, skipping metadata fetch");
             return true;
         }
         try {
-            ShowEntity showEntity = showRepository.findById(showFoundData.getShowId()).orElseThrow();
+            var showEntity = showRepository.findById(showFoundData.getShowId()).orElseThrow();
             for (String language : supportLanguages) {
                 Optional<TMDBResult> TMDBResult = showMetadata.getMetadata(showEntity.getName(), showEntity.getReleaseYear(), language);
                 if (TMDBResult.isPresent()) {
                     metaDataSave.save(TMDBResult.get(), null, showEntity, null);
                     if (TMDBResult.get().getBackgroundUrl() != null) {
-                        getAndSaveImage(TMDBResult.get().getBackgroundUrl(), ImageType.BACKGROUND, TMDBResult.get().getLanguage(), showEntity);
+                        imageDownloadService.downloadAndSave(TMDBResult.get().getBackgroundUrl(), ImageType.BACKGROUND, TMDBResult.get().getLanguage(), null, showEntity, null);
                     }
                     if (TMDBResult.get().getPosterUrl() != null) {
-                        getAndSaveImage(TMDBResult.get().getPosterUrl(), ImageType.COVER, TMDBResult.get().getLanguage(), showEntity);
+                        imageDownloadService.downloadAndSave(TMDBResult.get().getPosterUrl(), ImageType.COVER, TMDBResult.get().getLanguage(), null, showEntity, null);
                     }
                 }
             }
@@ -91,14 +79,5 @@ public class HandleShowFound implements Handle<app.ister.core.eventdata.ShowFoun
             return false;
         }
         return true;
-    }
-
-    private void getAndSaveImage(String imageUrl, ImageType imageType, String language, ShowEntity showEntity) throws IOException {
-        NodeEntity nodeEntity = nodeService.getOrCreateNodeEntityForThisNode();
-        var cacheDisk = directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity).stream().findFirst().orElseThrow();
-
-        String path = cacheDisk.getPath() + UUID.randomUUID() + ".jpg";
-        imageDownload.download(imageUrl, path);
-        imageSave.save(cacheDisk, path, imageType, language, "TMDB://" + imageUrl, null, showEntity, null);
     }
 }

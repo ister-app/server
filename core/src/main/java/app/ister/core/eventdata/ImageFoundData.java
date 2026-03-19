@@ -1,6 +1,6 @@
 package app.ister.core.eventdata;
 
-import app.ister.core.entitiy.ImageEntity;
+import app.ister.core.entity.ImageEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import lombok.AccessLevel;
@@ -37,9 +37,9 @@ public class ImageFoundData extends MessageData {
                 .imageType(imageEntity.getType())
                 .language(imageEntity.getLanguage())
                 .sourceUri(imageEntity.getSourceUri())
-                .movieEntityId(imageEntity.getMovieEntity() == null ? null : imageEntity.getMovieEntity().getId())
-                .showEntityId(imageEntity.getShowEntity() == null ? null : imageEntity.getShowEntity().getId())
-                .episodeEntityId(imageEntity.getEpisodeEntity() == null ? null : imageEntity.getEpisodeEntity().getId())
+                .movieEntityId(imageEntity.getMovieEntity() == null ? imageEntity.getMovieEntityId() : imageEntity.getMovieEntity().getId())
+                .showEntityId(imageEntity.getShowEntity() == null ? imageEntity.getShowEntityId() : imageEntity.getShowEntity().getId())
+                .episodeEntityId(imageEntity.getEpisodeEntity() == null ? imageEntity.getEpisodeEntityId() : imageEntity.getEpisodeEntity().getId())
                 .build();
     }
 }

@@ -31,11 +31,28 @@ enum SortingOrder {
     ASCENDING
 }
 
+enum LibraryType {
+    MOVIE
+    SHOW
+}
+
+enum DirectoryType {
+    LIBRARY
+    CACHE
+}
+
 type ServerInfo {
     name: String!
     url: String!
-    version: String!
     openIdUrl: String!
+    nodes: [Node!]!
+}
+
+type Node {
+    id: ID!
+    name: String!
+    url: String!
+    version: String!
 }
 
 type Episode {
@@ -57,6 +74,7 @@ type Image {
     sourceUri: String
     show: Show
     blurHash: String
+    directory: Directory!
 }
 
 type MediaFile {
@@ -66,6 +84,22 @@ type MediaFile {
     size: Float!
     durationInMilliseconds: Int
     mediaFileStreams: [MediaFileStream]
+    directory: Directory!
+}
+
+type Directory {
+    id: ID!
+    name: String!
+    node: Node!
+    library: Library!
+    path: String!
+    type: DirectoryType!
+}
+
+type Library {
+    id: ID!
+    name: String!
+    type: LibraryType!
 }
 
 type MediaFileStream {

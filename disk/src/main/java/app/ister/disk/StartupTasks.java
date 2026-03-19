@@ -1,8 +1,8 @@
 package app.ister.disk;
 
-import app.ister.core.entitiy.DirectoryEntity;
-import app.ister.core.entitiy.LibraryEntity;
-import app.ister.core.entitiy.NodeEntity;
+import app.ister.core.entity.DirectoryEntity;
+import app.ister.core.entity.LibraryEntity;
+import app.ister.core.entity.NodeEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.LibraryRepository;
@@ -11,39 +11,42 @@ import app.ister.disk.config.AppIsterServerConfig;
 import app.ister.disk.config.DirectoryConfigClass;
 import app.ister.disk.config.LibraryConfigClass;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
 @Slf4j
 @Component
-public class StartupTasks {
+public class StartupTasks implements ApplicationListener<ContextRefreshedEvent> {
 
-    @Autowired
-    private NodeService nodeService;
+    private final NodeService nodeService;
 
-    @Autowired
-    private AppIsterServerConfig appIsterServerConfig;
+    private final AppIsterServerConfig appIsterServerConfig;
 
-    @Autowired
-    private DirectoryRepository directoryRepository;
+    private final DirectoryRepository directoryRepository;
 
-    @Autowired
-    private LibraryRepository libraryRepository;
+    private final LibraryRepository libraryRepository;
 
     @Value("${app.ister.server.cache-dir}")
     private String cacheDir;
 
+    public StartupTasks(NodeService nodeService, AppIsterServerConfig appIsterServerConfig, DirectoryRepository directoryRepository, LibraryRepository libraryRepository) {
+        this.nodeService = nodeService;
+        this.appIsterServerConfig = appIsterServerConfig;
+        this.directoryRepository = directoryRepository;
+        this.libraryRepository = libraryRepository;
+    }
+
     /**
      * Create the node, libraries and directories (als the cache directory) entities in the database if they not exist there.
      */
-    @EventListener(ContextRefreshedEvent.class)
-    public void contextRefreshedEvent() {
-        NodeEntity nodeEntity = nodeService.getOrCreateNodeEntityForThisNode();
+    @Override
+    public void onApplicationEvent(ContextRefreshedEvent event) {
+        log.debug("Server started with the appIsterServerConfig: {}", appIsterServerConfig);
+        NodeEntity nodeEntity = nodeService.updateOrCreateNodeEntityForThisNode();
 
         appIsterServerConfig.getLibraries().forEach(this::handleLibrariesFromConfig);
         appIsterServerConfig.getDirectories().forEach(directoryConfigClass -> handleDirectoriesFromConfig(directoryConfigClass, nodeEntity));

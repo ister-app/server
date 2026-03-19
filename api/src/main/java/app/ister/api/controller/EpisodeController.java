@@ -1,6 +1,6 @@
 package app.ister.api.controller;
 
-import app.ister.core.entitiy.*;
+import app.ister.core.entity.*;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import app.ister.core.service.UserService;
@@ -124,6 +124,14 @@ public class EpisodeController {
     @SchemaMapping(typeName = "MediaFile", field = "mediaFileStreams")
     public List<MediaFileStreamEntity> mediaFileStreams(MediaFileEntity mediaFileEntity) {
         return mediaFileEntity.getMediaFileStreamEntity();
+    }
+
+    @SchemaMapping(typeName = "MediaFile", field = "episodes")
+    public List<EpisodeEntity> episodes(MediaFileEntity mediaFileEntity) {
+        if (mediaFileEntity.getEpisodeEntity() == null) {
+            return List.of();
+        }
+        return List.of(mediaFileEntity.getEpisodeEntity());
     }
 
 }

@@ -1,9 +1,9 @@
 package app.ister.api.controller;
 
-import app.ister.core.entitiy.EpisodeEntity;
-import app.ister.core.entitiy.MovieEntity;
-import app.ister.core.entitiy.PlayQueueEntity;
-import app.ister.core.entitiy.PlayQueueItemEntity;
+import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.MovieEntity;
+import app.ister.core.entity.PlayQueueEntity;
+import app.ister.core.entity.PlayQueueItemEntity;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.service.PlayQueueService;

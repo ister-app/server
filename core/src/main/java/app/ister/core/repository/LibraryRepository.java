@@ -1,6 +1,6 @@
 package app.ister.core.repository;
 
-import app.ister.core.entitiy.LibraryEntity;
+import app.ister.core.entity.LibraryEntity;
 import org.springframework.data.repository.CrudRepository;
 
 import java.util.Optional;

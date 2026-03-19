@@ -11,4 +11,5 @@ public enum EventType {
     NFO_FILE_FOUND,
     SUBTITLE_FILE_FOUND,
     IMAGE_FOUND,
+    UPDATE_IMAGES_REQUESTED,
 }

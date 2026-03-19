@@ -1,8 +1,8 @@
 package app.ister.worker.events.TMDBMetadata;
 
-import app.ister.core.entitiy.EpisodeEntity;
-import app.ister.core.entitiy.MetadataEntity;
-import app.ister.core.entitiy.ShowEntity;
+import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.MetadataEntity;
+import app.ister.core.entity.ShowEntity;
 import app.ister.core.repository.MetadataRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

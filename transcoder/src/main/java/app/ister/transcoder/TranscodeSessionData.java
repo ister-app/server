@@ -1,6 +1,6 @@
 package app.ister.transcoder;
 
-import app.ister.core.entitiy.MediaFileEntity;
+import app.ister.core.entity.MediaFileEntity;
 import lombok.Builder;
 import lombok.Getter;
 

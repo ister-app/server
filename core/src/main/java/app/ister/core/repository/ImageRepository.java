@@ -1,7 +1,7 @@
 package app.ister.core.repository;
 
-import app.ister.core.entitiy.DirectoryEntity;
-import app.ister.core.entitiy.ImageEntity;
+import app.ister.core.entity.DirectoryEntity;
+import app.ister.core.entity.ImageEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.CrudRepository;

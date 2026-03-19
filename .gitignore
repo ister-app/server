@@ -39,6 +39,7 @@ out/
 
 ### Database files
 db-data/
+db-data-1/
 
 ### Local files
 **/*-local.*

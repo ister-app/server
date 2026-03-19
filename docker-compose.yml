@@ -13,14 +13,14 @@ services:
     ports:
       - "5432:5432"
   rabbitMQ:
-      image: rabbitmq:3-management
-      restart: always
-      ports:
-        - "5672:5672"
-        - "15672:15672"
-      environment:
-        RABBITMQ_DEFAULT_USER: user
-        RABBITMQ_DEFAULT_PASS: password
+    image: rabbitmq:3-management
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: user
+      RABBITMQ_DEFAULT_PASS: password
   server:
     image: ghcr.io/ister-app/server:latest
     restart: always
@@ -28,23 +28,20 @@ services:
       DB_HOST: database
       APP_ISTER_SERVER_NAME: Test server
       APP_ISTER_SERVER_URL: http://localhost:8080
-      APP_ISTER_SERVER_LIBRARIES_0_NAME: shows
-      APP_ISTER_SERVER_LIBRARIES_0_TYPE: SHOW
-#      APP_ISTER_SERVER_DIRECTORIES_0_NAME: disk1
-#      APP_ISTER_SERVER_DIRECTORIES_0_PATH: /disk1
-#      APP_ISTER_SERVER_DIRECTORIES_0_LIBRARY: shows
-#      APP_ISTER_SERVER_DIRECTORIES_1_NAME: disk2
-#      APP_ISTER_SERVER_DIRECTORIES_1_PATH: /disk2
-#      APP_ISTER_SERVER_DIRECTORIES_1_LIBRARY: shows
+      APP_ISTER_DISK_LIBRARIES_0_NAME: shows
+      APP_ISTER_DISK_LIBRARIES_0_TYPE: SHOW
+#      APP_ISTER_DISK_DIRECTORIES_0_NAME: disk1
+#      APP_ISTER_DISK_DIRECTORIES_0_PATH: /disk1
+#      APP_ISTER_DISK_DIRECTORIES_0_LIBRARY: shows
+#      APP_ISTER_DISK_DIRECTORIES_1_NAME: disk2
+#      APP_ISTER_DISK_DIRECTORIES_1_PATH: /disk2
+#      APP_ISTER_DISK_DIRECTORIES_1_LIBRARY: shows
+      SPRING_RABBITMQ_HOST: rabbitMQ
+      SPRING_RABBITMQ_USERNAME: user
+      SPRING_RABBITMQ_PASSWORD: password
       OIDC_URL: https://localhost:8060/realms/Ister
     ports:
       - "8080:8080"
     depends_on:
       - database
-  website:
-    image: ghcr.io/ister-app/website:latest
-    restart: always
-    ports:
-      - "8090:8080"
-    depends_on:
-      - server
+      - rabbitMQ

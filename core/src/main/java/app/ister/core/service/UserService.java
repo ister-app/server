@@ -1,6 +1,6 @@
 package app.ister.core.service;
 
-import app.ister.core.entitiy.UserEntity;
+import app.ister.core.entity.UserEntity;
 import app.ister.core.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -1,8 +1,8 @@
 package app.ister.api.controller;
 
-import app.ister.core.entitiy.EpisodeEntity;
-import app.ister.core.entitiy.SeasonEntity;
-import app.ister.core.entitiy.ShowEntity;
+import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.SeasonEntity;
+import app.ister.core.entity.ShowEntity;
 import app.ister.core.repository.SeasonRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

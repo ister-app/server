@@ -1,6 +1,6 @@
 package app.ister.api.controller;
 
-import app.ister.core.entitiy.*;
+import app.ister.core.entity.*;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.repository.EpisodeRepository;

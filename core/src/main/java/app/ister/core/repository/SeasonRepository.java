@@ -1,7 +1,7 @@
 package app.ister.core.repository;
 
-import app.ister.core.entitiy.SeasonEntity;
-import app.ister.core.entitiy.ShowEntity;
+import app.ister.core.entity.SeasonEntity;
+import app.ister.core.entity.ShowEntity;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.repository.CrudRepository;
 

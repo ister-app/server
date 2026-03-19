@@ -1,6 +1,6 @@
 package app.ister.core.service;
 
-import app.ister.core.entitiy.*;
+import app.ister.core.entity.*;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.SeasonRepository;

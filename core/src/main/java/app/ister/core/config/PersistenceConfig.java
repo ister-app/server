@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @Configuration
 @EnableTransactionManagement
 @EnableJpaRepositories("app.ister.core.repository")
-@EntityScan("app.ister.core.entitiy")
+@EntityScan("app.ister.core.entity")
 @EnableJpaAuditing
 public class PersistenceConfig {
 }

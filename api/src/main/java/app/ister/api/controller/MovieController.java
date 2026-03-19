@@ -1,6 +1,6 @@
 package app.ister.api.controller;
 
-import app.ister.core.entitiy.*;
+import app.ister.core.entity.*;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import lombok.extern.slf4j.Slf4j;

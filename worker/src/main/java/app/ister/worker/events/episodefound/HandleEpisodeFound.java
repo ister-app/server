@@ -1,22 +1,16 @@
 package app.ister.worker.events.episodefound;
 
 import app.ister.core.MessageQueue;
-import app.ister.core.entitiy.EpisodeEntity;
-import app.ister.core.entitiy.NodeEntity;
-import app.ister.core.entitiy.ShowEntity;
-import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.eventdata.EpisodeFoundData;
-import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
-import app.ister.core.service.NodeService;
-import app.ister.worker.events.Handle;
+import app.ister.core.Handle;
 import app.ister.worker.events.TMDBMetadata.*;
 import feign.FeignException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,29 +19,21 @@ import tools.jackson.core.JacksonException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 @Slf4j
 @Transactional
+@RequiredArgsConstructor
 public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
     // List of languages in https://en.wikipedia.org/wiki/ISO_639-1.
     private static final List<String> supportLanguages = List.of("en", "nl");
-    @Autowired
-    private NodeService nodeService;
-    @Autowired
-    private DirectoryRepository directoryRepository;
-    @Autowired
-    private EpisodeRepository episodeRepository;
-    @Autowired
-    private EpisodeMetadata episodeMetadata;
-    @Autowired
-    private MetadataSave metaDataSave;
-    @Autowired
-    private ImageDownload imageDownload;
-    @Autowired
-    private ImageSave imageSave;
-    @Value("${app.ister.server.TMDB.apikey:'No api key available'}")
+
+    private final EpisodeRepository episodeRepository;
+    private final EpisodeMetadata episodeMetadata;
+    private final MetadataSave metaDataSave;
+    private final ImageDownloadService imageDownloadService;
+
+    @Value("${app.ister.server.TMDB.apikey:}")
     private String apikey;
 
     @Override
@@ -64,21 +50,22 @@ public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
     @Override
     public Boolean handle(app.ister.core.eventdata.EpisodeFoundData episodeFoundData) {
         // If no tmdb api key is set. Skip this event.
-        if (apikey.equals("'No api key available'")) {
+        if (apikey == null || apikey.isBlank()) {
+            log.warn("No TMDB API key configured, skipping metadata fetch");
             return true;
         }
         try {
-            EpisodeEntity episodeEntity = episodeRepository.findById(episodeFoundData.getEpisodeId()).orElseThrow();
+            var episodeEntity = episodeRepository.findById(episodeFoundData.getEpisodeId()).orElseThrow();
             for (String language : supportLanguages) {
-                ShowEntity showEntity = episodeEntity.getShowEntity();
+                var showEntity = episodeEntity.getShowEntity();
                 Optional<TMDBResult> TMDBResult = episodeMetadata.getMetadata(showEntity.getName(), showEntity.getReleaseYear(), episodeEntity.getSeasonEntity().getNumber(), episodeEntity.getNumber(), language);
                 if (TMDBResult.isPresent()) {
                     metaDataSave.save(TMDBResult.get(), null, null, episodeEntity);
                     if (TMDBResult.get().getBackgroundUrl() != null) {
-                        getAndSaveImage(TMDBResult.get().getBackgroundUrl(), ImageType.BACKGROUND, TMDBResult.get().getLanguage(), episodeEntity);
+                        imageDownloadService.downloadAndSave(TMDBResult.get().getBackgroundUrl(), ImageType.BACKGROUND, TMDBResult.get().getLanguage(), null, null, episodeEntity);
                     }
                     if (TMDBResult.get().getPosterUrl() != null) {
-                        getAndSaveImage(TMDBResult.get().getPosterUrl(), ImageType.COVER, TMDBResult.get().getLanguage(), episodeEntity);
+                        imageDownloadService.downloadAndSave(TMDBResult.get().getPosterUrl(), ImageType.COVER, TMDBResult.get().getLanguage(), null, null, episodeEntity);
                     }
                 }
             }
@@ -93,14 +80,5 @@ public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
             return false;
         }
         return true;
-    }
-
-    private void getAndSaveImage(String imageUrl, ImageType imageType, String language, EpisodeEntity episodeEntity) throws IOException {
-        NodeEntity nodeEntity = nodeService.getOrCreateNodeEntityForThisNode();
-        var cacheDisk = directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity).stream().findFirst().orElseThrow();
-
-        String toPath = cacheDisk.getPath() + UUID.randomUUID() + ".jpg";
-        imageDownload.download(imageUrl, toPath);
-        imageSave.save(cacheDisk, toPath, imageType, language, "TMDB://" + imageUrl, null, null, episodeEntity);
     }
 }

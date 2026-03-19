@@ -1,11 +1,11 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '4.0.1' apply false
+	id 'org.springframework.boot' version '4.0.3' apply false
 	id 'io.spring.dependency-management' version '1.1.7' apply false
-	id "org.hibernate.orm" version '7.2.0.Final' apply false
-	id 'org.graalvm.buildtools.native' version '0.11.3' apply false
+	id "org.hibernate.orm" version '7.2.7.Final' apply false
+	id 'org.graalvm.buildtools.native' version '0.11.5' apply false
 	id 'jacoco'
-	id "org.sonarqube" version "7.2.2.6593"
+	id "org.sonarqube" version "7.2.3.7755"
 }
 
 sonar {
@@ -19,11 +19,14 @@ sonar {
 subprojects {
 	apply plugin: 'java'
 	apply plugin: 'io.spring.dependency-management'
-	apply plugin: 'org.hibernate.orm'
 	apply plugin: 'jacoco'
 
+	if (project.name == 'core') {
+		apply plugin: 'org.hibernate.orm'
+	}
+
 	group = 'app.ister'
-	version = '0.0.1-SNAPSHOT'
+	version = '0.0.2-SNAPSHOT'
 
 	if (project.name == 'server') {
 		apply plugin: 'org.springframework.boot'
@@ -70,9 +73,11 @@ subprojects {
 		options.compilerArgs += ['-parameters']
 	}
 
-	hibernate {
-		enhancement {
-			enableAssociationManagement = true
+	if (project.name == 'core') {
+		hibernate {
+			enhancement {
+				enableAssociationManagement = true
+			}
 		}
 	}
 

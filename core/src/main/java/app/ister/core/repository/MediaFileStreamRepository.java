@@ -1,7 +1,7 @@
 package app.ister.core.repository;
 
-import app.ister.core.entitiy.MediaFileEntity;
-import app.ister.core.entitiy.MediaFileStreamEntity;
+import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.MediaFileStreamEntity;
 import org.springframework.data.repository.CrudRepository;
 
 import java.util.Optional;

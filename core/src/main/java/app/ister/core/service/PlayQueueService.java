@@ -1,9 +1,9 @@
 package app.ister.core.service;
 
-import app.ister.core.entitiy.MediaFileEntity;
-import app.ister.core.entitiy.PlayQueueEntity;
-import app.ister.core.entitiy.PlayQueueItemEntity;
-import app.ister.core.entitiy.WatchStatusEntity;
+import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.PlayQueueEntity;
+import app.ister.core.entity.PlayQueueItemEntity;
+import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.MediaType;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;

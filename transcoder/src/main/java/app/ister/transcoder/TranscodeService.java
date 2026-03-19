@@ -1,7 +1,7 @@
 package app.ister.transcoder;
 
-import app.ister.core.entitiy.MediaFileEntity;
-import app.ister.core.entitiy.MediaFileStreamEntity;
+import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.MediaFileStreamEntity;
 import app.ister.core.enums.StreamCodecType;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
