@@ -3,6 +3,8 @@ package app.ister.disk.scanner;
 import app.ister.disk.scanner.enums.DirType;
 import app.ister.disk.scanner.enums.FileType;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -119,35 +121,18 @@ class PathObjectTest {
         assertEquals(FileType.IMAGE, subject.getFileType());
     }
 
-    @Test
-    void episodeTest() {
-        var subject = new PathObject("/disk/shows/Show (2024)/s01e12.mkv");
+    @ParameterizedTest
+    @CsvSource({
+        "/disk/shows/Show (2024)/s01e12.mkv, 1, 12",
+        "/disk/shows/Show (2024)/Season 02/s02e99.mkv, 2, 99",
+        "/disk/shows/Show (2024)/Season 05/S05E05.mkv, 5, 5"
+    })
+    void episodeTest(String path, int season, int episode) {
+        var subject = new PathObject(path);
         assertEquals(2024, subject.getYear());
         assertEquals("Show", subject.getName());
-        assertEquals(1, subject.getSeason());
-        assertEquals(12, subject.getEpisode());
-        assertEquals(DirType.EPISODE, subject.getDirType());
-        assertEquals(FileType.MEDIA, subject.getFileType());
-    }
-
-    @Test
-    void episodeInSeasonDirTest() {
-        var subject = new PathObject("/disk/shows/Show (2024)/Season 02/s02e99.mkv");
-        assertEquals(2024, subject.getYear());
-        assertEquals("Show", subject.getName());
-        assertEquals(2, subject.getSeason());
-        assertEquals(99, subject.getEpisode());
-        assertEquals(DirType.EPISODE, subject.getDirType());
-        assertEquals(FileType.MEDIA, subject.getFileType());
-    }
-
-    @Test
-    void episodeWithCapitolInSeasonDirTest() {
-        var subject = new PathObject("/disk/shows/Show (2024)/Season 05/S05E05.mkv");
-        assertEquals(2024, subject.getYear());
-        assertEquals("Show", subject.getName());
-        assertEquals(5, subject.getSeason());
-        assertEquals(5, subject.getEpisode());
+        assertEquals(season, subject.getSeason());
+        assertEquals(episode, subject.getEpisode());
         assertEquals(DirType.EPISODE, subject.getDirType());
         assertEquals(FileType.MEDIA, subject.getFileType());
     }

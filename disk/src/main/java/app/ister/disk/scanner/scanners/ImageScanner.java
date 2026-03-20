@@ -11,8 +11,8 @@ import app.ister.core.service.ScannerHelperService;
 import app.ister.disk.scanner.PathObject;
 import app.ister.disk.scanner.enums.DirType;
 import app.ister.disk.scanner.enums.FileType;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,15 +24,13 @@ import java.util.Optional;
 @Component
 @Slf4j
 @Transactional(propagation = Propagation.REQUIRES_NEW)
+@RequiredArgsConstructor
 public class ImageScanner implements Scanner {
-    private final static List<String> BACKGROUND_FILE_NAMES = List.of("background", "thumb");
-    private final static List<String> COVER_FILE_NAMES = List.of("cover");
-    @Autowired
-    private ScannerHelperService scannerHelperService;
-    @Autowired
-    private ImageRepository imageRepository;
-    @Autowired
-    private MessageSender messageSender;
+    private static final List<String> BACKGROUND_FILE_NAMES = List.of("background", "thumb");
+    private static final List<String> COVER_FILE_NAMES = List.of("cover");
+    private final ScannerHelperService scannerHelperService;
+    private final ImageRepository imageRepository;
+    private final MessageSender messageSender;
 
     @Override
     public boolean analyzable(Path path, Boolean isRegularFile, long size) {

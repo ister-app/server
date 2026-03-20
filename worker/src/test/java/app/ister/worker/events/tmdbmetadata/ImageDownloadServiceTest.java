@@ -21,7 +21,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -76,8 +75,8 @@ class ImageDownloadServiceTest {
         assertTrue(downloadedPath.startsWith("/cache/"));
         assertTrue(downloadedPath.endsWith(".jpg"));
 
-        verify(imageSave).save(eq(cacheDisk), eq(downloadedPath), eq(ImageType.BACKGROUND), eq("en"),
-                eq("TMDB://http://example.com/img.jpg"), eq(movie), eq(null), eq(null));
+        verify(imageSave).save(cacheDisk, downloadedPath, ImageType.BACKGROUND, "en",
+                "TMDB://http://example.com/img.jpg", movie, null, null);
     }
 
     @Test

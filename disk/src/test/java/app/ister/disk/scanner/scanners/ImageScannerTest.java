@@ -43,11 +43,9 @@ class ImageScannerTest {
 
     @Test
     void notAnalyzable() {
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/background.jpg"), true, 0));
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/cover.png"), true, 0));
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/cover.jpg"), true, 0));
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/background.png"), true, 0));
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/s01e01.jpg"), true, 0));
+        assertFalse(subject.analyzable(Path.of("/disk/show/Show (2024)/s01e01.mkv"), true, 0));
+        assertFalse(subject.analyzable(Path.of("/disk/show/Show (2024)/background.jpg"), false, 0));
+        assertFalse(subject.analyzable(Path.of("/disk/show/Show (2024)/tvshow.nfo"), true, 0));
     }
 
     @Test

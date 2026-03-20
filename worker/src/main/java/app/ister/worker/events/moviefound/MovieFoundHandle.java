@@ -58,14 +58,14 @@ public class MovieFoundHandle implements Handle<MovieFoundData> {
         try {
             var movieEntity = movieRepository.findById(movieFoundData.getMovieId()).orElseThrow();
             for (String language : supportLanguages) {
-                Optional<TMDBResult> TMDBResult = movieMetadata.getMetadata(movieEntity.getName(), movieEntity.getReleaseYear(), language);
-                if (TMDBResult.isPresent()) {
-                    metaDataSave.save(TMDBResult.get(), movieEntity, null, null);
-                    if (TMDBResult.get().getBackgroundUrl() != null) {
-                        imageDownloadService.downloadAndSave(TMDBResult.get().getBackgroundUrl(), ImageType.BACKGROUND, TMDBResult.get().getLanguage(), movieEntity, null, null);
+                Optional<TMDBResult> tmdbResult = movieMetadata.getMetadata(movieEntity.getName(), movieEntity.getReleaseYear(), language);
+                if (tmdbResult.isPresent()) {
+                    metaDataSave.save(tmdbResult.get(), movieEntity, null, null);
+                    if (tmdbResult.get().getBackgroundUrl() != null) {
+                        imageDownloadService.downloadAndSave(tmdbResult.get().getBackgroundUrl(), ImageType.BACKGROUND, tmdbResult.get().getLanguage(), movieEntity, null, null);
                     }
-                    if (TMDBResult.get().getPosterUrl() != null) {
-                        imageDownloadService.downloadAndSave(TMDBResult.get().getPosterUrl(), ImageType.COVER, TMDBResult.get().getLanguage(), movieEntity, null, null);
+                    if (tmdbResult.get().getPosterUrl() != null) {
+                        imageDownloadService.downloadAndSave(tmdbResult.get().getPosterUrl(), ImageType.COVER, tmdbResult.get().getLanguage(), movieEntity, null, null);
                     }
                 }
             }

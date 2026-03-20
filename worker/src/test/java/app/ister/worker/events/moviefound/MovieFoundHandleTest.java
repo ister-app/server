@@ -99,7 +99,7 @@ class MovieFoundHandleTest {
     }
 
     @Test
-    void handleWithResultHavingNoUrls() throws IOException {
+    void handleWithResultHavingNoUrls() {
         ReflectionTestUtils.setField(subject, "apikey", "test-key");
         UUID movieId = UUID.randomUUID();
         MovieEntity movieEntity = MovieEntity.builder().id(movieId).name("Movie").releaseYear(2024).build();

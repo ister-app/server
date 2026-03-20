@@ -57,14 +57,14 @@ public class HandleShowFound implements Handle<app.ister.core.eventdata.ShowFoun
         try {
             var showEntity = showRepository.findById(showFoundData.getShowId()).orElseThrow();
             for (String language : supportLanguages) {
-                Optional<TMDBResult> TMDBResult = showMetadata.getMetadata(showEntity.getName(), showEntity.getReleaseYear(), language);
-                if (TMDBResult.isPresent()) {
-                    metaDataSave.save(TMDBResult.get(), null, showEntity, null);
-                    if (TMDBResult.get().getBackgroundUrl() != null) {
-                        imageDownloadService.downloadAndSave(TMDBResult.get().getBackgroundUrl(), ImageType.BACKGROUND, TMDBResult.get().getLanguage(), null, showEntity, null);
+                Optional<TMDBResult> tmdbResult = showMetadata.getMetadata(showEntity.getName(), showEntity.getReleaseYear(), language);
+                if (tmdbResult.isPresent()) {
+                    metaDataSave.save(tmdbResult.get(), null, showEntity, null);
+                    if (tmdbResult.get().getBackgroundUrl() != null) {
+                        imageDownloadService.downloadAndSave(tmdbResult.get().getBackgroundUrl(), ImageType.BACKGROUND, tmdbResult.get().getLanguage(), null, showEntity, null);
                     }
-                    if (TMDBResult.get().getPosterUrl() != null) {
-                        imageDownloadService.downloadAndSave(TMDBResult.get().getPosterUrl(), ImageType.COVER, TMDBResult.get().getLanguage(), null, showEntity, null);
+                    if (tmdbResult.get().getPosterUrl() != null) {
+                        imageDownloadService.downloadAndSave(tmdbResult.get().getPosterUrl(), ImageType.COVER, tmdbResult.get().getLanguage(), null, showEntity, null);
                     }
                 }
             }

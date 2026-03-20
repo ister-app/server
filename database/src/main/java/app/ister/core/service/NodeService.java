@@ -2,16 +2,16 @@ package app.ister.core.service;
 
 import app.ister.core.entity.NodeEntity;
 import app.ister.core.repository.NodeRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class NodeService {
-    @Autowired
-    private NodeRepository nodeRepository;
+    private final NodeRepository nodeRepository;
 
     @Value("${app.ister.server.name}")
     private String nodeName;

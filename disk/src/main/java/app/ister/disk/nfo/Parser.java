@@ -13,6 +13,8 @@ import java.util.Optional;
 @Slf4j
 public class Parser {
 
+    private Parser() {}
+
     public static Optional<ShowNfo> parseShow(String path) throws FileNotFoundException {
         File file = new File(path);
         InputStream stream = new FileInputStream(file);

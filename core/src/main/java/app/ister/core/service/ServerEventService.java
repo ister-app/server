@@ -4,17 +4,17 @@ import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.EpisodeFoundData;
 import app.ister.core.eventdata.MovieFoundData;
 import app.ister.core.eventdata.ShowFoundData;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class ServerEventService {
-    @Autowired
-    private MessageSender messageSender;
+    private final MessageSender messageSender;
 
     public void createMovieFoundEvent(UUID movieId) {
         messageSender.sendMovieFound(MovieFoundData.builder()

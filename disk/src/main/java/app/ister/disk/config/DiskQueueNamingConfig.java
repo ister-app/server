@@ -1,6 +1,6 @@
 package app.ister.disk.config;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
@@ -9,10 +9,10 @@ import java.util.stream.Stream;
 import static app.ister.core.MessageQueue.*;
 
 @Configuration
+@RequiredArgsConstructor
 public class DiskQueueNamingConfig {
 
-    @Autowired
-    private AppIsterServerConfig config;
+    private final AppIsterServerConfig config;
 
     @Value("${app.ister.server.name}")
     private String nodeName;

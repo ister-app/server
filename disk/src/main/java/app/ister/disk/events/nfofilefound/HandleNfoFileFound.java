@@ -11,9 +11,9 @@ import app.ister.core.Handle;
 import app.ister.disk.nfo.Parser;
 import app.ister.disk.scanner.PathObject;
 import app.ister.disk.scanner.enums.DirType;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,13 +22,11 @@ import java.io.FileNotFoundException;
 @Service
 @Transactional
 @Slf4j
+@RequiredArgsConstructor
 public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
-    @Autowired
-    private DirectoryRepository directoryRepository;
-    @Autowired
-    private MetadataRepository metadataRepository;
-    @Autowired
-    private ScannerHelperService scannerHelperService;
+    private final DirectoryRepository directoryRepository;
+    private final MetadataRepository metadataRepository;
+    private final ScannerHelperService scannerHelperService;
 
     @Override
     public EventType handles() {
@@ -67,7 +65,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
                     .released(parsed.getPremiered())
                     .showEntity(show)
                     .sourceUri("file://" + path).build());
-        } catch (FileNotFoundException e) {
+        } catch (FileNotFoundException _) {
             log.error("Something went wrong when nfo parsing: {}", path);
         }
     }
@@ -82,7 +80,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
                     .released(parsed.getAired())
                     .episodeEntity(episode)
                     .sourceUri("file://" + path).build());
-        } catch (FileNotFoundException e) {
+        } catch (FileNotFoundException _) {
             log.error("Something went wrong when nfo parsing: {}", path);
         }
     }

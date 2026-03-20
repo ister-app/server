@@ -8,7 +8,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
-import java.io.IOException;
 
 import static app.ister.core.MessageQueue.*;
 import static org.mockito.Mockito.verify;
@@ -21,7 +20,7 @@ class MessageSenderTest {
     private MessageSender subject;
 
     @BeforeEach
-    void setUp() throws IOException {
+    void setUp() {
         subject = new MessageSender(rabbitTemplateMock);
     }
 

@@ -99,7 +99,7 @@ class HandleShowFoundTest {
     }
 
     @Test
-    void handleWithResultHavingNoUrls() throws IOException {
+    void handleWithResultHavingNoUrls() {
         ReflectionTestUtils.setField(subject, "apikey", "test-key");
         UUID showId = UUID.randomUUID();
         ShowEntity showEntity = ShowEntity.builder().id(showId).name("Show").releaseYear(2024).build();

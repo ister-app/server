@@ -9,7 +9,7 @@ import app.ister.core.enums.ImageType;
 import app.ister.core.eventdata.ImageFoundData;
 import app.ister.core.service.MessageSender;
 import lombok.RequiredArgsConstructor;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component

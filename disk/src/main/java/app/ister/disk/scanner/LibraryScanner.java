@@ -9,8 +9,8 @@ import app.ister.disk.scanner.scanners.ImageScanner;
 import app.ister.disk.scanner.scanners.MediaFileScanner;
 import app.ister.disk.scanner.scanners.NfoScanner;
 import app.ister.disk.scanner.scanners.SubtitleScanner;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -21,23 +21,16 @@ import java.util.EnumSet;
 
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class LibraryScanner {
-    @Autowired
-    private MessageSender messageSender;
-    @Autowired
-    private MediaFileScanner mediaFileScanner;
-    @Autowired
-    private ImageScanner imageScanner;
-    @Autowired
-    private NfoScanner nfoScanner;
-    @Autowired
-    private SubtitleScanner subtitleScanner;
-    @Autowired
-    private ImageRepository imageRepository;
-    @Autowired
-    private MediaFileRepository mediaFileRepository;
-    @Autowired
-    private OtherPathFileRepository otherPathFileRepository;
+    private final MessageSender messageSender;
+    private final MediaFileScanner mediaFileScanner;
+    private final ImageScanner imageScanner;
+    private final NfoScanner nfoScanner;
+    private final SubtitleScanner subtitleScanner;
+    private final ImageRepository imageRepository;
+    private final MediaFileRepository mediaFileRepository;
+    private final OtherPathFileRepository otherPathFileRepository;
 
     public void scanDirectory(DirectoryEntity directoryEntity) throws IOException {
         scanDirectory(Path.of(directoryEntity.getPath()), directoryEntity);

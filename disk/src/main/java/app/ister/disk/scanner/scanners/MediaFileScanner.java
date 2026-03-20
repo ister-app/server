@@ -9,8 +9,8 @@ import app.ister.core.service.ScannerHelperService;
 import app.ister.disk.scanner.PathObject;
 import app.ister.disk.scanner.enums.DirType;
 import app.ister.disk.scanner.enums.FileType;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,13 +23,11 @@ import java.util.UUID;
 @Component
 @Slf4j
 @Transactional(propagation = Propagation.REQUIRES_NEW)
+@RequiredArgsConstructor
 public class MediaFileScanner implements Scanner {
-    @Autowired
-    private ScannerHelperService scannerHelperService;
-    @Autowired
-    private MediaFileRepository mediaFileRepository;
-    @Autowired
-    private MessageSender messageSender;
+    private final ScannerHelperService scannerHelperService;
+    private final MediaFileRepository mediaFileRepository;
+    private final MessageSender messageSender;
 
     @Override
     public boolean analyzable(Path path, Boolean isRegularFile, long size) {
@@ -55,9 +53,7 @@ public class MediaFileScanner implements Scanner {
                 movieEntity = Optional.of(scannerHelperService.getOrCreateMovie(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear()));
                 movieId = movieEntity.get().getId();
             }
-            default -> {
-                throw new IllegalStateException("Only EPISODE or MOVIE is supported");
-            }
+            default -> throw new IllegalStateException("Only EPISODE or MOVIE is supported");
         }
 
         Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString());

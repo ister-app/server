@@ -7,7 +7,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class SubtitleFilePathParser {
-    private final static String REGEX_FOR_LANG_CODE = ".*\\.(.*)\\.srt";
+    private static final String REGEX_FOR_LANG_CODE = ".*\\.(.*)\\.srt";
+
+    private SubtitleFilePathParser() {}
 
     /**
      * Get the 3-letter iso 3 code from a path string.

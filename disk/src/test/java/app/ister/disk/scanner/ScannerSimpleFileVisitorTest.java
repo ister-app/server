@@ -104,7 +104,7 @@ class ScannerSimpleFileVisitorTest {
 
             var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
 
-            assertEquals(result, FileVisitResult.CONTINUE);
+            assertEquals(FileVisitResult.CONTINUE, result);
         }
 
         @Test
@@ -114,7 +114,7 @@ class ScannerSimpleFileVisitorTest {
 
             var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
 
-            assertEquals(result, FileVisitResult.SKIP_SUBTREE);
+            assertEquals(FileVisitResult.SKIP_SUBTREE, result);
         }
     }
 }

@@ -10,7 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface SeasonRepository extends CrudRepository<SeasonEntity, UUID> {
-    Optional<SeasonEntity> findByShowEntityAndNumber(ShowEntity ShowEntity, int number);
+    Optional<SeasonEntity> findByShowEntityAndNumber(ShowEntity showEntity, int number);
 
-    List<SeasonEntity> findByShowEntityId(UUID TVShow, Sort sort);
+    List<SeasonEntity> findByShowEntityId(UUID tvShow, Sort sort);
 }

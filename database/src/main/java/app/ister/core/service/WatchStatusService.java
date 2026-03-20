@@ -5,8 +5,8 @@ import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.repository.WatchStatusRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
@@ -15,11 +15,10 @@ import java.util.UUID;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class WatchStatusService {
-    @Autowired
-    private UserService userService;
-    @Autowired
-    private WatchStatusRepository watchStatusRepository;
+    private final UserService userService;
+    private final WatchStatusRepository watchStatusRepository;
 
     public WatchStatusEntity getOrCreate(Authentication authentication, UUID playQueueItemId, EpisodeEntity episodeEntity, MovieEntity movieEntity) {
         UserEntity userEntity = userService.getOrCreateUser(authentication);

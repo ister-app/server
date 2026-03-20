@@ -11,8 +11,8 @@ import app.ister.core.service.MessageSender;
 import app.ister.disk.scanner.PathObject;
 import app.ister.disk.scanner.enums.DirType;
 import app.ister.disk.scanner.enums.FileType;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,11 +23,10 @@ import java.util.Optional;
 @Component
 @Slf4j
 @Transactional(propagation = Propagation.REQUIRES_NEW)
+@RequiredArgsConstructor
 public class NfoScanner implements Scanner {
-    @Autowired
-    private OtherPathFileRepository otherPathFileRepository;
-    @Autowired
-    private MessageSender messageSender;
+    private final OtherPathFileRepository otherPathFileRepository;
+    private final MessageSender messageSender;
 
     @Override
     public boolean analyzable(Path path, Boolean isRegularFile, long size) {

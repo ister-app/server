@@ -151,13 +151,11 @@ public class PlayQueueService {
             playQueueRepository.save(playQueueEntity);
             // Update the watch status of an episode if it's played for more then one minute
             if (progressInMilliseconds > 60000) {
-                switch (playQueueItemEntity.getType()) {
-                    case EPISODE ->
-                            updateEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
-                    case MOVIE ->
-                            updateMovieWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
+                if (playQueueItemEntity.getType() == MediaType.EPISODE) {
+                    updateEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
+                } else if (playQueueItemEntity.getType() == MediaType.MOVIE) {
+                    updateMovieWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
                 }
-
             }
         });
     }

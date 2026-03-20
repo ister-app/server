@@ -58,14 +58,14 @@ public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
             var episodeEntity = episodeRepository.findById(episodeFoundData.getEpisodeId()).orElseThrow();
             for (String language : supportLanguages) {
                 var showEntity = episodeEntity.getShowEntity();
-                Optional<TMDBResult> TMDBResult = episodeMetadata.getMetadata(showEntity.getName(), showEntity.getReleaseYear(), episodeEntity.getSeasonEntity().getNumber(), episodeEntity.getNumber(), language);
-                if (TMDBResult.isPresent()) {
-                    metaDataSave.save(TMDBResult.get(), null, null, episodeEntity);
-                    if (TMDBResult.get().getBackgroundUrl() != null) {
-                        imageDownloadService.downloadAndSave(TMDBResult.get().getBackgroundUrl(), ImageType.BACKGROUND, TMDBResult.get().getLanguage(), null, null, episodeEntity);
+                Optional<TMDBResult> tmdbResult = episodeMetadata.getMetadata(showEntity.getName(), showEntity.getReleaseYear(), episodeEntity.getSeasonEntity().getNumber(), episodeEntity.getNumber(), language);
+                if (tmdbResult.isPresent()) {
+                    metaDataSave.save(tmdbResult.get(), null, null, episodeEntity);
+                    if (tmdbResult.get().getBackgroundUrl() != null) {
+                        imageDownloadService.downloadAndSave(tmdbResult.get().getBackgroundUrl(), ImageType.BACKGROUND, tmdbResult.get().getLanguage(), null, null, episodeEntity);
                     }
-                    if (TMDBResult.get().getPosterUrl() != null) {
-                        imageDownloadService.downloadAndSave(TMDBResult.get().getPosterUrl(), ImageType.COVER, TMDBResult.get().getLanguage(), null, null, episodeEntity);
+                    if (tmdbResult.get().getPosterUrl() != null) {
+                        imageDownloadService.downloadAndSave(tmdbResult.get().getPosterUrl(), ImageType.COVER, tmdbResult.get().getLanguage(), null, null, episodeEntity);
                     }
                 }
             }

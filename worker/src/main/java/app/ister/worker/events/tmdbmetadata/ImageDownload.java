@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URL;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
@@ -12,7 +13,7 @@ import java.nio.channels.ReadableByteChannel;
 @Component
 public class ImageDownload {
     public void download(String imageUrl, String toPath) throws IOException {
-        URL url = new URL(imageUrl);
+        URL url = URI.create(imageUrl).toURL();
         try (ReadableByteChannel readableByteChannel = Channels.newChannel(url.openStream());
              FileOutputStream fileOutputStream = new FileOutputStream(toPath)) {
             FileChannel fileChannel = fileOutputStream.getChannel();

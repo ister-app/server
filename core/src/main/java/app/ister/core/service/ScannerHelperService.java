@@ -5,25 +5,21 @@ import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.SeasonRepository;
 import app.ister.core.repository.ShowRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class ScannerHelperService {
-    @Autowired
-    private MovieRepository movieRepository;
-    @Autowired
-    private ShowRepository showRepository;
-    @Autowired
-    private SeasonRepository seasonRepository;
-    @Autowired
-    private EpisodeRepository episodeRepository;
-    @Autowired
-    private ServerEventService serverEventService;
+    private final MovieRepository movieRepository;
+    private final ShowRepository showRepository;
+    private final SeasonRepository seasonRepository;
+    private final EpisodeRepository episodeRepository;
+    private final ServerEventService serverEventService;
 
     /**
      * Check if the database contains a show wit the given parameters.

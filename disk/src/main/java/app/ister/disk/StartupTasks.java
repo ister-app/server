@@ -63,7 +63,7 @@ public class StartupTasks implements ApplicationListener<ContextRefreshedEvent> 
                         .libraryType(libraryConfigClass.getType())
                         .name(libraryConfigClass.getName()).build();
                 libraryRepository.save(libraryEntity);
-            } catch (DataIntegrityViolationException e) {
+            } catch (DataIntegrityViolationException _) {
                 log.debug("Library '{}' was already created by another node", libraryConfigClass.getName());
             }
         }
@@ -75,7 +75,7 @@ public class StartupTasks implements ApplicationListener<ContextRefreshedEvent> 
             DirectoryEntity directoryEntity = directoryEntityOptional.get();
             // Check that the directory is used by the correct node
             if (!directoryEntity.getNodeEntity().equals(nodeEntity)) {
-                throw new RuntimeException("Directory " + directoryConfigClass.getName() + " name is already used by an other node");
+                throw new IllegalStateException("Directory " + directoryConfigClass.getName() + " name is already used by an other node");
             }
             // Check if the path of the directory is changed and if so change it in the database
             if (!directoryEntity.getPath().equals(directoryConfigClass.getPath())) {

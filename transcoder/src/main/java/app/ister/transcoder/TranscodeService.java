@@ -8,8 +8,8 @@ import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.repository.PlayQueueRepository;
 import com.github.kokorin.jaffree.ffmpeg.ProgressListener;
 import jakarta.annotation.PreDestroy;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -27,14 +27,12 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class TranscodeService {
     private final ArrayList<TranscodeSessionData> transcodeSessionEntities = new ArrayList<>();
-    @Autowired
-    private MediaFileRepository mediaFileRepository;
-    @Autowired
-    private MediaFileStreamRepository mediaFileStreamRepository;
-    @Autowired
-    private PlayQueueRepository playQueueRepository;
+    private final MediaFileRepository mediaFileRepository;
+    private final MediaFileStreamRepository mediaFileStreamRepository;
+    private final PlayQueueRepository playQueueRepository;
     @Value("${app.ister.server.tmp-dir}")
     private String tmpDir;
     @Value("${app.ister.server.ffmpeg-dir}")

@@ -11,8 +11,8 @@ import app.ister.core.service.ScannerHelperService;
 import app.ister.core.Handle;
 import app.ister.disk.scanner.PathObject;
 import app.ister.disk.scanner.enums.DirType;
+import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,13 +21,11 @@ import static app.ister.disk.events.subtitlefilefound.SubtitleFilePathParser.med
 
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class HandleSubtitleFileFound implements Handle<SubtitleFileFoundData> {
-    @Autowired
-    private DirectoryRepository directoryRepository;
-    @Autowired
-    private ScannerHelperService scannerHelperService;
-    @Autowired
-    private MediaFileStreamRepository mediaFileStreamRepository;
+    private final DirectoryRepository directoryRepository;
+    private final ScannerHelperService scannerHelperService;
+    private final MediaFileStreamRepository mediaFileStreamRepository;
 
     @Override
     public EventType handles() {

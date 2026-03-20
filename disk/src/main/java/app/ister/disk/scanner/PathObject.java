@@ -15,15 +15,15 @@ import java.util.regex.Pattern;
 @Slf4j
 public class PathObject {
 
-    private final static String REGEX_MOVIE = ".*\\/(.*)\\((\\d{4})\\)[a-zA-Z-]*\\.[a-zA-Z]+";
-    private final static String REGEX_SHOW = ".*\\/(.*)\\((\\d{4})\\)*";
-    private final static String REGEX_SEASON = "season\\s+(\\d{1,4})";
-    private final static String REGEX_EPISODE = "s(\\d{1,4})e(\\d{1,4}).*";
-    private final static String REGEX_FILE_TYPE = ".*\\.(.*)";
-    private final static List<String> IMAGE_FILE_TYPES = List.of("jpg", "png");
-    private final static List<String> NFO_FILE_TYPES = List.of("nfo");
-    private final static List<String> MEDIA_FILES_FILE_TYPES = List.of("mkv", "mp4");
-    private final static List<String> SUBTITLE_FILES_FILE_TYPES = List.of("srt");
+    private static final String REGEX_MOVIE = ".*\\/(.*)\\((\\d{4})\\)[a-zA-Z-]*\\.[a-zA-Z]+";
+    private static final String REGEX_SHOW = ".*\\/(.*)\\((\\d{4})\\)*";
+    private static final String REGEX_SEASON = "season\\s+(\\d{1,4})";
+    private static final String REGEX_EPISODE = "s(\\d{1,4})e(\\d{1,4}).*";
+    private static final String REGEX_FILE_TYPE = ".*\\.(.*)";
+    private static final List<String> IMAGE_FILE_TYPES = List.of("jpg", "png");
+    private static final List<String> NFO_FILE_TYPES = List.of("nfo");
+    private static final List<String> MEDIA_FILES_FILE_TYPES = List.of("mkv", "mp4");
+    private static final List<String> SUBTITLE_FILES_FILE_TYPES = List.of("srt");
     private String name;
     private int year;
     private int season;
@@ -45,7 +45,7 @@ public class PathObject {
         }
     }
 
-    private Boolean setMovie(String path) {
+    private boolean setMovie(String path) {
         var matches = regex(REGEX_MOVIE, path);
         if (matches.isPresent()) {
             name = matches.get().group(1).trim();
@@ -57,7 +57,7 @@ public class PathObject {
         }
     }
 
-    private Boolean setName(String path) {
+    private boolean setName(String path) {
         var matches = regex(REGEX_SHOW, path);
         if (matches.isPresent()) {
             name = matches.get().group(1).trim();
@@ -69,7 +69,7 @@ public class PathObject {
         }
     }
 
-    private Boolean setSeason(String path) {
+    private boolean setSeason(String path) {
         var matches = regex(REGEX_SEASON, path.toLowerCase());
         if (matches.isPresent()) {
             season = Integer.parseInt(matches.get().group(1));
@@ -80,7 +80,7 @@ public class PathObject {
         }
     }
 
-    private Boolean setEpisode(String path) {
+    private boolean setEpisode(String path) {
         var matches = regex(REGEX_EPISODE, path.toLowerCase());
         if (matches.isPresent()) {
             season = Integer.parseInt(matches.get().group(1));

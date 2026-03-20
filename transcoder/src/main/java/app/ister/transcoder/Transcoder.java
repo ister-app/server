@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 public class Transcoder {
+    private static final String ERROR_DURING_DELETING_FILES = "Error during deleting files: ";
     private final String dirOfFFmpeg;
     private FFmpegResultFuture async;
     private String toDir;
@@ -28,7 +29,7 @@ public class Transcoder {
             try {
                 TimeUnit.SECONDS.sleep(5);
             } catch (InterruptedException e) {
-                log.error("Error during deleting files: ", e);
+                log.error(ERROR_DURING_DELETING_FILES, e);
                 Thread.currentThread().interrupt();
             }
         }
@@ -39,13 +40,13 @@ public class Transcoder {
                     try {
                         Files.deleteIfExists(path);
                     } catch (IOException e) {
-                        log.error("Error during deleting files: ", e);
+                        log.error(ERROR_DURING_DELETING_FILES, e);
                     }
                 }
             });
             Files.deleteIfExists(Path.of(toDir));
         } catch (IOException e) {
-            log.error("Error during deleting files: ", e);
+            log.error(ERROR_DURING_DELETING_FILES, e);
         }
     }
 

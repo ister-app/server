@@ -31,20 +31,22 @@ public interface WatchStatusRepository extends CrudRepository<WatchStatusEntity,
      *         records are found or if the user has no watch status updates in the last 150 days.
      */
     @Query(
-            value = "WITH added_row_number AS (\n" +
-                    "  SELECT\n" +
-                    "    *,\n" +
-                    "    ROW_NUMBER() OVER(PARTITION BY ee.show_entity_id ORDER BY wse.date_updated DESC) AS row_number\n" +
-                    "  FROM watch_status_entity wse\n" +
-                    "  LEFT JOIN episode_entity ee ON wse.episode_entity_id  = ee.id\n" +
-                    "  WHERE user_entity_id = :userId AND episode_entity_id IS NOT NULL\n" +
-                    "    AND wse.date_updated >= CURRENT_DATE - INTERVAL '150 days'\n" +
-                    "  ORDER BY wse.date_updated DESC \n" +
-                    ")\n" +
-                    "SELECT\n" +
-                    "  added_row_number.episode_entity_id, added_row_number.show_entity_id\n" +
-                    "FROM added_row_number\n" +
-                    "WHERE row_number = 1;",
+            value = """
+                    WITH added_row_number AS (
+                      SELECT
+                        *,
+                        ROW_NUMBER() OVER(PARTITION BY ee.show_entity_id ORDER BY wse.date_updated DESC) AS row_number
+                      FROM watch_status_entity wse
+                      LEFT JOIN episode_entity ee ON wse.episode_entity_id  = ee.id
+                      WHERE user_entity_id = :userId AND episode_entity_id IS NOT NULL
+                        AND wse.date_updated >= CURRENT_DATE - INTERVAL '150 days'
+                      ORDER BY wse.date_updated DESC
+                    )
+                    SELECT
+                      added_row_number.episode_entity_id, added_row_number.show_entity_id
+                    FROM added_row_number
+                    WHERE row_number = 1;
+                    """,
             nativeQuery = true
     )
     List<String[]> findRecentEpisodesAndShowIdsByUserId(@Param("userId") UUID userId);
