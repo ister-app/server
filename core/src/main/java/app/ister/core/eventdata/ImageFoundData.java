@@ -28,6 +28,8 @@ public class ImageFoundData extends MessageData {
     private UUID showEntityId;
     @Nullable
     private UUID episodeEntityId;
+    @Nullable
+    private UUID seasonEntityId;
 
     public static ImageFoundData fromImageEntity(ImageEntity imageEntity) {
         return ImageFoundData.builder()
@@ -40,6 +42,7 @@ public class ImageFoundData extends MessageData {
                 .movieEntityId(imageEntity.getMovieEntity() == null ? imageEntity.getMovieEntityId() : imageEntity.getMovieEntity().getId())
                 .showEntityId(imageEntity.getShowEntity() == null ? imageEntity.getShowEntityId() : imageEntity.getShowEntity().getId())
                 .episodeEntityId(imageEntity.getEpisodeEntity() == null ? imageEntity.getEpisodeEntityId() : imageEntity.getEpisodeEntity().getId())
+                .seasonEntityId(imageEntity.getSeasonEntity() == null ? imageEntity.getSeasonEntityId() : imageEntity.getSeasonEntity().getId())
                 .build();
     }
 }

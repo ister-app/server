@@ -18,6 +18,7 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class ImageEntity extends FileFromPathEntity {
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ImageType type;
 

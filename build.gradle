@@ -1,6 +1,6 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '4.0.3' apply false
+	id 'org.springframework.boot' version '4.0.4' apply false
 	id 'io.spring.dependency-management' version '1.1.7' apply false
 	id "org.hibernate.orm" version '7.2.7.Final' apply false
 	id 'org.graalvm.buildtools.native' version '0.11.5' apply false
@@ -13,6 +13,7 @@ sonar {
 		property "sonar.projectKey", "ister-app_server"
 		property "sonar.organization", "ister-app"
 		property "sonar.host.url", "https://sonarcloud.io"
+		property "sonar.coverage.exclusions", "**/tmdbapi/**,**/core/entity/**,**/core/enums/**,**/core/eventdata/**,**/config/**,**/server/**,**/disk/StartupTasks*,**/disk/FileController*"
 	}
 }
 
@@ -21,7 +22,7 @@ subprojects {
 	apply plugin: 'io.spring.dependency-management'
 	apply plugin: 'jacoco'
 
-	if (project.name == 'core') {
+	if (project.name == 'database') {
 		apply plugin: 'org.hibernate.orm'
 	}
 
@@ -73,13 +74,6 @@ subprojects {
 		options.compilerArgs += ['-parameters']
 	}
 
-	if (project.name == 'core') {
-		hibernate {
-			enhancement {
-				enableAssociationManagement = true
-			}
-		}
-	}
 
 	jacocoTestReport {
 		reports {

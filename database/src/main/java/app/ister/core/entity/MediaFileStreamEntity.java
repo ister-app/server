@@ -24,6 +24,7 @@ public class MediaFileStreamEntity extends BaseEntity {
     @Column(nullable = false)
     private String codecName;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private StreamCodecType codecType;
 

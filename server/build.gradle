@@ -53,3 +53,14 @@ tasks.named("bootBuildImage") {
         bindHostToBuilder = true
     }
 }
+
+tasks.register("buildServerImage", Exec) {
+    dependsOn tasks.named("nativeCompile")
+    group = "docker"
+    description = "Builds the native server Docker image ghcr.io/ister-app/server"
+    commandLine "/usr/bin/podman", "build",
+            "--file", "${rootProject.projectDir}/Dockerfile.native",
+            "--tag", "ghcr.io/ister-app/server:latest",
+            "--tag", "ghcr.io/ister-app/server:${project.version}",
+            "${rootProject.projectDir}"
+}

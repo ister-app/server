@@ -66,6 +66,7 @@ public class ImageScanner implements Scanner {
             }
 
             ImageEntity build = imageEntity.build();
+            imageRepository.save(build);
             messageSender.sendImageFound(ImageFoundData.fromImageEntity(build), directoryEntity.getName());
             return Optional.of(build);
         } else {

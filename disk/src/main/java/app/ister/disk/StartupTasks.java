@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -57,10 +58,14 @@ public class StartupTasks implements ApplicationListener<ContextRefreshedEvent> 
 
     private void handleLibrariesFromConfig(LibraryConfigClass libraryConfigClass) {
         if (libraryRepository.findByName(libraryConfigClass.getName()).isEmpty()) {
-            LibraryEntity libraryEntity = LibraryEntity.builder()
-                    .libraryType(libraryConfigClass.getType())
-                    .name(libraryConfigClass.getName()).build();
-            libraryRepository.save(libraryEntity);
+            try {
+                LibraryEntity libraryEntity = LibraryEntity.builder()
+                        .libraryType(libraryConfigClass.getType())
+                        .name(libraryConfigClass.getName()).build();
+                libraryRepository.save(libraryEntity);
+            } catch (DataIntegrityViolationException e) {
+                log.debug("Library '{}' was already created by another node", libraryConfigClass.getName());
+            }
         }
     }
 

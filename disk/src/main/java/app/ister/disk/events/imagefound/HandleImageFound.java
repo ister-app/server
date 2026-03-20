@@ -1,6 +1,5 @@
 package app.ister.disk.events.imagefound;
 
-import app.ister.core.entity.BaseEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.ImageFoundData;
@@ -49,24 +48,39 @@ public class HandleImageFound implements Handle<ImageFoundData> {
 
             File file = new File(messageData.getPath());
             BufferedImage image = ImageIO.read(file);
+            if (image == null) {
+                log.error("Failed to read image at {}: unsupported format", messageData.getPath());
+                return false;
+            }
             String blurHash = BlurHash.encode(image);
 
             Optional<ImageEntity> oldImageEntity = imageRepository.findByDirectoryEntityIdAndPath(messageData.getDirectoryEntityId(), messageData.getPath());
 
-            ImageEntity imageEntity = ImageEntity.builder()
-                    .id(oldImageEntity.map(BaseEntity::getId).orElse(null))
-                    .dateCreated(oldImageEntity.map(BaseEntity::getDateCreated).orElse(null))
-                    .directoryEntityId(messageData.getDirectoryEntityId())
-                    .blurHash(blurHash)
-                    .path(messageData.getPath())
-                    .sourceUri(messageData.getSourceUri())
-                    .type(messageData.getImageType())
-                    .episodeEntityId(messageData.getEpisodeEntityId())
-                    .movieEntityId(messageData.getMovieEntityId())
-                    .showEntityId(messageData.getShowEntityId())
-                    .fileLastModifiedTime(basicFileAttributes.lastModifiedTime().toInstant())
-                    .fileCreationTime(basicFileAttributes.creationTime().toInstant())
-                    .build();
+            ImageEntity imageEntity;
+            if (oldImageEntity.isPresent()) {
+                imageEntity = oldImageEntity.get();
+                imageEntity.setBlurHash(blurHash);
+                imageEntity.setFileLastModifiedTime(basicFileAttributes.lastModifiedTime().toInstant());
+                imageEntity.setFileCreationTime(basicFileAttributes.creationTime().toInstant());
+                imageEntity.setShowEntityId(messageData.getShowEntityId());
+                imageEntity.setMovieEntityId(messageData.getMovieEntityId());
+                imageEntity.setEpisodeEntityId(messageData.getEpisodeEntityId());
+                imageEntity.setSeasonEntityId(messageData.getSeasonEntityId());
+            } else {
+                imageEntity = ImageEntity.builder()
+                        .directoryEntityId(messageData.getDirectoryEntityId())
+                        .blurHash(blurHash)
+                        .path(messageData.getPath())
+                        .sourceUri(messageData.getSourceUri())
+                        .type(messageData.getImageType())
+                        .episodeEntityId(messageData.getEpisodeEntityId())
+                        .movieEntityId(messageData.getMovieEntityId())
+                        .showEntityId(messageData.getShowEntityId())
+                        .seasonEntityId(messageData.getSeasonEntityId())
+                        .fileLastModifiedTime(basicFileAttributes.lastModifiedTime().toInstant())
+                        .fileCreationTime(basicFileAttributes.creationTime().toInstant())
+                        .build();
+            }
             imageRepository.save(imageEntity);
             return true;
         } catch (IOException e) {

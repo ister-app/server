@@ -3,6 +3,8 @@ package app.ister.core.entity;
 import app.ister.core.enums.EventType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.ManyToOne;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -14,6 +16,7 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class ServerEventEntity extends BaseEntity {
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EventType eventType;
 

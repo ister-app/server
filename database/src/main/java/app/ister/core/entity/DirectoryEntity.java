@@ -3,6 +3,8 @@ package app.ister.core.entity;
 import app.ister.core.enums.DirectoryType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.ManyToOne;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -29,6 +31,7 @@ public class DirectoryEntity extends BaseEntity {
     @Column(nullable = false)
     private String path;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private DirectoryType directoryType;
 

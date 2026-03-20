@@ -27,6 +27,7 @@ public class PlayQueueItemEntity extends BaseEntity {
     @Column(nullable = false, precision = 20, scale = 10)
     private BigDecimal position;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private MediaType type;
 
