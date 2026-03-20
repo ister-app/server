@@ -1,10 +1,16 @@
 package app.ister.api.controller;
 
 import app.ister.core.entity.*;
+import app.ister.core.enums.SortingEnum;
+import app.ister.core.enums.SortingOrder;
+import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
@@ -23,11 +29,29 @@ import java.util.UUID;
 public class MovieController {
     private final MovieRepository movieRepository;
     private final WatchStatusRepository watchStatusRepository;
+    private final LibraryRepository libraryRepository;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public List<MovieEntity> moviesRecentAdded() {
-        return movieRepository.findAll(Sort.by("dateCreated").descending());
+    public Page<MovieEntity> movies(
+            @Argument Optional<Integer> page,
+            @Argument Optional<Integer> size,
+            @Argument Optional<SortingEnum> sorting,
+            @Argument Optional<SortingOrder> sortingOrder,
+            @Argument Optional<UUID> libraryId) {
+        String sortingString = sorting.orElse(SortingEnum.DATE_CREATED).getDatabaseString();
+        Sort sortBy;
+        if (sortingOrder.isPresent()) {
+            sortBy = sortingOrder.get() == SortingOrder.ASCENDING
+                    ? Sort.by(sortingString).ascending()
+                    : Sort.by(sortingString).descending();
+        } else {
+            sortBy = Sort.by(sortingString).descending();
+        }
+        Pageable pageable = PageRequest.of(page.orElse(0), size.orElse(10), sortBy);
+        return libraryId.flatMap(libraryRepository::findById)
+                .map(lib -> movieRepository.findByLibraryEntity(lib, pageable))
+                .orElseGet(() -> movieRepository.findAll(pageable));
     }
 
     @PreAuthorize("hasRole('user')")

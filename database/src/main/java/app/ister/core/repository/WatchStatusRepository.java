@@ -50,4 +50,14 @@ public interface WatchStatusRepository extends CrudRepository<WatchStatusEntity,
             nativeQuery = true
     )
     List<String[]> findRecentEpisodesAndShowIdsByUserId(@Param("userId") UUID userId);
+
+    @Query(value = """
+            SELECT DISTINCT ON (wse.movie_entity_id) wse.movie_entity_id
+            FROM watch_status_entity wse
+            WHERE wse.user_entity_id = :userId
+              AND wse.movie_entity_id IS NOT NULL
+              AND wse.date_updated >= CURRENT_DATE - INTERVAL '150 days'
+            ORDER BY wse.movie_entity_id, wse.date_updated DESC
+            """, nativeQuery = true)
+    List<String> findRecentMovieIdsByUserId(@Param("userId") UUID userId);
 }

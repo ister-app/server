@@ -4,6 +4,7 @@ import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.MessageData;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class HandleTest {
@@ -26,7 +27,7 @@ class HandleTest {
         MessageData data = MessageData.builder()
                 .eventType(EventType.SHOW_FOUND)
                 .build();
-        subject.listener(data); // should not throw
+        assertDoesNotThrow(() -> subject.listener(data));
     }
 
     @Test

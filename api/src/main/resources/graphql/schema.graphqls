@@ -1,13 +1,14 @@
 type Query {
     getServerInfo: ServerInfo
-    episodesRecentWatched: [Episode!]
+    recentlyWatched: [RecentlyWatched!]
     episodeById(id: ID): Episode
     seasonById(id: ID): Season
-    shows(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder): ShowPage
-    moviesRecentAdded: [Movie!]
+    shows(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): ShowPage
+    movies(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): MoviePage
     movieById(id: ID): Movie
     showById(id: ID): Show
     getPlayQueue(id: ID!): PlayQueue
+    libraries: [Library!]
 }
 
 type Mutation {
@@ -34,6 +35,11 @@ enum SortingOrder {
 enum LibraryType {
     MOVIE
     SHOW
+}
+
+enum MediaType {
+    MOVIE
+    EPISODE
 }
 
 enum DirectoryType {
@@ -143,7 +149,7 @@ type PlayQueue {
 type PlayQueueItem {
     id: ID!
     position: Int!
-    type: String!
+    type: MediaType!
     movie: Movie
     episode: Episode
 }
@@ -153,6 +159,14 @@ type Season {
     episodes: [Episode!]
     show: Show!
     number: Int!
+}
+
+type MoviePage {
+    content: [Movie!]!
+    totalPages: Int!
+    totalElements: Int!
+    number: Int!
+    size: Int!
 }
 
 type ShowPage {
@@ -171,6 +185,12 @@ type Show {
     seasons: [Season!]
     images: [Image!]
     metadata: [Metadata!]
+}
+
+type RecentlyWatched {
+    type: MediaType!
+    episode: Episode
+    movie: Movie
 }
 
 type WatchStatus {

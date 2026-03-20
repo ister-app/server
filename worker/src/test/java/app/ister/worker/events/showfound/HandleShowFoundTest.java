@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -186,6 +187,6 @@ class HandleShowFoundTest {
         ShowFoundData data = ShowFoundData.builder()
                 .eventType(EventType.SHOW_FOUND)
                 .build();
-        subject.listener(data); // should not throw
+        assertDoesNotThrow(() -> subject.listener(data));
     }
 }

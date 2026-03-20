@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -78,6 +79,6 @@ class HandleUpdateImagesRequestedTest {
                 .eventType(EventType.UPDATE_IMAGES_REQUESTED)
                 .build();
         when(imageRepository.findAll()).thenReturn(List.of());
-        subject.listener(data); // should not throw
+        assertDoesNotThrow(() -> subject.listener(data));
     }
 }

@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -185,6 +186,6 @@ class MovieFoundHandleTest {
         MovieFoundData data = MovieFoundData.builder()
                 .eventType(EventType.MOVIE_FOUND)
                 .build();
-        subject.listener(data); // should not throw
+        assertDoesNotThrow(() -> subject.listener(data));
     }
 }

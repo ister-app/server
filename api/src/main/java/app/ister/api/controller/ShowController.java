@@ -5,6 +5,7 @@ import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.ImageRepository;
+import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.ShowRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ public class ShowController {
     private final ShowRepository showRepository;
     private final EpisodeRepository episodeRepository;
     private final ImageRepository imageRepository;
+    private final LibraryRepository libraryRepository;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -42,14 +44,17 @@ public class ShowController {
             @Argument Optional<Integer> page,
             @Argument Optional<Integer> size,
             @Argument Optional<SortingEnum> sorting,
-            @Argument Optional<SortingOrder> sortingOrder) {
+            @Argument Optional<SortingOrder> sortingOrder,
+            @Argument Optional<UUID> libraryId) {
         String sortingString = sorting.orElse(SortingEnum.NAME).getDatabaseString();
         Sort sortBy = Sort.by(sortingString);
         if (sortingOrder.isPresent()) {
             sortBy = sortingOrder.get() == SortingOrder.ASCENDING ? sortBy.ascending() : sortBy.descending();
         }
         Pageable pageable = PageRequest.of(page.orElse(0), size.orElse(10), sortBy);
-        return showRepository.findAll(pageable);
+        return libraryId.flatMap(libraryRepository::findById)
+                .map(lib -> showRepository.findByLibraryEntity(lib, pageable))
+                .orElseGet(() -> showRepository.findAll(pageable));
     }
 
     @SchemaMapping(typeName = "Show", field = "episodes")

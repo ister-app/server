@@ -7,8 +7,10 @@ import app.ister.core.entity.SeasonEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
+import app.ister.core.entity.LibraryEntity;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.ImageRepository;
+import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.ShowRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +28,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,6 +45,9 @@ class ShowControllerTest {
 
     @Mock
     private ImageRepository imageRepository;
+
+    @Mock
+    private LibraryRepository libraryRepository;
 
     @Test
     void showByIdReturnsFromRepository() {
@@ -70,7 +76,7 @@ class ShowControllerTest {
         Page<ShowEntity> page = new PageImpl<>(List.of());
         when(showRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        Page<ShowEntity> result = subject.shows(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+        Page<ShowEntity> result = subject.shows(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
         assertNotNull(result);
         verify(showRepository).findAll(any(Pageable.class));
@@ -82,7 +88,7 @@ class ShowControllerTest {
         Page<ShowEntity> page = new PageImpl<>(List.of(show));
         when(showRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        Page<ShowEntity> result = subject.shows(Optional.of(2), Optional.of(5), Optional.empty(), Optional.empty());
+        Page<ShowEntity> result = subject.shows(Optional.of(2), Optional.of(5), Optional.empty(), Optional.empty(), Optional.empty());
 
         assertEquals(1, result.getContent().size());
     }
@@ -92,7 +98,7 @@ class ShowControllerTest {
         Page<ShowEntity> page = new PageImpl<>(List.of());
         when(showRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        subject.shows(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.ASCENDING));
+        subject.shows(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.ASCENDING), Optional.empty());
 
         verify(showRepository).findAll(any(Pageable.class));
     }
@@ -102,8 +108,37 @@ class ShowControllerTest {
         Page<ShowEntity> page = new PageImpl<>(List.of());
         when(showRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        subject.shows(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.DESCENDING));
+        subject.shows(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.DESCENDING), Optional.empty());
 
+        verify(showRepository).findAll(any(Pageable.class));
+    }
+
+    @Test
+    void showsFiltersWithLibraryIdWhenPresent() {
+        UUID libraryId = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder().name("Shows").build();
+        library.setId(libraryId);
+        Page<ShowEntity> page = new PageImpl<>(List.of());
+        when(libraryRepository.findById(libraryId)).thenReturn(Optional.of(library));
+        when(showRepository.findByLibraryEntity(eq(library), any(Pageable.class))).thenReturn(page);
+
+        Page<ShowEntity> result = subject.shows(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(libraryId));
+
+        assertNotNull(result);
+        verify(showRepository).findByLibraryEntity(eq(library), any(Pageable.class));
+        verify(showRepository, never()).findAll(any(Pageable.class));
+    }
+
+    @Test
+    void showsReturnsAllWhenLibraryIdNotFound() {
+        UUID libraryId = UUID.randomUUID();
+        Page<ShowEntity> page = new PageImpl<>(List.of());
+        when(libraryRepository.findById(libraryId)).thenReturn(Optional.empty());
+        when(showRepository.findAll(any(Pageable.class))).thenReturn(page);
+
+        Page<ShowEntity> result = subject.shows(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(libraryId));
+
+        assertNotNull(result);
         verify(showRepository).findAll(any(Pageable.class));
     }
 
