@@ -16,17 +16,17 @@ import java.util.List;
 @Controller
 public class ServerInfoController {
 
-    private final String serverName;
+    private final String clusterName;
     private final String serverUrl;
     private final String openIdConnectUrl;
     private final NodeRepository nodeRepository;
 
     public ServerInfoController(
-            @Value("${app.ister.server.name}") String serverName,
+            @Value("${app.ister.cluster.name}") String clusterName,
             @Value("${app.ister.server.url}") String serverUrl,
             @Value("${springdoc.oAuthFlow.openIdConnectUrl}") String openIdConnectUrl,
             NodeRepository nodeRepository) {
-        this.serverName = serverName;
+        this.clusterName = clusterName;
         this.serverUrl = serverUrl;
         this.openIdConnectUrl = openIdConnectUrl;
         this.nodeRepository = nodeRepository;
@@ -37,7 +37,7 @@ public class ServerInfoController {
         List<Node> nodes = new ArrayList<>();
         nodeRepository.findAll().forEach(e -> nodes.add(new Node(e.getId().toString(), e.getName(), e.getUrl(), e.getVersion())));
         return ServerInfo.builder()
-                .name(serverName)
+                .name(clusterName)
                 .url(serverUrl)
                 .openIdUrl(openIdConnectUrl)
                 .nodes(nodes)
