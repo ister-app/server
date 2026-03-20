@@ -70,4 +70,42 @@ class EpisodeMetadataTest {
         Optional<TMDBResult> result = subject.getMetadata("Showname", 2024, 1, 1, "en");
         assertTrue(result.isEmpty());
     }
+
+    @Test
+    void returnsEmptyWhenNullResponseBody() throws FeignException {
+        when(tmdbClientMock._searchTv("Showname", null, null, null, null, 2024)).thenReturn(ResponseEntity.ok(null));
+        Optional<TMDBResult> result = subject.getMetadata("Showname", 2024, 1, 1, "en");
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void returnsEmptyWhenEpisodeHasNullAirDate() throws FeignException {
+        when(tmdbClientMock._searchTv("Showname", null, null, null, null, 2024)).thenReturn(ResponseEntity.ok(searchTv200ResponseMock));
+        when(searchTv200ResponseMock.getResults()).thenReturn(List.of(searchTv200ResponseResultsInnerMock));
+        when(searchTv200ResponseResultsInnerMock.getId()).thenReturn(1);
+        when(tmdbClientMock._tvEpisodeDetails(1, 1, 1, "", "en")).thenReturn(ResponseEntity.ok(tvEpisodeDetails200ResponseMock));
+        when(tvEpisodeDetails200ResponseMock.getAirDate()).thenReturn(null);
+
+        Optional<TMDBResult> result = subject.getMetadata("Showname", 2024, 1, 1, "en");
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void returnsNullTitleWhenNameIsDefault() throws FeignException {
+        when(tmdbClientMock._searchTv("Showname", null, null, null, null, 2024)).thenReturn(ResponseEntity.ok(searchTv200ResponseMock));
+        when(searchTv200ResponseMock.getResults()).thenReturn(List.of(searchTv200ResponseResultsInnerMock));
+        when(searchTv200ResponseResultsInnerMock.getId()).thenReturn(1);
+        when(tmdbClientMock._tvEpisodeDetails(1, 1, 1, "", "en")).thenReturn(ResponseEntity.ok(tvEpisodeDetails200ResponseMock));
+        when(tvEpisodeDetails200ResponseMock.getAirDate()).thenReturn("2024-04-01");
+        when(tvEpisodeDetails200ResponseMock.getOverview()).thenReturn("overview");
+        when(tvEpisodeDetails200ResponseMock.getEpisodeNumber()).thenReturn(1);
+        when(tvEpisodeDetails200ResponseMock.getName()).thenReturn("Episode 1"); // default name
+        when(tvEpisodeDetails200ResponseMock.getId()).thenReturn(1);
+        when(tvEpisodeDetails200ResponseMock.getStillPath()).thenReturn(null);
+
+        Optional<TMDBResult> result = subject.getMetadata("Showname", 2024, 1, 1, "en");
+        assertTrue(result.isPresent());
+        assertThat(result.get().getTitle()).isNull();
+        assertThat(result.get().getBackgroundUrl()).isNull();
+    }
 }

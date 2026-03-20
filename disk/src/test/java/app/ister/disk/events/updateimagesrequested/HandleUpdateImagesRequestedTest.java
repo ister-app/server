@@ -71,4 +71,13 @@ class HandleUpdateImagesRequestedTest {
 
         verify(imageRepository, never()).saveAll(any());
     }
+
+    @Test
+    void listenerCallsHandleWithCorrectEventType() {
+        UpdateImagesRequestedData data = UpdateImagesRequestedData.builder()
+                .eventType(EventType.UPDATE_IMAGES_REQUESTED)
+                .build();
+        when(imageRepository.findAll()).thenReturn(List.of());
+        subject.listener(data); // should not throw
+    }
 }

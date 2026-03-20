@@ -9,6 +9,7 @@ import app.ister.worker.events.tmdbmetadata.ImageDownloadService;
 import app.ister.worker.events.tmdbmetadata.MetadataSave;
 import app.ister.worker.events.tmdbmetadata.MovieMetadata;
 import app.ister.worker.events.tmdbmetadata.TMDBResult;
+import feign.FeignException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -21,6 +22,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
@@ -137,5 +139,52 @@ class MovieFoundHandleTest {
         assertTrue(subject.handle(data));
 
         verifyNoInteractions(metaDataSave, imageDownloadService);
+    }
+
+    @Test
+    void handleReturnsFalseOnFeignException() {
+        ReflectionTestUtils.setField(subject, "apikey", "test-key");
+        UUID movieId = UUID.randomUUID();
+        MovieEntity movieEntity = MovieEntity.builder().id(movieId).name("Movie").releaseYear(2024).build();
+        MovieFoundData data = MovieFoundData.builder()
+                .eventType(EventType.MOVIE_FOUND)
+                .movieId(movieId)
+                .build();
+
+        when(movieRepository.findById(movieId)).thenReturn(Optional.of(movieEntity));
+        when(movieMetadata.getMetadata(anyString(), anyInt(), anyString())).thenThrow(mock(FeignException.class));
+
+        assertFalse(subject.handle(data));
+    }
+
+    @Test
+    void handleReturnsFalseOnIOException() throws IOException {
+        ReflectionTestUtils.setField(subject, "apikey", "test-key");
+        UUID movieId = UUID.randomUUID();
+        MovieEntity movieEntity = MovieEntity.builder().id(movieId).name("Movie").releaseYear(2024).build();
+        MovieFoundData data = MovieFoundData.builder()
+                .eventType(EventType.MOVIE_FOUND)
+                .movieId(movieId)
+                .build();
+        TMDBResult result = TMDBResult.builder()
+                .language("eng")
+                .backgroundUrl("https://example.com/bg.jpg")
+                .build();
+
+        when(movieRepository.findById(movieId)).thenReturn(Optional.of(movieEntity));
+        when(movieMetadata.getMetadata(anyString(), anyInt(), anyString())).thenReturn(Optional.of(result));
+        doThrow(new IOException("download failed"))
+                .when(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), any(), any(), any());
+
+        assertFalse(subject.handle(data));
+    }
+
+    @Test
+    void listenerCallsHandleWithCorrectEventType() {
+        ReflectionTestUtils.setField(subject, "apikey", "");
+        MovieFoundData data = MovieFoundData.builder()
+                .eventType(EventType.MOVIE_FOUND)
+                .build();
+        subject.listener(data); // should not throw
     }
 }

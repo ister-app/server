@@ -51,7 +51,7 @@ class ImageScannerTest {
     @Test
     void analyzeShowBackground() {
         ImageEntity result = (ImageEntity) subject.analyze(DirectoryEntity.builder().nodeEntity(NodeEntity.builder().name("disk1").build()).build(), Path.of("/disk/show/Show (2024)/background.jpg"), false, 0).orElseThrow();
-        assertEquals(result.getType(), ImageType.BACKGROUND);
+        assertEquals(ImageType.BACKGROUND, result.getType());
         assertNull(result.getSeasonEntity());
     }
 

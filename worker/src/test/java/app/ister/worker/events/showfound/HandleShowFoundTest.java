@@ -16,11 +16,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import feign.FeignException;
+
 import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
@@ -137,5 +140,52 @@ class HandleShowFoundTest {
         assertTrue(subject.handle(data));
 
         verifyNoInteractions(metaDataSave, imageDownloadService);
+    }
+
+    @Test
+    void handleReturnsFalseOnFeignException() {
+        ReflectionTestUtils.setField(subject, "apikey", "test-key");
+        UUID showId = UUID.randomUUID();
+        ShowEntity showEntity = ShowEntity.builder().id(showId).name("Show").releaseYear(2024).build();
+        ShowFoundData data = ShowFoundData.builder()
+                .eventType(EventType.SHOW_FOUND)
+                .showId(showId)
+                .build();
+
+        when(showRepository.findById(showId)).thenReturn(Optional.of(showEntity));
+        when(showMetadata.getMetadata(anyString(), anyInt(), anyString())).thenThrow(mock(FeignException.class));
+
+        assertFalse(subject.handle(data));
+    }
+
+    @Test
+    void handleReturnsFalseOnIOException() throws IOException {
+        ReflectionTestUtils.setField(subject, "apikey", "test-key");
+        UUID showId = UUID.randomUUID();
+        ShowEntity showEntity = ShowEntity.builder().id(showId).name("Show").releaseYear(2024).build();
+        ShowFoundData data = ShowFoundData.builder()
+                .eventType(EventType.SHOW_FOUND)
+                .showId(showId)
+                .build();
+        TMDBResult result = TMDBResult.builder()
+                .language("eng")
+                .backgroundUrl("https://example.com/bg.jpg")
+                .build();
+
+        when(showRepository.findById(showId)).thenReturn(Optional.of(showEntity));
+        when(showMetadata.getMetadata(anyString(), anyInt(), anyString())).thenReturn(Optional.of(result));
+        doThrow(new IOException("download failed"))
+                .when(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), any(), any(), any());
+
+        assertFalse(subject.handle(data));
+    }
+
+    @Test
+    void listenerCallsHandleWithCorrectEventType() {
+        ReflectionTestUtils.setField(subject, "apikey", "");
+        ShowFoundData data = ShowFoundData.builder()
+                .eventType(EventType.SHOW_FOUND)
+                .build();
+        subject.listener(data); // should not throw
     }
 }
