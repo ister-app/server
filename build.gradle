@@ -1,9 +1,9 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '4.0.4' apply false
+	id 'org.springframework.boot' version '4.0.5' apply false
 	id 'io.spring.dependency-management' version '1.1.7' apply false
-	id "org.hibernate.orm" version '7.2.7.Final' apply false
-	id 'org.graalvm.buildtools.native' version '0.11.5' apply false
+	id "org.hibernate.orm" version '7.2.8.Final' apply false
+	id 'org.graalvm.buildtools.native' version '1.0.0' apply false
 	id 'jacoco'
 	id "org.sonarqube" version "7.2.3.7755"
 }

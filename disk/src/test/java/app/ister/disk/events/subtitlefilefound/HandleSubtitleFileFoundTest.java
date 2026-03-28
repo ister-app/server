@@ -4,10 +4,14 @@ import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.MediaFileStreamEntity;
+import app.ister.core.entity.OtherPathFileEntity;
 import app.ister.core.enums.EventType;
+import app.ister.core.enums.PathFileType;
 import app.ister.core.eventdata.SubtitleFileFoundData;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
+import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.ScannerHelperService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,9 +23,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
+
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,6 +43,9 @@ class HandleSubtitleFileFoundTest {
 
     @Mock
     private MediaFileStreamRepository mediaFileStreamRepository;
+
+    @Mock
+    private OtherPathFileRepository otherPathFileRepository;
 
     @Test
     void handles() {
@@ -88,9 +94,46 @@ class HandleSubtitleFileFoundTest {
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(directoryEntity));
         when(scannerHelperService.getOrCreateEpisode(any(), any(), anyInt(), anyInt(), anyInt()))
                 .thenReturn(episodeEntity);
+        when(mediaFileStreamRepository.save(any())).thenReturn(MediaFileStreamEntity.builder().build());
 
         assertTrue(subject.handle(data));
 
         verify(mediaFileStreamRepository).save(any());
+    }
+
+    @Test
+    void handleWithEpisodePathSetsMediaFileStreamFkOnOtherPathFile() {
+        UUID dirId = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder().build();
+        DirectoryEntity directoryEntity = DirectoryEntity.builder().id(dirId).libraryEntity(library).build();
+        MediaFileEntity mediaFileEntity = MediaFileEntity.builder()
+                .directoryEntity(directoryEntity)
+                .path("/disk/shows/Show (2024)/Season 01/s01e01.mkv")
+                .build();
+        EpisodeEntity episodeEntity = EpisodeEntity.builder()
+                .mediaFileEntities(List.of(mediaFileEntity))
+                .build();
+        String subtitlePath = "/disk/shows/Show (2024)/Season 01/s01e01.nl.srt";
+        MediaFileStreamEntity savedStream = MediaFileStreamEntity.builder().build();
+        OtherPathFileEntity otherFile = OtherPathFileEntity.builder()
+                .path(subtitlePath)
+                .pathFileType(PathFileType.SUBTITLE)
+                .build();
+        SubtitleFileFoundData data = SubtitleFileFoundData.builder()
+                .directoryEntityUUID(dirId)
+                .path(subtitlePath)
+                .build();
+
+        when(directoryRepository.findById(dirId)).thenReturn(Optional.of(directoryEntity));
+        when(scannerHelperService.getOrCreateEpisode(any(), any(), anyInt(), anyInt(), anyInt()))
+                .thenReturn(episodeEntity);
+        when(mediaFileStreamRepository.save(any())).thenReturn(savedStream);
+        when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, subtitlePath))
+                .thenReturn(Optional.of(otherFile));
+
+        assertTrue(subject.handle(data));
+
+        verify(otherPathFileRepository).save(otherFile);
+        assertEquals(savedStream, otherFile.getMediaFileStreamEntity());
     }
 }

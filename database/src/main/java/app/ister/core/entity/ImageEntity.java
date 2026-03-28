@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -14,6 +15,7 @@ import java.util.UUID;
 @Entity
 @Table(uniqueConstraints = @UniqueConstraint(columnNames = {"directoryEntityId", "path"}))
 @Data
+@EqualsAndHashCode(callSuper = true)
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class ImageEntity extends FileFromPathEntity {

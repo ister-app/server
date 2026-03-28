@@ -41,4 +41,9 @@ public class QueueConfig {
         return new Queue(APP_ISTER_SERVER_ANALYZE_LIBRARY_REQUESTED + "." + nodeName);
     }
 
+    @Bean
+    public Queue queueAnalyzeData() {
+        return new Queue(APP_ISTER_SERVER_ANALYZE_DATA);
+    }
+
 }

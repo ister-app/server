@@ -76,7 +76,7 @@ class ImageDownloadServiceTest {
         assertTrue(downloadedPath.endsWith(".jpg"));
 
         verify(imageSave).save(cacheDisk, downloadedPath, ImageType.BACKGROUND, "en",
-                "TMDB://http://example.com/img.jpg", movie, null, null);
+                "TMDB://http://example.com/img.jpg", new ImageSave.MediaEntityRef(movie, null, null));
     }
 
     @Test

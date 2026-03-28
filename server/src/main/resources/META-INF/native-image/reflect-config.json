@@ -3,5 +3,14 @@
     "name": "org.springframework.web.servlet.view.InternalResourceViewResolver",
     "allDeclaredConstructors": true,
     "allPublicMethods": true
+  },
+  {
+    "name": "com.sun.management.OperatingSystemMXBean",
+    "methods": [
+      {
+        "name": "getCpuLoad",
+        "parameterTypes": []
+      }
+    ]
   }
 ]

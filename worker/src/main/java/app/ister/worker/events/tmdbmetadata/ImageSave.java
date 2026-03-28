@@ -17,14 +17,16 @@ import org.springframework.stereotype.Component;
 public class ImageSave {
     private final MessageSender messageSender;
 
+    public record MediaEntityRef(@Nullable MovieEntity movie,
+                                  @Nullable ShowEntity show,
+                                  @Nullable EpisodeEntity episode) {}
+
     public void save(DirectoryEntity cacheDisk,
                      String path,
                      ImageType imageType,
                      String language,
                      String sourceUri,
-                     @Nullable MovieEntity movieEntity,
-                     @Nullable ShowEntity showEntity,
-                     @Nullable EpisodeEntity episodeEntity) {
+                     MediaEntityRef mediaEntityRef) {
         messageSender.sendImageFound(ImageFoundData.builder()
                 .eventType(EventType.IMAGE_FOUND)
                 .directoryEntityId(cacheDisk.getId())
@@ -32,9 +34,9 @@ public class ImageSave {
                 .imageType(imageType)
                 .language(language)
                 .sourceUri(sourceUri)
-                .movieEntityId(movieEntity == null ? null : movieEntity.getId())
-                .showEntityId(showEntity == null ? null : showEntity.getId())
-                .episodeEntityId(episodeEntity == null ? null : episodeEntity.getId())
+                .movieEntityId(mediaEntityRef.movie() == null ? null : mediaEntityRef.movie().getId())
+                .showEntityId(mediaEntityRef.show() == null ? null : mediaEntityRef.show().getId())
+                .episodeEntityId(mediaEntityRef.episode() == null ? null : mediaEntityRef.episode().getId())
                 .build(), cacheDisk.getNodeEntity().getName());
     }
 }

@@ -6,6 +6,7 @@ import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.NfoFileFoundData;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.MetadataRepository;
+import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.Handle;
 import app.ister.disk.nfo.Parser;
@@ -26,6 +27,7 @@ import java.io.FileNotFoundException;
 public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
     private final DirectoryRepository directoryRepository;
     private final MetadataRepository metadataRepository;
+    private final OtherPathFileRepository otherPathFileRepository;
     private final ScannerHelperService scannerHelperService;
 
     @Override
@@ -58,13 +60,15 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
     private void analyzeShow(DirectoryEntity directoryEntity, String path, PathObject pathObject) {
         var show = scannerHelperService.getOrCreateShow(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear());
         try {
-            var parsed = Parser.parseShow(path).orElseThrow();
-            metadataRepository.save(MetadataEntity.builder()
-                    .title(parsed.getTitle())
-                    .description(parsed.getPlot())
-                    .released(parsed.getPremiered())
-                    .showEntity(show)
-                    .sourceUri("file://" + path).build());
+            Parser.parseShow(path).ifPresent(parsed -> {
+                var saved = metadataRepository.save(MetadataEntity.builder()
+                        .title(parsed.getTitle())
+                        .description(parsed.getPlot())
+                        .released(parsed.getPremiered())
+                        .showEntity(show)
+                        .sourceUri("file://" + path).build());
+                setMetadataFk(directoryEntity, path, saved);
+            });
         } catch (FileNotFoundException _) {
             log.error("Something went wrong when nfo parsing: {}", path);
         }
@@ -73,15 +77,24 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
     private void analyzeEpisode(DirectoryEntity directoryEntity, String path, PathObject pathObject) {
         var episode = scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear(), pathObject.getSeason(), pathObject.getEpisode());
         try {
-            var parsed = Parser.parseEpisode(path).orElseThrow();
-            metadataRepository.save(MetadataEntity.builder()
-                    .title(parsed.getTitle())
-                    .description(parsed.getPlot())
-                    .released(parsed.getAired())
-                    .episodeEntity(episode)
-                    .sourceUri("file://" + path).build());
+            Parser.parseEpisode(path).ifPresent(parsed -> {
+                var saved = metadataRepository.save(MetadataEntity.builder()
+                        .title(parsed.getTitle())
+                        .description(parsed.getPlot())
+                        .released(parsed.getAired())
+                        .episodeEntity(episode)
+                        .sourceUri("file://" + path).build());
+                setMetadataFk(directoryEntity, path, saved);
+            });
         } catch (FileNotFoundException _) {
             log.error("Something went wrong when nfo parsing: {}", path);
         }
+    }
+
+    private void setMetadataFk(DirectoryEntity directoryEntity, String path, MetadataEntity saved) {
+        otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path).ifPresent(f -> {
+            f.setMetadataEntity(saved);
+            otherPathFileRepository.save(f);
+        });
     }
 }

@@ -4,11 +4,14 @@ import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MetadataEntity;
+import app.ister.core.entity.OtherPathFileEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.enums.EventType;
+import app.ister.core.enums.PathFileType;
 import app.ister.core.eventdata.NfoFileFoundData;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.MetadataRepository;
+import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.ScannerHelperService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,6 +44,9 @@ class HandleNfoFileFoundTest {
 
     @Mock
     private MetadataRepository metadataRepository;
+
+    @Mock
+    private OtherPathFileRepository otherPathFileRepository;
 
     @Mock
     private ScannerHelperService scannerHelperService;
@@ -160,5 +166,40 @@ class HandleNfoFileFoundTest {
         assertTrue(subject.handle(data));
 
         verify(metadataRepository).save(any(MetadataEntity.class));
+    }
+
+    @Test
+    void analyzeWithEpisodePathSetsMetadataFkOnOtherPathFile(@TempDir Path tempDir) throws IOException {
+        Path episodeDir = tempDir.resolve("Show (2024)").resolve("Season 01");
+        Files.createDirectories(episodeDir);
+        Path nfoFile = episodeDir.resolve("s01e01.nfo");
+        try (var in = HandleNfoFileFoundTest.class.getResourceAsStream("/nfo/episode.nfo")) {
+            Files.write(nfoFile, in.readAllBytes());
+        }
+
+        UUID uuid = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder().build();
+        DirectoryEntity directoryEntity = DirectoryEntity.builder().id(uuid).libraryEntity(library).build();
+        EpisodeEntity episode = EpisodeEntity.builder().build();
+        MetadataEntity savedMetadata = MetadataEntity.builder().build();
+        OtherPathFileEntity otherFile = OtherPathFileEntity.builder()
+                .path(nfoFile.toString())
+                .pathFileType(PathFileType.NFO)
+                .build();
+        NfoFileFoundData data = NfoFileFoundData.builder()
+                .directoryEntityUUID(uuid)
+                .path(nfoFile.toString())
+                .build();
+
+        when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
+        when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 1, 1)).thenReturn(episode);
+        when(metadataRepository.save(any(MetadataEntity.class))).thenReturn(savedMetadata);
+        when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, nfoFile.toString()))
+                .thenReturn(Optional.of(otherFile));
+
+        assertTrue(subject.handle(data));
+
+        verify(otherPathFileRepository).save(otherFile);
+        assertEquals(savedMetadata, otherFile.getMetadataEntity());
     }
 }

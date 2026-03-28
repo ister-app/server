@@ -1,6 +1,8 @@
 package app.ister.core.repository;
 
 import app.ister.core.entity.DirectoryEntity;
+import app.ister.core.entity.MediaFileStreamEntity;
+import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.OtherPathFileEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -14,4 +16,8 @@ public interface OtherPathFileRepository extends JpaRepository<OtherPathFileEnti
     Optional<OtherPathFileEntity> findByDirectoryEntityAndPath(DirectoryEntity directoryEntity, String path);
 
     List<OtherPathFileEntity> findByDirectoryEntity(DirectoryEntity directoryEntity);
+
+    Optional<OtherPathFileEntity> findByMetadataEntity(MetadataEntity metadataEntity);
+
+    Optional<OtherPathFileEntity> findByMediaFileStreamEntity(MediaFileStreamEntity mediaFileStreamEntity);
 }

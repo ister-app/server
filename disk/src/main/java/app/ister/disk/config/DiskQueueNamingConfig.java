@@ -76,4 +76,12 @@ public class DiskQueueNamingConfig {
                 Stream.of(APP_ISTER_SERVER_UPDATE_IMAGES_REQUESTED + "." + cacheDirName())
         ).toArray(String[]::new);
     }
+
+    public String[] getAnalyzeDataQueues() {
+        return Stream.concat(
+                config.getDirectories().stream()
+                        .map(dir -> APP_ISTER_SERVER_ANALYZE_DATA + "." + dir.getName()),
+                Stream.of(APP_ISTER_SERVER_ANALYZE_DATA + "." + cacheDirName())
+        ).toArray(String[]::new);
+    }
 }

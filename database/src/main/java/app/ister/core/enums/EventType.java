@@ -12,4 +12,5 @@ public enum EventType {
     SUBTITLE_FILE_FOUND,
     IMAGE_FOUND,
     UPDATE_IMAGES_REQUESTED,
+    ANALYZE_DATA,
 }

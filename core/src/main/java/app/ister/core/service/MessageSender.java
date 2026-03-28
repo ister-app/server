@@ -83,4 +83,17 @@ public class MessageSender {
         log.debug("Sending message for queue: {} and showFoundData: {}", APP_ISTER_SERVER_SHOW_FOUND, showFoundData);
         rabbitTemplate.convertAndSend(APP_ISTER_SERVER_SHOW_FOUND, showFoundData);
     }
+
+    // API → worker (no suffix, any worker can pick it up like sendMovieFound)
+    public void sendAnalyzeData(AnalyzeData data) {
+        log.debug("Sending message for queue: {} and analyzeData: {}", APP_ISTER_SERVER_ANALYZE_DATA, data);
+        rabbitTemplate.convertAndSend(APP_ISTER_SERVER_ANALYZE_DATA, data);
+    }
+
+    // Worker → disk (directory-scoped, like sendMediaFileFound)
+    public void sendAnalyzeData(AnalyzeData data, String directoryName) {
+        String queue = APP_ISTER_SERVER_ANALYZE_DATA + "." + directoryName;
+        log.debug("Sending message for queue: {} and analyzeData: {}", queue, data);
+        rabbitTemplate.convertAndSend(queue, data);
+    }
 }

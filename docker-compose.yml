@@ -60,6 +60,12 @@ services:
       SPRING_RABBITMQ_USERNAME: user
       SPRING_RABBITMQ_PASSWORD: password
       OIDC_URL: https://localhost:8060/realms/Ister
+      # Hardware acceleration — uncomment ONE block:
+      # VAAPI (Intel/AMD):
+#      HLS_HWACCEL: vaapi
+#      HLS_HWACCEL_DEVICE: /dev/dri/renderD128
+      # NVDEC (NVIDIA):
+#      HLS_HWACCEL: nvdec
     ports:
       - "8080:8080"
     depends_on:
@@ -67,3 +73,21 @@ services:
         condition: service_completed_successfully
       rabbitMQ:
         condition: service_healthy
+    # VAAPI device access (uncomment for Intel/AMD hardware decoding):
+#    devices:
+#      - /dev/dri/renderD128:/dev/dri/renderD128
+    # Required for AMD VAAPI — render group ID: getent group render | cut -d: -f3
+#    group_add:
+#      - "render"
+    # NVIDIA GPU access (uncomment for NVIDIA hardware decoding).
+    # Requires nvidia-container-toolkit on the host.
+    # Option A: Compose v2:
+#    deploy:
+#      resources:
+#        reservations:
+#          devices:
+#            - driver: nvidia
+#              count: 1
+#              capabilities: [gpu, video]
+    # Option B: standalone Docker:
+#    runtime: nvidia

@@ -13,6 +13,7 @@ public class MessageQueue {
     public static final String APP_ISTER_SERVER_SUBTITLE_FILE_FOUND = "app.ister.server.SubtitleFileFound";
     public static final String APP_ISTER_SERVER_IMAGE_FOUND = "app.ister.server.ImageFound";
     public static final String APP_ISTER_SERVER_UPDATE_IMAGES_REQUESTED = "app.ister.server.UpdateImagesRequested";
+    public static final String APP_ISTER_SERVER_ANALYZE_DATA = "app.ister.server.AnalyzeData";
 
     private MessageQueue() {
         throw new IllegalStateException("Utility class");

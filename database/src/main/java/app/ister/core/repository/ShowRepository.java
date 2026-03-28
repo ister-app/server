@@ -19,6 +19,9 @@ public interface ShowRepository extends JpaRepository<ShowEntity, UUID> {
     Page<ShowEntity> findByLibraryEntity(LibraryEntity libraryEntity, Pageable pageable);
 
 
+    @Query("SELECT s.id FROM ShowEntity s WHERE s.libraryEntity.id = :libraryId")
+    List<UUID> findIdsByLibraryId(@Param("libraryId") UUID libraryId);
+
     /**
      * Returns the IDs (UUID) of shows that have no {@link MetadataEntity} linked to them.
      */

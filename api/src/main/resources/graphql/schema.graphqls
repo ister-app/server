@@ -17,9 +17,11 @@ type Mutation {
     createPlayQueueForShow(showId: ID!, episodeId: ID!): PlayQueue!
     createPlayQueueForMovie(movieId: ID!): PlayQueue!
     updatePlayQueue(id: ID!, progressInMilliseconds: Int!, playQueueItemId: ID!): PlayQueue
-    startTranscoding(playQueueId: ID!, mediaFileId: ID!, startTimeInSeconds: Int!, audioId: ID, subtitleId: ID): ID!
-    readyTranscoding(id: ID!): Boolean!
-    stopTranscoding(id: ID!): Boolean!
+    createStreamToken: StreamToken!
+    analyzeDataForEpisode(episodeId: ID!): Boolean!
+    analyzeDataForMovie(movieId: ID!): Boolean!
+    analyzeDataForShow(showId: ID!): Boolean!
+    analyzeDataForLibrary(libraryId: ID!): Boolean!
 }
 
 enum SortingEnum {
@@ -191,6 +193,12 @@ type RecentlyWatched {
     type: MediaType!
     episode: Episode
     movie: Movie
+}
+
+type StreamToken {
+    id: ID!
+    token: String!
+    expiresAt: String!
 }
 
 type WatchStatus {

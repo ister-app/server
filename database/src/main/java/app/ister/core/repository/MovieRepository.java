@@ -18,6 +18,9 @@ public interface MovieRepository extends JpaRepository<MovieEntity, UUID> {
 
     Page<MovieEntity> findByLibraryEntity(LibraryEntity libraryEntity, Pageable pageable);
 
+    @Query("SELECT m.id FROM MovieEntity m WHERE m.libraryEntity.id = :libraryId")
+    List<UUID> findIdsByLibraryId(@Param("libraryId") UUID libraryId);
+
     /**
      * Returns the IDs (UUID) of movies that have no {@link MetadataEntity} linked to them.
      */

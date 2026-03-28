@@ -34,6 +34,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     private final MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams;
     private final MediaFileFoundCreateBackground mediaFileFoundCreateBackground;
     private final MediaFileFoundGetDuration mediaFileFoundGetDuration;
+    private final MediaFileFoundExtractSubtitles mediaFileFoundExtractSubtitles;
     private final MessageSender messageSender;
 
     @Value("${app.ister.server.ffmpeg-dir}")
@@ -48,6 +49,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
                                 MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams,
                                 MediaFileFoundCreateBackground mediaFileFoundCreateBackground,
                                 MediaFileFoundGetDuration mediaFileFoundGetDuration,
+                                MediaFileFoundExtractSubtitles mediaFileFoundExtractSubtitles,
                                 MessageSender messageSender) {
         this.nodeService = nodeService;
         this.directoryRepository = directoryRepository;
@@ -58,6 +60,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
         this.mediaFileFoundCheckForStreams = mediaFileFoundCheckForStreams;
         this.mediaFileFoundCreateBackground = mediaFileFoundCreateBackground;
         this.mediaFileFoundGetDuration = mediaFileFoundGetDuration;
+        this.mediaFileFoundExtractSubtitles = mediaFileFoundExtractSubtitles;
         this.messageSender = messageSender;
     }
 
@@ -109,7 +112,13 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             mediaFileRepository.save(mediaFileEntity);
 
             // Analyze media file streams and save the metadata.
-            mediaFileStreamRepository.saveAll(mediaFileFoundCheckForStreams.checkForStreams(mediaFileEntity, dirOfFFmpeg));
+            var streams = mediaFileFoundCheckForStreams.checkForStreams(mediaFileEntity, dirOfFFmpeg);
+            mediaFileStreamRepository.saveAll(streams);
+
+            // Extract embedded subtitles to SRT files in the cache directory.
+            NodeEntity cacheNode = nodeService.getOrCreateNodeEntityForThisNode();
+            DirectoryEntity cacheDisk = directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, cacheNode).stream().findFirst().orElseThrow();
+            mediaFileStreamRepository.saveAll(mediaFileFoundExtractSubtitles.extractSubtitles(mediaFileEntity, streams, cacheDisk, dirOfFFmpeg));
         });
         return mediaFile;
     }

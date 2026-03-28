@@ -33,6 +33,6 @@ public class ImageDownloadService {
                 .orElseThrow(() -> new IllegalStateException("No cache directory found for this node"));
         String toPath = cacheDisk.getPath() + UUID.randomUUID() + ".jpg";
         imageDownload.download(imageUrl, toPath);
-        imageSave.save(cacheDisk, toPath, imageType, language, "TMDB://" + imageUrl, movie, show, episode);
+        imageSave.save(cacheDisk, toPath, imageType, language, "TMDB://" + imageUrl, new ImageSave.MediaEntityRef(movie, show, episode));
     }
 }

@@ -7,6 +7,7 @@ import app.ister.core.enums.StreamCodecType;
 import app.ister.core.eventdata.SubtitleFileFoundData;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
+import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.Handle;
 import app.ister.disk.scanner.PathObject;
@@ -26,6 +27,7 @@ public class HandleSubtitleFileFound implements Handle<SubtitleFileFoundData> {
     private final DirectoryRepository directoryRepository;
     private final ScannerHelperService scannerHelperService;
     private final MediaFileStreamRepository mediaFileStreamRepository;
+    private final OtherPathFileRepository otherPathFileRepository;
 
     @Override
     public EventType handles() {
@@ -56,14 +58,19 @@ public class HandleSubtitleFileFound implements Handle<SubtitleFileFoundData> {
     private void analyzeSubtitleFile(DirectoryEntity directoryEntity, String path, PathObject pathObject) {
         var episode = scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear(), pathObject.getSeason(), pathObject.getEpisode());
         episode.getMediaFileEntities().forEach(mediaFileEntity -> {
-            if (directoryEntity.getId().equals(mediaFileEntity.getDirectoryEntity().getId()) && mediaFileAndSubtitleFileBelongTogether(mediaFileEntity.getPath(), path)) {
-                var mediaFileStream = MediaFileStreamEntity.builder()
+            if (directoryEntity.getId().equals(mediaFileEntity.getDirectoryEntity().getId()) && mediaFileAndSubtitleFileBelongTogether(mediaFileEntity.getPath(), path)
+                    && !mediaFileStreamRepository.existsByMediaFileEntityAndStreamIndexAndPath(mediaFileEntity, 0, path)) {
+                var saved = mediaFileStreamRepository.save(MediaFileStreamEntity.builder()
                         .mediaFileEntity(mediaFileEntity)
                         .codecName("subtitle srt")
                         .codecType(StreamCodecType.EXTERNAL_SUBTITLE)
                         .language(SubtitleFilePathParser.langCodeToIso3(path))
-                        .path(path);
-                mediaFileStreamRepository.save(mediaFileStream.build());
+                        .path(path)
+                        .build());
+                otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path).ifPresent(f -> {
+                    f.setMediaFileStreamEntity(saved);
+                    otherPathFileRepository.save(f);
+                });
             }
         });
     }

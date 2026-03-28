@@ -45,7 +45,7 @@ class ImageSaveTest {
         DirectoryEntity cacheDisk = buildCacheDisk("node1");
         MovieEntity movie = MovieEntity.builder().id(UUID.randomUUID()).build();
 
-        subject.save(cacheDisk, "/cache/img.jpg", ImageType.BACKGROUND, "en", "TMDB://img.jpg", movie, null, null);
+        subject.save(cacheDisk, "/cache/img.jpg", ImageType.BACKGROUND, "en", "TMDB://img.jpg", new ImageSave.MediaEntityRef(movie, null, null));
 
         ArgumentCaptor<ImageFoundData> captor = ArgumentCaptor.forClass(ImageFoundData.class);
         verify(messageSender).sendImageFound(captor.capture(), org.mockito.ArgumentMatchers.eq("node1"));
@@ -66,7 +66,7 @@ class ImageSaveTest {
         DirectoryEntity cacheDisk = buildCacheDisk("node1");
         ShowEntity show = ShowEntity.builder().id(UUID.randomUUID()).build();
 
-        subject.save(cacheDisk, "/cache/img.jpg", ImageType.COVER, "nl", "TMDB://img.jpg", null, show, null);
+        subject.save(cacheDisk, "/cache/img.jpg", ImageType.COVER, "nl", "TMDB://img.jpg", new ImageSave.MediaEntityRef(null, show, null));
 
         ArgumentCaptor<ImageFoundData> captor = ArgumentCaptor.forClass(ImageFoundData.class);
         verify(messageSender).sendImageFound(captor.capture(), org.mockito.ArgumentMatchers.eq("node1"));
@@ -82,7 +82,7 @@ class ImageSaveTest {
         DirectoryEntity cacheDisk = buildCacheDisk("node1");
         EpisodeEntity episode = EpisodeEntity.builder().id(UUID.randomUUID()).build();
 
-        subject.save(cacheDisk, "/cache/img.jpg", ImageType.BACKGROUND, "en", "TMDB://img.jpg", null, null, episode);
+        subject.save(cacheDisk, "/cache/img.jpg", ImageType.BACKGROUND, "en", "TMDB://img.jpg", new ImageSave.MediaEntityRef(null, null, episode));
 
         ArgumentCaptor<ImageFoundData> captor = ArgumentCaptor.forClass(ImageFoundData.class);
         verify(messageSender).sendImageFound(captor.capture(), org.mockito.ArgumentMatchers.eq("node1"));

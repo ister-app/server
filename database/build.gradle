@@ -33,6 +33,7 @@ tasks.register("buildMigrationsImage", Exec) {
     group = "docker"
     description = "Builds the Flyway migrations Docker image ghcr.io/ister-app/migrations"
     commandLine "/usr/bin/podman", "build",
+            "--no-cache",
             "--file", "${rootProject.projectDir}/Dockerfile.migrations",
             "--tag", "ghcr.io/ister-app/migrations:latest",
             "--tag", "ghcr.io/ister-app/migrations:${project.version}",

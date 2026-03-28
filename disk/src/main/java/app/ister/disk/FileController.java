@@ -5,6 +5,8 @@ import app.ister.core.repository.MediaFileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,14 +28,22 @@ public class FileController {
     private String tmpDir;
 
     @GetMapping("/images/{id}/download")
-    public InputStreamResource downloadImage(@PathVariable UUID id) throws IOException {
+    public ResponseEntity<InputStreamResource> downloadImage(@PathVariable UUID id) throws IOException {
         var imageEntity = imageRepository.findById(id).orElseThrow();
-        return new InputStreamResource(new FileInputStream(imageEntity.getPath())) {
+        Path imagePath = Path.of(imageEntity.getPath());
+        String contentType = Files.probeContentType(imagePath);
+        if (contentType == null) {
+            contentType = MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        }
+        InputStreamResource resource = new InputStreamResource(new FileInputStream(imagePath.toFile())) {
             @Override
             public long contentLength() throws IOException {
-                return Files.size(Path.of(imageEntity.getPath()));
+                return Files.size(imagePath);
             }
         };
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(resource);
     }
 
     @GetMapping("/transcode/download/{id}/{fileName}")
