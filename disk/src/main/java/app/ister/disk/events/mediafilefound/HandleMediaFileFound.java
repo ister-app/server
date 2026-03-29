@@ -111,6 +111,9 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             mediaFileEntity.setDurationInMilliseconds(mediaFileFoundGetDuration.getDuration(mediaFileEntity.getPath()));
             mediaFileRepository.save(mediaFileEntity);
 
+            // Clear existing stream metadata so re-analysis on retry doesn't hit duplicate-key errors.
+            mediaFileStreamRepository.deleteAllByMediaFileEntityId(mediaFileEntity.getId());
+
             // Analyze media file streams and save the metadata.
             var streams = mediaFileFoundCheckForStreams.checkForStreams(mediaFileEntity, dirOfFFmpeg);
             mediaFileStreamRepository.saveAll(streams);

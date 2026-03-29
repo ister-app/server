@@ -82,7 +82,10 @@ public class MediaFileFoundExtractSubtitles {
             String codecName = stream.getCodecName() != null ? stream.getCodecName().toLowerCase() : "";
             boolean extracted = false;
 
-            if (TEXT_SUBTITLE_CODECS.contains(codecName)) {
+            if (Files.exists(srtPath)) {
+                log.debug("SRT already extracted, skipping: {}", srtPath);
+                extracted = true;
+            } else if (TEXT_SUBTITLE_CODECS.contains(codecName)) {
                 extracted = extractTextSubtitle(mediaFile.getPath(), subIdx, srtPath, ffmpegDir);
             } else if (IMAGE_SUBTITLE_CODECS.contains(codecName)) {
                 extracted = extractImageSubtitle(mediaFile.getPath(), subIdx, srtPath, lang, ffmpegDir);
@@ -130,12 +133,13 @@ public class MediaFileFoundExtractSubtitles {
     }
 
     private boolean extractImageSubtitle(String inputPath, int subIdx, Path srtPath, String lang, String ffmpegDir) {
-        Path tmpDir = srtPath.getParent().resolve(".sub_tmp_" + ProcessHandle.current().pid());
+        String srtStem = srtPath.getFileName().toString().replace(".srt", "");
+        Path tmpDir = srtPath.getParent().resolve(".sub_tmp_" + srtStem);
         try {
             Files.createDirectories(tmpDir);
-            Path mksPath = tmpDir.resolve(lang + "_" + subIdx + ".mks");
-            String subBase = tmpDir.resolve(lang + "_" + subIdx).toString();
-            Path idxPath = tmpDir.resolve(lang + "_" + subIdx + ".idx");
+            Path mksPath = tmpDir.resolve(srtStem + ".mks");
+            String subBase = tmpDir.resolve(srtStem).toString();
+            Path idxPath = tmpDir.resolve(srtStem + ".idx");
 
             // Step 1: ffmpeg → dvdsub MKS
             FFmpeg.atPath(Paths.get(ffmpegDir))
