@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -254,7 +255,7 @@ public class HlsService {
 
         if (Files.exists(cacheFile)) {
             Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(System.currentTimeMillis()));
-            return Files.readString(cacheFile);
+            return Files.readString(cacheFile, StandardCharsets.UTF_8);
         }
         Files.createDirectories(cacheFile.getParent());
 
@@ -266,7 +267,7 @@ public class HlsService {
                 subtitleService.generateSubtitleSegments(subtitleStream, mediaFilePath, mediaFileId, cacheDir(mediaFileId));
             }
         }
-        return Files.readString(cacheFile);
+        return Files.readString(cacheFile, StandardCharsets.UTF_8);
     }
 
     /**

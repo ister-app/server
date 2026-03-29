@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -97,13 +98,13 @@ public class HlsSubtitleService {
                     .append("\n");
             sb.append(cue.text()).append("\n\n");
         }
-        Files.writeString(outputPath, sb.toString());
+        Files.writeString(outputPath, sb.toString(), StandardCharsets.UTF_8);
     }
 
     /** Parses an SRT file into a list of cues. Tolerates Windows line endings and missing cue numbers. */
     private List<SrtCue> parseSrt(String srtPath) throws IOException {
         List<SrtCue> cues = new ArrayList<>();
-        String[] lines = Files.readString(Path.of(srtPath))
+        String[] lines = Files.readString(Path.of(srtPath), StandardCharsets.UTF_8)
                 .replace("\r\n", "\n").replace("\r", "\n").split("\n");
 
         int i = 0;
@@ -200,7 +201,7 @@ public class HlsSubtitleService {
 
             Path segFile = cacheDir.resolve(
                     String.format(Locale.ROOT, "seg_sub_%s_%05d.vtt", subtitleId, i));
-            Files.writeString(segFile, vtt.toString());
+            Files.writeString(segFile, vtt.toString(), StandardCharsets.UTF_8);
         }
     }
 
