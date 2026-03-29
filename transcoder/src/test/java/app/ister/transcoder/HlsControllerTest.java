@@ -170,7 +170,7 @@ class HlsControllerTest {
 
         ResponseEntity<String> response = controller.getVttSegment(mediaFileId, filename);
 
-        assertEquals("text/vtt", response.getHeaders().getFirst("Content-Type"));
+        assertEquals("text/vtt;charset=utf-8", response.getHeaders().getFirst("Content-Type"));
         assertEquals(content, response.getBody());
     }
 
