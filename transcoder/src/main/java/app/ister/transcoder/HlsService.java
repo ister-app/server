@@ -2,9 +2,14 @@ package app.ister.transcoder;
 
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MediaFileStreamEntity;
+import app.ister.core.enums.EventType;
 import app.ister.core.enums.StreamCodecType;
+import app.ister.core.enums.SubtitleFormat;
+import app.ister.core.eventdata.TranscodePassRequestedData;
+import app.ister.core.eventdata.TranscodeRequestedData;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
+import app.ister.core.service.MessageSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,10 +28,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
- * Stateless on-demand HLS service — coordinates playlist building, transcoding, and subtitle handling.
+ * HLS service — coordinates playlist building, transcoding, and subtitle handling.
  * <p>
- * All generated files are cached under {@code tmpDir/{mediaFileId}/} and reused on
- * subsequent requests (last-modified time is touched on each access).
+ * Playlist generation is triggered by a {@code TRANSCODE_REQUESTED} RabbitMQ event.
+ * Individual FFmpeg passes are started lazily: the first {@code .ts} segment request for a
+ * quality level sends a {@code TRANSCODE_PASS_REQUESTED} event; the pass handler calls
+ * {@link #startPass} which delegates to {@link HlsTranscodeService#ensurePassStarted}.
+ * All generated files are cached under {@code tmpDir/{mediaFileId}/}.
  */
 @Service
 @Slf4j
@@ -38,9 +46,13 @@ public class HlsService {
     private final HlsTranscodeService transcodeService;
     private final MediaFileRepository mediaFileRepository;
     private final MediaFileStreamRepository mediaFileStreamRepository;
+    private final MessageSender messageSender;
 
     @Value("${app.ister.server.tmp-dir}")
     private String tmpDir;
+
+    @Value("${app.ister.server.hls.master-playlist-timeout-ms:120000}")
+    private long masterPlaylistTimeoutMs;
 
     /** Per-subtitle locks to prevent duplicate segment generation for the same subtitle stream. */
     private final ConcurrentHashMap<String, Object> subtitleLocks = new ConcurrentHashMap<>();
@@ -49,14 +61,14 @@ public class HlsService {
 
     /**
      * Returns (cached) master.m3u8 content.
-     * On first generation, all stream playlists are pre-generated using a single ffprobe call.
+     * On cache miss, sends a {@code TRANSCODE_REQUESTED} RabbitMQ event and polls until
+     * the event handler has written the file to cache.
      *
      * @param direct    include the stream-copy (direct) video + audio-copy quality variant
      * @param transcode include the re-encoded (720p + 480p) video quality variants
      */
     @Transactional(readOnly = true)
     public String getMasterPlaylist(UUID mediaFileId, boolean direct, boolean transcode, SubtitleFormat subtitleFormat) throws IOException {
-        MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
         String cacheFilename = String.format(Locale.ROOT, "master_d%d_t%d_s%s.m3u8",
                 direct ? 1 : 0, transcode ? 1 : 0, subtitleFormat.name());
         Path cacheFile = cacheDir(mediaFileId).resolve(cacheFilename);
@@ -66,14 +78,63 @@ public class HlsService {
             return Files.readString(cacheFile);
         }
 
+        MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
+        String directoryName = mediaFile.getDirectoryEntity().getName();
+        log.debug("Master playlist cache miss for {}, sending TRANSCODE_REQUESTED to directory queue {}", mediaFileId, directoryName);
+
+        messageSender.sendTranscodeRequested(
+                TranscodeRequestedData.builder()
+                        .eventType(EventType.TRANSCODE_REQUESTED)
+                        .mediaFileId(mediaFileId)
+                        .direct(direct)
+                        .transcode(transcode)
+                        .subtitleFormat(subtitleFormat)
+                        .build(),
+                directoryName);
+
+        return waitForMasterPlaylist(cacheFile);
+    }
+
+    /**
+     * Generates master.m3u8 and all stream playlists and writes them to cache.
+     * Called by the {@code HandleTranscodeRequested} event handler.
+     */
+    @Transactional(readOnly = true)
+    public void generateAllPlaylists(UUID mediaFileId, boolean direct, boolean transcode, SubtitleFormat subtitleFormat) throws IOException {
+        MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
+        String cacheFilename = String.format(Locale.ROOT, "master_d%d_t%d_s%s.m3u8",
+                direct ? 1 : 0, transcode ? 1 : 0, subtitleFormat.name());
+        Path cacheFile = cacheDir(mediaFileId).resolve(cacheFilename);
+
+        if (Files.exists(cacheFile)) {
+            log.debug("Playlists already cached for {}, skipping generation", mediaFileId);
+            return;
+        }
+
         Files.createDirectories(cacheFile.getParent());
         String masterContent = playlistBuilder.buildMasterPlaylist(mediaFile, direct, transcode, subtitleFormat);
-        Files.writeString(cacheFile, masterContent);
-
-        // Pre-generate all stream playlists with a single ffprobe call
         preGenerateStreamPlaylists(mediaFile, mediaFileId, direct, transcode, subtitleFormat);
+        // Write master playlist last so that getMasterPlaylist's poll only fires after all stream playlists exist
+        Files.writeString(cacheFile, masterContent);
+        log.debug("Generated all playlists for {}", mediaFileId);
+    }
 
-        return masterContent;
+    /**
+     * Starts the FFmpeg pass described by the given event data.
+     * Called by the {@code HandleTranscodePassRequested} event handler.
+     */
+    public void startPass(TranscodePassRequestedData data) {
+        Path cacheDirPath = cacheDir(data.getMediaFileId());
+        if ("video".equals(data.getPassCategory())) {
+            VideoQuality vq = VideoQuality.fromLabel(data.getQualityLabel());
+            transcodeService.ensurePassStarted(data.getPassKey(),
+                    () -> transcodeService.startVideoPass(data.getMediaFilePath(), cacheDirPath, vq));
+        } else {
+            AudioQuality aq = AudioQuality.fromLabel(data.getQualityLabel());
+            transcodeService.ensurePassStarted(data.getPassKey(),
+                    () -> transcodeService.startAudioPass(data.getMediaFilePath(), cacheDirPath,
+                            data.getAudioStreamIndex(), aq));
+        }
     }
 
     /**
@@ -98,23 +159,35 @@ public class HlsService {
     /**
      * Returns path to (cached) video-only .ts segment.
      * <p>
-     * format: {@code seg_video_{quality}_%05d.ts} — produced by a background FFmpeg pass.
+     * On first request for a quality level, sends a {@code TRANSCODE_PASS_REQUESTED} event
+     * to start the background FFmpeg pass, then polls until the segment appears.
      */
+    @Transactional(readOnly = true)
     public Path getVideoSegment(UUID mediaFileId, String segmentFilename) throws IOException {
-        String filePath = getMediaFilePath(mediaFileId);
-        String[] parts = segmentFilename.replace(".ts", "").split("_");
         Path cacheFile = cacheDir(mediaFileId).resolve(segmentFilename);
 
         Path stable = transcodeService.stableSegmentOrNull(cacheFile);
         if (stable != null) return stable;
         Files.createDirectories(cacheFile.getParent());
+        String[] parts = segmentFilename.replace(".ts", "").split("_");
         String qualityLabel = parts[2];
-        VideoQuality quality = VideoQuality.fromLabel(qualityLabel);
-        String generationKey = mediaFileId + "_video_" + qualityLabel;
-        Path cacheDirPath = cacheDir(mediaFileId);
-        transcodeService.ensurePassStarted(generationKey,
-                () -> transcodeService.startVideoPass(filePath, cacheDirPath, quality));
-        return transcodeService.waitForSegment(cacheFile, generationKey);
+        String passKey = mediaFileId + "_video_" + qualityLabel;
+        if (!transcodeService.isPassActive(passKey) && !transcodeService.hasCompletedPass(passKey)) {
+            String inputPath = getMediaFilePath(mediaFileId);
+            String directoryName = mediaFileRepository.findById(mediaFileId).orElseThrow()
+                    .getDirectoryEntity().getName();
+            messageSender.sendTranscodePassRequested(
+                    TranscodePassRequestedData.builder()
+                            .eventType(EventType.TRANSCODE_PASS_REQUESTED)
+                            .mediaFileId(mediaFileId)
+                            .passKey(passKey)
+                            .mediaFilePath(inputPath)
+                            .passCategory("video")
+                            .qualityLabel(qualityLabel)
+                            .build(),
+                    directoryName);
+        }
+        return transcodeService.waitForSegment(cacheFile, passKey);
     }
 
     /**
@@ -122,13 +195,15 @@ public class HlsService {
      * <p>
      * COPY format:       {@code seg_audio_{start}_{duration}_{streamIdx}_copy.ts} — generated on demand per segment.
      * Transcoded format: {@code seg_audio_{streamIdx}_{bitrate}_%05d.ts}           — produced by a background FFmpeg pass.
+     * On first request for a transcoded quality, sends a {@code TRANSCODE_PASS_REQUESTED} event.
      */
+    @Transactional(readOnly = true)
     public Path getAudioSegment(UUID mediaFileId, String segmentFilename) throws IOException {
-        String filePath = getMediaFilePath(mediaFileId);
         String[] parts = segmentFilename.replace(".ts", "").split("_");
         Path cacheFile = cacheDir(mediaFileId).resolve(segmentFilename);
 
         if ("copy".equals(parts[parts.length - 1])) {
+            String filePath = getMediaFilePath(mediaFileId);
             return getCachedOrGenerateBinary(cacheFile, out -> {
                 double start = Double.parseDouble(parts[2]);
                 double duration = Double.parseDouble(parts[3]);
@@ -143,12 +218,24 @@ public class HlsService {
         Files.createDirectories(cacheFile.getParent());
         int streamIdx = Integer.parseInt(parts[2]);
         String bitrateLabel = parts[3];
-        AudioQuality audioQuality = AudioQuality.fromLabel(bitrateLabel);
-        String generationKey = mediaFileId + "_audio_" + streamIdx + "_" + bitrateLabel;
-        Path cacheDirPath = cacheDir(mediaFileId);
-        transcodeService.ensurePassStarted(generationKey,
-                () -> transcodeService.startAudioPass(filePath, cacheDirPath, streamIdx, audioQuality));
-        return transcodeService.waitForSegment(cacheFile, generationKey);
+        String passKey = mediaFileId + "_audio_" + streamIdx + "_" + bitrateLabel;
+        if (!transcodeService.isPassActive(passKey) && !transcodeService.hasCompletedPass(passKey)) {
+            String inputPath = getMediaFilePath(mediaFileId);
+            String directoryName = mediaFileRepository.findById(mediaFileId).orElseThrow()
+                    .getDirectoryEntity().getName();
+            messageSender.sendTranscodePassRequested(
+                    TranscodePassRequestedData.builder()
+                            .eventType(EventType.TRANSCODE_PASS_REQUESTED)
+                            .mediaFileId(mediaFileId)
+                            .passKey(passKey)
+                            .mediaFilePath(inputPath)
+                            .passCategory("audio")
+                            .qualityLabel(bitrateLabel)
+                            .audioStreamIndex(streamIdx)
+                            .build(),
+                    directoryName);
+        }
+        return transcodeService.waitForSegment(cacheFile, passKey);
     }
 
     /**
@@ -296,6 +383,24 @@ public class HlsService {
         if (!Files.exists(cacheFile)) {
             Files.writeString(cacheFile, content);
         }
+    }
+
+    // ========== Polling ==========
+
+    private String waitForMasterPlaylist(Path cacheFile) throws IOException {
+        long deadline = System.currentTimeMillis() + masterPlaylistTimeoutMs;
+        while (System.currentTimeMillis() < deadline) {
+            if (Files.exists(cacheFile)) {
+                return Files.readString(cacheFile);
+            }
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted waiting for master playlist");
+            }
+        }
+        throw new IOException("Timeout waiting for master playlist: " + cacheFile);
     }
 
     // ========== Cache helpers ==========

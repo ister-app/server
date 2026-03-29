@@ -3,6 +3,7 @@ package app.ister.transcoder;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MediaFileStreamEntity;
 import app.ister.core.enums.StreamCodecType;
+import app.ister.core.enums.SubtitleFormat;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

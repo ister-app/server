@@ -122,7 +122,17 @@ public class HlsTranscodeService {
      * Slot acquisition happens inside the executor thread, so HTTP handler threads are
      * never blocked. {@link #waitForSegment} will time out if a slot is not available in time.
      */
-    void ensurePassStarted(String generationKey, Runnable passStarter) {
+    public boolean isPassActive(String key) {
+        CompletableFuture<Void> cf = activeGenerations.get(key);
+        return cf != null && !cf.isDone();
+    }
+
+    public boolean hasCompletedPass(String key) {
+        CompletableFuture<Void> cf = activeGenerations.get(key);
+        return cf != null && cf.isDone() && !cf.isCompletedExceptionally();
+    }
+
+    public void ensurePassStarted(String generationKey, Runnable passStarter) {
         String mediaFileId = generationKey.split("_", 2)[0];
         Object lock = generationLocks.computeIfAbsent(generationKey, k -> new Object());
         synchronized (lock) {
@@ -184,7 +194,7 @@ public class HlsTranscodeService {
      * Uses {@code -f segment -segment_times} so the encoder runs continuously,
      * eliminating the per-segment PTS reset that causes A/V drift.
      */
-    void startVideoPass(String inputPath, Path cacheDir, VideoQuality quality) {
+    public void startVideoPass(String inputPath, Path cacheDir, VideoQuality quality) {
         List<Double> keyframes = getCachedKeyframes(inputPath);
         String segmentTimes = buildSegmentTimes(keyframes);
         Path outputPattern = cacheDir.resolve("seg_video_" + quality.getLabel() + "_%05d.ts");
@@ -233,7 +243,7 @@ public class HlsTranscodeService {
      * Starts a background audio-only FFmpeg pass for the given stream index and quality.
      * The encoder runs continuously across all segments, so PTS is never reset.
      */
-    void startAudioPass(String inputPath, Path cacheDir, int streamIdx, AudioQuality audioQuality) {
+    public void startAudioPass(String inputPath, Path cacheDir, int streamIdx, AudioQuality audioQuality) {
         List<Double> keyframes = getCachedKeyframes(inputPath);
         String segmentTimes = buildSegmentTimes(keyframes);
         Path outputPattern = cacheDir.resolve(

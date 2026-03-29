@@ -1,5 +1,6 @@
 package app.ister.transcoder;
 
+import app.ister.core.enums.SubtitleFormat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

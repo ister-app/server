@@ -1,5 +1,6 @@
 package app.ister.transcoder;
 
+import app.ister.core.enums.SubtitleFormat;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
@@ -24,6 +25,7 @@ public class HlsController {
     private static final String M3U8_CONTENT_TYPE = "application/x-mpegURL";
     private static final String TS_CONTENT_TYPE = "video/MP2T";
     private static final String VTT_CONTENT_TYPE = "text/vtt";
+    private static final String CACHE_CONTROL_2H = "public, max-age=7200";
 
     private final HlsService hlsService;
 
@@ -42,6 +44,7 @@ public class HlsController {
         String content = hlsService.getMasterPlaylist(mediaFileId, direct, transcode, subtitleFormat);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, M3U8_CONTENT_TYPE)
+                .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_2H)
                 .body(appendTokenToUris(content, token));
     }
 
@@ -53,6 +56,7 @@ public class HlsController {
         String content = hlsService.getStreamPlaylist(mediaFileId, streamFilename);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, M3U8_CONTENT_TYPE)
+                .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_2H)
                 .body(appendTokenToUris(content, token));
     }
 
@@ -69,6 +73,7 @@ public class HlsController {
         long size = Files.size(filePath);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, TS_CONTENT_TYPE)
+                .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_2H)
                 .contentLength(size)
                 .body(new InputStreamResource(new FileInputStream(filePath.toFile())));
     }
@@ -80,6 +85,7 @@ public class HlsController {
         String content = hlsService.getSubtitleSegment(mediaFileId, segmentFilename);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, VTT_CONTENT_TYPE)
+                .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_2H)
                 .body(content);
     }
 
@@ -91,6 +97,7 @@ public class HlsController {
         long size = Files.size(filePath);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, "application/x-subrip")
+                .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_2H)
                 .contentLength(size)
                 .body(new InputStreamResource(new FileInputStream(filePath.toFile())));
     }

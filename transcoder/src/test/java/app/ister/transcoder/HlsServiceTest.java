@@ -3,8 +3,10 @@ package app.ister.transcoder;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MediaFileStreamEntity;
 import app.ister.core.enums.StreamCodecType;
+import app.ister.core.enums.SubtitleFormat;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
+import app.ister.core.service.MessageSender;
 import app.ister.core.utils.Jaffree;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +40,7 @@ class HlsServiceTest {
     @Mock private FfprobeService ffprobeService;
     @Mock private MediaFileRepository mediaFileRepository;
     @Mock private MediaFileStreamRepository mediaFileStreamRepository;
+    @Mock private MessageSender messageSender;
 
     @TempDir
     Path tempDir;
@@ -56,7 +59,7 @@ class HlsServiceTest {
         ReflectionTestUtils.setField(transcodeService, "segmentTimeoutMs", 5000L);
         ReflectionTestUtils.setField(transcodeService, "concurrentFileSlots", new Semaphore(10));
         hlsService = new HlsService(playlistBuilder, subtitleService, transcodeService,
-                mediaFileRepository, mediaFileStreamRepository);
+                mediaFileRepository, mediaFileStreamRepository, messageSender);
         ReflectionTestUtils.setField(hlsService, "tmpDir", tempDir.toString());
     }
 
@@ -73,6 +76,7 @@ class HlsServiceTest {
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
+        hlsService.generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT);
         String master = hlsService.getMasterPlaylist(id, true, false, SubtitleFormat.WEBVTT);
 
         assertTrue(master.contains("#EXTM3U"));
@@ -93,6 +97,7 @@ class HlsServiceTest {
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
+        hlsService.generateAllPlaylists(id, false, true, SubtitleFormat.WEBVTT);
         String master = hlsService.getMasterPlaylist(id, false, true, SubtitleFormat.WEBVTT);
 
         assertFalse(master.contains("stream_video_copy.m3u8"));
@@ -114,6 +119,7 @@ class HlsServiceTest {
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
+        hlsService.generateAllPlaylists(id, true, true, SubtitleFormat.WEBVTT);
         String master = hlsService.getMasterPlaylist(id, true, true, SubtitleFormat.WEBVTT);
 
         assertTrue(master.contains("stream_video_copy.m3u8"));
@@ -134,6 +140,7 @@ class HlsServiceTest {
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
+        hlsService.generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT);
         String master = hlsService.getMasterPlaylist(id, true, false, SubtitleFormat.WEBVTT);
 
         assertTrue(master.contains("SUBTITLES=\"subs\""));
@@ -152,10 +159,11 @@ class HlsServiceTest {
         when(ffprobeService.getKeyframes(any())).thenReturn(List.of(0.0, 5.0));
         when(ffprobeService.getTotalDuration(any())).thenReturn(10.0);
 
+        hlsService.generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT);
         hlsService.getMasterPlaylist(id, true, false, SubtitleFormat.WEBVTT);
         hlsService.getMasterPlaylist(id, true, false, SubtitleFormat.WEBVTT);
 
-        // ffprobe should only be called once (second call uses cache)
+        // ffprobe should only be called once (generateAllPlaylists call; subsequent calls hit cache)
         verify(ffprobeService, times(1)).getKeyframes(any());
     }
 
@@ -349,7 +357,6 @@ class HlsServiceTest {
         Path cacheDir = tempDir.resolve(id.toString());
         Files.createDirectories(cacheDir);
 
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0, 10.0));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
@@ -366,11 +373,15 @@ class HlsServiceTest {
             return null;
         }).when(ffmpegMock).execute();
 
+        // Start the pass explicitly (as the event handler would do)
+        String generationKey = id + "_video_720p";
+        transcodeService.ensurePassStarted(generationKey,
+                () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
+        passStarted.await(3, TimeUnit.SECONDS);
+
         ExecutorService pool = Executors.newFixedThreadPool(2);
 
         Future<Path> f1 = pool.submit(() -> hlsService.getVideoSegment(id, "seg_video_720p_00000.ts"));
-        passStarted.await(3, TimeUnit.SECONDS);
-
         Future<Path> f2 = pool.submit(() -> hlsService.getVideoSegment(id, "seg_video_720p_00001.ts"));
 
         releasePass.countDown();
@@ -389,7 +400,6 @@ class HlsServiceTest {
         Path cacheDir = tempDir.resolve(id.toString());
         Files.createDirectories(cacheDir);
 
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
@@ -401,6 +411,10 @@ class HlsServiceTest {
             }
             return null;
         }).when(ffmpegMock).execute();
+
+        // Start the pass explicitly (as the event handler would do)
+        transcodeService.ensurePassStarted(id + "_video_720p",
+                () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
 
         for (int i = 0; i < 2; i++) {
             hlsService.getVideoSegment(id, String.format("seg_video_720p_%05d.ts", i));
@@ -421,7 +435,6 @@ class HlsServiceTest {
         Path cacheDir = tempDir.resolve(id.toString());
         Files.createDirectories(cacheDir);
 
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
@@ -437,6 +450,12 @@ class HlsServiceTest {
             }
             return null;
         }).when(ffmpegMock).execute();
+
+        // Start passes explicitly (as the event handler would do)
+        transcodeService.ensurePassStarted(id + "_video_720p",
+                () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
+        transcodeService.ensurePassStarted(id + "_audio_1_192k",
+                () -> transcodeService.startAudioPass("/test/video.mkv", cacheDir, 1, AudioQuality.Q192K));
 
         Path videoResult = hlsService.getVideoSegment(id, "seg_video_720p_00000.ts");
         Path audioResult = hlsService.getAudioSegment(id, "seg_audio_1_192k_00000.ts");
@@ -597,7 +616,6 @@ class HlsServiceTest {
 
         ReflectionTestUtils.setField(transcodeService, "hwaccelProperty", "vaapi");
 
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
@@ -608,6 +626,8 @@ class HlsServiceTest {
             return null;
         }).when(ffmpegMock).execute();
 
+        transcodeService.ensurePassStarted(id + "_video_720p",
+                () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
         Path result = hlsService.getVideoSegment(id, "seg_video_720p_00000.ts");
 
         assertNotNull(result);
@@ -622,7 +642,6 @@ class HlsServiceTest {
 
         ReflectionTestUtils.setField(transcodeService, "hwaccelProperty", "nvdec");
 
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
@@ -633,6 +652,8 @@ class HlsServiceTest {
             return null;
         }).when(ffmpegMock).execute();
 
+        transcodeService.ensurePassStarted(id + "_video_720p",
+                () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
         Path result = hlsService.getVideoSegment(id, "seg_video_720p_00000.ts");
 
         assertNotNull(result);
@@ -647,7 +668,6 @@ class HlsServiceTest {
 
         ReflectionTestUtils.setField(transcodeService, "hwaccelProperty", "vaapi");
 
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
@@ -658,6 +678,8 @@ class HlsServiceTest {
             return null;
         }).when(ffmpegMock).execute();
 
+        transcodeService.ensurePassStarted(id + "_audio_1_192k",
+                () -> transcodeService.startAudioPass("/test/video.mkv", cacheDir, 1, AudioQuality.Q192K));
         Path result = hlsService.getAudioSegment(id, "seg_audio_1_192k_00000.ts");
 
         assertNotNull(result);
@@ -676,7 +698,6 @@ class HlsServiceTest {
         Path cacheDir = tempDir.resolve(id.toString());
         Files.createDirectories(cacheDir);
 
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
@@ -687,6 +708,11 @@ class HlsServiceTest {
             Files.writeString(cacheDir.resolve("seg_audio_1_192k_00000.ts"), "audio-data");
             return null;
         }).when(ffmpegMock).execute();
+
+        transcodeService.ensurePassStarted(id + "_video_720p",
+                () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
+        transcodeService.ensurePassStarted(id + "_audio_1_192k",
+                () -> transcodeService.startAudioPass("/test/video.mkv", cacheDir, 1, AudioQuality.Q192K));
 
         Path video = hlsService.getVideoSegment(id, "seg_video_720p_00000.ts");
         Path audio = hlsService.getAudioSegment(id, "seg_audio_1_192k_00000.ts");
@@ -708,8 +734,6 @@ class HlsServiceTest {
         Files.createDirectories(cacheDir1);
         Files.createDirectories(cacheDir2);
 
-        when(mediaFileRepository.findById(id1)).thenReturn(Optional.of(mediaFileEntity(id1, "/test/video1.mkv")));
-        when(mediaFileRepository.findById(id2)).thenReturn(Optional.of(mediaFileEntity(id2, "/test/video2.mkv")));
         when(ffprobeService.getKeyframes(any())).thenReturn(List.of(0.0, 5.0));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
@@ -735,12 +759,20 @@ class HlsServiceTest {
             return null;
         }).when(ffmpegMock).execute();
 
-        ExecutorService pool = Executors.newFixedThreadPool(2);
+        ExecutorService pool = Executors.newFixedThreadPool(4);
 
-        Future<Path> f1 = pool.submit(() -> hlsService.getVideoSegment(id1, "seg_video_720p_00000.ts"));
+        // Start passes explicitly (as the event handler would do)
+        pool.submit(() -> transcodeService.ensurePassStarted(id1 + "_video_720p",
+                () -> transcodeService.startVideoPass("/test/video1.mkv", cacheDir1, VideoQuality.Q720P)));
         file1PassStarted.await(3, TimeUnit.SECONDS);
 
-        // File 2 starts while file 1 holds the slot — it should be queued
+        Future<Path> f1 = pool.submit(() -> hlsService.getVideoSegment(id1, "seg_video_720p_00000.ts"));
+
+        // File 2 starts while file 1 holds the slot — it should be queued.
+        // Call ensurePassStarted directly (it returns immediately after registering the CF in
+        // activeGenerations) so that isPassActive(id2) is true before getVideoSegment checks it.
+        transcodeService.ensurePassStarted(id2 + "_video_720p",
+                () -> transcodeService.startVideoPass("/test/video2.mkv", cacheDir2, VideoQuality.Q720P));
         Future<Path> f2 = pool.submit(() -> hlsService.getVideoSegment(id2, "seg_video_720p_00000.ts"));
 
         // Give file 2 time to queue up, then release file 1
@@ -764,7 +796,6 @@ class HlsServiceTest {
         Path cacheDir = tempDir.resolve(id.toString());
         Files.createDirectories(cacheDir);
 
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
@@ -775,6 +806,8 @@ class HlsServiceTest {
             return null;
         }).when(ffmpegMock).execute();
 
+        transcodeService.ensurePassStarted(id + "_video_720p",
+                () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
         hlsService.getVideoSegment(id, "seg_video_720p_00000.ts");
 
         // Wait briefly for the pass future to complete
@@ -792,7 +825,6 @@ class HlsServiceTest {
         Path cacheDir = tempDir.resolve(id.toString());
         Files.createDirectories(cacheDir);
 
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
@@ -807,8 +839,15 @@ class HlsServiceTest {
             return null;
         }).when(ffmpegMock).execute();
 
+        // First pass: fails
+        String generationKey = id + "_video_720p";
+        transcodeService.ensurePassStarted(generationKey,
+                () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
         assertThrows(IOException.class, () -> hlsService.getVideoSegment(id, "seg_video_720p_00000.ts"));
 
+        // Second pass: restarts because first was exceptionally completed
+        transcodeService.ensurePassStarted(generationKey,
+                () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
         Path result = hlsService.getVideoSegment(id, "seg_video_720p_00000.ts");
         assertNotNull(result);
         verify(ffmpegMock, times(2)).execute();

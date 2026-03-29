@@ -90,6 +90,19 @@ public class MessageSender {
         rabbitTemplate.convertAndSend(APP_ISTER_SERVER_ANALYZE_DATA, data);
     }
 
+    // transcoder module (directory-scoped, like sendMediaFileFound)
+    public void sendTranscodeRequested(TranscodeRequestedData transcodeRequestedData, String directoryName) {
+        String queue = APP_ISTER_SERVER_TRANSCODE_REQUESTED + "." + directoryName;
+        log.debug("Sending message for queue: {} and transcodeRequestedData: {}", queue, transcodeRequestedData);
+        rabbitTemplate.convertAndSend(queue, transcodeRequestedData);
+    }
+
+    public void sendTranscodePassRequested(TranscodePassRequestedData transcodePassRequestedData, String directoryName) {
+        String queue = APP_ISTER_SERVER_TRANSCODE_PASS_REQUESTED + "." + directoryName;
+        log.debug("Sending message for queue: {} and transcodePassRequestedData: {}", queue, transcodePassRequestedData);
+        rabbitTemplate.convertAndSend(queue, transcodePassRequestedData);
+    }
+
     // Worker → disk (directory-scoped, like sendMediaFileFound)
     public void sendAnalyzeData(AnalyzeData data, String directoryName) {
         String queue = APP_ISTER_SERVER_ANALYZE_DATA + "." + directoryName;

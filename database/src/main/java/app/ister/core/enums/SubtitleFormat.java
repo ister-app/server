@@ -1,4 +1,4 @@
-package app.ister.transcoder;
+package app.ister.core.enums;
 
 public enum SubtitleFormat {
     WEBVTT, SRT
