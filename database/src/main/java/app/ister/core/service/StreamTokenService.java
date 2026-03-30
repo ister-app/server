@@ -34,14 +34,27 @@ public class StreamTokenService {
         return streamTokenRepository.save(entity);
     }
 
-    public Optional<UserEntity> validateToken(String tokenStr) {
+    public Optional<StreamTokenEntity> validateStreamToken(String tokenStr) {
         try {
             UUID token = UUID.fromString(tokenStr);
             return streamTokenRepository.findByToken(token)
-                    .filter(entity -> entity.getExpiresAt().isAfter(Instant.now()))
-                    .map(StreamTokenEntity::getUserEntity);
-        } catch (IllegalArgumentException _) {
+                    .filter(entity -> entity.getExpiresAt().isAfter(Instant.now()));
+        } catch (IllegalArgumentException ignored) {
             return Optional.empty();
         }
+    }
+
+    public Optional<UserEntity> validateToken(String tokenStr) {
+        return validateStreamToken(tokenStr).map(StreamTokenEntity::getUserEntity);
+    }
+
+    public StreamTokenEntity createNodeToken() {
+        StreamTokenEntity entity = StreamTokenEntity.builder()
+                .token(UUID.randomUUID())
+                .expiresAt(Instant.now().plus(14, ChronoUnit.HOURS))
+                .download(true)
+                .upload(true)
+                .build();
+        return streamTokenRepository.save(entity);
     }
 }

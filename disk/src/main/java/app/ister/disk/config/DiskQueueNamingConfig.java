@@ -84,4 +84,10 @@ public class DiskQueueNamingConfig {
                 Stream.of(APP_ISTER_SERVER_ANALYZE_DATA + "." + cacheDirName())
         ).toArray(String[]::new);
     }
+
+    public String[] getPreTranscodeRecentlyWatchedQueues() {
+        return config.getDirectories().stream()
+                .map(dir -> APP_ISTER_SERVER_PRE_TRANSCODE_RECENTLY_WATCHED + "." + dir.getName())
+                .toArray(String[]::new);
+    }
 }

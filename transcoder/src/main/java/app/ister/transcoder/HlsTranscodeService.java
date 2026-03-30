@@ -127,6 +127,10 @@ public class HlsTranscodeService {
         return cf != null && !cf.isDone();
     }
 
+    public CompletableFuture<Void> getActiveFuture(String key) {
+        return activeGenerations.get(key);
+    }
+
     public boolean hasCompletedPass(String key) {
         CompletableFuture<Void> cf = activeGenerations.get(key);
         return cf != null && cf.isDone() && !cf.isCompletedExceptionally();
@@ -195,6 +199,11 @@ public class HlsTranscodeService {
      * eliminating the per-segment PTS reset that causes A/V drift.
      */
     public void startVideoPass(String inputPath, Path cacheDir, VideoQuality quality) {
+        try {
+            Files.createDirectories(cacheDir);
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not create cache dir: " + cacheDir, e);
+        }
         List<Double> keyframes = getCachedKeyframes(inputPath);
         String segmentTimes = buildSegmentTimes(keyframes);
         Path outputPattern = cacheDir.resolve("seg_video_" + quality.getLabel() + "_%05d.ts");
@@ -244,6 +253,11 @@ public class HlsTranscodeService {
      * The encoder runs continuously across all segments, so PTS is never reset.
      */
     public void startAudioPass(String inputPath, Path cacheDir, int streamIdx, AudioQuality audioQuality) {
+        try {
+            Files.createDirectories(cacheDir);
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not create cache dir: " + cacheDir, e);
+        }
         List<Double> keyframes = getCachedKeyframes(inputPath);
         String segmentTimes = buildSegmentTimes(keyframes);
         Path outputPattern = cacheDir.resolve(
@@ -431,9 +445,15 @@ public class HlsTranscodeService {
         Path root = Paths.get(tmpDir);
         if (!Files.exists(root)) return;
 
+        Set<String> keepIds = loadKeepFileIds(root);
         Instant twoHoursAgo = Instant.now().minus(2, ChronoUnit.HOURS);
         try (var dirs = Files.list(root)) {
             dirs.filter(Files::isDirectory).forEach(dir -> {
+                String dirName = dir.getFileName().toString();
+                if (keepIds.contains(dirName)) {
+                    log.debug("Skipping pre-transcode kept dir: {}", dir);
+                    return;
+                }
                 try (var entries = Files.list(dir)) {
                     boolean allOld = entries.allMatch(f -> isOlderThan(f, twoHoursAgo));
                     if (allOld) {
@@ -447,14 +467,13 @@ public class HlsTranscodeService {
                                 }
                             });
                         }
-                        String staleMediaFileId = dir.getFileName().toString();
-                        activeGenerations.keySet().removeIf(k -> k.startsWith(staleMediaFileId));
-                        generationLocks.keySet().removeIf(k -> k.startsWith(staleMediaFileId));
-                        if (filesWithAcquiredSlot.remove(staleMediaFileId)) {
+                        activeGenerations.keySet().removeIf(k -> k.startsWith(dirName));
+                        generationLocks.keySet().removeIf(k -> k.startsWith(dirName));
+                        if (filesWithAcquiredSlot.remove(dirName)) {
                             concurrentFileSlots.release();
-                            log.warn("Released stale transcode slot during cleanup: {}", staleMediaFileId);
+                            log.warn("Released stale transcode slot during cleanup: {}", dirName);
                         }
-                        activePassesPerFile.remove(staleMediaFileId);
+                        activePassesPerFile.remove(dirName);
                     }
                 } catch (IOException e) {
                     log.warn("Error scanning cache dir {}", dir, e);
@@ -462,6 +481,28 @@ public class HlsTranscodeService {
             });
         } catch (IOException e) {
             log.warn("Error during HLS cache cleanup", e);
+        }
+    }
+
+    private Set<String> loadKeepFileIds(Path root) {
+        try (var files = Files.list(root)) {
+            return files
+                    .filter(p -> !Files.isDirectory(p))
+                    .filter(p -> p.getFileName().toString().startsWith("pretranscode_keep_")
+                              && p.getFileName().toString().endsWith(".txt"))
+                    .flatMap(p -> {
+                        try {
+                            return Files.readAllLines(p).stream();
+                        } catch (IOException e) {
+                            log.warn("Could not read keep file {}", p, e);
+                            return java.util.stream.Stream.empty();
+                        }
+                    })
+                    .filter(line -> !line.isBlank())
+                    .collect(Collectors.toSet());
+        } catch (IOException e) {
+            log.warn("Could not read pretranscode keep files", e);
+            return Set.of();
         }
     }
 

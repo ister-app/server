@@ -1,6 +1,6 @@
 package app.ister.core.config;
 
-import app.ister.core.entity.UserEntity;
+import app.ister.core.entity.StreamTokenEntity;
 import app.ister.core.service.StreamTokenService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -27,22 +27,37 @@ public class StreamTokenAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String token = request.getParameter("token");
         if (token != null && !token.isBlank() && SecurityContextHolder.getContext().getAuthentication() == null) {
-            Optional<UserEntity> user = streamTokenService.validateToken(token);
-            if (user.isPresent()) {
-                UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                        user.get().getExternalId(),
-                        null,
-                        List.of(new SimpleGrantedAuthority("ROLE_user"))
-                );
-                SecurityContextHolder.getContext().setAuthentication(auth);
-            }
+            Optional<StreamTokenEntity> tokenEntity = streamTokenService.validateStreamToken(token);
+            tokenEntity.ifPresent(entity -> {
+                String path = request.getRequestURI();
+                if ((path.startsWith(pathPrefix + "/hls/") || path.startsWith(pathPrefix + "/images/"))
+                        && entity.getUserEntity() != null) {
+                    setAuth(entity.getUserEntity().getExternalId(), "ROLE_user");
+                } else if (path.startsWith(pathPrefix + "/mediaFile/") && entity.isDownload()) {
+                    setAuth("node", "ROLE_node");
+                } else if (path.startsWith(pathPrefix + "/transcode/upload/") && entity.isUpload()) {
+                    setAuth("node", "ROLE_node");
+                }
+            });
         }
         filterChain.doFilter(request, response);
+    }
+
+    private void setAuth(String principal, String role) {
+        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                principal,
+                null,
+                List.of(new SimpleGrantedAuthority(role))
+        );
+        SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return !path.startsWith(pathPrefix + "/hls/") && !path.startsWith(pathPrefix + "/images/");
+        return !path.startsWith(pathPrefix + "/hls/")
+                && !path.startsWith(pathPrefix + "/images/")
+                && !path.startsWith(pathPrefix + "/mediaFile/")
+                && !path.startsWith(pathPrefix + "/transcode/upload/");
     }
 }

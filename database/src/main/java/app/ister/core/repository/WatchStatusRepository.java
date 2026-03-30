@@ -51,6 +51,37 @@ public interface WatchStatusRepository extends CrudRepository<WatchStatusEntity,
     )
     List<String[]> findRecentEpisodesAndShowIdsByUserId(@Param("userId") UUID userId);
 
+    /**
+     * Like {@link #findRecentEpisodesAndShowIdsByUserId} but also returns the date_updated
+     * column so callers can determine how recently the episode was watched.
+     *
+     * @return list of Object[] rows: [episode_entity_id (String), show_entity_id (String), date_updated (Timestamp)]
+     */
+    @Query(
+            value = """
+                    WITH added_row_number AS (
+                      SELECT
+                        wse.episode_entity_id,
+                        ee.show_entity_id,
+                        wse.date_updated AS wse_date_updated,
+                        ROW_NUMBER() OVER(PARTITION BY ee.show_entity_id ORDER BY wse.date_updated DESC) AS row_number
+                      FROM watch_status_entity wse
+                      LEFT JOIN episode_entity ee ON wse.episode_entity_id = ee.id
+                      WHERE wse.user_entity_id = :userId AND wse.episode_entity_id IS NOT NULL
+                        AND wse.date_updated >= CURRENT_DATE - INTERVAL '150 days'
+                      ORDER BY wse.date_updated DESC
+                    )
+                    SELECT
+                      episode_entity_id,
+                      show_entity_id,
+                      wse_date_updated
+                    FROM added_row_number
+                    WHERE row_number = 1;
+                    """,
+            nativeQuery = true
+    )
+    List<Object[]> findRecentEpisodesWithDateByUserId(@Param("userId") UUID userId);
+
     @Query(value = """
             SELECT DISTINCT ON (wse.movie_entity_id) wse.movie_entity_id
             FROM watch_status_entity wse

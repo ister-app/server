@@ -16,6 +16,7 @@ public class MessageQueue {
     public static final String APP_ISTER_SERVER_ANALYZE_DATA = "app.ister.server.AnalyzeData";
     public static final String APP_ISTER_SERVER_TRANSCODE_REQUESTED = "app.ister.server.TranscodeRequested";
     public static final String APP_ISTER_SERVER_TRANSCODE_PASS_REQUESTED = "app.ister.server.TranscodePassRequested";
+    public static final String APP_ISTER_SERVER_PRE_TRANSCODE_RECENTLY_WATCHED = "app.ister.server.PreTranscodeRecentlyWatched";
 
     private MessageQueue() {
         throw new IllegalStateException("Utility class");

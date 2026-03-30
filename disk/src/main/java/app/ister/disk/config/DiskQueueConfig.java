@@ -27,7 +27,8 @@ public class DiskQueueConfig {
                 APP_ISTER_SERVER_SUBTITLE_FILE_FOUND,
                 APP_ISTER_SERVER_IMAGE_FOUND,
                 APP_ISTER_SERVER_UPDATE_IMAGES_REQUESTED,
-                APP_ISTER_SERVER_ANALYZE_DATA
+                APP_ISTER_SERVER_ANALYZE_DATA,
+                APP_ISTER_SERVER_PRE_TRANSCODE_RECENTLY_WATCHED
         );
         String cacheDirName = nodeName + "-cache-directory";
         return new Declarables(

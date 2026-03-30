@@ -2,6 +2,7 @@ package app.ister.disk;
 
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
@@ -9,12 +10,15 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
 @RestController
@@ -66,5 +70,18 @@ public class FileController {
                 return Files.size(Path.of(mediaFileEntity.getPath()));
             }
         };
+    }
+
+    @PostMapping("/transcode/upload/{id}/{fileName}")
+    public ResponseEntity<Void> uploadTranscode(
+            @PathVariable UUID id,
+            @PathVariable String fileName,
+            HttpServletRequest request) throws IOException {
+        Path dir = Path.of(tmpDir, id.toString());
+        Files.createDirectories(dir);
+        try (InputStream in = request.getInputStream()) {
+            Files.copy(in, dir.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+        }
+        return ResponseEntity.ok().build();
     }
 }

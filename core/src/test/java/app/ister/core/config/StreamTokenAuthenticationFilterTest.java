@@ -1,5 +1,6 @@
 package app.ister.core.config;
 
+import app.ister.core.entity.StreamTokenEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.service.StreamTokenService;
 import jakarta.servlet.FilterChain;
@@ -67,6 +68,24 @@ class StreamTokenAuthenticationFilterTest {
     }
 
     @Test
+    void shouldNotFilterReturnsFalseForMediaFilePath() {
+        when(request.getRequestURI()).thenReturn("/api/mediaFile/some-uuid/download");
+
+        boolean result = filter.shouldNotFilter(request);
+
+        assertFalse(result, "MediaFile paths should be filtered");
+    }
+
+    @Test
+    void shouldNotFilterReturnsFalseForTranscodeUploadPath() {
+        when(request.getRequestURI()).thenReturn("/api/transcode/upload/some-uuid/seg.ts");
+
+        boolean result = filter.shouldNotFilter(request);
+
+        assertFalse(result, "Transcode upload paths should be filtered");
+    }
+
+    @Test
     void shouldNotFilterReturnsTrueForOtherPaths() {
         when(request.getRequestURI()).thenReturn("/api/graphql");
 
@@ -97,10 +116,16 @@ class StreamTokenAuthenticationFilterTest {
     // ========== doFilterInternal ==========
 
     @Test
-    void doFilterInternalWithValidTokenSetsAuthentication() throws ServletException, IOException {
+    void doFilterInternalWithValidUserTokenSetsAuthentication() throws ServletException, IOException {
         UserEntity user = UserEntity.builder().externalId("user-xyz").build();
+        StreamTokenEntity tokenEntity = StreamTokenEntity.builder()
+                .userEntity(user)
+                .download(false)
+                .upload(false)
+                .build();
         when(request.getParameter("token")).thenReturn("valid-token-uuid");
-        when(streamTokenService.validateToken("valid-token-uuid")).thenReturn(Optional.of(user));
+        when(request.getRequestURI()).thenReturn("/api/hls/some-uuid/master.m3u8");
+        when(streamTokenService.validateStreamToken("valid-token-uuid")).thenReturn(Optional.of(tokenEntity));
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -108,6 +133,44 @@ class StreamTokenAuthenticationFilterTest {
         assertNotNull(auth);
         assertEquals("user-xyz", auth.getPrincipal());
         assertTrue(auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_user")));
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void doFilterInternalWithNodeDownloadTokenSetsNodeAuth() throws ServletException, IOException {
+        StreamTokenEntity tokenEntity = StreamTokenEntity.builder()
+                .download(true)
+                .upload(true)
+                .build();
+        when(request.getParameter("token")).thenReturn("node-token-uuid");
+        when(request.getRequestURI()).thenReturn("/api/mediaFile/some-uuid/download");
+        when(streamTokenService.validateStreamToken("node-token-uuid")).thenReturn(Optional.of(tokenEntity));
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        assertNotNull(auth);
+        assertEquals("node", auth.getPrincipal());
+        assertTrue(auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_node")));
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void doFilterInternalWithNodeUploadTokenSetsNodeAuth() throws ServletException, IOException {
+        StreamTokenEntity tokenEntity = StreamTokenEntity.builder()
+                .download(true)
+                .upload(true)
+                .build();
+        when(request.getParameter("token")).thenReturn("node-token-uuid");
+        when(request.getRequestURI()).thenReturn("/api/transcode/upload/some-uuid/seg.ts");
+        when(streamTokenService.validateStreamToken("node-token-uuid")).thenReturn(Optional.of(tokenEntity));
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        assertNotNull(auth);
+        assertEquals("node", auth.getPrincipal());
+        assertTrue(auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_node")));
         verify(filterChain).doFilter(request, response);
     }
 
@@ -136,7 +199,7 @@ class StreamTokenAuthenticationFilterTest {
     @Test
     void doFilterInternalWithInvalidTokenJustCallsFilterChain() throws ServletException, IOException {
         when(request.getParameter("token")).thenReturn("invalid-token");
-        when(streamTokenService.validateToken("invalid-token")).thenReturn(Optional.empty());
+        when(streamTokenService.validateStreamToken("invalid-token")).thenReturn(Optional.empty());
 
         filter.doFilterInternal(request, response, filterChain);
 

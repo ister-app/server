@@ -103,6 +103,12 @@ public class MessageSender {
         rabbitTemplate.convertAndSend(queue, transcodePassRequestedData);
     }
 
+    public void sendPreTranscodeRecentlyWatched(PreTranscodeRecentlyWatchedData data, String diskName) {
+        String queue = APP_ISTER_SERVER_PRE_TRANSCODE_RECENTLY_WATCHED + "." + diskName;
+        log.debug("Sending message for queue: {}", queue);
+        rabbitTemplate.convertAndSend(queue, data);
+    }
+
     // Worker → disk (directory-scoped, like sendMediaFileFound)
     public void sendAnalyzeData(AnalyzeData data, String directoryName) {
         String queue = APP_ISTER_SERVER_ANALYZE_DATA + "." + directoryName;

@@ -22,11 +22,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 /**
  * HLS service — coordinates playlist building, transcoding, and subtitle handling.
@@ -48,6 +54,8 @@ public class HlsService {
     private final MediaFileRepository mediaFileRepository;
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final MessageSender messageSender;
+    private final RemoteNodeClient remoteNodeClient;
+    private final NodeTokenManager nodeTokenManager;
 
     @Value("${app.ister.server.tmp-dir}")
     private String tmpDir;
@@ -55,8 +63,18 @@ public class HlsService {
     @Value("${app.ister.server.hls.master-playlist-timeout-ms:120000}")
     private long masterPlaylistTimeoutMs;
 
+    @Value("${app.ister.server.name}")
+    private String localNodeName;
+
     /** Per-subtitle locks to prevent duplicate segment generation for the same subtitle stream. */
     private final ConcurrentHashMap<String, Object> subtitleLocks = new ConcurrentHashMap<>();
+
+    /** Daemon thread pool for segment-upload watcher threads (remote transcoding). */
+    private final ExecutorService watcherExecutor = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "segment-watcher");
+        t.setDaemon(true);
+        return t;
+    });
 
     // ========== Public API ==========
 
@@ -99,6 +117,7 @@ public class HlsService {
     /**
      * Generates master.m3u8 and all stream playlists and writes them to cache.
      * Called by the {@code HandleTranscodeRequested} event handler.
+     * If the media file is on a remote node, all generated playlists are uploaded to that node.
      */
     @Transactional(readOnly = true)
     public void generateAllPlaylists(UUID mediaFileId, boolean direct, boolean transcode, SubtitleFormat subtitleFormat) throws IOException {
@@ -118,23 +137,115 @@ public class HlsService {
         // Write master playlist last so that getMasterPlaylist's poll only fires after all stream playlists exist
         Files.writeString(cacheFile, masterContent);
         log.debug("Generated all playlists for {}", mediaFileId);
+
+        if (isRemote(mediaFile)) {
+            String nodeUrl = mediaFile.getDirectoryEntity().getNodeEntity().getUrl();
+            try (Stream<Path> files = Files.list(cacheDir(mediaFileId))) {
+                files.filter(p -> p.toString().endsWith(".m3u8"))
+                        .forEach(p -> {
+                            try {
+                                remoteNodeClient.uploadFile(nodeUrl, mediaFileId, p);
+                            } catch (IOException e) {
+                                log.warn("Playlist upload failed: {}", p, e);
+                            }
+                        });
+            }
+        }
     }
 
     /**
      * Starts the FFmpeg pass described by the given event data.
      * Called by the {@code HandleTranscodePassRequested} event handler.
+     * For remote media files, a watcher thread uploads each stable segment to the source node.
      */
+    @Transactional(readOnly = true)
     public void startPass(TranscodePassRequestedData data) {
+        MediaFileEntity mediaFile = mediaFileRepository.findById(data.getMediaFileId()).orElseThrow();
+        boolean remote = isRemote(mediaFile);
+        // Re-resolve from this node's perspective: local path if file is here, HTTP URL if on another node.
+        String mediaFilePath = resolveInputPath(mediaFile);
+
         Path cacheDirPath = cacheDir(data.getMediaFileId());
+        String segmentPrefix;
+        Runnable passStarter;
+
         if ("video".equals(data.getPassCategory())) {
             VideoQuality vq = VideoQuality.fromLabel(data.getQualityLabel());
-            transcodeService.ensurePassStarted(data.getPassKey(),
-                    () -> transcodeService.startVideoPass(data.getMediaFilePath(), cacheDirPath, vq));
+            segmentPrefix = "seg_video_" + data.getQualityLabel() + "_";
+            passStarter = () -> transcodeService.startVideoPass(mediaFilePath, cacheDirPath, vq);
         } else {
             AudioQuality aq = AudioQuality.fromLabel(data.getQualityLabel());
-            transcodeService.ensurePassStarted(data.getPassKey(),
-                    () -> transcodeService.startAudioPass(data.getMediaFilePath(), cacheDirPath,
-                            data.getAudioStreamIndex(), aq));
+            segmentPrefix = "seg_audio_" + data.getAudioStreamIndex() + "_" + data.getQualityLabel() + "_";
+            passStarter = () -> transcodeService.startAudioPass(mediaFilePath, cacheDirPath,
+                    data.getAudioStreamIndex(), aq);
+        }
+
+        transcodeService.ensurePassStarted(data.getPassKey(), passStarter);
+
+        if (remote) {
+            String nodeUrl = mediaFile.getDirectoryEntity().getNodeEntity().getUrl();
+            UUID mediaFileId = data.getMediaFileId();
+            CompletableFuture<Void> passFuture = transcodeService.getActiveFuture(data.getPassKey());
+            watcherExecutor.submit(() ->
+                    watchAndUpload(cacheDirPath, segmentPrefix, nodeUrl, mediaFileId, passFuture));
+        }
+    }
+
+    /**
+     * Starts FFmpeg passes for all quality variants of the given media file.
+     * Called after playlist generation so that .ts segments are produced eagerly.
+     * Already-running or completed passes are skipped.
+     *
+     * @param direct    whether the stream-copy (direct) quality is included
+     * @param transcode whether the re-encoded (720p + 480p) qualities are included
+     */
+    @Transactional(readOnly = true)
+    public void startAllPasses(UUID mediaFileId, boolean direct, boolean transcode) {
+        MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
+        String inputPath = resolveInputPath(mediaFile);
+
+        boolean[] includeQuality = {direct, transcode, transcode};
+        VideoQuality[] videoQualities = VideoQuality.values();
+        AudioQuality[] audioQualities = AudioQuality.values();
+
+        List<MediaFileStreamEntity> audioStreams = mediaFile.getMediaFileStreamEntity().stream()
+                .filter(s -> s.getCodecType() == StreamCodecType.AUDIO)
+                .toList();
+
+        for (int i = 0; i < videoQualities.length; i++) {
+            if (!includeQuality[i]) continue;
+            String qualityLabel = videoQualities[i].getLabel();
+            String passKey = mediaFileId + "_video_" + qualityLabel;
+            if (!transcodeService.isPassActive(passKey) && !transcodeService.hasCompletedPass(passKey)) {
+                startPass(TranscodePassRequestedData.builder()
+                        .eventType(EventType.TRANSCODE_PASS_REQUESTED)
+                        .mediaFileId(mediaFileId)
+                        .passKey(passKey)
+                        .mediaFilePath(inputPath)
+                        .passCategory("video")
+                        .qualityLabel(qualityLabel)
+                        .build());
+            }
+        }
+
+        for (int qi = 0; qi < audioQualities.length; qi++) {
+            if (!includeQuality[qi] || audioQualities[qi] == AudioQuality.COPY) continue;
+            String qualityLabel = audioQualities[qi].getLabel();
+            for (MediaFileStreamEntity audioStream : audioStreams) {
+                int streamIdx = audioStream.getStreamIndex();
+                String passKey = mediaFileId + "_audio_" + streamIdx + "_" + qualityLabel;
+                if (!transcodeService.isPassActive(passKey) && !transcodeService.hasCompletedPass(passKey)) {
+                    startPass(TranscodePassRequestedData.builder()
+                            .eventType(EventType.TRANSCODE_PASS_REQUESTED)
+                            .mediaFileId(mediaFileId)
+                            .passKey(passKey)
+                            .mediaFilePath(inputPath)
+                            .passCategory("audio")
+                            .qualityLabel(qualityLabel)
+                            .audioStreamIndex(streamIdx)
+                            .build());
+                }
+            }
         }
     }
 
@@ -142,13 +253,15 @@ public class HlsService {
      * Returns (cached) stream playlist content.
      * Filename determines the type: stream_video_*, stream_audio_*, or stream_sub_*.
      */
+    @Transactional(readOnly = true)
     public String getStreamPlaylist(UUID mediaFileId, String streamFilename) throws IOException {
         Path cacheFile = cacheDir(mediaFileId).resolve(streamFilename);
         if (Files.exists(cacheFile)) {
             Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(System.currentTimeMillis()));
             return Files.readString(cacheFile);
         }
-        String filePath = getMediaFilePath(mediaFileId);
+        MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
+        String filePath = resolveInputPath(mediaFile);
         List<Double> keyframes = transcodeService.getCachedKeyframes(filePath);
         double totalDuration = transcodeService.getTotalDuration(filePath);
         Files.createDirectories(cacheFile.getParent());
@@ -174,9 +287,9 @@ public class HlsService {
         String qualityLabel = parts[2];
         String passKey = mediaFileId + "_video_" + qualityLabel;
         if (!transcodeService.isPassActive(passKey) && !transcodeService.hasCompletedPass(passKey)) {
-            String inputPath = getMediaFilePath(mediaFileId);
-            String directoryName = mediaFileRepository.findById(mediaFileId).orElseThrow()
-                    .getDirectoryEntity().getName();
+            MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
+            String inputPath = resolveInputPath(mediaFile);
+            String directoryName = mediaFile.getDirectoryEntity().getName();
             messageSender.sendTranscodePassRequested(
                     TranscodePassRequestedData.builder()
                             .eventType(EventType.TRANSCODE_PASS_REQUESTED)
@@ -204,7 +317,8 @@ public class HlsService {
         Path cacheFile = cacheDir(mediaFileId).resolve(segmentFilename);
 
         if ("copy".equals(parts[parts.length - 1])) {
-            String filePath = getMediaFilePath(mediaFileId);
+            MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
+            String filePath = resolveInputPath(mediaFile);
             return getCachedOrGenerateBinary(cacheFile, out -> {
                 double start = Double.parseDouble(parts[2]);
                 double duration = Double.parseDouble(parts[3]);
@@ -221,9 +335,9 @@ public class HlsService {
         String bitrateLabel = parts[3];
         String passKey = mediaFileId + "_audio_" + streamIdx + "_" + bitrateLabel;
         if (!transcodeService.isPassActive(passKey) && !transcodeService.hasCompletedPass(passKey)) {
-            String inputPath = getMediaFilePath(mediaFileId);
-            String directoryName = mediaFileRepository.findById(mediaFileId).orElseThrow()
-                    .getDirectoryEntity().getName();
+            MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
+            String inputPath = resolveInputPath(mediaFile);
+            String directoryName = mediaFile.getDirectoryEntity().getName();
             messageSender.sendTranscodePassRequested(
                     TranscodePassRequestedData.builder()
                             .eventType(EventType.TRANSCODE_PASS_REQUESTED)
@@ -259,7 +373,8 @@ public class HlsService {
         }
         Files.createDirectories(cacheFile.getParent());
 
-        String mediaFilePath = getMediaFilePath(mediaFileId);
+        MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
+        String mediaFilePath = resolveInputPath(mediaFile);
         String generationKey = mediaFileId + "_sub_" + subtitleId;
         Object lock = subtitleLocks.computeIfAbsent(generationKey, k -> new Object());
         synchronized (lock) {
@@ -286,7 +401,8 @@ public class HlsService {
         if (stream.getCodecType() == StreamCodecType.EXTERNAL_SUBTITLE) {
             sourceSrtPath = stream.getPath();
         } else {
-            String mediaFilePath = getMediaFilePath(mediaFileId);
+            MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
+            String mediaFilePath = resolveInputPath(mediaFile);
             Files.createDirectories(cacheDir(mediaFileId));
             sourceSrtPath = subtitleService.extractEmbeddedSubtitleToSrt(stream, mediaFilePath, cacheDir(mediaFileId));
         }
@@ -301,7 +417,7 @@ public class HlsService {
     private void preGenerateStreamPlaylists(MediaFileEntity mediaFile, UUID mediaFileId,
                                              boolean direct, boolean transcode,
                                              SubtitleFormat subtitleFormat) throws IOException {
-        String filePath = mediaFile.getPath();
+        String filePath = resolveInputPath(mediaFile);
         List<Double> keyframes = transcodeService.getCachedKeyframes(filePath);
         double totalDuration = transcodeService.getTotalDuration(filePath);
 
@@ -386,6 +502,68 @@ public class HlsService {
         }
     }
 
+    // ========== Remote node helpers ==========
+
+    private boolean isRemote(MediaFileEntity mediaFile) {
+        return !localNodeName.equals(mediaFile.getDirectoryEntity().getNodeEntity().getName());
+    }
+
+    private String resolveInputPath(MediaFileEntity mediaFile) {
+        if (!isRemote(mediaFile)) {
+            return mediaFile.getPath();
+        }
+        return mediaFile.getDirectoryEntity().getNodeEntity().getUrl()
+                + "/mediaFile/" + mediaFile.getId()
+                + "/download?token=" + nodeTokenManager.getToken();
+    }
+
+    private void watchAndUpload(Path cacheDirPath, String prefix, String nodeUrl,
+                                 UUID mediaFileId, CompletableFuture<Void> passFuture) {
+        Set<String> uploaded = new HashSet<>();
+        while (!passFuture.isDone() || !allUploaded(cacheDirPath, prefix, uploaded)) {
+            try (Stream<Path> files = Files.list(cacheDirPath)) {
+                files.filter(p -> p.getFileName().toString().startsWith(prefix)
+                               && p.getFileName().toString().endsWith(".ts")
+                               && !uploaded.contains(p.getFileName().toString()))
+                     .forEach(p -> {
+                         try {
+                             if (transcodeService.stableSegmentOrNull(p) != null) {
+                                 remoteNodeClient.uploadFile(nodeUrl, mediaFileId, p);
+                                 uploaded.add(p.getFileName().toString());
+                             }
+                         } catch (IOException e) {
+                             log.warn("Segment upload failed: {}", p, e);
+                         }
+                     });
+                if (!passFuture.isDone()) {
+                    Thread.sleep(500);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (java.nio.file.NoSuchFileException e) {
+                log.debug("Cache dir removed, stopping watcher: {}", cacheDirPath);
+                break;
+            } catch (IOException e) {
+                log.warn("Watcher error in {}", cacheDirPath, e);
+                break;
+            }
+        }
+    }
+
+    private boolean allUploaded(Path cacheDir, String prefix, Set<String> uploaded) {
+        try (Stream<Path> files = Files.list(cacheDir)) {
+            List<String> all = files
+                    .filter(p -> p.getFileName().toString().startsWith(prefix)
+                              && p.getFileName().toString().endsWith(".ts"))
+                    .map(p -> p.getFileName().toString())
+                    .toList();
+            return !all.isEmpty() && uploaded.containsAll(all);
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
     // ========== Polling ==========
 
     private String waitForMasterPlaylist(Path cacheFile) throws IOException {
@@ -408,10 +586,6 @@ public class HlsService {
 
     private Path cacheDir(UUID mediaFileId) {
         return Paths.get(tmpDir, mediaFileId.toString());
-    }
-
-    private String getMediaFilePath(UUID mediaFileId) {
-        return mediaFileRepository.findById(mediaFileId).orElseThrow().getPath();
     }
 
     private Path getCachedOrGenerateBinary(Path cacheFile, Consumer<Path> generator) throws IOException {

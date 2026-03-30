@@ -1,7 +1,10 @@
 package app.ister.transcoder;
 
+import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MediaFileStreamEntity;
+import app.ister.core.entity.NodeEntity;
+import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.StreamCodecType;
 import app.ister.core.enums.SubtitleFormat;
 import app.ister.core.repository.MediaFileRepository;
@@ -36,11 +39,15 @@ import static org.mockito.Mockito.RETURNS_SELF;
 @ExtendWith(MockitoExtension.class)
 class HlsServiceTest {
 
+    private static final String LOCAL_NODE_NAME = "test-node";
+
     @Mock private Jaffree jaffree;
     @Mock private FfprobeService ffprobeService;
     @Mock private MediaFileRepository mediaFileRepository;
     @Mock private MediaFileStreamRepository mediaFileStreamRepository;
     @Mock private MessageSender messageSender;
+    @Mock private RemoteNodeClient remoteNodeClient;
+    @Mock private NodeTokenManager nodeTokenManager;
 
     @TempDir
     Path tempDir;
@@ -59,8 +66,10 @@ class HlsServiceTest {
         ReflectionTestUtils.setField(transcodeService, "segmentTimeoutMs", 5000L);
         ReflectionTestUtils.setField(transcodeService, "concurrentFileSlots", new Semaphore(10));
         hlsService = new HlsService(playlistBuilder, subtitleService, transcodeService,
-                mediaFileRepository, mediaFileStreamRepository, messageSender);
+                mediaFileRepository, mediaFileStreamRepository, messageSender,
+                remoteNodeClient, nodeTokenManager);
         ReflectionTestUtils.setField(hlsService, "tmpDir", tempDir.toString());
+        ReflectionTestUtils.setField(hlsService, "localNodeName", LOCAL_NODE_NAME);
     }
 
     // ========== Master playlist ==========
@@ -853,15 +862,163 @@ class HlsServiceTest {
         verify(ffmpegMock, times(2)).execute();
     }
 
+    // ========== startAllPasses ==========
+
+    @Test
+    void startAllPassesTranscodeOnlyStartsFourPasses() throws Exception {
+        UUID id = UUID.randomUUID();
+        Path cacheDir = tempDir.resolve(id.toString());
+        Files.createDirectories(cacheDir);
+
+        MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
+        MediaFileEntity mediaFile = mediaFileEntity(id, "/test/video.mkv", audioStream);
+
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+
+        CountDownLatch allDone = new CountDownLatch(4);
+        doAnswer(inv -> {
+            Files.writeString(cacheDir.resolve("seg_video_720p_00000.ts"), "data");
+            Files.writeString(cacheDir.resolve("seg_video_480p_00000.ts"), "data");
+            Files.writeString(cacheDir.resolve("seg_audio_1_192k_00000.ts"), "data");
+            Files.writeString(cacheDir.resolve("seg_audio_1_64k_00000.ts"), "data");
+            allDone.countDown();
+            return null;
+        }).when(ffmpegMock).execute();
+
+        hlsService.startAllPasses(id, false, true);
+        assertTrue(allDone.await(5, TimeUnit.SECONDS), "All 4 passes should have started");
+
+        // 720p + 480p video, 192k + 64k audio
+        verify(ffmpegMock, times(4)).execute();
+    }
+
+    @Test
+    void startAllPassesDirectOnlyStartsOneCopyVideoPass() throws Exception {
+        UUID id = UUID.randomUUID();
+        Path cacheDir = tempDir.resolve(id.toString());
+        Files.createDirectories(cacheDir);
+
+        MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
+        MediaFileEntity mediaFile = mediaFileEntity(id, "/test/video.mkv", audioStream);
+
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+
+        CountDownLatch copyDone = new CountDownLatch(1);
+        doAnswer(inv -> {
+            Files.writeString(cacheDir.resolve("seg_video_copy_00000.ts"), "data");
+            copyDone.countDown();
+            return null;
+        }).when(ffmpegMock).execute();
+
+        hlsService.startAllPasses(id, true, false);
+        assertTrue(copyDone.await(5, TimeUnit.SECONDS));
+
+        // Only COPY video pass — COPY audio is generated on-demand, not via a background pass
+        verify(ffmpegMock, times(1)).execute();
+    }
+
+    @Test
+    void startAllPassesSkipsAlreadyActivePass() throws Exception {
+        UUID id = UUID.randomUUID();
+        Path cacheDir = tempDir.resolve(id.toString());
+        Files.createDirectories(cacheDir);
+
+        MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
+        MediaFileEntity mediaFile = mediaFileEntity(id, "/test/video.mkv", audioStream);
+
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+
+        // Latch to confirm 720p pass is inside execute() before startAllPasses runs
+        CountDownLatch pass720pInExecute = new CountDownLatch(1);
+        CountDownLatch hold720p = new CountDownLatch(1);
+        CountDownLatch allDone = new CountDownLatch(4); // 1 manual 720p + 3 from startAllPasses
+        doAnswer(inv -> {
+            pass720pInExecute.countDown(); // Signal that we are inside execute()
+            hold720p.await(5, TimeUnit.SECONDS);
+            Files.writeString(cacheDir.resolve("seg_video_720p_00000.ts"), "data");
+            Files.writeString(cacheDir.resolve("seg_video_480p_00000.ts"), "data");
+            Files.writeString(cacheDir.resolve("seg_audio_1_192k_00000.ts"), "data");
+            Files.writeString(cacheDir.resolve("seg_audio_1_64k_00000.ts"), "data");
+            allDone.countDown();
+            return null;
+        }).when(ffmpegMock).execute();
+
+        // Start 720p pass manually and wait until it is confirmed running
+        transcodeService.ensurePassStarted(id + "_video_720p",
+                () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
+        assertTrue(pass720pInExecute.await(3, TimeUnit.SECONDS), "720p pass should be running");
+
+        // 720p is now confirmed active inside execute(); startAllPasses must skip it
+        hlsService.startAllPasses(id, false, true);
+        hold720p.countDown();
+        assertTrue(allDone.await(5, TimeUnit.SECONDS), "All passes should complete");
+
+        // 1 (manual 720p) + 3 (480p + 192k + 64k from startAllPasses) = 4 total; 720p NOT restarted
+        verify(ffmpegMock, times(4)).execute();
+    }
+
+    @Test
+    void startAllPassesWithTwoAudioStreamsStartsSixPasses() throws Exception {
+        UUID id = UUID.randomUUID();
+        Path cacheDir = tempDir.resolve(id.toString());
+        Files.createDirectories(cacheDir);
+
+        MediaFileStreamEntity audio1 = audioStream(1, "eng", "English");
+        MediaFileStreamEntity audio2 = audioStream(2, "nld", "Dutch");
+        MediaFileEntity mediaFile = mediaFileEntity(id, "/test/video.mkv", audio1, audio2);
+
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+
+        CountDownLatch allDone = new CountDownLatch(6);
+        doAnswer(inv -> {
+            allDone.countDown();
+            return null;
+        }).when(ffmpegMock).execute();
+
+        hlsService.startAllPasses(id, false, true);
+        assertTrue(allDone.await(5, TimeUnit.SECONDS), "All 6 passes should have started");
+
+        // 720p + 480p video, 192k×2 + 64k×2 audio
+        verify(ffmpegMock, times(6)).execute();
+    }
+
     // ========== Helpers ==========
 
     private MediaFileEntity mediaFileEntity(UUID id, String path, MediaFileStreamEntity... streams) {
-        return MediaFileEntity.builder()
+        NodeEntity node = NodeEntity.builder()
+                .name(LOCAL_NODE_NAME)
+                .url("http://localhost:8080")
+                .build();
+        DirectoryEntity directory = DirectoryEntity.builder()
+                .name("test-dir")
+                .path("/test")
+                .directoryType(DirectoryType.LIBRARY)
+                .nodeEntity(node)
+                .build();
+        MediaFileEntity entity = MediaFileEntity.builder()
                 .path(path)
                 .size(0)
                 .directoryEntityId(UUID.randomUUID())
                 .mediaFileStreamEntity(List.of(streams))
                 .build();
+        entity.setDirectoryEntity(directory);
+        return entity;
     }
 
     private MediaFileStreamEntity videoStream(int index, int width, int height) {

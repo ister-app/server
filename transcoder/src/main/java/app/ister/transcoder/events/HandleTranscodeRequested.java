@@ -34,6 +34,9 @@ public class HandleTranscodeRequested implements Handle<TranscodeRequestedData> 
         log.debug("Handling TRANSCODE_REQUESTED for mediaFileId={}", data.getMediaFileId());
         try {
             hlsService.generateAllPlaylists(data.getMediaFileId(), data.getDirect(), data.getTranscode(), data.getSubtitleFormat());
+            if (data.isPreTranscode()) {
+                hlsService.startAllPasses(data.getMediaFileId(), data.getDirect(), data.getTranscode());
+            }
         } catch (Exception e) {
             log.error("Failed to handle TRANSCODE_REQUESTED for mediaFileId={}", data.getMediaFileId(), e);
             return false;
