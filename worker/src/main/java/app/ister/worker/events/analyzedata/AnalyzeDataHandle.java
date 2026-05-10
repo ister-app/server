@@ -4,9 +4,13 @@ import app.ister.core.Handle;
 import app.ister.core.MessageQueue;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.LibraryType;
+import app.ister.core.eventdata.AlbumFoundData;
 import app.ister.core.eventdata.AnalyzeData;
+import app.ister.core.eventdata.ArtistFoundData;
+import app.ister.core.eventdata.AudioFileFoundData;
 import app.ister.core.eventdata.EpisodeFoundData;
 import app.ister.core.eventdata.MovieFoundData;
 import app.ister.core.eventdata.ShowFoundData;
@@ -31,6 +35,10 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
     private final MovieRepository movieRepository;
     private final ShowRepository showRepository;
     private final LibraryRepository libraryRepository;
+    private final ArtistRepository artistRepository;
+    private final AlbumRepository albumRepository;
+    private final TrackRepository trackRepository;
+    private final DirectoryRepository directoryRepository;
     private final MessageSender messageSender;
     private final MetadataRepository metadataRepository;
     private final MediaFileStreamRepository mediaFileStreamRepository;
@@ -49,7 +57,13 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
 
     @Override
     public Boolean handle(AnalyzeData data) {
-        if (data.getLibraryId() != null) {
+        if (data.getArtistId() != null) {
+            handleArtist(data);
+        } else if (data.getAlbumId() != null) {
+            handleAlbum(data);
+        } else if (data.getTrackId() != null) {
+            handleTrack(data);
+        } else if (data.getLibraryId() != null) {
             handleLibrary(data);
         } else if (data.getShowId() != null) {
             handleShow(data);
@@ -75,6 +89,50 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
         return true;
     }
 
+    private void handleArtist(AnalyzeData data) {
+        artistRepository.findById(data.getArtistId()).ifPresent(artist -> {
+            metadataRepository.deleteAll(artist.getMetadataEntities());
+            imageRepository.deleteAll(artist.getImageEntities());
+            directoryRepository.findByLibraryEntityAndDirectoryType(artist.getLibraryEntity(), DirectoryType.LIBRARY)
+                    .stream()
+                    .map(dir -> dir.getNodeEntity().getName())
+                    .distinct()
+                    .forEach(nodeName -> messageSender.sendArtistFound(
+                            ArtistFoundData.builder().eventType(EventType.ARTIST_FOUND).artistId(data.getArtistId()).build(),
+                            nodeName));
+            artist.getAlbumEntities().forEach(album -> messageSender.sendAnalyzeData(
+                    AnalyzeData.builder().eventType(EventType.ANALYZE_DATA).albumId(album.getId()).build()));
+        });
+    }
+
+    private void handleAlbum(AnalyzeData data) {
+        albumRepository.findById(data.getAlbumId()).ifPresent(album -> {
+            metadataRepository.deleteAll(album.getMetadataEntities());
+            imageRepository.deleteAll(album.getImageEntities());
+            directoryRepository.findByLibraryEntityAndDirectoryType(album.getLibraryEntity(), DirectoryType.LIBRARY)
+                    .stream()
+                    .map(dir -> dir.getNodeEntity().getName())
+                    .distinct()
+                    .forEach(nodeName -> messageSender.sendAlbumFound(
+                            AlbumFoundData.builder().eventType(EventType.ALBUM_FOUND).albumId(data.getAlbumId()).build(),
+                            nodeName));
+            messageSender.sendAlbumFound(
+                    AlbumFoundData.builder().eventType(EventType.ALBUM_FOUND).albumId(data.getAlbumId()).build());
+            album.getTrackEntities().forEach(track -> messageSender.sendAnalyzeData(
+                    AnalyzeData.builder().eventType(EventType.ANALYZE_DATA).trackId(track.getId()).build()));
+        });
+    }
+
+    private void handleTrack(AnalyzeData data) {
+        trackRepository.findById(data.getTrackId()).ifPresent(track -> {
+            metadataRepository.deleteAll(track.getMetadataEntities());
+            track.getMediaFileEntities().stream()
+                    .filter(m -> m.getDirectoryEntity() != null)
+                    .forEach(m -> messageSender.sendAudioFileFound(
+                            AudioFileFoundData.fromMediaFileEntity(m), m.getDirectoryEntity().getName()));
+        });
+    }
+
     private void handleLibrary(AnalyzeData data) {
         LibraryEntity library = libraryRepository.findById(data.getLibraryId()).orElseThrow();
         if (library.getLibraryType() == LibraryType.SHOW) {
@@ -83,6 +141,13 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
                             AnalyzeData.builder()
                                     .eventType(EventType.ANALYZE_DATA)
                                     .showId(showId)
+                                    .build()));
+        } else if (library.getLibraryType() == LibraryType.MUSIC) {
+            artistRepository.findByLibraryEntityId(data.getLibraryId())
+                    .forEach(artist -> messageSender.sendAnalyzeData(
+                            AnalyzeData.builder()
+                                    .eventType(EventType.ANALYZE_DATA)
+                                    .artistId(artist.getId())
                                     .build()));
         } else {
             movieRepository.findIdsByLibraryId(data.getLibraryId())

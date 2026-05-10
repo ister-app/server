@@ -13,9 +13,12 @@ import java.util.UUID;
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class AnalyzeData extends MessageData {
-    private UUID episodeId;    // nullable
-    private UUID movieId;      // nullable
-    private UUID showId;       // nullable — fan-out step for library re-analysis
-    private UUID libraryId;    // nullable — triggers fan-out to all shows/movies
-    private UUID directoryId;  // null when sent to worker; set by worker when fanning out to disk
+    private UUID episodeId;
+    private UUID movieId;
+    private UUID showId;
+    private UUID libraryId;
+    private UUID directoryId;
+    private UUID artistId;
+    private UUID albumId;
+    private UUID trackId;
 }

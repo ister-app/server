@@ -4,6 +4,7 @@ import app.ister.core.Handle;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.TranscodeRequestedData;
 import app.ister.transcoder.HlsService;
+import app.ister.transcoder.HlsTranscodeService;
 import app.ister.transcoder.config.TranscoderQueueNamingConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 public class HandleTranscodeRequested implements Handle<TranscodeRequestedData> {
 
     private final HlsService hlsService;
+    private final HlsTranscodeService transcodeService;
     private final TranscoderQueueNamingConfig transcoderQueueNamingConfig;
 
     @Override
@@ -34,8 +36,12 @@ public class HandleTranscodeRequested implements Handle<TranscodeRequestedData> 
         log.debug("Handling TRANSCODE_REQUESTED for mediaFileId={}", data.getMediaFileId());
         try {
             hlsService.generateAllPlaylists(data.getMediaFileId(), data.getDirect(), data.getTranscode(), data.getSubtitleFormat());
-            if (data.isPreTranscode()) {
-                hlsService.startAllPasses(data.getMediaFileId(), data.getDirect(), data.getTranscode());
+            if (Boolean.TRUE.equals(data.getPreTranscode())) {
+                if (transcodeService.hasAnyActiveOrCompletedPassForFile(data.getMediaFileId())) {
+                    log.debug("Skipping pre-transcode passes for {} - already transcoding or recently completed", data.getMediaFileId());
+                } else {
+                    hlsService.startAllPasses(data.getMediaFileId(), data.getDirect(), data.getTranscode());
+                }
             }
         } catch (Exception e) {
             log.error("Failed to handle TRANSCODE_REQUESTED for mediaFileId={}", data.getMediaFileId(), e);

@@ -101,7 +101,8 @@ class HandleEpisodeFoundTest {
 
         verify(metaDataSave, times(2)).save(result, null, null, episodeEntity);
         verify(imageDownloadService, times(2)).downloadAndSave(
-                eq("https://example.com/still.jpg"), eq(ImageType.BACKGROUND), eq("eng"), isNull(), isNull(), eq(episodeEntity));
+                eq("https://example.com/still.jpg"), eq(ImageType.BACKGROUND), eq("eng"),
+                eq("TMDB://https://example.com/still.jpg"), isNull(), isNull(), eq(episodeEntity), isNull(), isNull());
     }
 
     @Test
@@ -151,7 +152,8 @@ class HandleEpisodeFoundTest {
         assertTrue(subject.handle(data));
 
         verify(imageDownloadService, times(2)).downloadAndSave(
-                eq("https://example.com/poster.jpg"), eq(ImageType.COVER), eq("eng"), isNull(), isNull(), eq(episodeEntity));
+                eq("https://example.com/poster.jpg"), eq(ImageType.COVER), eq("eng"),
+                eq("TMDB://https://example.com/poster.jpg"), isNull(), isNull(), eq(episodeEntity), isNull(), isNull());
     }
 
     @Test
@@ -195,7 +197,7 @@ class HandleEpisodeFoundTest {
         when(episodeMetadata.getMetadata(anyString(), anyInt(), anyInt(), anyInt(), anyString()))
                 .thenReturn(Optional.of(result));
         doThrow(new IOException("download failed"))
-                .when(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), any(), any(), any());
+                .when(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), anyString(), any(), any(), any(), any(), any());
 
         assertFalse(subject.handle(data));
     }

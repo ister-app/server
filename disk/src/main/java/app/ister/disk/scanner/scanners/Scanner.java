@@ -7,7 +7,7 @@ import java.nio.file.Path;
 import java.util.Optional;
 
 public interface Scanner {
-    boolean analyzable(Path dir, Boolean isRegularFile, long size);
+    boolean analyzable(Path dir, boolean isRegularFile, long size);
 
-    Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path dir, Boolean isRegularFile, long size);
+    Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path dir, boolean isRegularFile, long size);
 }

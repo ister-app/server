@@ -1,6 +1,7 @@
 package app.ister.core.service;
 
 import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.UserRepository;
@@ -50,51 +51,57 @@ public class PreTranscodeService {
         Instant recentCutoff = Instant.now().minus(Duration.ofDays(RECENT_DAYS));
 
         userRepository.findAll().forEach(user -> {
-            // Episodes
-            List<Object[]> rows = watchStatusRepository.findRecentEpisodesWithDateByUserId(user.getId());
-            for (Object[] row : rows) {
-                UUID episodeId = UUID.fromString(row[0].toString());
-                UUID showId = UUID.fromString(row[1].toString());
-                Instant lastWatched = (Instant) row[2];
-
-                episodeRepository.findById(episodeId).ifPresent(lastWatchedEpisode -> {
-                    // Always include the recently-watched episode itself
-                    lastWatchedEpisode.getMediaFileEntities().stream()
-                            .filter(mf -> diskName.equals(mf.getDirectoryEntity().getName()))
-                            .map(mf -> mf.getId())
-                            .forEach(mediaFileIds::add);
-
-                    // If watched within the last 7 days, also include the next episode
-                    if (lastWatched.isAfter(recentCutoff)) {
-                        List<EpisodeEntity> showEpisodes = episodesByShow.computeIfAbsent(showId,
-                                id -> episodeRepository.findByShowEntityId(id,
-                                        Sort.by("seasonEntity.number").ascending().and(Sort.by("number").ascending())));
-                        for (int i = 0; i < showEpisodes.size(); i++) {
-                            if (showEpisodes.get(i).getId().equals(lastWatchedEpisode.getId()) && i + 1 < showEpisodes.size()) {
-                                showEpisodes.get(i + 1).getMediaFileEntities().stream()
-                                        .filter(mf -> diskName.equals(mf.getDirectoryEntity().getName()))
-                                        .map(mf -> mf.getId())
-                                        .forEach(mediaFileIds::add);
-                                break;
-                            }
-                        }
-                    }
-                });
-            }
-
-            // Movies
-            watchStatusRepository.findRecentMovieIdsByUserId(user.getId()).forEach(movieIdStr -> {
-                UUID movieId = UUID.fromString(movieIdStr.toString());
-                movieRepository.findById(movieId).ifPresent(movie ->
-                        movie.getMediaFileEntities().stream()
-                                .filter(mf -> diskName.equals(mf.getDirectoryEntity().getName()))
-                                .map(mf -> mf.getId())
-                                .forEach(mediaFileIds::add)
-                );
-            });
+            collectEpisodeMediaFileIds(user.getId(), diskName, recentCutoff, episodesByShow, mediaFileIds);
+            collectMovieMediaFileIds(user.getId(), diskName, mediaFileIds);
         });
 
         log.debug("Collected {} media file IDs to pre-transcode for disk: {}", mediaFileIds.size(), diskName);
         return mediaFileIds;
+    }
+
+    private void collectEpisodeMediaFileIds(UUID userId, String diskName, Instant recentCutoff,
+                                             Map<UUID, List<EpisodeEntity>> episodesByShow,
+                                             Set<UUID> mediaFileIds) {
+        List<Object[]> rows = watchStatusRepository.findRecentEpisodesWithDateByUserId(userId);
+        for (Object[] row : rows) {
+            UUID episodeId = UUID.fromString(row[0].toString());
+            UUID showId = UUID.fromString(row[1].toString());
+            Instant lastWatched = (Instant) row[2];
+            episodeRepository.findById(episodeId).ifPresent(lastWatchedEpisode -> {
+                addMediaFileIds(lastWatchedEpisode.getMediaFileEntities(), diskName, mediaFileIds);
+                if (lastWatched.isAfter(recentCutoff)) {
+                    addNextEpisodeMediaFileIds(showId, lastWatchedEpisode, diskName, episodesByShow, mediaFileIds);
+                }
+            });
+        }
+    }
+
+    private void addNextEpisodeMediaFileIds(UUID showId, EpisodeEntity lastWatched, String diskName,
+                                             Map<UUID, List<EpisodeEntity>> episodesByShow,
+                                             Set<UUID> mediaFileIds) {
+        List<EpisodeEntity> showEpisodes = episodesByShow.computeIfAbsent(showId,
+                id -> episodeRepository.findByShowEntityId(id,
+                        Sort.by("seasonEntity.number").ascending().and(Sort.by("number").ascending())));
+        for (int i = 0; i < showEpisodes.size(); i++) {
+            if (showEpisodes.get(i).getId().equals(lastWatched.getId()) && i + 1 < showEpisodes.size()) {
+                addMediaFileIds(showEpisodes.get(i + 1).getMediaFileEntities(), diskName, mediaFileIds);
+                break;
+            }
+        }
+    }
+
+    private void collectMovieMediaFileIds(UUID userId, String diskName, Set<UUID> mediaFileIds) {
+        watchStatusRepository.findRecentMovieIdsByUserId(userId).forEach(movieIdStr -> {
+            UUID movieId = UUID.fromString(movieIdStr.toString());
+            movieRepository.findById(movieId).ifPresent(movie ->
+                    addMediaFileIds(movie.getMediaFileEntities(), diskName, mediaFileIds));
+        });
+    }
+
+    private static void addMediaFileIds(List<MediaFileEntity> mediaFiles, String diskName, Set<UUID> mediaFileIds) {
+        mediaFiles.stream()
+                .filter(mf -> diskName.equals(mf.getDirectoryEntity().getName()))
+                .map(MediaFileEntity::getId)
+                .forEach(mediaFileIds::add);
     }
 }

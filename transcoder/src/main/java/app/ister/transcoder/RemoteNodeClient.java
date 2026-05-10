@@ -1,6 +1,6 @@
 package app.ister.transcoder;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -12,11 +12,20 @@ import java.nio.file.Path;
 import java.util.UUID;
 
 @Component
-@RequiredArgsConstructor
 public class RemoteNodeClient {
 
     private final NodeTokenManager nodeTokenManager;
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient;
+
+    @Autowired
+    public RemoteNodeClient(NodeTokenManager nodeTokenManager) {
+        this(nodeTokenManager, HttpClient.newHttpClient());
+    }
+
+    RemoteNodeClient(NodeTokenManager nodeTokenManager, HttpClient httpClient) {
+        this.nodeTokenManager = nodeTokenManager;
+        this.httpClient = httpClient;
+    }
 
     public void uploadFile(String nodeUrl, UUID mediaFileId, Path file) throws IOException {
         String url = nodeUrl + "/transcode/upload/" + mediaFileId + "/"

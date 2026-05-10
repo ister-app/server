@@ -56,4 +56,7 @@ public class PlayQueueItemEntity extends BaseEntity {
         this.episodeEntity = episodeEntity;
         this.episodeEntityId = (episodeEntity != null) ? episodeEntity.getId() : null;
     }
+
+    @Column(name = "track_entity_id")
+    private UUID trackEntityId;
 }

@@ -73,7 +73,12 @@ public class MediaFileFoundGetDuration {
                         UrlInput.fromUrl(path)
                 )
                 .addOutput(new NullOutput())
-                .setProgressListener(progress -> durationMillis.set(progress.getTimeMillis()))
+                .setProgressListener(progress -> {
+                    Long timeMillis = progress.getTimeMillis();
+                    if (timeMillis != null) {
+                        durationMillis.set(timeMillis);
+                    }
+                })
                 .execute();
         return durationMillis.get();
     }

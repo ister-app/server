@@ -97,9 +97,11 @@ class HandleShowFoundTest {
 
         verify(metaDataSave, times(2)).save(result, null, showEntity, null);
         verify(imageDownloadService, times(2)).downloadAndSave(
-                eq("https://example.com/bg.jpg"), eq(ImageType.BACKGROUND), eq("eng"), isNull(), eq(showEntity), isNull());
+                eq("https://example.com/bg.jpg"), eq(ImageType.BACKGROUND), eq("eng"),
+                eq("TMDB://https://example.com/bg.jpg"), isNull(), eq(showEntity), isNull(), isNull(), isNull());
         verify(imageDownloadService, times(2)).downloadAndSave(
-                eq("https://example.com/poster.jpg"), eq(ImageType.COVER), eq("eng"), isNull(), eq(showEntity), isNull());
+                eq("https://example.com/poster.jpg"), eq(ImageType.COVER), eq("eng"),
+                eq("TMDB://https://example.com/poster.jpg"), isNull(), eq(showEntity), isNull(), isNull(), isNull());
     }
 
     @Test
@@ -176,7 +178,7 @@ class HandleShowFoundTest {
         when(showRepository.findById(showId)).thenReturn(Optional.of(showEntity));
         when(showMetadata.getMetadata(anyString(), anyInt(), anyString())).thenReturn(Optional.of(result));
         doThrow(new IOException("download failed"))
-                .when(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), any(), any(), any());
+                .when(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), anyString(), any(), any(), any(), any(), any());
 
         assertFalse(subject.handle(data));
     }

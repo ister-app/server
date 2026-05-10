@@ -4,8 +4,10 @@ import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PlayQueueEntity;
 import app.ister.core.entity.PlayQueueItemEntity;
+import app.ister.core.entity.TrackEntity;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
+import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.PlayQueueService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -29,10 +31,13 @@ public class PlayQueueController {
 
     private final MovieRepository movieRepository;
 
-    public PlayQueueController(PlayQueueService playQueueService, EpisodeRepository episodeRepository, MovieRepository movieRepository) {
+    private final TrackRepository trackRepository;
+
+    public PlayQueueController(PlayQueueService playQueueService, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository) {
         this.playQueueService = playQueueService;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
+        this.trackRepository = trackRepository;
     }
 
     @PreAuthorize("hasRole('user')")
@@ -52,6 +57,12 @@ public class PlayQueueController {
     @MutationMapping
     public PlayQueueEntity createPlayQueueForMovie(@Argument UUID movieId, Authentication authentication) {
         return playQueueService.createPlayQueueForMovie(movieId, authentication);
+    }
+
+    @PreAuthorize("hasRole('user')")
+    @MutationMapping
+    public PlayQueueEntity createPlayQueueForAlbum(@Argument UUID albumId, @Argument UUID trackId, Authentication authentication) {
+        return playQueueService.createPlayQueueForAlbum(albumId, trackId, authentication);
     }
 
     @PreAuthorize("hasRole('user')")
@@ -111,6 +122,12 @@ public class PlayQueueController {
         return currentItem != null ? movieRepository.findById(currentItem) : Optional.empty();
     }
 
+    @SchemaMapping(typeName = "PlayQueue", field = "currentItemTrack")
+    public Optional<TrackEntity> currentItemTrack(PlayQueueEntity playQueueEntity) {
+        UUID currentItem = playQueueEntity.getCurrentItem();
+        return currentItem != null ? trackRepository.findById(currentItem) : Optional.empty();
+    }
+
     @SchemaMapping(typeName = "PlayQueueItem", field = "episode")
     public Optional<EpisodeEntity> playQueueItemEpisode(PlayQueueItemEntity playQueueItemEntity) {
         if (playQueueItemEntity.getEpisodeEntityId() != null) {
@@ -122,6 +139,13 @@ public class PlayQueueController {
     public Optional<MovieEntity> playQueueItemMovie(PlayQueueItemEntity playQueueItemEntity) {
         if (playQueueItemEntity.getMovieEntityId() != null) {
             return movieRepository.findById(playQueueItemEntity.getMovieEntityId());
+        } else return Optional.empty();
+    }
+
+    @SchemaMapping(typeName = "PlayQueueItem", field = "track")
+    public Optional<TrackEntity> playQueueItemTrack(PlayQueueItemEntity playQueueItemEntity) {
+        if (playQueueItemEntity.getTrackEntityId() != null) {
+            return trackRepository.findById(playQueueItemEntity.getTrackEntityId());
         } else return Optional.empty();
     }
 }

@@ -9,6 +9,11 @@ type Query {
     showById(id: ID): Show
     getPlayQueue(id: ID!): PlayQueue
     libraries: [Library!]
+    artists(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): ArtistPage
+    artistById(id: ID): Artist
+    albums(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, artistId: ID, libraryId: ID): AlbumPage
+    albumById(id: ID): Album
+    trackById(id: ID): Track
 }
 
 type Mutation {
@@ -16,12 +21,16 @@ type Mutation {
     analyzeLibrary: Boolean!
     createPlayQueueForShow(showId: ID!, episodeId: ID!): PlayQueue!
     createPlayQueueForMovie(movieId: ID!): PlayQueue!
+    createPlayQueueForAlbum(albumId: ID!, trackId: ID!): PlayQueue!
     updatePlayQueue(id: ID!, progressInMilliseconds: Int!, playQueueItemId: ID!): PlayQueue
     createStreamToken: StreamToken!
     analyzeDataForEpisode(episodeId: ID!): Boolean!
     analyzeDataForMovie(movieId: ID!): Boolean!
     analyzeDataForShow(showId: ID!): Boolean!
     analyzeDataForLibrary(libraryId: ID!): Boolean!
+    analyzeDataForArtist(artistId: ID!): Boolean!
+    analyzeDataForAlbum(albumId: ID!): Boolean!
+    analyzeDataForTrack(trackId: ID!): Boolean!
 }
 
 enum SortingEnum {
@@ -37,6 +46,7 @@ enum SortingOrder {
 enum LibraryType {
     MOVIE
     SHOW
+    MUSIC
 }
 
 enum MediaType {
@@ -145,6 +155,7 @@ type PlayQueue {
     currentItemId: String
     currentItemEpisode: Episode
     currentItemMovie: Movie
+    currentItemTrack: Track
     playQueueItems: [PlayQueueItem!]
 }
 
@@ -154,6 +165,7 @@ type PlayQueueItem {
     type: MediaType!
     movie: Movie
     episode: Episode
+    track: Track
 }
 
 type Season {
@@ -173,6 +185,50 @@ type MoviePage {
 
 type ShowPage {
     content: [Show!]!
+    totalPages: Int!
+    totalElements: Int!
+    number: Int!
+    size: Int!
+}
+
+type Artist {
+    id: ID!
+    name: String!
+    albums: [Album!]
+    images: [Image!]
+    metadata: [Metadata!]
+}
+
+type Album {
+    id: ID!
+    name: String!
+    releaseYear: Int!
+    artist: Artist!
+    tracks: [Track!]
+    images: [Image!]
+    metadata: [Metadata!]
+}
+
+type Track {
+    id: ID!
+    number: Int!
+    discNumber: Int!
+    artist: Artist!
+    album: Album!
+    metadata: [Metadata!]
+    mediaFile: [MediaFile!]
+}
+
+type ArtistPage {
+    content: [Artist!]!
+    totalPages: Int!
+    totalElements: Int!
+    number: Int!
+    size: Int!
+}
+
+type AlbumPage {
+    content: [Album!]!
     totalPages: Int!
     totalElements: Int!
     number: Int!

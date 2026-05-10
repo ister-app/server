@@ -46,6 +46,11 @@ public class StartupTasks implements ApplicationListener<ContextRefreshedEvent> 
      */
     @Override
     public void onApplicationEvent(ContextRefreshedEvent event) {
+        // Skip events propagated from child contexts (e.g., Feign client named contexts),
+        // since ContextRefreshedEvent bubbles up to parent and would run startup tasks twice.
+        if (event.getApplicationContext().getParent() != null) {
+            return;
+        }
         log.debug("Server started with the appIsterServerConfig: {}", appIsterServerConfig);
         NodeEntity nodeEntity = nodeService.updateOrCreateNodeEntityForThisNode();
 
@@ -74,7 +79,7 @@ public class StartupTasks implements ApplicationListener<ContextRefreshedEvent> 
         if (directoryEntityOptional.isPresent()) {
             DirectoryEntity directoryEntity = directoryEntityOptional.get();
             // Check that the directory is used by the correct node
-            if (!directoryEntity.getNodeEntity().equals(nodeEntity)) {
+            if (!directoryEntity.getNodeEntity().getId().equals(nodeEntity.getId())) {
                 throw new IllegalStateException("Directory " + directoryConfigClass.getName() + " name is already used by an other node");
             }
             // Check if the path of the directory is changed and if so change it in the database

@@ -3,11 +3,13 @@ package app.ister.core.service;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.PlayQueueEntity;
 import app.ister.core.entity.PlayQueueItemEntity;
+import app.ister.core.entity.TrackEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.MediaType;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.PlayQueueRepository;
+import app.ister.core.repository.TrackRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
@@ -29,6 +31,8 @@ public class PlayQueueService {
 
     private final MovieRepository movieRepository;
 
+    private final TrackRepository trackRepository;
+
     private final UserService userService;
 
     private final WatchStatusRepository watchStatusRepository;
@@ -37,10 +41,11 @@ public class PlayQueueService {
 
     private static final BigDecimal GAP = new BigDecimal("1000");
 
-    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService) {
+    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService) {
         this.playQueueRepository = playQueueRepository;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
+        this.trackRepository = trackRepository;
         this.userService = userService;
         this.watchStatusRepository = watchStatusRepository;
         this.watchStatusService = watchStatusService;
@@ -126,6 +131,46 @@ public class PlayQueueService {
                 .filter(i -> i.getMovieEntityId().equals(movieId))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Movie not in queue"))
+                .getId();
+        queue.setCurrentItem(currentItemId);
+        playQueueRepository.save(queue);
+
+        return queue;
+    }
+
+    public PlayQueueEntity createPlayQueueForAlbum(UUID albumId,
+                                                    UUID trackId,
+                                                    Authentication authentication) {
+        log.debug("Creating play queue for user: {}, album: {}", authentication.getName(), albumId);
+
+        List<TrackEntity> tracks = trackRepository.findByAlbumEntity_Id(
+                albumId,
+                Sort.by("discNumber").ascending().and(Sort.by("number").ascending()));
+
+        List<PlayQueueItemEntity> items = new ArrayList<>();
+        BigDecimal pos = null;
+        PlayQueueEntity queue = PlayQueueEntity.builder()
+                .userEntity(userService.getOrCreateUser(authentication))
+                .build();
+
+        for (TrackEntity track : tracks) {
+            pos = nextPosition(pos);
+            PlayQueueItemEntity item = PlayQueueItemEntity.builder()
+                    .position(pos)
+                    .type(MediaType.TRACK)
+                    .trackEntityId(track.getId())
+                    .playQueueEntity(queue)
+                    .build();
+            items.add(item);
+        }
+
+        queue.setItems(items);
+        playQueueRepository.save(queue);
+
+        UUID currentItemId = queue.getItems().stream()
+                .filter(i -> i.getTrackEntityId().equals(trackId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Track not in queue"))
                 .getId();
         queue.setCurrentItem(currentItemId);
         playQueueRepository.save(queue);

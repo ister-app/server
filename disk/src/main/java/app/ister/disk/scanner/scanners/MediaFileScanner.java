@@ -30,7 +30,7 @@ public class MediaFileScanner implements Scanner {
     private final MessageSender messageSender;
 
     @Override
-    public boolean analyzable(Path path, Boolean isRegularFile, long size) {
+    public boolean analyzable(Path path, boolean isRegularFile, long size) {
         PathObject pathObject = new PathObject(path.toString());
         return isRegularFile
                 && List.of(DirType.EPISODE, DirType.MOVIE).contains(pathObject.getDirType())
@@ -38,7 +38,7 @@ public class MediaFileScanner implements Scanner {
     }
 
     @Override
-    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, Boolean isRegularFile, long size) {
+    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, boolean isRegularFile, long size) {
         PathObject pathObject = new PathObject(path.toString());
         Optional<EpisodeEntity> episodeEntity = Optional.empty();
         Optional<MovieEntity> movieEntity = Optional.empty();

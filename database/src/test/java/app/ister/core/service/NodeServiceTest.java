@@ -62,6 +62,7 @@ class NodeServiceTest {
         ReflectionTestUtils.setField(subject, "buildVersion", "2.0.0");
 
         when(nodeRepository.findByName("node1")).thenReturn(Optional.of(existing));
+        when(nodeRepository.save(existing)).thenReturn(existing);
 
         NodeEntity result = subject.updateOrCreateNodeEntityForThisNode();
 
@@ -77,6 +78,7 @@ class NodeServiceTest {
         ReflectionTestUtils.setField(subject, "buildVersion", "1.0.0");
 
         when(nodeRepository.findByName("node2")).thenReturn(Optional.empty());
+        when(nodeRepository.save(any(NodeEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         NodeEntity result = subject.updateOrCreateNodeEntityForThisNode();
 

@@ -90,4 +90,20 @@ public class DiskQueueNamingConfig {
                 .map(dir -> APP_ISTER_SERVER_PRE_TRANSCODE_RECENTLY_WATCHED + "." + dir.getName())
                 .toArray(String[]::new);
     }
+
+    public String[] getAudioFileFoundQueues() {
+        return Stream.concat(
+                config.getDirectories().stream()
+                        .map(dir -> APP_ISTER_SERVER_AUDIO_FILE_FOUND + "." + dir.getName()),
+                Stream.of(APP_ISTER_SERVER_AUDIO_FILE_FOUND + "." + cacheDirName())
+        ).toArray(String[]::new);
+    }
+
+    public String getArtistFoundQueue() {
+        return APP_ISTER_SERVER_ARTIST_FOUND + "." + nodeName;
+    }
+
+    public String getAlbumFoundQueue() {
+        return APP_ISTER_SERVER_ALBUM_FOUND + "." + nodeName;
+    }
 }

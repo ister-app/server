@@ -6,8 +6,8 @@ import java.io.InputStream;
 import java.time.LocalDate;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
+
 
 class ParserTest {
 
@@ -35,6 +35,53 @@ class ParserTest {
         assertEquals("Filmed Before a Live Studio Audience", subject.getTitle());
         assertEquals("Wanda and Vision struggle to conceal their powers during dinner with Vision\u2019s boss and his wife.", subject.getPlot());
         assertEquals(LocalDate.parse("2021-01-15"), subject.getAired());
+    }
+
+    @Test
+    void parseArtistSuccessful() {
+        InputStream resourceAsStream = ParserTest.class.getResourceAsStream("/nfo/artist.nfo");
+        var subject = Parser.parseArtist(resourceAsStream).orElseThrow();
+        assertEquals("The Beatles", subject.getName());
+        assertEquals("Beatles, The", subject.getSortname());
+        assertEquals("The Beatles were an English rock band formed in Liverpool in 1960.", subject.getBiography());
+        assertEquals("Rock", subject.getGenre());
+        assertEquals("1960-1970", subject.getYearsactive());
+    }
+
+    @Test
+    void parseArtistError() {
+        InputStream resourceAsStream = ParserTest.class.getResourceAsStream("404");
+        var subject = Parser.parseArtist(resourceAsStream);
+        assertTrue(subject.isEmpty());
+    }
+
+    @Test
+    void parseAlbumSuccessful() {
+        InputStream resourceAsStream = ParserTest.class.getResourceAsStream("/nfo/album.nfo");
+        var subject = Parser.parseAlbum(resourceAsStream).orElseThrow();
+        assertEquals("Abbey Road", subject.getTitle());
+        assertEquals("The eleventh studio album by the English rock band the Beatles.", subject.getReview());
+        assertEquals("Rock", subject.getGenre());
+        assertEquals("Apple Records", subject.getLabel());
+        assertEquals(1969, subject.getYear());
+        assertEquals(LocalDate.parse("1969-09-26"), subject.getReleasedate());
+    }
+
+    @Test
+    void parseAlbumMinimal() {
+        InputStream resourceAsStream = ParserTest.class.getResourceAsStream("/nfo/album_minimal.nfo");
+        var subject = Parser.parseAlbum(resourceAsStream).orElseThrow();
+        assertEquals("Minimal Album", subject.getTitle());
+        assertNull(subject.getReview());
+        assertNull(subject.getReleasedate());
+        assertEquals(0, subject.getYear());
+    }
+
+    @Test
+    void parseAlbumError() {
+        InputStream resourceAsStream = ParserTest.class.getResourceAsStream("404");
+        var subject = Parser.parseAlbum(resourceAsStream);
+        assertTrue(subject.isEmpty());
     }
 
 }

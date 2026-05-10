@@ -66,7 +66,8 @@ class ImageDownloadServiceTest {
         when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node))
                 .thenReturn(List.of(cacheDisk));
 
-        subject.downloadAndSave("http://example.com/img.jpg", ImageType.BACKGROUND, "en", movie, null, null);
+        subject.downloadAndSave("http://example.com/img.jpg", ImageType.BACKGROUND, "en",
+                "TMDB://http://example.com/img.jpg", movie, null, null, null, null);
 
         ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
         verify(imageDownload).download(eq("http://example.com/img.jpg"), pathCaptor.capture());
@@ -76,7 +77,7 @@ class ImageDownloadServiceTest {
         assertTrue(downloadedPath.endsWith(".jpg"));
 
         verify(imageSave).save(cacheDisk, downloadedPath, ImageType.BACKGROUND, "en",
-                "TMDB://http://example.com/img.jpg", new ImageSave.MediaEntityRef(movie, null, null));
+                "TMDB://http://example.com/img.jpg", new ImageSave.MediaEntityRef(movie, null, null, null, null));
     }
 
     @Test
@@ -89,6 +90,7 @@ class ImageDownloadServiceTest {
                 .thenReturn(List.of());
 
         assertThrows(IllegalStateException.class, () ->
-                subject.downloadAndSave("http://example.com/img.jpg", ImageType.COVER, "nl", null, show, null));
+                subject.downloadAndSave("http://example.com/img.jpg", ImageType.COVER, "nl",
+                        "TMDB://http://example.com/img.jpg", null, show, null, null, null));
     }
 }

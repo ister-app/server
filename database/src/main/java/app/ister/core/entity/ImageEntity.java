@@ -82,4 +82,30 @@ public class ImageEntity extends FileFromPathEntity {
         this.episodeEntity = episodeEntity;
         this.episodeEntityId = (episodeEntity != null) ? episodeEntity.getId() : null;
     }
+
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "artist_entity_id", referencedColumnName = "id", insertable = false, updatable = false)
+    private ArtistEntity artistEntity;
+
+    @Column(name = "artist_entity_id")
+    private UUID artistEntityId;
+
+    public void setArtistEntity(ArtistEntity artistEntity) {
+        this.artistEntity = artistEntity;
+        this.artistEntityId = (artistEntity != null) ? artistEntity.getId() : null;
+    }
+
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "album_entity_id", referencedColumnName = "id", insertable = false, updatable = false)
+    private AlbumEntity albumEntity;
+
+    @Column(name = "album_entity_id")
+    private UUID albumEntityId;
+
+    public void setAlbumEntity(AlbumEntity albumEntity) {
+        this.albumEntity = albumEntity;
+        this.albumEntityId = (albumEntity != null) ? albumEntity.getId() : null;
+    }
 }

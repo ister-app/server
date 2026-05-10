@@ -1,5 +1,5 @@
 plugins {
-    id 'org.openapi.generator' version '7.17.0'
+    id 'org.openapi.generator' version '7.22.0'
 }
 
 
@@ -13,8 +13,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-jackson'
 
     // Spring Cloud
-    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign:5.0.0'
-    implementation 'io.github.openfeign:feign-jackson:13.6'
+    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign:5.0.1'
+    implementation 'io.github.openfeign:feign-jackson:13.12'
 
     // XML and Validation APIs
     implementation 'jakarta.xml.bind:jakarta.xml.bind-api'
@@ -39,8 +39,8 @@ dependencies {
 
 openApiGenerate {
     generatorName.set('spring')
-    inputSpec.set("$projectDir/src/main/resources/openapi/tmdb-api.json") // Path to your OpenAPI spec
-    outputDir.set("${buildDir}/generated") // Output directory for generated code
+    inputSpec.set(layout.projectDirectory.file("src/main/resources/openapi/tmdb-api.json"))
+    outputDir.set(layout.buildDirectory.dir("generated"))
     validateSpec.set(true) // Validate the OpenAPI specification before generating
 
     modelPackage.set('app.ister.tmdbapi.model') // Package for model classes

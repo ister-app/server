@@ -10,10 +10,17 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.junit.jupiter.api.io.TempDir;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -80,5 +87,49 @@ class HandleUpdateImagesRequestedTest {
                 .build();
         when(imageRepository.findAll()).thenReturn(List.of());
         assertDoesNotThrow(() -> subject.listener(data));
+    }
+
+    @Test
+    void handleGeneratesBlurHashForImageWithoutHash(@TempDir Path tempDir) throws IOException {
+        Path imageFile = tempDir.resolve("cover.png");
+        BufferedImage img = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "png", imageFile.toFile());
+
+        ImageEntity imageWithoutHash = ImageEntity.builder()
+                .path(imageFile.toString())
+                .build();
+
+        UpdateImagesRequestedData data = UpdateImagesRequestedData.builder()
+                .eventType(EventType.UPDATE_IMAGES_REQUESTED)
+                .build();
+
+        when(imageRepository.findAll()).thenReturn(List.of(imageWithoutHash));
+
+        assertTrue(subject.handle(data));
+
+        verify(imageRepository).saveAll(any());
+        assertNotNull(imageWithoutHash.getBlurHash());
+        assertNotNull(imageWithoutHash.getFileLastModifiedTime());
+        assertNotNull(imageWithoutHash.getFileCreationTime());
+    }
+
+    @Test
+    void handleWithMultipleImagesOnlySavesOnesWithoutHash(@TempDir Path tempDir) throws IOException {
+        Path imageFile = tempDir.resolve("cover.png");
+        BufferedImage img = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "png", imageFile.toFile());
+
+        ImageEntity withHash = ImageEntity.builder().blurHash("existing").build();
+        ImageEntity withoutHash = ImageEntity.builder().path(imageFile.toString()).build();
+
+        UpdateImagesRequestedData data = UpdateImagesRequestedData.builder()
+                .eventType(EventType.UPDATE_IMAGES_REQUESTED)
+                .build();
+
+        when(imageRepository.findAll()).thenReturn(List.of(withHash, withoutHash));
+
+        assertTrue(subject.handle(data));
+
+        verify(imageRepository).saveAll(List.of(withoutHash));
     }
 }

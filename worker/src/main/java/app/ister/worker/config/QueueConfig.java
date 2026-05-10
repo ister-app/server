@@ -46,4 +46,14 @@ public class QueueConfig {
         return new Queue(APP_ISTER_SERVER_ANALYZE_DATA);
     }
 
+    @Bean
+    public Queue queueArtistFound() {
+        return new Queue(APP_ISTER_SERVER_ARTIST_FOUND);
+    }
+
+    @Bean
+    public Queue queueAlbumFound() {
+        return new Queue(APP_ISTER_SERVER_ALBUM_FOUND);
+    }
+
 }

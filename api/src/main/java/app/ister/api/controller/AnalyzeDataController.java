@@ -60,4 +60,37 @@ public class AnalyzeDataController {
                         .build());
         return true;
     }
+
+    @MutationMapping
+    @PreAuthorize("hasRole('user')")
+    public Boolean analyzeDataForArtist(@Argument UUID artistId) {
+        messageSender.sendAnalyzeData(
+                AnalyzeData.builder()
+                        .eventType(EventType.ANALYZE_DATA)
+                        .artistId(artistId)
+                        .build());
+        return true;
+    }
+
+    @MutationMapping
+    @PreAuthorize("hasRole('user')")
+    public Boolean analyzeDataForAlbum(@Argument UUID albumId) {
+        messageSender.sendAnalyzeData(
+                AnalyzeData.builder()
+                        .eventType(EventType.ANALYZE_DATA)
+                        .albumId(albumId)
+                        .build());
+        return true;
+    }
+
+    @MutationMapping
+    @PreAuthorize("hasRole('user')")
+    public Boolean analyzeDataForTrack(@Argument UUID trackId) {
+        messageSender.sendAnalyzeData(
+                AnalyzeData.builder()
+                        .eventType(EventType.ANALYZE_DATA)
+                        .trackId(trackId)
+                        .build());
+        return true;
+    }
 }

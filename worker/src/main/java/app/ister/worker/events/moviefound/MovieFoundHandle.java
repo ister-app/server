@@ -62,10 +62,10 @@ public class MovieFoundHandle implements Handle<MovieFoundData> {
                 if (tmdbResult.isPresent()) {
                     metaDataSave.save(tmdbResult.get(), movieEntity, null, null);
                     if (tmdbResult.get().getBackgroundUrl() != null) {
-                        imageDownloadService.downloadAndSave(tmdbResult.get().getBackgroundUrl(), ImageType.BACKGROUND, tmdbResult.get().getLanguage(), movieEntity, null, null);
+                        imageDownloadService.downloadAndSave(tmdbResult.get().getBackgroundUrl(), ImageType.BACKGROUND, tmdbResult.get().getLanguage(), "TMDB://" + tmdbResult.get().getBackgroundUrl(), movieEntity, null, null, null, null);
                     }
                     if (tmdbResult.get().getPosterUrl() != null) {
-                        imageDownloadService.downloadAndSave(tmdbResult.get().getPosterUrl(), ImageType.COVER, tmdbResult.get().getLanguage(), movieEntity, null, null);
+                        imageDownloadService.downloadAndSave(tmdbResult.get().getPosterUrl(), ImageType.COVER, tmdbResult.get().getLanguage(), "TMDB://" + tmdbResult.get().getPosterUrl(), movieEntity, null, null, null, null);
                     }
                 }
             }

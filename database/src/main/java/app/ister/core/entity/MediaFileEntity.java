@@ -26,6 +26,11 @@ public class MediaFileEntity extends FileFromPathEntity {
     @ManyToOne(optional = true)
     private EpisodeEntity episodeEntity;
 
+    @Getter(onMethod = @__(@JsonBackReference))
+    @Setter
+    @ManyToOne(optional = true)
+    private TrackEntity trackEntity;
+
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "mediaFileEntity")
     private List<MediaFileStreamEntity> mediaFileStreamEntity;
 

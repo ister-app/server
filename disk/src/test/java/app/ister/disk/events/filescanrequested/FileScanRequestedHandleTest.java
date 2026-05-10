@@ -1,9 +1,12 @@
 package app.ister.disk.events.filescanrequested;
 
 import app.ister.core.entity.DirectoryEntity;
+import app.ister.core.entity.LibraryEntity;
 import app.ister.core.enums.EventType;
+import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.FileScanRequestedData;
 import app.ister.core.repository.DirectoryRepository;
+import app.ister.disk.scanner.scanners.AudioScanner;
 import app.ister.disk.scanner.scanners.ImageScanner;
 import app.ister.disk.scanner.scanners.MediaFileScanner;
 import app.ister.disk.scanner.scanners.NfoScanner;
@@ -34,12 +37,14 @@ class FileScanRequestedHandleTest {
     private NfoScanner nfoScanner;
     @Mock
     private SubtitleScanner subtitleScanner;
+    @Mock
+    private AudioScanner audioScanner;
 
     private FileScanRequestedHandle subject;
 
     @BeforeEach
     void setUp() {
-        subject = new FileScanRequestedHandle(directoryRepositoryMock, mediaFileScanner, imageScanner, nfoScanner, subtitleScanner);
+        subject = new FileScanRequestedHandle(directoryRepositoryMock, mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner);
     }
 
     @Test
@@ -77,5 +82,33 @@ class FileScanRequestedHandleTest {
         assertTrue(subject.handle(fileScanRequestedData));
 
         verify(mediaFileScanner).analyze(directoryEntity, path, true, 10);
+    }
+
+    @Test
+    void handleMusicDirectory() {
+        UUID directoryEntityUUID = UUID.randomUUID();
+        Path path = Path.of("/music/Artist/Album/01 - Track.flac");
+        FileScanRequestedData fileScanRequestedData = FileScanRequestedData.builder()
+                .directoryEntityUUID(directoryEntityUUID)
+                .path(path)
+                .regularFile(true)
+                .size(5000)
+                .build();
+
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
+        DirectoryEntity directoryEntity = DirectoryEntity.builder()
+                .id(directoryEntityUUID)
+                .libraryEntity(library)
+                .path("/music")
+                .build();
+
+        when(directoryRepositoryMock.findById(directoryEntityUUID)).thenReturn(Optional.of(directoryEntity));
+        when(audioScanner.analyzable(path, true, directoryEntity)).thenReturn(true);
+        when(imageScanner.analyzable(path, true, 5000, directoryEntity)).thenReturn(false);
+        when(nfoScanner.analyzable(path, true, 5000, directoryEntity)).thenReturn(false);
+
+        assertTrue(subject.handle(fileScanRequestedData));
+
+        verify(audioScanner).analyze(directoryEntity, path, true, 5000);
     }
 }

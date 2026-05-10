@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<artist>
+    <name>The Beatles</name>
+    <sortname>Beatles, The</sortname>
+    <biography>The Beatles were an English rock band formed in Liverpool in 1960.</biography>
+    <genre>Rock</genre>
+    <style>Pop Rock</style>
+    <mood>Upbeat</mood>
+    <born>1940-10-09</born>
+    <formed>1960-01-01</formed>
+    <yearsactive>1960-1970</yearsactive>
+</artist>

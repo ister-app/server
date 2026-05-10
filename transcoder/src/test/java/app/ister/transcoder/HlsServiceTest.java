@@ -5,8 +5,10 @@ import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MediaFileStreamEntity;
 import app.ister.core.entity.NodeEntity;
 import app.ister.core.enums.DirectoryType;
+import app.ister.core.enums.EventType;
 import app.ister.core.enums.StreamCodecType;
 import app.ister.core.enums.SubtitleFormat;
+import app.ister.core.eventdata.TranscodePassRequestedData;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.service.MessageSender;
@@ -79,7 +81,7 @@ class HlsServiceTest {
         UUID id = UUID.randomUUID();
         MediaFileStreamEntity videoStream = videoStream(0, 1920, 1080);
         MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
-        MediaFileEntity mediaFile = mediaFileEntity(id, "/test/video.mkv", videoStream, audioStream);
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream, audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
@@ -100,7 +102,7 @@ class HlsServiceTest {
         UUID id = UUID.randomUUID();
         MediaFileStreamEntity videoStream = videoStream(0, 1920, 1080);
         MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
-        MediaFileEntity mediaFile = mediaFileEntity(id, "/test/video.mkv", videoStream, audioStream);
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream, audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
@@ -122,7 +124,7 @@ class HlsServiceTest {
         UUID id = UUID.randomUUID();
         MediaFileStreamEntity videoStream = videoStream(0, 1920, 1080);
         MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
-        MediaFileEntity mediaFile = mediaFileEntity(id, "/test/video.mkv", videoStream, audioStream);
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream, audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
@@ -143,7 +145,7 @@ class HlsServiceTest {
         MediaFileStreamEntity videoStream = videoStream(0, 1920, 1080);
         MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
         MediaFileStreamEntity subtitleStream = subtitleStream(subtitleId, 2, "nld", "Nederlands");
-        MediaFileEntity mediaFile = mediaFileEntity(id, "/test/video.mkv", videoStream, audioStream, subtitleStream);
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream, audioStream, subtitleStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
@@ -162,7 +164,7 @@ class HlsServiceTest {
         UUID id = UUID.randomUUID();
         MediaFileStreamEntity videoStream = videoStream(0, 1920, 1080);
         MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
-        MediaFileEntity mediaFile = mediaFileEntity(id, "/test/video.mkv", videoStream, audioStream);
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream, audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
         when(ffprobeService.getKeyframes(any())).thenReturn(List.of(0.0, 5.0));
@@ -181,7 +183,7 @@ class HlsServiceTest {
     @Test
     void getStreamPlaylistForVideo720pUsesKeyframes() throws IOException {
         UUID id = UUID.randomUUID();
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0, 10.0));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(15.0);
 
@@ -196,7 +198,7 @@ class HlsServiceTest {
     @Test
     void getStreamPlaylistForAudioCopyReturnsSingleSegment() throws IOException {
         UUID id = UUID.randomUUID();
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(60.0);
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
 
@@ -209,7 +211,7 @@ class HlsServiceTest {
     @Test
     void getStreamPlaylistForAudio192kUsesKeyframes() throws IOException {
         UUID id = UUID.randomUUID();
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 4.0));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(8.0);
 
@@ -220,9 +222,9 @@ class HlsServiceTest {
     }
 
     @Test
-    void getStreamPlaylistUnknownFilenameThrows() throws IOException {
+    void getStreamPlaylistUnknownFilenameThrows() {
         UUID id = UUID.randomUUID();
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
         when(ffprobeService.getKeyframes(any())).thenReturn(List.of(0.0, 5.0));
         when(ffprobeService.getTotalDuration(any())).thenReturn(10.0);
 
@@ -233,7 +235,7 @@ class HlsServiceTest {
     @Test
     void getStreamPlaylistIsCached() throws IOException {
         UUID id = UUID.randomUUID();
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
         when(ffprobeService.getKeyframes(any())).thenReturn(List.of(0.0, 5.0));
         when(ffprobeService.getTotalDuration(any())).thenReturn(10.0);
 
@@ -261,7 +263,7 @@ class HlsServiceTest {
         ReflectionTestUtils.setField(subtitleStream, "id", subtitleId);
 
         when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
-        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity(mediaFileId, "/test/video.mkv")));
+        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
@@ -279,9 +281,16 @@ class HlsServiceTest {
         UUID mediaFileId = UUID.randomUUID();
         UUID subtitleId = UUID.randomUUID();
         Path srtFile = tempDir.resolve("sub.srt");
-        Files.writeString(srtFile,
-                "1\n00:00:01,000 --> 00:00:03,000\nInside\n\n" +
-                "2\n00:00:20,000 --> 00:00:25,000\nOutside\n\n");
+        Files.writeString(srtFile, """
+                1
+                00:00:01,000 --> 00:00:03,000
+                Inside
+
+                2
+                00:00:20,000 --> 00:00:25,000
+                Outside
+
+                """);
 
         MediaFileStreamEntity subtitleStream = MediaFileStreamEntity.builder()
                 .codecType(StreamCodecType.EXTERNAL_SUBTITLE)
@@ -292,7 +301,7 @@ class HlsServiceTest {
         ReflectionTestUtils.setField(subtitleStream, "id", subtitleId);
 
         when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
-        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity(mediaFileId, "/test/video.mkv")));
+        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
         // Two segments: 0-10s and 10-30s; "Inside" is in segment 0, "Outside" is in segment 1
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 10.0));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(30.0);
@@ -321,7 +330,7 @@ class HlsServiceTest {
         ReflectionTestUtils.setField(subtitleStream, "id", subtitleId);
 
         when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
-        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity(mediaFileId, "/test/video.mkv")));
+        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(4000.0);
 
@@ -337,7 +346,7 @@ class HlsServiceTest {
     @Test
     void vodPlaylistHasCorrectTargetDuration() throws IOException {
         UUID id = UUID.randomUUID();
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
         // Segments: 0-7s (7s), 7-10s (3s) → max=7 → target=7
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 7.0));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
@@ -348,9 +357,9 @@ class HlsServiceTest {
     }
 
     @Test
-    void vodPlaylistThrowsWhenNoKeyframes() throws IOException {
+    void vodPlaylistThrowsWhenNoKeyframes() {
         UUID id = UUID.randomUUID();
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
         when(ffprobeService.getKeyframes(any())).thenReturn(List.of());
         when(ffprobeService.getTotalDuration(any())).thenReturn(10.0);
 
@@ -482,7 +491,7 @@ class HlsServiceTest {
         Path cacheDir = tempDir.resolve(id.toString());
         Files.createDirectories(cacheDir);
 
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -505,7 +514,7 @@ class HlsServiceTest {
         Path cacheDir = tempDir.resolve(id.toString());
         Files.createDirectories(cacheDir);
 
-        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity(id, "/test/video.mkv")));
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -602,7 +611,7 @@ class HlsServiceTest {
         ReflectionTestUtils.setField(subtitleStream, "id", subtitleId);
 
         when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
-        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity(mediaFileId, "/test/video.mkv")));
+        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
@@ -784,8 +793,11 @@ class HlsServiceTest {
                 () -> transcodeService.startVideoPass("/test/video2.mkv", cacheDir2, VideoQuality.Q720P));
         Future<Path> f2 = pool.submit(() -> hlsService.getVideoSegment(id2, "seg_video_720p_00000.ts"));
 
-        // Give file 2 time to queue up, then release file 1
-        Thread.sleep(200);
+        // Give file 2 time to queue up (wait until the pass is registered), then release file 1
+        long waitUntil = System.currentTimeMillis() + 5_000;
+        while (!transcodeService.isPassActive(id2 + "_video_720p") && System.currentTimeMillis() < waitUntil) {
+            Thread.yield();
+        }
         releaseFile1.countDown();
 
         f1.get(5, TimeUnit.SECONDS);
@@ -819,8 +831,9 @@ class HlsServiceTest {
                 () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
         hlsService.getVideoSegment(id, "seg_video_720p_00000.ts");
 
-        // Wait briefly for the pass future to complete
-        Thread.sleep(200);
+        // Wait until the pass future completes
+        CompletableFuture<Void> passFuture = transcodeService.getActiveFuture(id + "_video_720p");
+        if (passFuture != null) passFuture.get(5, TimeUnit.SECONDS);
 
         // After all passes for file are done, the slot must be back (1 available)
         Semaphore slots = (Semaphore) ReflectionTestUtils.getField(transcodeService, "concurrentFileSlots");
@@ -871,7 +884,7 @@ class HlsServiceTest {
         Files.createDirectories(cacheDir);
 
         MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
-        MediaFileEntity mediaFile = mediaFileEntity(id, "/test/video.mkv", audioStream);
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
@@ -881,10 +894,6 @@ class HlsServiceTest {
 
         CountDownLatch allDone = new CountDownLatch(4);
         doAnswer(inv -> {
-            Files.writeString(cacheDir.resolve("seg_video_720p_00000.ts"), "data");
-            Files.writeString(cacheDir.resolve("seg_video_480p_00000.ts"), "data");
-            Files.writeString(cacheDir.resolve("seg_audio_1_192k_00000.ts"), "data");
-            Files.writeString(cacheDir.resolve("seg_audio_1_64k_00000.ts"), "data");
             allDone.countDown();
             return null;
         }).when(ffmpegMock).execute();
@@ -903,7 +912,7 @@ class HlsServiceTest {
         Files.createDirectories(cacheDir);
 
         MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
-        MediaFileEntity mediaFile = mediaFileEntity(id, "/test/video.mkv", audioStream);
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
@@ -932,7 +941,7 @@ class HlsServiceTest {
         Files.createDirectories(cacheDir);
 
         MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
-        MediaFileEntity mediaFile = mediaFileEntity(id, "/test/video.mkv", audioStream);
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
@@ -977,7 +986,7 @@ class HlsServiceTest {
 
         MediaFileStreamEntity audio1 = audioStream(1, "eng", "English");
         MediaFileStreamEntity audio2 = audioStream(2, "nld", "Dutch");
-        MediaFileEntity mediaFile = mediaFileEntity(id, "/test/video.mkv", audio1, audio2);
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", audio1, audio2);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
@@ -998,9 +1007,599 @@ class HlsServiceTest {
         verify(ffmpegMock, times(6)).execute();
     }
 
+    // ========== generateAllPlaylists edge cases ==========
+
+    @Test
+    void generateAllPlaylistsIsNoOpWhenAlreadyCached() throws IOException {
+        UUID id = UUID.randomUUID();
+        MediaFileStreamEntity videoStream = videoStream(0, 1920, 1080);
+        MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream, audioStream);
+
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
+
+        // First call generates the cache
+        hlsService.generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT);
+        // Second call should not invoke ffprobe again
+        hlsService.generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT);
+
+        verify(ffprobeService, times(1)).getKeyframes(any());
+    }
+
+    @Test
+    void generateAllPlaylistsSkipsWhenNoStreamEntries() throws IOException {
+        UUID id = UUID.randomUUID();
+        // Media file with no streams → master playlist has no EXT-X-MEDIA or EXT-X-STREAM-INF
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv");
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+
+        // Should not throw, but should not write a cache file either
+        hlsService.generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT);
+
+        Path cacheFile = tempDir.resolve(id.toString()).resolve("master_d1_t0_sWEBVTT.m3u8");
+        assertFalse(cacheFile.toFile().exists(), "Master playlist should not be cached when content has no streams");
+    }
+
+    @Test
+    void generateAllPlaylistsUploadsToRemoteNode() throws IOException {
+        UUID id = UUID.randomUUID();
+        MediaFileStreamEntity videoStream = videoStream(0, 1920, 1080);
+        MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
+        // Build a media file entity on a REMOTE node (different from LOCAL_NODE_NAME)
+        NodeEntity remoteNode = NodeEntity.builder().name("remote-node").url("http://remote:8080").build();
+        DirectoryEntity directory = DirectoryEntity.builder()
+                .name("remote-dir")
+                .path("/remote")
+                .directoryType(DirectoryType.LIBRARY)
+                .nodeEntity(remoteNode)
+                .build();
+        MediaFileEntity remoteFile = MediaFileEntity.builder()
+                .path("/remote/video.mkv")
+                .size(0)
+                .directoryEntityId(UUID.randomUUID())
+                .mediaFileStreamEntity(List.of(videoStream, audioStream))
+                .build();
+        remoteFile.setDirectoryEntity(directory);
+        ReflectionTestUtils.setField(remoteFile, "id", id);
+
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(remoteFile));
+        when(nodeTokenManager.getToken()).thenReturn("node-token-123");
+        String remoteUrl = "http://remote:8080/mediaFile/" + id + "/download?token=node-token-123";
+        when(ffprobeService.getKeyframes(remoteUrl)).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getTotalDuration(remoteUrl)).thenReturn(10.0);
+
+        hlsService.generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT);
+
+        verify(remoteNodeClient, atLeastOnce()).uploadFile(eq("http://remote:8080"), eq(id), any(Path.class));
+    }
+
+    // ========== getMasterPlaylist edge cases ==========
+
+    @Test
+    void getMasterPlaylistThrowsWhenMediaHasNoStreams() throws IOException {
+        UUID id = UUID.randomUUID();
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv");
+        mediaFile.setDirectoryEntity(DirectoryEntity.builder().name("dir").path("/").directoryType(DirectoryType.LIBRARY)
+                .nodeEntity(NodeEntity.builder().name(LOCAL_NODE_NAME).url("http://localhost").build()).build());
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+
+        assertThrows(IOException.class,
+                () -> hlsService.getMasterPlaylist(id, true, false, SubtitleFormat.WEBVTT));
+    }
+
+    @Test
+    void getMasterPlaylistTimeoutThrowsIOException() throws IOException {
+        UUID id = UUID.randomUUID();
+        ReflectionTestUtils.setField(hlsService, "masterPlaylistTimeoutMs", 100L);
+        MediaFileStreamEntity videoStream = videoStream(0, 1920, 1080);
+        MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream, audioStream);
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+
+        // Do not call generateAllPlaylists, so the cache file never appears
+        assertThrows(IOException.class,
+                () -> hlsService.getMasterPlaylist(id, true, false, SubtitleFormat.WEBVTT));
+        verify(messageSender).sendTranscodeRequested(any(), any());
+    }
+
+    @Test
+    void getMasterPlaylistDeletesAndRegeneratesStaleCache() throws IOException {
+        UUID id = UUID.randomUUID();
+        ReflectionTestUtils.setField(hlsService, "masterPlaylistTimeoutMs", 100L);
+        MediaFileStreamEntity videoStream = videoStream(0, 1920, 1080);
+        MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream, audioStream);
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+
+        // Write a stale cache file (no #EXT-X-MEDIA or #EXT-X-STREAM-INF)
+        Path cacheDir = tempDir.resolve(id.toString());
+        Files.createDirectories(cacheDir);
+        String cacheFilename = "master_d1_t0_sWEBVTT.m3u8";
+        Path cacheFile = cacheDir.resolve(cacheFilename);
+        Files.writeString(cacheFile, "#EXTM3U\n# empty/stale\n");
+
+        // Should delete stale file and send TRANSCODE_REQUESTED, then timeout
+        assertThrows(IOException.class,
+                () -> hlsService.getMasterPlaylist(id, true, false, SubtitleFormat.WEBVTT));
+
+        assertFalse(Files.exists(cacheFile), "Stale cache file should be deleted");
+        verify(messageSender).sendTranscodeRequested(any(), any());
+    }
+
+    // ========== getVideoSegment sends TRANSCODE_PASS_REQUESTED ==========
+
+    @Test
+    void getVideoSegmentSendsTranscodePassRequestedWhenNoActivePass() throws Exception {
+        UUID id = UUID.randomUUID();
+        Path cacheDir = tempDir.resolve(id.toString());
+        Files.createDirectories(cacheDir);
+        Path segFile = cacheDir.resolve("seg_video_720p_00000.ts");
+
+        MediaFileStreamEntity videoStream = videoStream(0, 1920, 1080);
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream);
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+
+        // Write the segment after a short delay to simulate FFmpeg producing it externally
+        Thread writer = new Thread(() -> {
+            try {
+                Thread.sleep(200);
+                Files.writeString(segFile, "segment-data");
+            } catch (Exception ignored) {}
+        });
+        writer.setDaemon(true);
+        writer.start();
+
+        // No pass is active — getVideoSegment must send TRANSCODE_PASS_REQUESTED
+        Path result = hlsService.getVideoSegment(id, "seg_video_720p_00000.ts");
+
+        assertNotNull(result);
+        verify(messageSender).sendTranscodePassRequested(any(), any());
+    }
+
+    // ========== getMasterPlaylist wait path ==========
+
+    @Test
+    void getMasterPlaylistWaitsForFileToAppear() throws Exception {
+        UUID id = UUID.randomUUID();
+        Path cacheDir = tempDir.resolve(id.toString());
+        Files.createDirectories(cacheDir);
+        Path cacheFile = cacheDir.resolve("master_d1_t0_sWEBVTT.m3u8");
+        String masterContent = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=3000000\nstream.m3u8\n";
+
+        MediaFileStreamEntity videoStream = videoStream(0, 1920, 1080);
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream);
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+
+        ReflectionTestUtils.setField(hlsService, "masterPlaylistTimeoutMs", 2000L);
+
+        Thread writer = new Thread(() -> {
+            try {
+                Thread.sleep(200);
+                Files.writeString(cacheFile, masterContent);
+            } catch (Exception ignored) {}
+        });
+        writer.setDaemon(true);
+        writer.start();
+
+        String result = hlsService.getMasterPlaylist(id, true, false, SubtitleFormat.WEBVTT);
+
+        assertEquals(masterContent, result);
+        verify(messageSender).sendTranscodeRequested(any(), any());
+    }
+
+    // ========== startPass ==========
+
+    @Test
+    void startPassVideoCategoryStartsPass() {
+        UUID id = UUID.randomUUID();
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv");
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+        lenient().when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        lenient().when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+
+        TranscodePassRequestedData data = TranscodePassRequestedData.builder()
+                .eventType(EventType.TRANSCODE_PASS_REQUESTED)
+                .mediaFileId(id)
+                .passKey(id + "_video_720p")
+                .passCategory("video")
+                .qualityLabel("720p")
+                .build();
+
+        hlsService.startPass(data);
+
+        verify(mediaFileRepository).findById(id);
+    }
+
+    @Test
+    void startPassAudioCategoryStartsPass() {
+        UUID id = UUID.randomUUID();
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv");
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+        lenient().when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        lenient().when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+
+        TranscodePassRequestedData data = TranscodePassRequestedData.builder()
+                .eventType(EventType.TRANSCODE_PASS_REQUESTED)
+                .mediaFileId(id)
+                .passKey(id + "_audio_1_192k")
+                .passCategory("audio")
+                .qualityLabel("192k")
+                .audioStreamIndex(1)
+                .build();
+
+        hlsService.startPass(data);
+
+        verify(mediaFileRepository).findById(id);
+    }
+
+    // ========== startPass remote path ==========
+
+    private MediaFileEntity remoteMediaFileEntity(UUID id) {
+        NodeEntity remoteNode = NodeEntity.builder().name("remote-node").url("http://remote:8080").build();
+        DirectoryEntity directory = DirectoryEntity.builder()
+                .name("remote-dir").path("/remote")
+                .directoryType(DirectoryType.LIBRARY).nodeEntity(remoteNode).build();
+        MediaFileEntity entity = MediaFileEntity.builder()
+                .path("/remote/video.mkv").size(0)
+                .directoryEntityId(UUID.randomUUID())
+                .mediaFileStreamEntity(List.of()).build();
+        entity.setDirectoryEntity(directory);
+        ReflectionTestUtils.setField(entity, "id", id);
+        return entity;
+    }
+
+    @Test
+    void startPassRemoteFileWatcherExitsOnMissingCacheDir() throws Exception {
+        UUID id = UUID.randomUUID();
+        String passKey = id + "_video_720p";
+
+        HlsTranscodeService mockTs = mock(HlsTranscodeService.class);
+        ReflectionTestUtils.setField(hlsService, "transcodeService", mockTs);
+        when(mockTs.getActiveFuture(passKey)).thenReturn(CompletableFuture.completedFuture(null));
+        when(nodeTokenManager.getToken()).thenReturn("test-token");
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(remoteMediaFileEntity(id)));
+
+        ExecutorService syncExecutor = Executors.newSingleThreadExecutor();
+        ReflectionTestUtils.setField(hlsService, "watcherExecutor", syncExecutor);
+
+        TranscodePassRequestedData data = TranscodePassRequestedData.builder()
+                .eventType(EventType.TRANSCODE_PASS_REQUESTED)
+                .mediaFileId(id).passKey(passKey)
+                .passCategory("video").qualityLabel("720p").build();
+
+        hlsService.startPass(data);
+        syncExecutor.shutdown();
+        assertTrue(syncExecutor.awaitTermination(5, TimeUnit.SECONDS));
+
+        // cacheDir doesn't exist → scanAndUploadBatch exits via NoSuchFileException → no uploads
+        verify(remoteNodeClient, never()).uploadFile(any(), any(), any());
+    }
+
+    @Test
+    void startPassRemoteWatcherUploadsStableSegments() throws Exception {
+        UUID id = UUID.randomUUID();
+        String passKey = id + "_video_720p";
+
+        HlsTranscodeService mockTs = mock(HlsTranscodeService.class);
+        ReflectionTestUtils.setField(hlsService, "transcodeService", mockTs);
+        when(mockTs.getActiveFuture(passKey)).thenReturn(CompletableFuture.completedFuture(null));
+        when(nodeTokenManager.getToken()).thenReturn("test-token");
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(remoteMediaFileEntity(id)));
+
+        Path cacheDir = tempDir.resolve(id.toString());
+        Files.createDirectories(cacheDir);
+        Path segFile = cacheDir.resolve("seg_video_720p_00000.ts");
+        Files.writeString(segFile, "ts-data");
+        when(mockTs.stableSegmentOrNull(segFile)).thenReturn(segFile);
+
+        ExecutorService syncExecutor = Executors.newSingleThreadExecutor();
+        ReflectionTestUtils.setField(hlsService, "watcherExecutor", syncExecutor);
+
+        TranscodePassRequestedData data = TranscodePassRequestedData.builder()
+                .eventType(EventType.TRANSCODE_PASS_REQUESTED)
+                .mediaFileId(id).passKey(passKey)
+                .passCategory("video").qualityLabel("720p").build();
+
+        hlsService.startPass(data);
+        syncExecutor.shutdown();
+        assertTrue(syncExecutor.awaitTermination(5, TimeUnit.SECONDS));
+
+        verify(remoteNodeClient).uploadFile(eq("http://remote:8080"), eq(id), eq(segFile));
+    }
+
+    @Test
+    void startPassRemoteWatcherHandlesUploadIOException() throws Exception {
+        UUID id = UUID.randomUUID();
+        String passKey = id + "_video_720p";
+
+        HlsTranscodeService mockTs = mock(HlsTranscodeService.class);
+        ReflectionTestUtils.setField(hlsService, "transcodeService", mockTs);
+        when(mockTs.getActiveFuture(passKey)).thenReturn(CompletableFuture.completedFuture(null));
+        when(nodeTokenManager.getToken()).thenReturn("test-token");
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(remoteMediaFileEntity(id)));
+
+        Path cacheDir = tempDir.resolve(id.toString());
+        Files.createDirectories(cacheDir);
+        Path segFile = cacheDir.resolve("seg_video_720p_00000.ts");
+        Files.writeString(segFile, "ts-data");
+        when(mockTs.stableSegmentOrNull(segFile)).thenReturn(segFile);
+        // First upload throws, second succeeds → loop terminates after second iteration
+        doThrow(new IOException("upload failed")).doNothing()
+                .when(remoteNodeClient).uploadFile(any(), any(), eq(segFile));
+
+        ExecutorService syncExecutor = Executors.newSingleThreadExecutor();
+        ReflectionTestUtils.setField(hlsService, "watcherExecutor", syncExecutor);
+
+        TranscodePassRequestedData data = TranscodePassRequestedData.builder()
+                .eventType(EventType.TRANSCODE_PASS_REQUESTED)
+                .mediaFileId(id).passKey(passKey)
+                .passCategory("video").qualityLabel("720p").build();
+
+        hlsService.startPass(data);
+        syncExecutor.shutdown();
+        assertTrue(syncExecutor.awaitTermination(5, TimeUnit.SECONDS));
+
+        verify(remoteNodeClient, times(2)).uploadFile(any(), any(), eq(segFile));
+    }
+
+    // ========== getAudioSegment transcoded path ==========
+
+    @Test
+    void getAudioSegmentTranscodedSendsTranscodePassRequested() throws Exception {
+        UUID id = UUID.randomUUID();
+        Path cacheDir = tempDir.resolve(id.toString());
+        Files.createDirectories(cacheDir);
+        Path segFile = cacheDir.resolve("seg_audio_1_192k_00000.ts");
+
+        MediaFileStreamEntity audio = audioStream(1, "eng", "English");
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", audio);
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+
+        Thread writer = new Thread(() -> {
+            try {
+                Thread.sleep(200);
+                Files.writeString(segFile, "audio-segment-data");
+            } catch (Exception ignored) {}
+        });
+        writer.setDaemon(true);
+        writer.start();
+
+        Path result = hlsService.getAudioSegment(id, "seg_audio_1_192k_00000.ts");
+
+        assertNotNull(result);
+        verify(messageSender).sendTranscodePassRequested(any(), any());
+    }
+
+    // ========== getSrtSubtitle embedded path ==========
+
+    @Test
+    void getSrtSubtitleEmbeddedExtractsFromMedia() throws Exception {
+        UUID mediaFileId = UUID.randomUUID();
+        UUID subtitleId = UUID.randomUUID();
+        Path cacheDir = tempDir.resolve(mediaFileId.toString());
+        Files.createDirectories(cacheDir);
+
+        MediaFileStreamEntity subtitleStream = MediaFileStreamEntity.builder()
+                .codecType(StreamCodecType.SUBTITLE)
+                .codecName("subrip")
+                .streamIndex(2)
+                .path("")
+                .width(0).height(0)
+                .build();
+        ReflectionTestUtils.setField(subtitleStream, "id", subtitleId);
+
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv");
+        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
+
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        doAnswer(inv -> {
+            Files.writeString(cacheDir.resolve("sub_" + subtitleId + ".srt"),
+                    "1\n00:00:01,000 --> 00:00:03,000\nHello\n\n");
+            return null;
+        }).when(ffmpegMock).execute();
+
+        Path result = hlsService.getSrtSubtitle(mediaFileId, "sub_" + subtitleId + ".srt");
+
+        assertNotNull(result);
+        assertTrue(result.toString().endsWith("_offset.srt"));
+    }
+
+    // ========== generateAllPlaylists SRT subtitle format ==========
+
+    @Test
+    void generateAllPlaylistsWithSrtSubtitleFormat() throws IOException {
+        UUID id = UUID.randomUUID();
+        UUID subtitleId = UUID.randomUUID();
+        MediaFileStreamEntity video = videoStream(0, 1920, 1080);
+        MediaFileStreamEntity audio = audioStream(1, "eng", "English");
+        MediaFileStreamEntity sub = subtitleStream(subtitleId, 2, "eng", "English");
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", video, audio, sub);
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
+
+        hlsService.generateAllPlaylists(id, true, false, SubtitleFormat.SRT);
+
+        Path subPlaylist = tempDir.resolve(id.toString()).resolve("stream_sub_" + subtitleId + "_srt.m3u8");
+        assertTrue(Files.exists(subPlaylist));
+        assertTrue(Files.readString(subPlaylist).contains("sub_" + subtitleId + ".srt"));
+    }
+
+    // ========== getSubtitleSegment with embedded subtitle ==========
+
+    @Test
+    void getSubtitleSegmentWithEmbeddedSubtitleExtractsViafFmpeg() throws IOException {
+        UUID mediaFileId = UUID.randomUUID();
+        UUID subtitleId = UUID.randomUUID();
+        Path cacheDir = tempDir.resolve(mediaFileId.toString());
+        Files.createDirectories(cacheDir);
+
+        MediaFileStreamEntity subtitleStream = MediaFileStreamEntity.builder()
+                .codecType(StreamCodecType.SUBTITLE)
+                .codecName("subrip")
+                .streamIndex(2)
+                .path("")
+                .width(0).height(0)
+                .build();
+        ReflectionTestUtils.setField(subtitleStream, "id", subtitleId);
+
+        when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
+        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
+        when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
+
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        doAnswer(inv -> {
+            Files.writeString(cacheDir.resolve("sub_" + subtitleId + ".srt"),
+                    "1\n00:00:01,000 --> 00:00:03,000\nHello\n\n");
+            return null;
+        }).when(ffmpegMock).execute();
+
+        String vtt = hlsService.getSubtitleSegment(mediaFileId,
+                String.format("seg_sub_%s_00000.vtt", subtitleId));
+
+        assertTrue(vtt.startsWith("WEBVTT"));
+        assertTrue(vtt.contains("Hello"));
+    }
+
+    @Test
+    void getSubtitleSegmentWithEmbeddedSubtitleUsesCachedSrtFile() throws IOException {
+        UUID mediaFileId = UUID.randomUUID();
+        UUID subtitleId = UUID.randomUUID();
+        Path cacheDir = tempDir.resolve(mediaFileId.toString());
+        Files.createDirectories(cacheDir);
+        // Pre-create the SRT file — extractEmbeddedSubtitleToSrt should return it without running FFmpeg
+        Files.writeString(cacheDir.resolve("sub_" + subtitleId + ".srt"),
+                "1\n00:00:01,000 --> 00:00:03,000\nCached\n\n");
+
+        MediaFileStreamEntity subtitleStream = MediaFileStreamEntity.builder()
+                .codecType(StreamCodecType.SUBTITLE)
+                .codecName("subrip")
+                .streamIndex(2)
+                .path("")
+                .width(0).height(0)
+                .build();
+        ReflectionTestUtils.setField(subtitleStream, "id", subtitleId);
+
+        when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
+        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
+        when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
+
+        String vtt = hlsService.getSubtitleSegment(mediaFileId,
+                String.format("seg_sub_%s_00000.vtt", subtitleId));
+
+        assertTrue(vtt.contains("Cached"));
+        verify(jaffree, never()).getFFMPEG();
+    }
+
+    @Test
+    void getSubtitleSegmentParsesEdgeCaseSrtFormats() throws IOException {
+        UUID mediaFileId = UUID.randomUUID();
+        UUID subtitleId = UUID.randomUUID();
+        Path srtFile = tempDir.resolve("edge.srt");
+        // SRT with: unexpected non-blank line, no-millisecond timestamp, invalid timestamp
+        Files.writeString(srtFile,
+                "Unexpected line\n" +
+                "1\n" +
+                "00:00:01 --> 00:00:03\n" +
+                "NoMilliseconds\n\n" +
+                "bad-ts --> 00:00:05\n" +
+                "BadEntry\n\n");
+
+        MediaFileStreamEntity subtitleStream = MediaFileStreamEntity.builder()
+                .codecType(StreamCodecType.EXTERNAL_SUBTITLE)
+                .codecName("srt")
+                .path(srtFile.toString())
+                .width(0).height(0)
+                .build();
+        ReflectionTestUtils.setField(subtitleStream, "id", subtitleId);
+
+        when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
+        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
+        when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
+
+        String vtt = hlsService.getSubtitleSegment(mediaFileId,
+                String.format("seg_sub_%s_00000.vtt", subtitleId));
+
+        assertTrue(vtt.startsWith("WEBVTT"));
+        assertTrue(vtt.contains("NoMilliseconds"));
+        assertFalse(vtt.contains("BadEntry"));
+    }
+
+    // ========== generateAllPlaylists audio-only (synthetic keyframes) ==========
+
+    @Test
+    void generateAllPlaylistsAudioOnlyBuildsSyntheticKeyframes() throws IOException {
+        UUID id = UUID.randomUUID();
+        MediaFileStreamEntity audio = audioStream(0, "eng", "English");
+        // No video stream → buildSyntheticKeyframes is called
+        MediaFileEntity mediaFile = mediaFileEntity("/test/audio.flac", audio);
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+        when(ffprobeService.getKeyframes("/test/audio.flac")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getTotalDuration("/test/audio.flac")).thenReturn(30.0);
+
+        hlsService.generateAllPlaylists(id, false, true, SubtitleFormat.WEBVTT);
+
+        Path cacheFile = tempDir.resolve(id.toString()).resolve("master_d0_t1_sWEBVTT.m3u8");
+        assertTrue(Files.exists(cacheFile));
+    }
+
+    // ========== generateAllPlaylists remote upload IOException ==========
+
+    @Test
+    void generateAllPlaylistsSwallowsIOExceptionOnPlaylistUpload() throws IOException {
+        UUID id = UUID.randomUUID();
+        MediaFileStreamEntity videoStream = videoStream(0, 1920, 1080);
+        MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
+        NodeEntity remoteNode = NodeEntity.builder().name("remote-node").url("http://remote:8080").build();
+        DirectoryEntity directory = DirectoryEntity.builder()
+                .name("remote-dir").path("/remote")
+                .directoryType(DirectoryType.LIBRARY).nodeEntity(remoteNode).build();
+        MediaFileEntity remoteFile = MediaFileEntity.builder()
+                .path("/remote/video.mkv").size(0)
+                .directoryEntityId(UUID.randomUUID())
+                .mediaFileStreamEntity(List.of(videoStream, audioStream)).build();
+        remoteFile.setDirectoryEntity(directory);
+        ReflectionTestUtils.setField(remoteFile, "id", id);
+
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(remoteFile));
+        when(nodeTokenManager.getToken()).thenReturn("token");
+        String remoteUrl = "http://remote:8080/mediaFile/" + id + "/download?token=token";
+        when(ffprobeService.getKeyframes(remoteUrl)).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getTotalDuration(remoteUrl)).thenReturn(10.0);
+        doThrow(new IOException("upload failed")).when(remoteNodeClient).uploadFile(any(), any(), any());
+
+        assertDoesNotThrow(() -> hlsService.generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT));
+        verify(remoteNodeClient, atLeastOnce()).uploadFile(eq("http://remote:8080"), eq(id), any());
+    }
+
+    // ========== watcherExecutor thread factory ==========
+
+    @Test
+    void watcherExecutorUsesCustomThreadFactory() throws Exception {
+        ExecutorService executor = (ExecutorService) ReflectionTestUtils.getField(hlsService, "watcherExecutor");
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicBoolean isDaemon = new AtomicBoolean(false);
+        executor.submit(() -> {
+            isDaemon.set(Thread.currentThread().isDaemon());
+            latch.countDown();
+        });
+        assertTrue(latch.await(2, TimeUnit.SECONDS));
+        assertTrue(isDaemon.get());
+    }
+
     // ========== Helpers ==========
 
-    private MediaFileEntity mediaFileEntity(UUID id, String path, MediaFileStreamEntity... streams) {
+    private MediaFileEntity mediaFileEntity(String path, MediaFileStreamEntity... streams) {
         NodeEntity node = NodeEntity.builder()
                 .name(LOCAL_NODE_NAME)
                 .url("http://localhost:8080")

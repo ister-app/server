@@ -61,10 +61,10 @@ public class HandleShowFound implements Handle<app.ister.core.eventdata.ShowFoun
                 if (tmdbResult.isPresent()) {
                     metaDataSave.save(tmdbResult.get(), null, showEntity, null);
                     if (tmdbResult.get().getBackgroundUrl() != null) {
-                        imageDownloadService.downloadAndSave(tmdbResult.get().getBackgroundUrl(), ImageType.BACKGROUND, tmdbResult.get().getLanguage(), null, showEntity, null);
+                        imageDownloadService.downloadAndSave(tmdbResult.get().getBackgroundUrl(), ImageType.BACKGROUND, tmdbResult.get().getLanguage(), "TMDB://" + tmdbResult.get().getBackgroundUrl(), null, showEntity, null, null, null);
                     }
                     if (tmdbResult.get().getPosterUrl() != null) {
-                        imageDownloadService.downloadAndSave(tmdbResult.get().getPosterUrl(), ImageType.COVER, tmdbResult.get().getLanguage(), null, showEntity, null);
+                        imageDownloadService.downloadAndSave(tmdbResult.get().getPosterUrl(), ImageType.COVER, tmdbResult.get().getLanguage(), "TMDB://" + tmdbResult.get().getPosterUrl(), null, showEntity, null, null, null);
                     }
                 }
             }

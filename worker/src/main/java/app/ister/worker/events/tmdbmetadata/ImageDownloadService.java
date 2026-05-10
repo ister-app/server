@@ -1,5 +1,7 @@
 package app.ister.worker.events.tmdbmetadata;
 
+import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.ArtistEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.ShowEntity;
@@ -23,9 +25,12 @@ public class ImageDownloadService {
     private final ImageSave imageSave;
 
     public void downloadAndSave(String imageUrl, ImageType imageType, String language,
+                                String sourceUri,
                                 @Nullable MovieEntity movie,
                                 @Nullable ShowEntity show,
-                                @Nullable EpisodeEntity episode) throws IOException {
+                                @Nullable EpisodeEntity episode,
+                                @Nullable ArtistEntity artist,
+                                @Nullable AlbumEntity album) throws IOException {
         var nodeEntity = nodeService.getOrCreateNodeEntityForThisNode();
         var cacheDisk = directoryRepository
                 .findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity)
@@ -33,6 +38,6 @@ public class ImageDownloadService {
                 .orElseThrow(() -> new IllegalStateException("No cache directory found for this node"));
         String toPath = cacheDisk.getPath() + UUID.randomUUID() + ".jpg";
         imageDownload.download(imageUrl, toPath);
-        imageSave.save(cacheDisk, toPath, imageType, language, "TMDB://" + imageUrl, new ImageSave.MediaEntityRef(movie, show, episode));
+        imageSave.save(cacheDisk, toPath, imageType, language, sourceUri, new ImageSave.MediaEntityRef(movie, show, episode, artist, album));
     }
 }

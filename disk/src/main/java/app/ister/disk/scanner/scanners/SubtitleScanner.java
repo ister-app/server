@@ -29,14 +29,14 @@ public class SubtitleScanner implements Scanner {
     private final MessageSender messageSender;
 
     @Override
-    public boolean analyzable(Path path, Boolean isRegularFile, long size) {
+    public boolean analyzable(Path path, boolean isRegularFile, long size) {
         return isRegularFile
                 && new PathObject(path.toString()).getDirType().equals(DirType.EPISODE)
                 && new PathObject(path.toString()).getFileType().equals(FileType.SUBTITLE);
     }
 
     @Override
-    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, Boolean isRegularFile, long size) {
+    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, boolean isRegularFile, long size) {
         Optional<OtherPathFileEntity> otherPathFileEntity = otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString());
         if (otherPathFileEntity.isEmpty()) {
             var entity = OtherPathFileEntity.builder()

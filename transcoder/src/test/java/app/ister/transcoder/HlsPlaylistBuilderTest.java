@@ -139,11 +139,32 @@ class HlsPlaylistBuilderTest {
     }
 
     @Test
-    void buildMasterPlaylistNoVideoStreamDefaultsTo1920x1080() {
+    void buildMasterPlaylistNoVideoStreamOmitsVideoVariants() {
         MediaFileEntity mediaFile = mediaFile(audioStream(1, "eng", null));
         String result = builder.buildMasterPlaylist(mediaFile, true, false, SubtitleFormat.WEBVTT);
 
-        assertTrue(result.contains("RESOLUTION=1920x1080"));
+        assertFalse(result.contains("RESOLUTION="));
+        assertTrue(result.contains("EXT-X-MEDIA:TYPE=AUDIO"));
+    }
+
+    @Test
+    void buildMasterPlaylistAudioOnlyIncludesStreamInf() {
+        MediaFileEntity mediaFile = mediaFile(audioStream(0, "eng", "English"));
+        String result = builder.buildMasterPlaylist(mediaFile, true, false, SubtitleFormat.WEBVTT);
+
+        assertTrue(result.contains("#EXT-X-STREAM-INF:"));
+        assertTrue(result.contains("stream_audio_0_copy.m3u8"));
+        assertFalse(result.contains("RESOLUTION="));
+    }
+
+    @Test
+    void buildMasterPlaylistAudioOnlyTranscodeIncludesStreamInf() {
+        MediaFileEntity mediaFile = mediaFile(audioStream(0, "eng", "English"));
+        String result = builder.buildMasterPlaylist(mediaFile, false, true, SubtitleFormat.WEBVTT);
+
+        assertTrue(result.contains("#EXT-X-STREAM-INF:"));
+        assertTrue(result.contains("stream_audio_0_192k.m3u8"));
+        assertFalse(result.contains("stream_audio_0_64k.m3u8")); // deduplicated
     }
 
     @Test
@@ -239,8 +260,9 @@ class HlsPlaylistBuilderTest {
 
     @Test
     void buildStreamPlaylistUnknownFilenameThrows() {
+        List<Double> keyframes = List.of(0.0);
         assertThrows(IllegalArgumentException.class,
-                () -> builder.buildStreamPlaylist("stream_unknown_foo.m3u8", List.of(0.0), 10.0));
+                () -> builder.buildStreamPlaylist("stream_unknown_foo.m3u8", keyframes, 10.0));
     }
 
     // ========== buildVodPlaylist ==========
@@ -271,8 +293,9 @@ class HlsPlaylistBuilderTest {
 
     @Test
     void buildVodPlaylistEmptyKeyframesThrows() {
+        List<Double> empty = List.of();
         assertThrows(IllegalStateException.class,
-                () -> builder.buildVodPlaylist(List.of(), 10.0, (s, d, i) -> "seg_" + i + ".ts"));
+                () -> builder.buildVodPlaylist(empty, 10.0, (s, d, i) -> "seg_" + i + ".ts"));
     }
 
     @Test

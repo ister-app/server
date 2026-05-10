@@ -96,9 +96,11 @@ class MovieFoundHandleTest {
 
         verify(metaDataSave, times(2)).save(result, movieEntity, null, null);
         verify(imageDownloadService, times(2)).downloadAndSave(
-                eq("https://example.com/bg.jpg"), eq(ImageType.BACKGROUND), eq("eng"), eq(movieEntity), isNull(), isNull());
+                eq("https://example.com/bg.jpg"), eq(ImageType.BACKGROUND), eq("eng"),
+                eq("TMDB://https://example.com/bg.jpg"), eq(movieEntity), isNull(), isNull(), isNull(), isNull());
         verify(imageDownloadService, times(2)).downloadAndSave(
-                eq("https://example.com/poster.jpg"), eq(ImageType.COVER), eq("eng"), eq(movieEntity), isNull(), isNull());
+                eq("https://example.com/poster.jpg"), eq(ImageType.COVER), eq("eng"),
+                eq("TMDB://https://example.com/poster.jpg"), eq(movieEntity), isNull(), isNull(), isNull(), isNull());
     }
 
     @Test
@@ -175,7 +177,7 @@ class MovieFoundHandleTest {
         when(movieRepository.findById(movieId)).thenReturn(Optional.of(movieEntity));
         when(movieMetadata.getMetadata(anyString(), anyInt(), anyString())).thenReturn(Optional.of(result));
         doThrow(new IOException("download failed"))
-                .when(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), any(), any(), any());
+                .when(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), anyString(), any(), any(), any(), any(), any());
 
         assertFalse(subject.handle(data));
     }

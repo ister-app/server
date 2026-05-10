@@ -28,14 +28,22 @@ public class DiskQueueConfig {
                 APP_ISTER_SERVER_IMAGE_FOUND,
                 APP_ISTER_SERVER_UPDATE_IMAGES_REQUESTED,
                 APP_ISTER_SERVER_ANALYZE_DATA,
-                APP_ISTER_SERVER_PRE_TRANSCODE_RECENTLY_WATCHED
+                APP_ISTER_SERVER_PRE_TRANSCODE_RECENTLY_WATCHED,
+                APP_ISTER_SERVER_AUDIO_FILE_FOUND
         );
         String cacheDirName = nodeName + "-cache-directory";
+        List<Queue> nodeQueues = List.of(
+                new Queue(APP_ISTER_SERVER_ARTIST_FOUND + "." + nodeName),
+                new Queue(APP_ISTER_SERVER_ALBUM_FOUND + "." + nodeName)
+        );
         return new Declarables(
                 Stream.concat(
-                        config.getDirectories().stream()
-                                .flatMap(dir -> bases.stream().map(base -> new Queue(base + "." + dir.getName()))),
-                        bases.stream().map(base -> new Queue(base + "." + cacheDirName))
+                        Stream.concat(
+                                config.getDirectories().stream()
+                                        .flatMap(dir -> bases.stream().map(base -> new Queue(base + "." + dir.getName()))),
+                                bases.stream().map(base -> new Queue(base + "." + cacheDirName))
+                        ),
+                        nodeQueues.stream()
                 ).toList()
         );
     }

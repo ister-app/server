@@ -1,5 +1,5 @@
 plugins {
-    id "com.gorylenko.gradle-git-properties" version "2.5.4"
+    id "com.gorylenko.gradle-git-properties" version "2.5.7"
 }
 
 dependencies {
@@ -31,9 +31,13 @@ dependencies {
 }
 
 graalvmNative {
+    toolchainDetection = true
     binaries {
         named("main") {
-            mainClass.set("app.ister.server.IsterServerApplication")   // optioneel
+            mainClass.set("app.ister.server.IsterServerApplication")
+            javaLauncher = javaToolchains.launcherFor {
+                languageVersion = JavaLanguageVersion.of(25)
+            }
         }
     }
 }

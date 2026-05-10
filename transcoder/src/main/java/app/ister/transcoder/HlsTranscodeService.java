@@ -50,6 +50,8 @@ public class HlsTranscodeService {
     private static final String ARG_SEGMENT_TIMES = "-segment_times";
     private static final String ARG_SEGMENT_TIME_DELTA = "-segment_time_delta";
 
+    private static final Set<String> MPEGTS_NATIVE_AUDIO_CODECS = Set.of("aac", "mp3", "ac3", "eac3", "dts");
+
     private final Jaffree jaffree;
     private final FfprobeService ffprobeService;
 
@@ -134,6 +136,16 @@ public class HlsTranscodeService {
     public boolean hasCompletedPass(String key) {
         CompletableFuture<Void> cf = activeGenerations.get(key);
         return cf != null && cf.isDone() && !cf.isCompletedExceptionally();
+    }
+
+    public boolean hasAnyActiveOrCompletedPassForFile(UUID mediaFileId) {
+        String prefix = mediaFileId.toString() + "_";
+        return activeGenerations.entrySet().stream()
+                .filter(e -> e.getKey().startsWith(prefix))
+                .anyMatch(e -> {
+                    CompletableFuture<Void> cf = e.getValue();
+                    return !cf.isDone() || (cf.isDone() && !cf.isCompletedExceptionally());
+                });
     }
 
     public void ensurePassStarted(String generationKey, Runnable passStarter) {
@@ -279,6 +291,8 @@ public class HlsTranscodeService {
             output.addArguments("-force_key_frames", segmentTimes);
             output.addArguments(ARG_SEGMENT_TIMES, segmentTimes);
             output.addArguments(ARG_SEGMENT_TIME_DELTA, "0.05");
+        } else {
+            output.addArguments("-segment_time", "10");
         }
 
         jaffree.getFFMPEG()
@@ -323,15 +337,23 @@ public class HlsTranscodeService {
                 .execute();
     }
 
-    void generateAudioSegment(String inputPath, Path outputPath, double start, double duration, int audioIdx, AudioQuality quality) {
+    void generateAudioSegment(String inputPath, Path outputPath, double start, double duration, int audioIdx, AudioQuality quality, String sourceCodecName) {
         UrlOutput output = UrlOutput.toPath(outputPath)
                 .setFormat(FORMAT_MPEGTS)
                 .addArgument("-vn")
                 .addArguments("-map", "0:" + audioIdx);
 
-        if (quality == AudioQuality.COPY) {
+        if (quality == AudioQuality.COPY && MPEGTS_NATIVE_AUDIO_CODECS.contains(sourceCodecName.toLowerCase())) {
             output.addArguments("-c:a", "copy")
                     .addArguments("-t", String.format(Locale.ROOT, "%.6f", duration));
+        } else if (quality == AudioQuality.COPY) {
+            // Non-MPEG-TS-native codec (e.g. FLAC, ALAC): transcode to AAC
+            log.debug("Codec '{}' cannot be copied into MPEG-TS, transcoding to AAC", sourceCodecName);
+            output.addArguments("-t", String.format(Locale.ROOT, "%.6f", duration))
+                    .addArguments("-c:a", "aac")
+                    .addArguments("-ar", "48000")
+                    .addArguments("-b:a", "192k")
+                    .addArguments("-ac", "2");
         } else {
             output.addArguments("-t", String.format(Locale.ROOT, "%.6f", duration))
                     .addArguments("-c:a", "aac")
