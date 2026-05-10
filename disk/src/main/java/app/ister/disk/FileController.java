@@ -35,6 +35,9 @@ public class FileController {
     public ResponseEntity<InputStreamResource> downloadImage(@PathVariable UUID id) throws IOException {
         var imageEntity = imageRepository.findById(id).orElseThrow();
         Path imagePath = Path.of(imageEntity.getPath());
+        if (!Files.exists(imagePath)) {
+            return ResponseEntity.notFound().build();
+        }
         String contentType = Files.probeContentType(imagePath);
         if (contentType == null) {
             contentType = MediaType.APPLICATION_OCTET_STREAM_VALUE;

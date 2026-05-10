@@ -62,10 +62,6 @@ public class HlsPlaylistBuilder {
         boolean[] includeVideo = {direct, transcode, transcode};
         AudioQuality[] audioQualities = AudioQuality.values();
         VideoQuality[] videoQualities = VideoQuality.values();
-        long[] bandwidths = {8_000_000, 2_000_000, 1_000_000};
-        int[] resWidths = {srcWidth, 1280, 854};
-        int[] resHeights = {srcHeight, 720, 480};
-
         StringBuilder sb = new StringBuilder();
         sb.append("#EXTM3U\n");
         sb.append("#EXT-X-VERSION:6\n");
@@ -73,7 +69,11 @@ public class HlsPlaylistBuilder {
 
         appendAudioMediaEntries(sb, audioStreams, audioQualities, includeVideo);
         appendSubtitleMediaEntries(sb, subtitleStreams, subtitleFormat);
-        appendVideoVariants(sb, videoQualities, audioQualities, includeVideo, bandwidths, resWidths, resHeights, subtitleStreams);
+        if (videoStream != null) {
+            appendVideoVariants(sb, videoQualities, audioQualities, includeVideo, srcWidth, srcHeight, subtitleStreams);
+        } else if (!audioStreams.isEmpty()) {
+            appendAudioOnlyVariants(sb, audioStreams, audioQualities, includeVideo);
+        }
 
         return sb.toString();
     }
@@ -89,19 +89,24 @@ public class HlsPlaylistBuilder {
             boolean isTranscoded = (aq == AudioQuality.Q192K || aq == AudioQuality.Q64K);
             if (!includeVideo[qi] || (isTranscoded && transcodedAudioEmitted)) continue;
             AudioQuality emitAq = isTranscoded ? AudioQuality.Q192K : aq;
-            String groupId = "audio-" + emitAq.getLabel();
-            for (int ai = 0; ai < audioStreams.size(); ai++) {
-                MediaFileStreamEntity as = audioStreams.get(ai);
-                String lang = as.getLanguage() != null ? as.getLanguage() : "und";
-                String name = as.getTitle() != null ? as.getTitle() : lang;
-                boolean isDefault = firstGroup && (ai == 0);
-                sb.append(String.format(
-                        "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"%s\",LANGUAGE=\"%s\",NAME=\"%s\",DEFAULT=%s,AUTOSELECT=YES,URI=\"stream_audio_%d_%s" + EXT_M3U8 + "\"%n",
-                        groupId, lang, name, isDefault ? "YES" : "NO",
-                        as.getStreamIndex(), emitAq.getLabel()));
-            }
+            appendAudioGroupEntries(sb, "audio-" + emitAq.getLabel(), audioStreams, emitAq, firstGroup);
             firstGroup = false;
             if (isTranscoded) transcodedAudioEmitted = true;
+        }
+    }
+
+    private void appendAudioGroupEntries(StringBuilder sb, String groupId,
+                                          List<MediaFileStreamEntity> audioStreams,
+                                          AudioQuality emitAq, boolean firstGroup) {
+        for (int ai = 0; ai < audioStreams.size(); ai++) {
+            MediaFileStreamEntity as = audioStreams.get(ai);
+            String lang = as.getLanguage() != null ? as.getLanguage() : "und";
+            String name = as.getTitle() != null ? as.getTitle() : lang;
+            boolean isDefault = firstGroup && (ai == 0);
+            sb.append(String.format(
+                    "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"%s\",LANGUAGE=\"%s\",NAME=\"%s\",DEFAULT=%s,AUTOSELECT=YES,URI=\"stream_audio_%d_%s" + EXT_M3U8 + "\"%n",
+                    groupId, lang, name, isDefault ? "YES" : "NO",
+                    as.getStreamIndex(), emitAq.getLabel()));
         }
     }
 
@@ -123,9 +128,11 @@ public class HlsPlaylistBuilder {
     }
 
     private void appendVideoVariants(StringBuilder sb, VideoQuality[] videoQualities, AudioQuality[] audioQualities,
-                                      boolean[] includeVideo, long[] bandwidths, int[] resWidths, int[] resHeights,
+                                      boolean[] includeVideo, int srcWidth, int srcHeight,
                                       List<MediaFileStreamEntity> subtitleStreams) {
-        // Video quality variants
+        long[] bandwidths = {8_000_000, 2_000_000, 1_000_000};
+        int[] resWidths = {srcWidth, 1280, 854};
+        int[] resHeights = {srcHeight, 720, 480};
         String subtitleAttr = subtitleStreams.isEmpty() ? "" : ",SUBTITLES=\"subs\"";
         sb.append("\n");
         for (int i = 0; i < videoQualities.length; i++) {
@@ -137,6 +144,28 @@ public class HlsPlaylistBuilder {
                     "#EXT-X-STREAM-INF:BANDWIDTH=%d,RESOLUTION=%dx%d,CODECS=\"avc1.640028,mp4a.40.2\",AUDIO=\"%s\"%s%n",
                     bandwidths[i], resWidths[i], resHeights[i], audioGroup, subtitleAttr));
             sb.append(PREFIX_STREAM_VIDEO).append(videoQualities[i].getLabel()).append(EXT_M3U8).append("\n");
+        }
+    }
+
+    private void appendAudioOnlyVariants(StringBuilder sb, List<MediaFileStreamEntity> audioStreams,
+                                          AudioQuality[] audioQualities, boolean[] includeVideo) {
+        // For audio-only content (no video stream), emit EXT-X-STREAM-INF pointing to the audio playlist.
+        // Without these entries, HLS players won't know what to play.
+        long[] bandwidths = {256_000, 192_000, 64_000};
+        sb.append("\n");
+        boolean transcodedEmitted = false;
+        for (int qi = 0; qi < audioQualities.length; qi++) {
+            AudioQuality aq = audioQualities[qi];
+            boolean isTranscoded = (aq == AudioQuality.Q192K || aq == AudioQuality.Q64K);
+            if (!includeVideo[qi] || (isTranscoded && transcodedEmitted)) continue;
+            AudioQuality emitAq = isTranscoded ? AudioQuality.Q192K : aq;
+            // Use the first audio stream as the default variant
+            MediaFileStreamEntity first = audioStreams.get(0);
+            sb.append(String.format(
+                    "#EXT-X-STREAM-INF:BANDWIDTH=%d,CODECS=\"mp4a.40.2\",AUDIO=\"audio-%s\"%n",
+                    bandwidths[qi], emitAq.getLabel()));
+            sb.append(String.format("stream_audio_%d_%s%s%n", first.getStreamIndex(), emitAq.getLabel(), EXT_M3U8));
+            if (isTranscoded) transcodedEmitted = true;
         }
     }
 

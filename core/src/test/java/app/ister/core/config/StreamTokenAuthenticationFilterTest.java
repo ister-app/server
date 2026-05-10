@@ -11,6 +11,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
@@ -49,40 +51,17 @@ class StreamTokenAuthenticationFilterTest {
 
     // ========== shouldNotFilter ==========
 
-    @Test
-    void shouldNotFilterReturnsFalseForHlsPath() {
-        when(request.getRequestURI()).thenReturn("/api/hls/some-uuid/master.m3u8");
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "/api/hls/some-uuid/master.m3u8",
+        "/api/images/some-image.jpg",
+        "/api/mediaFile/some-uuid/download",
+        "/api/transcode/upload/some-uuid/seg.ts"
+    })
+    void shouldNotFilterReturnsFalseForFilteredPaths(String uri) {
+        when(request.getRequestURI()).thenReturn(uri);
 
-        boolean result = filter.shouldNotFilter(request);
-
-        assertFalse(result, "HLS paths should be filtered");
-    }
-
-    @Test
-    void shouldNotFilterReturnsFalseForImagesPath() {
-        when(request.getRequestURI()).thenReturn("/api/images/some-image.jpg");
-
-        boolean result = filter.shouldNotFilter(request);
-
-        assertFalse(result, "Image paths should be filtered");
-    }
-
-    @Test
-    void shouldNotFilterReturnsFalseForMediaFilePath() {
-        when(request.getRequestURI()).thenReturn("/api/mediaFile/some-uuid/download");
-
-        boolean result = filter.shouldNotFilter(request);
-
-        assertFalse(result, "MediaFile paths should be filtered");
-    }
-
-    @Test
-    void shouldNotFilterReturnsFalseForTranscodeUploadPath() {
-        when(request.getRequestURI()).thenReturn("/api/transcode/upload/some-uuid/seg.ts");
-
-        boolean result = filter.shouldNotFilter(request);
-
-        assertFalse(result, "Transcode upload paths should be filtered");
+        assertFalse(filter.shouldNotFilter(request), "Path should be filtered: " + uri);
     }
 
     @Test

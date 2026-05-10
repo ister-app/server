@@ -76,4 +76,43 @@ class AnalyzeDataControllerTest {
         assertEquals(EventType.ANALYZE_DATA, captor.getValue().getEventType());
         assertEquals(libraryId, captor.getValue().getLibraryId());
     }
+
+    @Test
+    void analyzeDataForArtistSendsCorrectMessage() {
+        UUID artistId = UUID.randomUUID();
+
+        Boolean result = subject.analyzeDataForArtist(artistId);
+
+        assertTrue(result);
+        ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
+        verify(messageSender).sendAnalyzeData(captor.capture());
+        assertEquals(EventType.ANALYZE_DATA, captor.getValue().getEventType());
+        assertEquals(artistId, captor.getValue().getArtistId());
+    }
+
+    @Test
+    void analyzeDataForAlbumSendsCorrectMessage() {
+        UUID albumId = UUID.randomUUID();
+
+        Boolean result = subject.analyzeDataForAlbum(albumId);
+
+        assertTrue(result);
+        ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
+        verify(messageSender).sendAnalyzeData(captor.capture());
+        assertEquals(EventType.ANALYZE_DATA, captor.getValue().getEventType());
+        assertEquals(albumId, captor.getValue().getAlbumId());
+    }
+
+    @Test
+    void analyzeDataForTrackSendsCorrectMessage() {
+        UUID trackId = UUID.randomUUID();
+
+        Boolean result = subject.analyzeDataForTrack(trackId);
+
+        assertTrue(result);
+        ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
+        verify(messageSender).sendAnalyzeData(captor.capture());
+        assertEquals(EventType.ANALYZE_DATA, captor.getValue().getEventType());
+        assertEquals(trackId, captor.getValue().getTrackId());
+    }
 }

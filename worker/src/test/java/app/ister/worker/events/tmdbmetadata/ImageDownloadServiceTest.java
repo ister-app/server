@@ -3,7 +3,6 @@ package app.ister.worker.events.tmdbmetadata;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.NodeEntity;
-import app.ister.core.entity.ShowEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.repository.DirectoryRepository;
@@ -66,7 +65,8 @@ class ImageDownloadServiceTest {
         when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node))
                 .thenReturn(List.of(cacheDisk));
 
-        subject.downloadAndSave("http://example.com/img.jpg", ImageType.BACKGROUND, "en", movie, null, null);
+        subject.downloadAndSave("http://example.com/img.jpg", ImageType.BACKGROUND, "en",
+                "TMDB://http://example.com/img.jpg", new ImageSave.MediaEntityRef(movie, null, null, null, null));
 
         ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
         verify(imageDownload).download(eq("http://example.com/img.jpg"), pathCaptor.capture());
@@ -76,19 +76,19 @@ class ImageDownloadServiceTest {
         assertTrue(downloadedPath.endsWith(".jpg"));
 
         verify(imageSave).save(cacheDisk, downloadedPath, ImageType.BACKGROUND, "en",
-                "TMDB://http://example.com/img.jpg", new ImageSave.MediaEntityRef(movie, null, null));
+                "TMDB://http://example.com/img.jpg", new ImageSave.MediaEntityRef(movie, null, null, null, null));
     }
 
     @Test
     void downloadAndSaveThrowsWhenNoCacheDirectory() {
         NodeEntity node = buildNode();
-        ShowEntity show = ShowEntity.builder().id(UUID.randomUUID()).build();
 
         when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
         when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node))
                 .thenReturn(List.of());
 
         assertThrows(IllegalStateException.class, () ->
-                subject.downloadAndSave("http://example.com/img.jpg", ImageType.COVER, "nl", null, show, null));
+                subject.downloadAndSave("http://example.com/img.jpg", ImageType.COVER, "nl",
+                        "TMDB://http://example.com/img.jpg", new ImageSave.MediaEntityRef(null, null, null, null, null)));
     }
 }

@@ -66,6 +66,8 @@ public class HandleImageFound implements Handle<ImageFoundData> {
                 imageEntity.setMovieEntityId(messageData.getMovieEntityId());
                 imageEntity.setEpisodeEntityId(messageData.getEpisodeEntityId());
                 imageEntity.setSeasonEntityId(messageData.getSeasonEntityId());
+                imageEntity.setArtistEntityId(messageData.getArtistEntityId());
+                imageEntity.setAlbumEntityId(messageData.getAlbumEntityId());
             } else {
                 imageEntity = ImageEntity.builder()
                         .directoryEntityId(messageData.getDirectoryEntityId())
@@ -77,6 +79,8 @@ public class HandleImageFound implements Handle<ImageFoundData> {
                         .movieEntityId(messageData.getMovieEntityId())
                         .showEntityId(messageData.getShowEntityId())
                         .seasonEntityId(messageData.getSeasonEntityId())
+                        .artistEntityId(messageData.getArtistEntityId())
+                        .albumEntityId(messageData.getAlbumEntityId())
                         .fileLastModifiedTime(basicFileAttributes.lastModifiedTime().toInstant())
                         .fileCreationTime(basicFileAttributes.creationTime().toInstant())
                         .build();
@@ -85,6 +89,9 @@ public class HandleImageFound implements Handle<ImageFoundData> {
             return true;
         } catch (IOException e) {
             log.error("Failed to process image at {}: {}", messageData.getPath(), e.getMessage(), e);
+            return false;
+        } catch (Error e) {
+            log.error("Failed to process image at {} (native error): {}", messageData.getPath(), e.getMessage(), e);
             return false;
         }
 

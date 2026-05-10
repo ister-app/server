@@ -9,11 +9,19 @@ import com.github.kokorin.jaffree.ffprobe.FFprobeResult;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Paths;
+import java.time.LocalTime;
+import java.time.temporal.ChronoField;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Component
 public class MediaFileFoundCheckForStreams {
+
+    private static final List<String> DURATION_TAGS = List.of("DURATION", "DURATION-eng");
+
+    public record CheckResult(List<MediaFileStreamEntity> streams, boolean hasAttachedPic, long durationInMilliseconds) {}
+
     private static StreamCodecType codecTypeToEnum(String codecType) {
         return switch (codecType) {
             case "VIDEO" -> StreamCodecType.VIDEO;
@@ -26,8 +34,10 @@ public class MediaFileFoundCheckForStreams {
         };
     }
 
-    public List<MediaFileStreamEntity> checkForStreams(MediaFileEntity mediaFileEntity, String dirOfFFmpeg) {
+    public CheckResult checkForStreams(MediaFileEntity mediaFileEntity, String dirOfFFmpeg) {
         List<MediaFileStreamEntity> result = new ArrayList<>();
+        List<Long> durationList = new ArrayList<>();
+        boolean hasAttachedPic = false;
         FFprobeResult mediaStreams = FFprobe.atPath(Paths.get(dirOfFFmpeg))
                 .setShowStreams(true)
                 .setInput(mediaFileEntity.getPath())
@@ -35,6 +45,21 @@ public class MediaFileFoundCheckForStreams {
                 .execute();
 
         for (com.github.kokorin.jaffree.ffprobe.Stream stream : mediaStreams.getStreams()) {
+            if (stream.getDuration() != null) {
+                durationList.add(Math.round(stream.getDuration().doubleValue() * 1000));
+            }
+            for (String tag : DURATION_TAGS) {
+                String tagValue = stream.getTag(tag);
+                if (tagValue != null) {
+                    durationList.add(LocalTime.parse(tagValue).getLong(ChronoField.MILLI_OF_DAY));
+                }
+            }
+
+            if (stream.getDisposition() != null
+                    && Boolean.TRUE.equals(stream.getDisposition().getAttachedPic())) {
+                hasAttachedPic = true;
+                continue;
+            }
             MediaFileStreamEntity.MediaFileStreamEntityBuilder<?, ?> mediaFileStream = MediaFileStreamEntity.builder()
                     .mediaFileEntity(mediaFileEntity)
                     .streamIndex(stream.getIndex())
@@ -49,6 +74,7 @@ public class MediaFileFoundCheckForStreams {
             }
             result.add(mediaFileStream.build());
         }
-        return result;
+        long duration = durationList.isEmpty() ? 0L : Collections.max(durationList);
+        return new CheckResult(result, hasAttachedPic, duration);
     }
 }

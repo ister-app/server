@@ -39,7 +39,7 @@ public class StreamTokenService {
             UUID token = UUID.fromString(tokenStr);
             return streamTokenRepository.findByToken(token)
                     .filter(entity -> entity.getExpiresAt().isAfter(Instant.now()));
-        } catch (IllegalArgumentException ignored) {
+        } catch (IllegalArgumentException _) {
             return Optional.empty();
         }
     }

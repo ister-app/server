@@ -2,14 +2,14 @@ package app.ister.disk.scanner;
 
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.enums.EventType;
+import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.FileScanRequestedData;
 import app.ister.core.service.MessageSender;
 import app.ister.disk.scanner.enums.DirType;
+import app.ister.disk.scanner.scanners.AudioScanner;
 import app.ister.disk.scanner.scanners.ImageScanner;
-import app.ister.disk.scanner.scanners.MediaFileScanner;
 import app.ister.disk.scanner.scanners.NfoScanner;
 import app.ister.disk.scanner.scanners.Scanner;
-import app.ister.disk.scanner.scanners.SubtitleScanner;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -22,28 +22,18 @@ import java.util.List;
 @Slf4j
 class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
     private final DirectoryEntity directoryEntity;
-
     private final ScannedCache scannedCache;
     private final MessageSender messageSender;
-    private final MediaFileScanner mediaFileScanner;
-    private final ImageScanner imageScanner;
-    private final NfoScanner nfoScanner;
-    private final SubtitleScanner subtitleScanner;
+    private final Scanners scanners;
 
     public AnalyzerSimpleFileVisitor(DirectoryEntity directoryEntity,
                                      ScannedCache scannedCache,
                                      MessageSender messageSender,
-                                     MediaFileScanner mediaFileScanner,
-                                     ImageScanner imageScanner,
-                                     NfoScanner nfoScanner,
-                                     SubtitleScanner subtitleScanner) {
+                                     Scanners scanners) {
         this.directoryEntity = directoryEntity;
         this.scannedCache = scannedCache;
         this.messageSender = messageSender;
-        this.mediaFileScanner = mediaFileScanner;
-        this.imageScanner = imageScanner;
-        this.nfoScanner = nfoScanner;
-        this.subtitleScanner = subtitleScanner;
+        this.scanners = scanners;
     }
 
     private String getDirectoryName() {
@@ -62,11 +52,17 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
     }
 
     private FileVisitResult analyzeDir(Path dir, BasicFileAttributes attrs) {
-        if (attrs.isDirectory() && List.of(DirType.SHOW, DirType.SEASON).contains(new PathObject(dir.toString()).getDirType())) {
-            return FileVisitResult.CONTINUE;
-        } else {
+        if (!attrs.isDirectory()) {
             return FileVisitResult.SKIP_SUBTREE;
         }
+        if (directoryEntity.getLibraryEntity() != null
+                && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.MUSIC) {
+            MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), dir.toString());
+            return List.of(DirType.ARTIST, DirType.ALBUM).contains(musicPath.getDirType())
+                    ? FileVisitResult.CONTINUE : FileVisitResult.SKIP_SUBTREE;
+        }
+        return List.of(DirType.SHOW, DirType.SEASON).contains(new PathObject(dir.toString()).getDirType())
+                ? FileVisitResult.CONTINUE : FileVisitResult.SKIP_SUBTREE;
     }
 
     @Override
@@ -76,8 +72,19 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
 
     @Override
     public FileVisitResult visitFile(Path path, BasicFileAttributes basicFileAttributes) {
-        for (Scanner scanner : List.of(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner)) {
-            if (scanner.analyzable(path, basicFileAttributes.isRegularFile(), basicFileAttributes.size()) && !scannedCache.foundPath(path.toString())) {
+        boolean isMusic = directoryEntity.getLibraryEntity() != null
+                && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.MUSIC;
+        List<Scanner> scannerList = isMusic
+                ? List.of(scanners.audio(), scanners.image(), scanners.nfo())
+                : List.of(scanners.mediaFile(), scanners.image(), scanners.nfo(), scanners.subtitle());
+        for (Scanner scanner : scannerList) {
+            boolean canAnalyze = isMusic
+                    ? musicAnalyzable(scanner, path, basicFileAttributes)
+                    : scanner.analyzable(path, basicFileAttributes.isRegularFile(), basicFileAttributes.size());
+            boolean alreadyScanned = isMusic && scanner instanceof AudioScanner
+                    ? scannedCache.foundMusicAudioPath(path.toString())
+                    : scannedCache.foundPath(path.toString());
+            if (canAnalyze && !alreadyScanned) {
                 log.debug("Found file: {}, for scanner: {}", path, scanner);
                 messageSender.sendFileScanRequested(FileScanRequestedData.builder()
                         .path(path)
@@ -89,6 +96,21 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
             }
         }
         return FileVisitResult.CONTINUE;
+    }
+
+    private boolean musicAnalyzable(Scanner scanner, Path path, BasicFileAttributes attrs) {
+        boolean regular = attrs.isRegularFile();
+        long size = attrs.size();
+        if (scanner instanceof AudioScanner s) {
+            return s.analyzable(path, regular, directoryEntity);
+        }
+        if (scanner instanceof ImageScanner s) {
+            return s.analyzable(path, regular, size, directoryEntity);
+        }
+        if (scanner instanceof NfoScanner s) {
+            return s.analyzable(path, regular, size, directoryEntity);
+        }
+        return scanner.analyzable(path, regular, size);
     }
 
     @Override

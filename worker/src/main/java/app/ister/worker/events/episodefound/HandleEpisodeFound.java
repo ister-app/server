@@ -62,10 +62,10 @@ public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
                 if (tmdbResult.isPresent()) {
                     metaDataSave.save(tmdbResult.get(), null, null, episodeEntity);
                     if (tmdbResult.get().getBackgroundUrl() != null) {
-                        imageDownloadService.downloadAndSave(tmdbResult.get().getBackgroundUrl(), ImageType.BACKGROUND, tmdbResult.get().getLanguage(), null, null, episodeEntity);
+                        imageDownloadService.downloadAndSave(tmdbResult.get().getBackgroundUrl(), ImageType.BACKGROUND, tmdbResult.get().getLanguage(), "TMDB://" + tmdbResult.get().getBackgroundUrl(), new ImageSave.MediaEntityRef(null, null, episodeEntity, null, null));
                     }
                     if (tmdbResult.get().getPosterUrl() != null) {
-                        imageDownloadService.downloadAndSave(tmdbResult.get().getPosterUrl(), ImageType.COVER, tmdbResult.get().getLanguage(), null, null, episodeEntity);
+                        imageDownloadService.downloadAndSave(tmdbResult.get().getPosterUrl(), ImageType.COVER, tmdbResult.get().getLanguage(), "TMDB://" + tmdbResult.get().getPosterUrl(), new ImageSave.MediaEntityRef(null, null, episodeEntity, null, null));
                     }
                 }
             }

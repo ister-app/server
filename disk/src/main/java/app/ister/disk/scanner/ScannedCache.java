@@ -38,6 +38,23 @@ public class ScannedCache {
                 otherPathFileEntities.removeIf(otherPathFileEntity -> otherPathFileEntity.getPath().equals(path)));
     }
 
+    /**
+     * Like foundPath, but for music audio files: marks the path as seen (so it won't be deleted)
+     * yet returns false when the existing entry has no track entity, allowing the scanner to
+     * re-process and assign the correct track.
+     */
+    public boolean foundMusicAudioPath(String path) {
+        boolean[] hasTrack = {false};
+        boolean removed = mediaFileEntities.removeIf(mf -> {
+            if (mf.getPath().equals(path)) {
+                hasTrack[0] = mf.getTrackEntity() != null;
+                return true;
+            }
+            return false;
+        });
+        return removed && hasTrack[0];
+    }
+
     public void removeNotScannedFilesFromDatabase() {
         imageRepository.deleteAll(imageEntities);
         mediaFileRepository.deleteAll(mediaFileEntities);

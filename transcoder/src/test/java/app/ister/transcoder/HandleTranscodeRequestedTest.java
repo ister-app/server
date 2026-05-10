@@ -13,9 +13,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,11 +31,77 @@ class HandleTranscodeRequestedTest {
     private HlsService hlsService;
 
     @Mock
+    private HlsTranscodeService transcodeService;
+
+    @Mock
     private TranscoderQueueNamingConfig transcoderQueueNamingConfig;
 
     @Test
-    void preTranscodeTrueStartsAllPasses() throws Exception {
+    void handles() {
+        assertEquals(EventType.TRANSCODE_REQUESTED, handler.handles());
+    }
+
+    @Test
+    void listenerThrowsOnWrongEventType() {
+        TranscodeRequestedData data = TranscodeRequestedData.builder()
+                .eventType(EventType.MEDIA_FILE_FOUND)
+                .build();
+        assertThrows(IllegalArgumentException.class, () -> handler.listener(data));
+    }
+
+    @Test
+    void listenerWithCorrectEventTypeCallsHandle() throws Exception {
         UUID id = UUID.randomUUID();
+        TranscodeRequestedData data = TranscodeRequestedData.builder()
+                .eventType(EventType.TRANSCODE_REQUESTED)
+                .mediaFileId(id)
+                .direct(true)
+                .transcode(false)
+                .subtitleFormat(SubtitleFormat.WEBVTT)
+                .preTranscode(false)
+                .build();
+        handler.listener(data);
+        verify(hlsService).generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT);
+    }
+
+    @Test
+    void handleReturnsTrueOnSuccess() throws Exception {
+        UUID id = UUID.randomUUID();
+        TranscodeRequestedData data = TranscodeRequestedData.builder()
+                .eventType(EventType.TRANSCODE_REQUESTED)
+                .mediaFileId(id)
+                .direct(true)
+                .transcode(false)
+                .subtitleFormat(SubtitleFormat.WEBVTT)
+                .preTranscode(false)
+                .build();
+
+        assertTrue(handler.handle(data));
+        verify(hlsService).generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT);
+    }
+
+    @Test
+    void handleReturnsFalseWhenGeneratePlaylistsThrows() throws Exception {
+        UUID id = UUID.randomUUID();
+        TranscodeRequestedData data = TranscodeRequestedData.builder()
+                .eventType(EventType.TRANSCODE_REQUESTED)
+                .mediaFileId(id)
+                .direct(true)
+                .transcode(false)
+                .subtitleFormat(SubtitleFormat.WEBVTT)
+                .preTranscode(false)
+                .build();
+
+        doThrow(new RuntimeException("ffprobe failure")).when(hlsService).generateAllPlaylists(any(), anyBoolean(), anyBoolean(), any());
+
+        assertFalse(handler.handle(data));
+    }
+
+    @Test
+    void preTranscodeTrueStartsAllPassesWhenNoneActive() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(transcodeService.hasAnyActiveOrCompletedPassForFile(id)).thenReturn(false);
+
         TranscodeRequestedData data = TranscodeRequestedData.builder()
                 .eventType(EventType.TRANSCODE_REQUESTED)
                 .mediaFileId(id)
@@ -44,8 +113,28 @@ class HandleTranscodeRequestedTest {
 
         handler.handle(data);
 
-        verify(hlsService).generateAllPlaylists(eq(id), eq(false), eq(true), eq(SubtitleFormat.WEBVTT));
-        verify(hlsService).startAllPasses(eq(id), eq(false), eq(true));
+        verify(hlsService).generateAllPlaylists(id, false, true, SubtitleFormat.WEBVTT);
+        verify(hlsService).startAllPasses(id, false, true);
+    }
+
+    @Test
+    void preTranscodeTrueSkipsPassesWhenAlreadyActive() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(transcodeService.hasAnyActiveOrCompletedPassForFile(id)).thenReturn(true);
+
+        TranscodeRequestedData data = TranscodeRequestedData.builder()
+                .eventType(EventType.TRANSCODE_REQUESTED)
+                .mediaFileId(id)
+                .direct(false)
+                .transcode(true)
+                .subtitleFormat(SubtitleFormat.WEBVTT)
+                .preTranscode(true)
+                .build();
+
+        handler.handle(data);
+
+        verify(hlsService).generateAllPlaylists(id, false, true, SubtitleFormat.WEBVTT);
+        verify(hlsService, never()).startAllPasses(any(), anyBoolean(), anyBoolean());
     }
 
     @Test
@@ -62,7 +151,7 @@ class HandleTranscodeRequestedTest {
 
         handler.handle(data);
 
-        verify(hlsService).generateAllPlaylists(eq(id), eq(false), eq(true), eq(SubtitleFormat.WEBVTT));
+        verify(hlsService).generateAllPlaylists(id, false, true, SubtitleFormat.WEBVTT);
         verify(hlsService, never()).startAllPasses(any(), anyBoolean(), anyBoolean());
     }
 }

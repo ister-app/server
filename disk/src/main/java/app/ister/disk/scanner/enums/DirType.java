@@ -5,5 +5,7 @@ public enum DirType {
     MOVIE,
     SHOW,
     SEASON,
-    EPISODE
+    EPISODE,
+    ARTIST,
+    ALBUM
 }

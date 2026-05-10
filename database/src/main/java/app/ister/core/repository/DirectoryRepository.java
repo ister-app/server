@@ -1,6 +1,7 @@
 package app.ister.core.repository;
 
 import app.ister.core.entity.DirectoryEntity;
+import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.NodeEntity;
 import app.ister.core.enums.DirectoryType;
 import org.springframework.data.repository.CrudRepository;
@@ -15,4 +16,6 @@ public interface DirectoryRepository extends CrudRepository<DirectoryEntity, UUI
     List<DirectoryEntity> findByDirectoryTypeAndNodeEntity(DirectoryType directoryType, NodeEntity nodeEntity);
 
     List<DirectoryEntity> findByDirectoryType(DirectoryType directoryType);
+
+    List<DirectoryEntity> findByLibraryEntityAndDirectoryType(LibraryEntity libraryEntity, DirectoryType directoryType);
 }

@@ -38,8 +38,7 @@ public class NodeService {
                 .orElseGet(() -> NodeEntity.builder().name(nodeName).build());
         nodeEntity.setUrl(nodeUrl);
         nodeEntity.setVersion(buildVersion);
-        nodeRepository.save(nodeEntity);
-        return nodeEntity;
+        return nodeRepository.save(nodeEntity);
     }
 
 }

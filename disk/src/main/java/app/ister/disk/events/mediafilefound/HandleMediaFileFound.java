@@ -107,15 +107,19 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     private Optional<MediaFileEntity> checkMediaFile(DirectoryEntity directoryEntity, String file) {
         Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, file);
         mediaFile.ifPresent(mediaFileEntity -> {
-            // Get duration.
-            mediaFileEntity.setDurationInMilliseconds(mediaFileFoundGetDuration.getDuration(mediaFileEntity.getPath()));
-            mediaFileRepository.save(mediaFileEntity);
-
             // Clear existing stream metadata so re-analysis on retry doesn't hit duplicate-key errors.
             mediaFileStreamRepository.deleteAllByMediaFileEntityId(mediaFileEntity.getId());
+            mediaFileStreamRepository.flush();
 
-            // Analyze media file streams and save the metadata.
-            var streams = mediaFileFoundCheckForStreams.checkForStreams(mediaFileEntity, dirOfFFmpeg);
+            // Analyze media file streams; duration is derived from the same ffprobe call.
+            var checkResult = mediaFileFoundCheckForStreams.checkForStreams(mediaFileEntity, dirOfFFmpeg);
+            long duration = checkResult.durationInMilliseconds() > 0
+                    ? checkResult.durationInMilliseconds()
+                    : mediaFileFoundGetDuration.getDurationByDecodingFile(mediaFileEntity.getPath());
+            mediaFileEntity.setDurationInMilliseconds(duration);
+            mediaFileRepository.save(mediaFileEntity);
+
+            var streams = checkResult.streams();
             mediaFileStreamRepository.saveAll(streams);
 
             // Extract embedded subtitles to SRT files in the cache directory.

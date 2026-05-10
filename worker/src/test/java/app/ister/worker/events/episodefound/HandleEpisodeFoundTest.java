@@ -9,6 +9,7 @@ import app.ister.core.eventdata.EpisodeFoundData;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.worker.events.tmdbmetadata.EpisodeMetadata;
 import app.ister.worker.events.tmdbmetadata.ImageDownloadService;
+import app.ister.worker.events.tmdbmetadata.ImageSave;
 import app.ister.worker.events.tmdbmetadata.MetadataSave;
 import app.ister.worker.events.tmdbmetadata.TMDBResult;
 import feign.FeignException;
@@ -101,7 +102,8 @@ class HandleEpisodeFoundTest {
 
         verify(metaDataSave, times(2)).save(result, null, null, episodeEntity);
         verify(imageDownloadService, times(2)).downloadAndSave(
-                eq("https://example.com/still.jpg"), eq(ImageType.BACKGROUND), eq("eng"), isNull(), isNull(), eq(episodeEntity));
+                eq("https://example.com/still.jpg"), eq(ImageType.BACKGROUND), eq("eng"),
+                eq("TMDB://https://example.com/still.jpg"), eq(new ImageSave.MediaEntityRef(null, null, episodeEntity, null, null)));
     }
 
     @Test
@@ -151,7 +153,8 @@ class HandleEpisodeFoundTest {
         assertTrue(subject.handle(data));
 
         verify(imageDownloadService, times(2)).downloadAndSave(
-                eq("https://example.com/poster.jpg"), eq(ImageType.COVER), eq("eng"), isNull(), isNull(), eq(episodeEntity));
+                eq("https://example.com/poster.jpg"), eq(ImageType.COVER), eq("eng"),
+                eq("TMDB://https://example.com/poster.jpg"), eq(new ImageSave.MediaEntityRef(null, null, episodeEntity, null, null)));
     }
 
     @Test
@@ -195,7 +198,7 @@ class HandleEpisodeFoundTest {
         when(episodeMetadata.getMetadata(anyString(), anyInt(), anyInt(), anyInt(), anyString()))
                 .thenReturn(Optional.of(result));
         doThrow(new IOException("download failed"))
-                .when(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), any(), any(), any());
+                .when(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), anyString(), any());
 
         assertFalse(subject.handle(data));
     }

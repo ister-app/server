@@ -4,10 +4,13 @@ import app.ister.core.entity.BaseEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.enums.ImageType;
+import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.ImageFoundData;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
+import app.ister.core.utils.Jaffree;
+import app.ister.disk.scanner.MusicPathObject;
 import app.ister.disk.scanner.PathObject;
 import app.ister.disk.scanner.enums.DirType;
 import app.ister.disk.scanner.enums.FileType;
@@ -17,6 +20,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -28,47 +33,107 @@ import java.util.Optional;
 public class ImageScanner implements Scanner {
     private static final List<String> BACKGROUND_FILE_NAMES = List.of("background", "thumb");
     private static final List<String> COVER_FILE_NAMES = List.of("cover");
+    private static final List<String> AUDIO_EXTENSIONS = List.of("mp3", "flac", "aac", "opus", "ogg", "wav", "m4a", "wma");
     private final ScannerHelperService scannerHelperService;
     private final ImageRepository imageRepository;
     private final MessageSender messageSender;
+    private final Jaffree jaffree;
 
     @Override
-    public boolean analyzable(Path path, Boolean isRegularFile, long size) {
+    public boolean analyzable(Path path, boolean isRegularFile, long size) {
         return isRegularFile && new PathObject(path.toString()).getFileType().equals(FileType.IMAGE);
     }
 
+    public boolean analyzable(Path path, boolean isRegularFile, long size, DirectoryEntity directoryEntity) {
+        if (!isRegularFile) {
+            return false;
+        }
+        if (directoryEntity.getLibraryEntity() != null
+                && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.MUSIC) {
+            MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), path.toString());
+            return musicPath.getFileType().equals(FileType.IMAGE);
+        }
+        return analyzable(path, isRegularFile, size);
+    }
+
     @Override
-    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, Boolean isRegularFile, long size) {
-        if (imageRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString()).isEmpty()) {
-            PathObject pathObject = new PathObject(path.toString());
-
-            var imageEntity = ImageEntity.builder()
-                    .directoryEntityId(directoryEntity.getId())
-                    .sourceUri("file://" + path)
-                    .path(path.toString());
-
-            ImageType imageType = getImageType(path);
-            if (imageType.equals(ImageType.UNKNOWN)) {
-                return Optional.empty();
-            }
-            imageEntity.type(imageType);
-
-            if (pathObject.getDirType().equals(DirType.SHOW)) {
-                imageEntity.showEntity(scannerHelperService.getOrCreateShow(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear()));
-            } else if (pathObject.getDirType().equals(DirType.SEASON)) {
-                imageEntity.seasonEntity(scannerHelperService.getOrCreateSeason(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear(), pathObject.getSeason()));
-            } else if (pathObject.getDirType().equals(DirType.EPISODE)) {
-                imageEntity.episodeEntity(scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear(), pathObject.getSeason(), pathObject.getEpisode()));
-            } else if (pathObject.getDirType().equals(DirType.MOVIE)) {
-                imageEntity.movieEntity(scannerHelperService.getOrCreateMovie(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear()));
-            }
-
-            ImageEntity build = imageEntity.build();
-            imageRepository.save(build);
-            messageSender.sendImageFound(ImageFoundData.fromImageEntity(build), directoryEntity.getName());
-            return Optional.of(build);
-        } else {
+    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, boolean isRegularFile, long size) {
+        if (imageRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString()).isPresent()) {
             return Optional.empty();
+        }
+        ImageType imageType = getImageType(path);
+        if (imageType.equals(ImageType.UNKNOWN)) {
+            return Optional.empty();
+        }
+        var imageEntity = ImageEntity.builder()
+                .directoryEntityId(directoryEntity.getId())
+                .sourceUri("file://" + path)
+                .path(path.toString())
+                .type(imageType);
+
+        linkToVideoLibraryEntity(imageEntity, new PathObject(path.toString()), directoryEntity);
+        linkToMusicLibraryEntity(imageEntity, directoryEntity, path);
+
+        ImageEntity build = imageEntity.build();
+        imageRepository.save(build);
+        messageSender.sendImageFound(ImageFoundData.fromImageEntity(build), directoryEntity.getName());
+        return Optional.of(build);
+    }
+
+    private void linkToVideoLibraryEntity(ImageEntity.ImageEntityBuilder<?, ?> imageEntity,
+                                           PathObject pathObject, DirectoryEntity directoryEntity) {
+        if (pathObject.getDirType().equals(DirType.SHOW)) {
+            imageEntity.showEntity(scannerHelperService.getOrCreateShow(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear()));
+        } else if (pathObject.getDirType().equals(DirType.SEASON)) {
+            imageEntity.seasonEntity(scannerHelperService.getOrCreateSeason(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear(), pathObject.getSeason()));
+        } else if (pathObject.getDirType().equals(DirType.EPISODE)) {
+            imageEntity.episodeEntity(scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear(), pathObject.getSeason(), pathObject.getEpisode()));
+        } else if (pathObject.getDirType().equals(DirType.MOVIE)) {
+            imageEntity.movieEntity(scannerHelperService.getOrCreateMovie(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear()));
+        }
+    }
+
+    private void linkToMusicLibraryEntity(ImageEntity.ImageEntityBuilder<?, ?> imageEntity,
+                                           DirectoryEntity directoryEntity, Path path) {
+        if (directoryEntity.getLibraryEntity() == null
+                || directoryEntity.getLibraryEntity().getLibraryType() != LibraryType.MUSIC) {
+            return;
+        }
+        MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), path.toString());
+        if (musicPath.getDirType() == DirType.ARTIST && musicPath.isFlatAlbumStructure()) {
+            String artistName = readAlbumArtistFromDirectory(path.getParent(), musicPath.getArtistName());
+            var artist = scannerHelperService.getOrCreateArtist(directoryEntity.getLibraryEntity(), artistName);
+            imageEntity.albumEntity(scannerHelperService.getOrCreateAlbum(directoryEntity.getLibraryEntity(), artist, musicPath.getAlbumName(), musicPath.getAlbumYear()));
+        } else if (musicPath.getDirType() == DirType.ARTIST) {
+            imageEntity.artistEntity(scannerHelperService.getOrCreateArtist(directoryEntity.getLibraryEntity(), musicPath.getArtistName()));
+        } else if (musicPath.getDirType() == DirType.ALBUM) {
+            var artist = scannerHelperService.getOrCreateArtist(directoryEntity.getLibraryEntity(), musicPath.getArtistName());
+            imageEntity.albumEntity(scannerHelperService.getOrCreateAlbum(directoryEntity.getLibraryEntity(), artist, musicPath.getAlbumName(), musicPath.getAlbumYear()));
+        }
+    }
+
+    private String readAlbumArtistFromDirectory(Path directory, String fallback) {
+        try (var stream = Files.list(directory)) {
+            return stream
+                    .filter(p -> AUDIO_EXTENSIONS.stream().anyMatch(ext -> p.toString().toLowerCase().endsWith("." + ext)))
+                    .findFirst()
+                    .map(audioFile -> {
+                        try {
+                            var format = jaffree.getFFPROBE().setShowFormat(true).setInput(audioFile.toString()).execute().getFormat();
+                            if (format != null) {
+                                String tag = format.getTag("album_artist");
+                                if (tag == null) tag = format.getTag("ALBUM_ARTIST");
+                                if (tag != null && !tag.isBlank()) return tag;
+                            }
+                        } catch (Exception e) {
+                            log.warn("Could not read album_artist from {}: {}", audioFile, e.getMessage());
+                        }
+                        return fallback;
+                    })
+                    .orElse(fallback);
+        } catch (IOException e) {
+            log.warn("Could not list directory {}: {}", directory, e.getMessage());
+            return fallback;
         }
     }
 

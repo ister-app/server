@@ -5,10 +5,13 @@ import app.ister.core.entity.NodeEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.AnalyzeLibraryRequestedData;
+import app.ister.core.repository.AlbumRepository;
+import app.ister.core.repository.ArtistRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.ShowRepository;
+import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.NodeService;
 import org.junit.jupiter.api.Test;
@@ -51,6 +54,15 @@ class AnalyzeLibraryRequestedHandleTest {
 
     @Mock
     private DirectoryRepository directoryRepository;
+
+    @Mock
+    private ArtistRepository artistRepository;
+
+    @Mock
+    private AlbumRepository albumRepository;
+
+    @Mock
+    private TrackRepository trackRepository;
 
     @Test
     void handles() {

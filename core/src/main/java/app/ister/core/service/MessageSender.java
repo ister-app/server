@@ -109,6 +109,39 @@ public class MessageSender {
         rabbitTemplate.convertAndSend(queue, data);
     }
 
+    public void sendArtistFound(ArtistFoundData artistFoundData) {
+        log.debug("Sending message for queue: {} and artistFoundData: {}", APP_ISTER_SERVER_ARTIST_FOUND, artistFoundData);
+        rabbitTemplate.convertAndSend(APP_ISTER_SERVER_ARTIST_FOUND, artistFoundData);
+    }
+
+    public void sendArtistFound(ArtistFoundData artistFoundData, String nodeName) {
+        String queue = APP_ISTER_SERVER_ARTIST_FOUND + "." + nodeName;
+        log.debug("Sending message for queue: {} and artistFoundData: {}", queue, artistFoundData);
+        rabbitTemplate.convertAndSend(queue, artistFoundData);
+    }
+
+    public void sendAlbumFound(AlbumFoundData albumFoundData) {
+        log.debug("Sending message for queue: {} and albumFoundData: {}", APP_ISTER_SERVER_ALBUM_FOUND, albumFoundData);
+        rabbitTemplate.convertAndSend(APP_ISTER_SERVER_ALBUM_FOUND, albumFoundData);
+    }
+
+    public void sendAlbumFound(AlbumFoundData albumFoundData, String nodeName) {
+        String queue = APP_ISTER_SERVER_ALBUM_FOUND + "." + nodeName;
+        log.debug("Sending message for queue: {} and albumFoundData: {}", queue, albumFoundData);
+        rabbitTemplate.convertAndSend(queue, albumFoundData);
+    }
+
+    public void sendTrackFound(TrackFoundData trackFoundData) {
+        log.debug("Sending message for queue: {} and trackFoundData: {}", APP_ISTER_SERVER_TRACK_FOUND, trackFoundData);
+        rabbitTemplate.convertAndSend(APP_ISTER_SERVER_TRACK_FOUND, trackFoundData);
+    }
+
+    public void sendAudioFileFound(AudioFileFoundData audioFileFoundData, String directoryName) {
+        String queue = APP_ISTER_SERVER_AUDIO_FILE_FOUND + "." + directoryName;
+        log.debug("Sending message for queue: {} and audioFileFoundData: {}", queue, audioFileFoundData);
+        rabbitTemplate.convertAndSend(queue, audioFileFoundData);
+    }
+
     // Worker → disk (directory-scoped, like sendMediaFileFound)
     public void sendAnalyzeData(AnalyzeData data, String directoryName) {
         String queue = APP_ISTER_SERVER_ANALYZE_DATA + "." + directoryName;

@@ -33,7 +33,7 @@ public class MediaFileFoundGetDuration {
     public long getDuration(String path) {
         long duration = getDurationFromStream(path);
         if (duration == 0) {
-            return getDurationWithLoadingFile(path);
+            return getDurationByDecodingFile(path);
         } else {
             return duration;
         }
@@ -66,14 +66,19 @@ public class MediaFileFoundGetDuration {
 
     }
 
-    private long getDurationWithLoadingFile(String path) {
+    public long getDurationByDecodingFile(String path) {
         final AtomicLong durationMillis = new AtomicLong();
         jaffree.getFFMPEG()
                 .addInput(
                         UrlInput.fromUrl(path)
                 )
                 .addOutput(new NullOutput())
-                .setProgressListener(progress -> durationMillis.set(progress.getTimeMillis()))
+                .setProgressListener(progress -> {
+                    Long timeMillis = progress.getTimeMillis();
+                    if (timeMillis != null) {
+                        durationMillis.set(timeMillis);
+                    }
+                })
                 .execute();
         return durationMillis.get();
     }

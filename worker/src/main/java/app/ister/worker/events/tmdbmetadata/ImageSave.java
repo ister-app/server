@@ -1,5 +1,7 @@
 package app.ister.worker.events.tmdbmetadata;
 
+import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.ArtistEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
@@ -19,7 +21,9 @@ public class ImageSave {
 
     public record MediaEntityRef(@Nullable MovieEntity movie,
                                   @Nullable ShowEntity show,
-                                  @Nullable EpisodeEntity episode) {}
+                                  @Nullable EpisodeEntity episode,
+                                  @Nullable ArtistEntity artist,
+                                  @Nullable AlbumEntity album) {}
 
     public void save(DirectoryEntity cacheDisk,
                      String path,
@@ -37,6 +41,8 @@ public class ImageSave {
                 .movieEntityId(mediaEntityRef.movie() == null ? null : mediaEntityRef.movie().getId())
                 .showEntityId(mediaEntityRef.show() == null ? null : mediaEntityRef.show().getId())
                 .episodeEntityId(mediaEntityRef.episode() == null ? null : mediaEntityRef.episode().getId())
+                .artistEntityId(mediaEntityRef.artist() == null ? null : mediaEntityRef.artist().getId())
+                .albumEntityId(mediaEntityRef.album() == null ? null : mediaEntityRef.album().getId())
                 .build(), cacheDisk.getNodeEntity().getName());
     }
 }

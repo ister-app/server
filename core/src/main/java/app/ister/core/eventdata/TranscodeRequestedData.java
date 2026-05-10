@@ -18,5 +18,5 @@ public class TranscodeRequestedData extends MessageData {
     private Boolean direct;
     private Boolean transcode;
     private SubtitleFormat subtitleFormat;
-    private boolean preTranscode;
+    private Boolean preTranscode;
 }

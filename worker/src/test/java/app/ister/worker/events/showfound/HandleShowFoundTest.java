@@ -6,6 +6,7 @@ import app.ister.core.enums.ImageType;
 import app.ister.core.eventdata.ShowFoundData;
 import app.ister.core.repository.ShowRepository;
 import app.ister.worker.events.tmdbmetadata.ImageDownloadService;
+import app.ister.worker.events.tmdbmetadata.ImageSave;
 import app.ister.worker.events.tmdbmetadata.MetadataSave;
 import app.ister.worker.events.tmdbmetadata.ShowMetadata;
 import app.ister.worker.events.tmdbmetadata.TMDBResult;
@@ -97,9 +98,11 @@ class HandleShowFoundTest {
 
         verify(metaDataSave, times(2)).save(result, null, showEntity, null);
         verify(imageDownloadService, times(2)).downloadAndSave(
-                eq("https://example.com/bg.jpg"), eq(ImageType.BACKGROUND), eq("eng"), isNull(), eq(showEntity), isNull());
+                eq("https://example.com/bg.jpg"), eq(ImageType.BACKGROUND), eq("eng"),
+                eq("TMDB://https://example.com/bg.jpg"), eq(new ImageSave.MediaEntityRef(null, showEntity, null, null, null)));
         verify(imageDownloadService, times(2)).downloadAndSave(
-                eq("https://example.com/poster.jpg"), eq(ImageType.COVER), eq("eng"), isNull(), eq(showEntity), isNull());
+                eq("https://example.com/poster.jpg"), eq(ImageType.COVER), eq("eng"),
+                eq("TMDB://https://example.com/poster.jpg"), eq(new ImageSave.MediaEntityRef(null, showEntity, null, null, null)));
     }
 
     @Test
@@ -176,7 +179,7 @@ class HandleShowFoundTest {
         when(showRepository.findById(showId)).thenReturn(Optional.of(showEntity));
         when(showMetadata.getMetadata(anyString(), anyInt(), anyString())).thenReturn(Optional.of(result));
         doThrow(new IOException("download failed"))
-                .when(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), any(), any(), any());
+                .when(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), anyString(), any());
 
         assertFalse(subject.handle(data));
     }

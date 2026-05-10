@@ -1,0 +1,1 @@
+ALTER TABLE metadata_entity ADD COLUMN IF NOT EXISTS genre VARCHAR(255);

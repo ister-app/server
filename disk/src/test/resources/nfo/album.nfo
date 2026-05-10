@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<album>
+    <title>Abbey Road</title>
+    <review>The eleventh studio album by the English rock band the Beatles.</review>
+    <genre>Rock</genre>
+    <style>Art Rock</style>
+    <mood>Melancholic</mood>
+    <label>Apple Records</label>
+    <year>1969</year>
+    <releasedate>1969-09-26</releasedate>
+</album>

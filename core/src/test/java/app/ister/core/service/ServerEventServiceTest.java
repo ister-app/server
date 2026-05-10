@@ -1,8 +1,11 @@
 package app.ister.core.service;
 
+import app.ister.core.eventdata.AlbumFoundData;
+import app.ister.core.eventdata.ArtistFoundData;
 import app.ister.core.eventdata.EpisodeFoundData;
 import app.ister.core.eventdata.MovieFoundData;
 import app.ister.core.eventdata.ShowFoundData;
+import app.ister.core.eventdata.TrackFoundData;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -55,5 +58,38 @@ class ServerEventServiceTest {
         ArgumentCaptor<EpisodeFoundData> captor = ArgumentCaptor.forClass(EpisodeFoundData.class);
         verify(messageSender).sendEpisodeFound(captor.capture());
         assertEquals(episodeId, captor.getValue().getEpisodeId());
+    }
+
+    @Test
+    void createArtistFoundEventSendsCorrectData() {
+        UUID artistId = UUID.randomUUID();
+
+        subject.createArtistFoundEvent(artistId);
+
+        ArgumentCaptor<ArtistFoundData> captor = ArgumentCaptor.forClass(ArtistFoundData.class);
+        verify(messageSender).sendArtistFound(captor.capture());
+        assertEquals(artistId, captor.getValue().getArtistId());
+    }
+
+    @Test
+    void createAlbumFoundEventSendsCorrectData() {
+        UUID albumId = UUID.randomUUID();
+
+        subject.createAlbumFoundEvent(albumId);
+
+        ArgumentCaptor<AlbumFoundData> captor = ArgumentCaptor.forClass(AlbumFoundData.class);
+        verify(messageSender).sendAlbumFound(captor.capture());
+        assertEquals(albumId, captor.getValue().getAlbumId());
+    }
+
+    @Test
+    void createTrackFoundEventSendsCorrectData() {
+        UUID trackId = UUID.randomUUID();
+
+        subject.createTrackFoundEvent(trackId);
+
+        ArgumentCaptor<TrackFoundData> captor = ArgumentCaptor.forClass(TrackFoundData.class);
+        verify(messageSender).sendTrackFound(captor.capture());
+        assertEquals(trackId, captor.getValue().getTrackId());
     }
 }

@@ -4,10 +4,12 @@ import app.ister.core.entity.BaseEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.OtherPathFileEntity;
 import app.ister.core.enums.EventType;
+import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.PathFileType;
 import app.ister.core.eventdata.NfoFileFoundData;
 import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.MessageSender;
+import app.ister.disk.scanner.MusicPathObject;
 import app.ister.disk.scanner.PathObject;
 import app.ister.disk.scanner.enums.DirType;
 import app.ister.disk.scanner.enums.FileType;
@@ -29,7 +31,7 @@ public class NfoScanner implements Scanner {
     private final MessageSender messageSender;
 
     @Override
-    public boolean analyzable(Path path, Boolean isRegularFile, long size) {
+    public boolean analyzable(Path path, boolean isRegularFile, long size) {
         PathObject pathObject = new PathObject(path.toString());
         Boolean showCorrect = pathObject.getDirType().equals(DirType.SHOW) && path.getFileName().toString().equals("tvshow.nfo");
         Boolean episodeCorrect = pathObject.getDirType().equals(DirType.EPISODE) && pathObject.getFileType().equals(FileType.NFO);
@@ -38,8 +40,20 @@ public class NfoScanner implements Scanner {
                 && (showCorrect ^ episodeCorrect));
     }
 
+    public boolean analyzable(Path path, boolean isRegularFile, long size, DirectoryEntity directoryEntity) {
+        if (!isRegularFile) {
+            return false;
+        }
+        if (directoryEntity.getLibraryEntity() != null
+                && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.MUSIC) {
+            MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), path.toString());
+            return musicPath.getFileType().equals(FileType.NFO);
+        }
+        return analyzable(path, isRegularFile, size);
+    }
+
     @Override
-    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, Boolean isRegularFile, long size) {
+    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, boolean isRegularFile, long size) {
         Optional<OtherPathFileEntity> otherPathFileEntity = otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString());
         if (otherPathFileEntity.isEmpty()) {
             var entity = OtherPathFileEntity.builder()

@@ -12,9 +12,33 @@
     "allDeclaredMethods": true
   },
   {
+    "name": "app.ister.disk.nfo.AlbumNfo",
+    "allDeclaredConstructors": true,
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "app.ister.disk.nfo.ArtistNfo",
+    "allDeclaredConstructors": true,
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true
+  },
+  {
     "name": "app.ister.disk.nfo.DateAdapter",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true
+  },
+  {
+    "name": "org.glassfish.jaxb.runtime.v2.runtime.property.SingleElementNodeProperty",
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": [
+          "org.glassfish.jaxb.runtime.v2.runtime.JAXBContextImpl",
+          "org.glassfish.jaxb.runtime.v2.model.runtime.RuntimeElementPropertyInfo"
+        ]
+      }
+    ]
   },
   {
     "name": "org.glassfish.jaxb.runtime.v2.runtime.property.ArrayElementLeafProperty",

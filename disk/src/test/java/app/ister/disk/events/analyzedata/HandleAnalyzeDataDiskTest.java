@@ -24,6 +24,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -273,6 +278,45 @@ class HandleAnalyzeDataDiskTest {
         assertTrue(subject.handle(data));
 
         verify(messageSender, never()).sendSubtitleFileFound(any(), any());
+    }
+
+    @Test
+    void handleDeletesHlsCacheWhenDirectoryExists(@TempDir Path tempDir) throws IOException {
+        UUID dirId = UUID.randomUUID();
+        UUID episodeId = UUID.randomUUID();
+        UUID mediaFileId = UUID.randomUUID();
+
+        // Create a fake HLS cache directory
+        Path hlsDir = tempDir.resolve(mediaFileId.toString());
+        Files.createDirectories(hlsDir);
+        Files.writeString(hlsDir.resolve("segment.ts"), "fake");
+
+        ReflectionTestUtils.setField(subject, "tmpDir", tempDir.toString());
+
+        DirectoryEntity dir = DirectoryEntity.builder().id(dirId).name("shows").build();
+        MediaFileEntity mf = MediaFileEntity.builder().id(mediaFileId).path("/shows/episode.mkv").build();
+        mf.setDirectoryEntity(dir);
+        EpisodeEntity episode = EpisodeEntity.builder()
+                .id(episodeId)
+                .mediaFileEntities(List.of(mf))
+                .metadataEntities(List.of())
+                .imagesEntities(List.of())
+                .build();
+
+        AnalyzeData data = AnalyzeData.builder()
+                .eventType(EventType.ANALYZE_DATA)
+                .directoryId(dirId)
+                .episodeId(episodeId)
+                .build();
+
+        when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
+                .thenReturn(List.of());
+
+        assertTrue(subject.handle(data));
+
+        org.junit.jupiter.api.Assertions.assertFalse(Files.exists(hlsDir));
     }
 
     @Test

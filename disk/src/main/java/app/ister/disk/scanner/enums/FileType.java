@@ -5,5 +5,6 @@ public enum FileType {
     MEDIA,
     IMAGE,
     NFO,
-    SUBTITLE
+    SUBTITLE,
+    AUDIO
 }

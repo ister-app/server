@@ -1,9 +1,8 @@
 package app.ister.core.service;
 
 import app.ister.core.enums.EventType;
-import app.ister.core.eventdata.EpisodeFoundData;
-import app.ister.core.eventdata.MovieFoundData;
-import app.ister.core.eventdata.ShowFoundData;
+import app.ister.core.eventdata.*;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,6 +33,27 @@ public class ServerEventService {
         messageSender.sendEpisodeFound(EpisodeFoundData.builder()
                 .eventType(EventType.EPISODE_FOUND)
                 .episodeId(episodeId)
+                .build());
+    }
+
+    public void createArtistFoundEvent(UUID artistId) {
+        messageSender.sendArtistFound(ArtistFoundData.builder()
+                .eventType(EventType.ARTIST_FOUND)
+                .artistId(artistId)
+                .build());
+    }
+
+    public void createAlbumFoundEvent(UUID albumId) {
+        messageSender.sendAlbumFound(AlbumFoundData.builder()
+                .eventType(EventType.ALBUM_FOUND)
+                .albumId(albumId)
+                .build());
+    }
+
+    public void createTrackFoundEvent(UUID trackId) {
+        messageSender.sendTrackFound(TrackFoundData.builder()
+                .eventType(EventType.TRACK_FOUND)
+                .trackId(trackId)
                 .build());
     }
 }

@@ -32,6 +32,18 @@ public class MetadataEntity extends BaseEntity {
     @ManyToOne
     private EpisodeEntity episodeEntity;
 
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne
+    private ArtistEntity artistEntity;
+
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne
+    private AlbumEntity albumEntity;
+
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne
+    private TrackEntity trackEntity;
+
     private String sourceUri;
 
     // https://en.wikipedia.org/wiki/ISO_639-3
@@ -41,4 +53,5 @@ public class MetadataEntity extends BaseEntity {
     @Column(columnDefinition = "text")
     private String description;
     private LocalDate released;
+    private String genre;
 }

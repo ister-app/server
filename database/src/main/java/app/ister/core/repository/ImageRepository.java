@@ -20,4 +20,8 @@ public interface ImageRepository extends CrudRepository<ImageEntity, UUID> {
     List<ImageEntity> findByDirectoryEntity(DirectoryEntity directoryEntity);
 
     List<ImageEntity> findByShowEntityId(UUID showEntityId);
+
+    List<ImageEntity> findByArtistEntityId(UUID artistEntityId);
+
+    List<ImageEntity> findByAlbumEntityId(UUID albumEntityId);
 }

@@ -17,6 +17,10 @@ public class MessageQueue {
     public static final String APP_ISTER_SERVER_TRANSCODE_REQUESTED = "app.ister.server.TranscodeRequested";
     public static final String APP_ISTER_SERVER_TRANSCODE_PASS_REQUESTED = "app.ister.server.TranscodePassRequested";
     public static final String APP_ISTER_SERVER_PRE_TRANSCODE_RECENTLY_WATCHED = "app.ister.server.PreTranscodeRecentlyWatched";
+    public static final String APP_ISTER_SERVER_ARTIST_FOUND = "app.ister.server.ArtistFound";
+    public static final String APP_ISTER_SERVER_ALBUM_FOUND = "app.ister.server.AlbumFound";
+    public static final String APP_ISTER_SERVER_TRACK_FOUND = "app.ister.server.TrackFound";
+    public static final String APP_ISTER_SERVER_AUDIO_FILE_FOUND = "app.ister.server.AudioFileFound";
 
     private MessageQueue() {
         throw new IllegalStateException("Utility class");
