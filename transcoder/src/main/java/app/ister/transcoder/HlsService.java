@@ -68,6 +68,10 @@ public class HlsService {
     @Value("${app.ister.server.hls.master-playlist-timeout-ms:120000}")
     private long masterPlaylistTimeoutMs;
 
+    /** After the pass completes, keep retrying failed segment uploads for at most this long. */
+    @Value("${app.ister.transcoder.hls.upload-drain-timeout-ms:300000}")
+    private long uploadDrainTimeoutMs;
+
     @Value("${app.ister.server.name}")
     private String localNodeName;
 
@@ -114,17 +118,23 @@ public class HlsService {
         String directoryName = mediaFile.getDirectoryEntity().getName();
         log.debug("Master playlist cache miss for {}, sending TRANSCODE_REQUESTED to directory queue {}", mediaFileId, directoryName);
 
-        messageSender.sendTranscodeRequested(
-                TranscodeRequestedData.builder()
-                        .eventType(EventType.TRANSCODE_REQUESTED)
-                        .mediaFileId(mediaFileId)
-                        .direct(direct)
-                        .transcode(transcode)
-                        .subtitleFormat(subtitleFormat)
-                        .build(),
-                directoryName);
+        TranscodeRequestedData request = TranscodeRequestedData.builder()
+                .eventType(EventType.TRANSCODE_REQUESTED)
+                .mediaFileId(mediaFileId)
+                .direct(direct)
+                .transcode(transcode)
+                .subtitleFormat(subtitleFormat)
+                .build();
+        messageSender.sendTranscodeRequested(request, directoryName);
 
-        return waitForMasterPlaylist(cacheFile);
+        try {
+            return waitForMasterPlaylist(cacheFile, masterPlaylistTimeoutMs / 2);
+        } catch (IOException _) {
+            // The event may have been lost or dead-lettered; re-issue it once before giving up.
+            log.warn("Master playlist for {} not produced in time, re-sending TRANSCODE_REQUESTED once", mediaFileId);
+            messageSender.sendTranscodeRequested(request, directoryName);
+            return waitForMasterPlaylist(cacheFile, masterPlaylistTimeoutMs / 2);
+        }
     }
 
     /**
@@ -587,24 +597,32 @@ public class HlsService {
     private void watchAndUpload(Path cacheDirPath, String prefix, String nodeUrl,
                                  UUID mediaFileId, CompletableFuture<Void> passFuture) {
         Set<String> uploaded = new HashSet<>();
+        long drainDeadline = -1;
         while (!passFuture.isDone() || !allUploaded(cacheDirPath, prefix, uploaded)) {
-            if (!scanAndUploadBatch(cacheDirPath, prefix, nodeUrl, mediaFileId, uploaded, passFuture)) {
+            if (passFuture.isDone()) {
+                // Pass finished but uploads are incomplete (e.g. peer unreachable): keep
+                // retrying for a bounded drain window instead of looping forever.
+                if (drainDeadline < 0) {
+                    drainDeadline = System.currentTimeMillis() + uploadDrainTimeoutMs;
+                } else if (System.currentTimeMillis() > drainDeadline) {
+                    log.warn("Giving up uploading remaining segments for {} after {} ms", cacheDirPath, uploadDrainTimeoutMs);
+                    break;
+                }
+            }
+            if (!scanAndUploadBatch(cacheDirPath, prefix, nodeUrl, mediaFileId, uploaded)) {
                 break;
             }
         }
     }
 
     private boolean scanAndUploadBatch(Path cacheDirPath, String prefix, String nodeUrl,
-                                        UUID mediaFileId, Set<String> uploaded,
-                                        CompletableFuture<Void> passFuture) {
+                                        UUID mediaFileId, Set<String> uploaded) {
         try (Stream<Path> files = Files.list(cacheDirPath)) {
             files.filter(p -> p.getFileName().toString().startsWith(prefix)
                            && p.getFileName().toString().endsWith(".ts")
                            && !uploaded.contains(p.getFileName().toString()))
                  .forEach(p -> tryUploadSegment(nodeUrl, mediaFileId, p, uploaded));
-            if (!passFuture.isDone()) {
-                Thread.sleep(500);
-            }
+            Thread.sleep(500);
             return true;
         } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
@@ -644,8 +662,8 @@ public class HlsService {
 
     // ========== Polling ==========
 
-    private String waitForMasterPlaylist(Path cacheFile) throws IOException {
-        long deadline = System.currentTimeMillis() + masterPlaylistTimeoutMs;
+    private String waitForMasterPlaylist(Path cacheFile, long timeoutMs) throws IOException {
+        long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
             if (Files.exists(cacheFile)) {
                 String content = Files.readString(cacheFile);

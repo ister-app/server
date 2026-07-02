@@ -2,6 +2,8 @@ package app.ister.transcoder;
 
 import app.ister.core.utils.Jaffree;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
+import com.github.kokorin.jaffree.ffmpeg.FFmpegResultFuture;
+import com.github.kokorin.jaffree.process.Stopper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,7 +47,20 @@ class HlsTranscodeServiceTest {
         ReflectionTestUtils.setField(service, "hwaccelProperty", "none");
         ReflectionTestUtils.setField(service, "hwaccelDevice", "/dev/dri/renderD128");
         ReflectionTestUtils.setField(service, "maxConcurrentFiles", 2);
+        ReflectionTestUtils.setField(service, "maxConcurrentPasses", 4);
+        ReflectionTestUtils.setField(service, "segmentStabilityMs", 200L);
+        ReflectionTestUtils.setField(service, "passTimeoutMultiplier", 4.0);
+        ReflectionTestUtils.setField(service, "passTimeoutMinSeconds", 1800L);
+        ReflectionTestUtils.setField(service, "cacheRetentionHours", 2L);
         service.init();
+    }
+
+    private static FFmpegResultFuture completedFFmpegFuture() {
+        return new FFmpegResultFuture(CompletableFuture.completedFuture(null), new Stopper() {
+            @Override public void graceStop() {}
+            @Override public void forceStop() {}
+            @Override public void setProcess(Process process) {}
+        });
     }
 
     @SuppressWarnings("unchecked")
@@ -223,14 +238,23 @@ class HlsTranscodeServiceTest {
     }
 
     @Test
-    void stableSegmentOrNullReturnsPathWhenFileSizeIsStable() throws IOException {
+    void stableSegmentOrNullReturnsPathWhenFileSizeIsStable() throws IOException, InterruptedException {
+        ReflectionTestUtils.setField(service, "segmentStabilityMs", 20L);
         Path seg = tempDir.resolve("stable.ts");
         Files.writeString(seg, "video segment data");
 
-        Path result = service.stableSegmentOrNull(seg);
+        // Non-blocking contract: the first call only records the size sample and returns null
+        assertNull(service.stableSegmentOrNull(seg));
 
+        Thread.sleep(30);
+
+        // Same size after >= segmentStabilityMs -> stable
+        Path result = service.stableSegmentOrNull(seg);
         assertNotNull(result);
         assertEquals(seg, result);
+
+        // Memoized as known-stable: repeat calls return instantly
+        assertEquals(seg, service.stableSegmentOrNull(seg));
     }
 
     // ========== waitForSegment ==========
@@ -397,10 +421,11 @@ class HlsTranscodeServiceTest {
         when(ffprobeService.getKeyframes("/test/audio.mkv")).thenReturn(List.of());
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
 
         service.startAudioPass("/test/audio.mkv", tempDir, 0, AudioQuality.Q192K);
 
-        verify(ffmpegMock).execute();
+        verify(ffmpegMock).executeAsync();
     }
 
     // ========== generateVideoSegment ==========
@@ -409,20 +434,22 @@ class HlsTranscodeServiceTest {
     void generateVideoSegmentCopyModeCallsExecute() {
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
 
         service.generateVideoSegment("/test/video.mkv", tempDir.resolve("out.ts"), 0.0, 10.0, VideoQuality.COPY);
 
-        verify(ffmpegMock).execute();
+        verify(ffmpegMock).executeAsync();
     }
 
     @Test
     void generateVideoSegmentTranscodeModeCallsExecute() {
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
 
         service.generateVideoSegment("/test/video.mkv", tempDir.resolve("out.ts"), 0.0, 10.0, VideoQuality.Q720P);
 
-        verify(ffmpegMock).execute();
+        verify(ffmpegMock).executeAsync();
     }
 
     // ========== generateAudioSegment ==========
@@ -431,31 +458,34 @@ class HlsTranscodeServiceTest {
     void generateAudioSegmentTranscodeModeCallsExecute() {
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
 
         service.generateAudioSegment("/test/audio.mkv", tempDir.resolve("out.ts"), 0.0, 10.0, 0, AudioQuality.Q192K, "aac");
 
-        verify(ffmpegMock).execute();
+        verify(ffmpegMock).executeAsync();
     }
 
     @Test
     void generateAudioSegmentCopyModeNativeCodecCallsExecute() {
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
 
         // AAC and MP3 are MPEG-TS native — stream copy should be used
         service.generateAudioSegment("/test/audio.mp3", tempDir.resolve("out.ts"), 0.0, 10.0, 0, AudioQuality.COPY, "mp3");
 
-        verify(ffmpegMock).execute();
+        verify(ffmpegMock).executeAsync();
     }
 
     @Test
     void generateAudioSegmentCopyModeNonNativeCodecTranscodesToAac() {
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
 
         // FLAC cannot be muxed into MPEG-TS — must be transcoded to AAC
         service.generateAudioSegment("/test/audio.flac", tempDir.resolve("out.ts"), 0.0, 10.0, 0, AudioQuality.COPY, "flac");
 
-        verify(ffmpegMock).execute();
+        verify(ffmpegMock).executeAsync();
     }
 }

@@ -71,6 +71,25 @@ public class HlsTranscodeService {
     @Value("${app.ister.transcoder.hls.max-concurrent-files:2}")
     private int maxConcurrentFiles;
 
+    /** Upper bound on concurrent FFmpeg passes across all files (one pass per quality level). */
+    @Value("${app.ister.transcoder.hls.max-concurrent-passes:4}")
+    private int maxConcurrentPasses;
+
+    /** A segment is considered fully written when its size is unchanged for this long. */
+    @Value("${app.ister.transcoder.hls.segment-stability-ms:200}")
+    private long segmentStabilityMs;
+
+    /** A pass is force-stopped after {@code max(duration * multiplier, minimum)} to reap hung FFmpeg processes. */
+    @Value("${app.ister.transcoder.hls.pass-timeout-multiplier:4}")
+    private double passTimeoutMultiplier;
+
+    @Value("${app.ister.transcoder.hls.pass-timeout-min-seconds:1800}")
+    private long passTimeoutMinSeconds;
+
+    /** HLS cache directories untouched for this long are removed by the cleanup job. */
+    @Value("${app.ister.transcoder.hls.cache-retention-hours:2}")
+    private long cacheRetentionHours;
+
     /**
      * Per-quality-level locks used by {@link #ensurePassStarted}.
      * Key format: "{mediaFileId}_video_{quality}" or "{mediaFileId}_audio_{streamIdx}_{bitrate}".
@@ -83,11 +102,20 @@ public class HlsTranscodeService {
     /** Cached keyframes per file path — shared between video and audio passes to avoid redundant ffprobe calls. */
     private final ConcurrentHashMap<String, List<Double>> keyframeCache = new ConcurrentHashMap<>();
 
-    /** Bounded thread pool for background FFmpeg passes (one pass per quality level). */
-    private final ExecutorService transcodeExecutor = Executors.newFixedThreadPool(4);
+    /** Cached total duration per file path — used to derive the pass timeout. */
+    private final ConcurrentHashMap<String, Double> durationCache = new ConcurrentHashMap<>();
+
+    /** Bounded thread pool for background FFmpeg passes (one pass per quality level). Initialised in {@link #init()}. */
+    ExecutorService transcodeExecutor;
 
     /** Limits the number of media files being transcoded simultaneously. Initialised in {@link #init()}. */
     Semaphore concurrentFileSlots;
+
+    /** Segments observed with a stable size; lets repeat requests skip the stability window. */
+    private final Set<String> knownStableSegments = ConcurrentHashMap.newKeySet();
+
+    /** Last observed {size, epochMillis} per still-growing segment, for the non-blocking stability check. */
+    private final ConcurrentHashMap<String, long[]> segmentSizeSamples = new ConcurrentHashMap<>();
 
     /** Number of active FFmpeg passes per media file ID. */
     private final ConcurrentHashMap<String, AtomicInteger> activePassesPerFile = new ConcurrentHashMap<>();
@@ -98,6 +126,7 @@ public class HlsTranscodeService {
     @PostConstruct
     void init() {
         concurrentFileSlots = new Semaphore(maxConcurrentFiles);
+        transcodeExecutor = Executors.newFixedThreadPool(maxConcurrentPasses);
     }
 
     // ========== Hardware acceleration ==========
@@ -168,21 +197,39 @@ public class HlsTranscodeService {
             boolean isFirstPassForFile = activePassesPerFile
                     .computeIfAbsent(mediaFileId, k -> new AtomicInteger(0))
                     .getAndIncrement() == 0;
-            CompletableFuture<Void> future = CompletableFuture.runAsync(
-                    () -> runPassWithSlot(mediaFileId, isFirstPassForFile, passStarter),
-                    transcodeExecutor);
+            // The file slot is acquired on a virtual thread, NOT inside the pass pool: if
+            // slot-waiters occupied pool threads, a full pool of waiting first-passes would
+            // starve the queued passes of the slot-holding files (deadlock until timeout).
+            CompletableFuture<Void> future = new CompletableFuture<>();
+            Thread.startVirtualThread(() -> runPassWithSlot(mediaFileId, isFirstPassForFile, passStarter, future));
             activeGenerations.put(generationKey, future);
         }
     }
 
-    private void runPassWithSlot(String mediaFileId, boolean isFirstPassForFile, Runnable passStarter) {
-        if (isFirstPassForFile) {
-            acquireTranscodeSlot(mediaFileId);
+    private void runPassWithSlot(String mediaFileId, boolean isFirstPassForFile, Runnable passStarter,
+                                 CompletableFuture<Void> future) {
+        try {
+            if (isFirstPassForFile) {
+                acquireTranscodeSlot(mediaFileId);
+            }
+        } catch (RuntimeException e) {
+            future.completeExceptionally(e);
+            return;
         }
         try {
-            passStarter.run();
-        } finally {
+            transcodeExecutor.submit(() -> {
+                try {
+                    passStarter.run();
+                    future.complete(null);
+                } catch (Throwable t) {
+                    future.completeExceptionally(t);
+                } finally {
+                    releaseTranscodeSlotIfDone(mediaFileId);
+                }
+            });
+        } catch (RuntimeException e) { // executor shut down
             releaseTranscodeSlotIfDone(mediaFileId);
+            future.completeExceptionally(e);
         }
     }
 
@@ -258,12 +305,12 @@ public class HlsTranscodeService {
             }
         }
 
-        jaffree.getFFMPEG()
+        executePassWithTimeout(jaffree.getFFMPEG()
                 .addInput(buildInput(inputPath))
                 .addOutput(output)
                 .setOverwriteOutput(true)
-                .setLogLevel(LogLevel.ERROR)
-                .execute();
+                .setLogLevel(LogLevel.ERROR),
+                inputPath, "video pass " + quality.getLabel());
     }
 
     /**
@@ -301,12 +348,37 @@ public class HlsTranscodeService {
             output.addArguments("-segment_time", "10");
         }
 
-        jaffree.getFFMPEG()
+        executePassWithTimeout(jaffree.getFFMPEG()
                 .addInput(UrlInput.fromUrl(inputPath))
                 .addOutput(output)
                 .setOverwriteOutput(true)
-                .setLogLevel(LogLevel.ERROR)
-                .execute();
+                .setLogLevel(LogLevel.ERROR),
+                inputPath, "audio pass " + streamIdx + "/" + audioQuality.getLabel());
+    }
+
+    /**
+     * Runs a whole-file FFmpeg pass with an upper time bound derived from the media duration.
+     * A hung FFmpeg is force-stopped instead of holding its pool thread (and OS process) forever.
+     */
+    private void executePassWithTimeout(com.github.kokorin.jaffree.ffmpeg.FFmpeg ffmpeg, String inputPath, String what) {
+        long timeoutSeconds = Math.max((long) (getTotalDuration(inputPath) * passTimeoutMultiplier), passTimeoutMinSeconds);
+        executeWithTimeout(ffmpeg, timeoutSeconds, what);
+    }
+
+    private void executeWithTimeout(com.github.kokorin.jaffree.ffmpeg.FFmpeg ffmpeg, long timeoutSeconds, String what) {
+        var future = ffmpeg.executeAsync();
+        try {
+            future.get(timeoutSeconds, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (java.util.concurrent.TimeoutException e) {
+            future.forceStop();
+            throw new IllegalStateException("FFmpeg timed out after " + timeoutSeconds + "s: " + what);
+        } catch (java.util.concurrent.ExecutionException e) {
+            throw new IllegalStateException("FFmpeg failed: " + what, e.getCause());
+        } catch (InterruptedException e) {
+            future.forceStop();
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted during FFmpeg run: " + what, e);
+        }
     }
 
     // ========== COPY-mode segment generators ==========
@@ -335,12 +407,12 @@ public class HlsTranscodeService {
         }
 
         log.debug("Generating video segment: start={} duration={} quality={} hwaccel={} -> {}", start, duration, quality.getLabel(), hwaccelProperty, outputPath);
-        jaffree.getFFMPEG()
+        executeWithTimeout(jaffree.getFFMPEG()
                 .addInput(buildInput(inputPath).addArguments("-ss", String.format(Locale.ROOT, "%.6f", start)))
                 .addOutput(output)
                 .setOverwriteOutput(true)
-                .setLogLevel(LogLevel.ERROR)
-                .execute();
+                .setLogLevel(LogLevel.ERROR),
+                Math.max(60, segmentTimeoutMs / 1000), "video segment " + outputPath.getFileName());
     }
 
     void generateAudioSegment(String inputPath, Path outputPath, double start, double duration, int audioIdx, AudioQuality quality, String sourceCodecName) {
@@ -369,12 +441,12 @@ public class HlsTranscodeService {
         }
 
         log.debug("Generating audio segment: start={} duration={} idx={} quality={} -> {}", start, duration, audioIdx, quality.getLabel(), outputPath);
-        jaffree.getFFMPEG()
+        executeWithTimeout(jaffree.getFFMPEG()
                 .addInput(UrlInput.fromUrl(inputPath).addArguments("-ss", String.format(Locale.ROOT, "%.6f", start)))
                 .addOutput(output)
                 .setOverwriteOutput(true)
-                .setLogLevel(LogLevel.ERROR)
-                .execute();
+                .setLogLevel(LogLevel.ERROR),
+                Math.max(60, segmentTimeoutMs / 1000), "audio segment " + outputPath.getFileName());
     }
 
     // ========== Segment waiting ==========
@@ -430,23 +502,40 @@ public class HlsTranscodeService {
     }
 
     /**
-     * Returns the path if the segment file exists and has a stable (non-zero) size
-     * after a 200 ms double-check, indicating FFmpeg has fully closed the file.
+     * Returns the path if the segment file exists and its (non-zero) size has been stable
+     * for at least {@code segment-stability-ms}, indicating FFmpeg has fully closed the file.
      * Returns {@code null} if the file does not exist, is empty, or is still being written.
+     * <p>
+     * Non-blocking: instead of sleeping between two size reads (which used to stall the
+     * calling HTTP/watcher thread for 200 ms per call), the last observed size is remembered
+     * per path and compared on the next call — callers already poll on their own schedule.
+     * Once a segment has been seen stable it is remembered, so repeat requests return instantly.
      */
     Path stableSegmentOrNull(Path segmentPath) throws IOException {
-        if (Files.exists(segmentPath) && Files.size(segmentPath) > 0) {
-            long size1 = Files.size(segmentPath);
-            try {
-                Thread.sleep(200);
-            } catch (InterruptedException _) {
-                Thread.currentThread().interrupt();
-                throw new IOException("Interrupted while waiting for segment");
-            }
-            if (Files.exists(segmentPath) && Files.size(segmentPath) == size1) {
+        String key = segmentPath.toString();
+        if (knownStableSegments.contains(key)) {
+            if (Files.exists(segmentPath)) {
                 Files.setLastModifiedTime(segmentPath, FileTime.fromMillis(System.currentTimeMillis()));
                 return segmentPath;
             }
+            knownStableSegments.remove(key); // cache dir was cleaned up
+            return null;
+        }
+        if (!Files.exists(segmentPath) || Files.size(segmentPath) == 0) {
+            return null;
+        }
+        long size = Files.size(segmentPath);
+        long now = System.currentTimeMillis();
+        long[] previous = segmentSizeSamples.get(key);
+        if (previous == null || previous[0] != size) {
+            segmentSizeSamples.put(key, new long[]{size, now}); // (re)start the stability window
+            return null;
+        }
+        if (now - previous[1] >= segmentStabilityMs) {
+            segmentSizeSamples.remove(key);
+            knownStableSegments.add(key);
+            Files.setLastModifiedTime(segmentPath, FileTime.fromMillis(now));
+            return segmentPath;
         }
         return null;
     }
@@ -456,7 +545,7 @@ public class HlsTranscodeService {
     }
 
     double getTotalDuration(String filePath) {
-        return ffprobeService.getTotalDuration(filePath);
+        return durationCache.computeIfAbsent(filePath, ffprobeService::getTotalDuration);
     }
 
     private String buildSegmentTimes(List<Double> keyframes) {
@@ -474,7 +563,7 @@ public class HlsTranscodeService {
         if (!Files.exists(root)) return;
 
         Set<String> keepIds = loadKeepFileIds(root);
-        Instant twoHoursAgo = Instant.now().minus(2, ChronoUnit.HOURS);
+        Instant retentionThreshold = Instant.now().minus(cacheRetentionHours, ChronoUnit.HOURS);
         try (var dirs = Files.list(root)) {
             dirs.filter(Files::isDirectory).forEach(dir -> {
                 String dirName = dir.getFileName().toString();
@@ -483,7 +572,7 @@ public class HlsTranscodeService {
                     return;
                 }
                 try (var entries = Files.list(dir)) {
-                    boolean allOld = entries.allMatch(f -> isOlderThan(f, twoHoursAgo));
+                    boolean allOld = entries.allMatch(f -> isOlderThan(f, retentionThreshold));
                     if (allOld) {
                         log.debug("Removing stale HLS cache: {}", dir);
                         try (var walk = Files.walk(dir)) {
@@ -497,6 +586,8 @@ public class HlsTranscodeService {
                         }
                         activeGenerations.keySet().removeIf(k -> k.startsWith(dirName));
                         generationLocks.keySet().removeIf(k -> k.startsWith(dirName));
+                        knownStableSegments.removeIf(k -> k.contains(dirName));
+                        segmentSizeSamples.keySet().removeIf(k -> k.contains(dirName));
                         if (filesWithAcquiredSlot.remove(dirName)) {
                             concurrentFileSlots.release();
                             log.warn("Released stale transcode slot during cleanup: {}", dirName);

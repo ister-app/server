@@ -41,51 +41,58 @@ updated — it is the canonical progress tracker for this effort.
       were already env-based; kept the localhost dev defaults since
       docker-compose-local.yml depends on them.
 
-## Phase 2 — Event-system reliability (highest architectural impact)
+## Phase 2 — Event-system reliability (highest architectural impact) ✅ (mostly)
 
-- [ ] `Handle.handle()` returns `Boolean` but every `@RabbitListener` discards it —
-      failed events are acked and silently dropped (`core/.../Handle.java:9`).
-      Change contract: throw on failure instead of returning `false`.
-- [ ] Add retry policy (e.g. 3x with backoff) + dead-letter queues for all queues
-      (`worker/config/QueueConfig.java`, `transcoder/config/TranscoderQueueConfig.java`,
-      disk queue configs). Currently no DLQ/retry anywhere — poison messages have no safety net.
-- [ ] Recovery for poll timeouts: `waitForMasterPlaylist` (`HlsService.java:647`)
-      and `waitForSegment` (`HlsTranscodeService.java:391`) just throw IOException;
-      consider re-issuing the transcode event once before giving up.
-- [ ] Basic metrics on processed/failed events (ties into Phase 6 observability).
+- [x] `Handle.handle()` is now void; failure = throw (checked exceptions wrapped in
+      new `EventHandlingException`). All 21 handlers converted, benign skips
+      preserved as plain returns (6c9a7c5).
+- [x] Retry (3x, exponential backoff, core.properties) + `app.ister.server.dead-letter`
+      queue via `RepublishMessageRecoverer` in `core/.../RabbitReliabilityConfig` (6c9a7c5).
+      Verified end-to-end in `server/.../IsterServerIntegrationTest` (828d101).
+- [ ] Recovery for poll timeouts in HlsService/HlsTranscodeService — picked up in
+      Phase 4 (same files).
+- [ ] Basic metrics on processed/failed events → folded into Phase 6 observability.
 
 ## Phase 3 — Integration-test foundation (Testcontainers)
 
 Currently ~87 test classes, all Mockito unit tests; zero `@SpringBootTest` /
 `@DataJpaTest` / `@GraphQlTest`. Order of value:
 
-- [ ] Testcontainers PostgreSQL test: apply Flyway migrations (V1..V6) and
-      exercise the native queries in `WatchStatusRepository` and
-      `MediaFileStreamRepository` (never run against real Postgres today).
-- [ ] Testcontainers RabbitMQ test: one full event flow end-to-end
-      (e.g. MEDIA_FILE_FOUND → MOVIE_FOUND), including Phase 2 retry/DLQ behavior.
-- [ ] Context-load smoke test in the `server` module.
-- [ ] `@GraphQlTest` coverage for the GraphQL controllers.
-- [ ] Unit tests for the largest untested classes:
-      `transcoder/.../HlsSubtitleService.java` (225 lines),
-      `worker/.../musicbrainz/MusicBrainzService.java` (208 lines),
-      `HandleAlbumFound`, `HandleArtistFound`.
+- [x] Testcontainers PostgreSQL test (`database/.../PostgresRepositoryIntegrationTest`):
+      Flyway V1..V6 + ddl-auto=validate + native queries on Postgres 18 (a3fb2b9).
+      **Real bug found & fixed**: since the Boot 4 upgrade the `spring-boot-flyway`
+      module was missing, so `spring.flyway.enabled=true` silently did nothing.
+      NB: run locally with `DOCKER_HOST=unix:///run/user/1000/podman/podman.sock`
+      (and `systemctl --user start podman.socket`); tests skip without it, CI runs them.
+- [x] Full-application Testcontainers test (`server/.../IsterServerIntegrationTest`):
+      context boots against real Postgres + RabbitMQ; failing event → 3 retries →
+      dead-letter queue, payload/routing-key/exception preserved (828d101).
+- [x] Context-load smoke test — covered by the same server-module test.
+- [x] `@GraphQlTest` exemplar for ShowController (schema wiring + @BatchMapping
+      registration, e2ef307); extend to other controllers over time.
+- [x] Unit tests: `HlsSubtitleServiceTest` (13) + `MusicBrainzServiceTest` (15)
+      (89eceb7); worker `HandleAlbumFound`/`HandleArtistFound` tests added separately.
 
-## Phase 4 — Transcoder hardening
+## Phase 4 — Transcoder hardening ✅
 
-- [ ] Starvation risk: `concurrentFileSlots` semaphore (2 permits) is acquired
-      *inside* the fixed 4-thread pool (`HlsTranscodeService.java:87,189`) —
-      acquire the slot before submitting, or derive pool size from `max-concurrent-files`.
-- [ ] `Thread.sleep(200)` on HTTP request threads in `stableSegmentOrNull`
-      (`HlsTranscodeService.java:437-452`) — every segment request stalls a Tomcat thread.
-- [ ] No ffmpeg timeout / orphan guard: hung ffmpeg holds thread + slot; the 15-min
-      janitor (`:471`) releases the slot but never kills the process.
-- [ ] `RemoteNodeClient` uses `HttpClient.newHttpClient()` with no connect/request
-      timeout (`:22,33`); `watchAndUpload` (`HlsService.java:587`) can hang forever
-      on an unresponsive peer.
-- [ ] Extract magic numbers to config: pool size (4), poll sleep (200ms),
-      cache retention (2h), synthetic keyframe interval (10.0), audio 192k/-ac 2,
-      token TTLs 14h/24h — follow the existing `max-concurrent-files` pattern.
+- [x] Starvation/deadlock fixed: file-slot acquisition moved to a virtual thread so
+      pool threads never block on the semaphore (a full pool of slot-waiters would
+      have starved the queued passes of slot-holding files).
+- [x] `stableSegmentOrNull` is now non-blocking: per-path {size, timestamp} samples
+      instead of an inline 200ms sleep, plus a known-stable memo so repeat requests
+      (players, upload watcher) return instantly.
+- [x] FFmpeg runs via `executeAsync` with a timeout — passes bounded by
+      `max(duration × pass-timeout-multiplier, pass-timeout-min-seconds)`,
+      COPY-segments by the segment timeout; hung processes are force-stopped.
+- [x] `RemoteNodeClient`: 10s connect / 5min request timeouts. `watchAndUpload`:
+      bounded drain window after pass completion (`upload-drain-timeout-ms`) —
+      also fixes a busy-spin when uploads kept failing after the pass finished.
+- [x] Master-playlist wait now re-sends TRANSCODE_REQUESTED once at half-timeout
+      (recovers from lost/dead-lettered events) — the Phase 2 leftover.
+- [x] Config extracted (`app.ister.transcoder.hls.*`): `max-concurrent-passes`,
+      `segment-stability-ms`, `pass-timeout-multiplier`, `pass-timeout-min-seconds`,
+      `cache-retention-hours`, `upload-drain-timeout-ms`. Audio bitrate defaults and
+      token TTLs deliberately left as constants (no operational need yet).
 
 ## Phase 5 — API quality
 
@@ -102,15 +109,15 @@ Currently ~87 test classes, all Mockito unit tests; zero `@SpringBootTest` /
 
 ## Phase 6 — Maintenance & operations
 
-- [ ] Gradle version catalog (`gradle/libs.versions.toml`): jaffree pinned 4x,
-      jimfs/blurhash/Lombok blocks duplicated per module; junit-platform-launcher
-      declared both globally and per module.
-- [ ] Add Dependabot or Renovate (nothing tracks CVEs; stack is bleeding-edge
-      Spring Boot 4 / JDK 25).
-- [ ] Validate `nativeCompile` on PRs — currently only runs post-merge
-      (`.github/workflows/docker-publish.yml`).
-- [ ] Observability: custom metrics (transcode/scan pipelines), health indicators,
-      structured logging config (`logback-spring.xml`) for multi-node.
-- [ ] Expand `README.md` (21 lines today): architecture, multi-node, OIDC,
-      GraphQL, required env vars. Reconsider Sonar coverage exclusions for
-      `FileController`/`StartupTasks` (real runtime code).
+- [x] Gradle version catalog `gradle/libs.versions.toml` for jaffree/blurhash/jimfs
+      (5ac832a). Lombok/test blocks per module left as-is (Boot BOM manages them).
+- [x] Dependabot for gradle + github-actions, weekly, minor/patch grouped (eac0460).
+- [x] `nativeCompile` now validated on PRs via `.github/workflows/native-build.yml` (eac0460).
+- [x] Observability: `ister.events.dead.lettered` counter (aed570d); Spring AMQP
+      provides per-listener timers automatically via the actuator. Structured JSON
+      logging deliberately NOT enabled by default — Spring Boot supports it natively,
+      set env `LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs` per node when needed; no
+      logback-spring.xml required.
+- [x] README expanded: architecture, config table, multi-node, auth, testing (b9f31a3).
+      Sonar exclusion for `FileController` removed; `StartupTasks` stays excluded
+      until it has tests (5ac832a).

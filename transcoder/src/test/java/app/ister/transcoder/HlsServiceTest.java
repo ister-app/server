@@ -22,6 +22,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
+import com.github.kokorin.jaffree.ffmpeg.FFmpegResultFuture;
+import com.github.kokorin.jaffree.process.Stopper;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -66,12 +68,34 @@ class HlsServiceTest {
         transcodeService = new HlsTranscodeService(jaffree, ffprobeService);
         ReflectionTestUtils.setField(transcodeService, "tmpDir", tempDir.toString());
         ReflectionTestUtils.setField(transcodeService, "segmentTimeoutMs", 5000L);
+        ReflectionTestUtils.setField(transcodeService, "maxConcurrentFiles", 10);
+        ReflectionTestUtils.setField(transcodeService, "maxConcurrentPasses", 4);
+        ReflectionTestUtils.setField(transcodeService, "segmentStabilityMs", 200L);
+        ReflectionTestUtils.setField(transcodeService, "passTimeoutMultiplier", 4.0);
+        ReflectionTestUtils.setField(transcodeService, "passTimeoutMinSeconds", 1800L);
+        ReflectionTestUtils.setField(transcodeService, "cacheRetentionHours", 2L);
+        transcodeService.init();
         ReflectionTestUtils.setField(transcodeService, "concurrentFileSlots", new Semaphore(10));
         hlsService = new HlsService(playlistBuilder, subtitleService, transcodeService,
                 mediaFileRepository, mediaFileStreamRepository, messageSender,
                 remoteNodeClient, nodeTokenManager);
         ReflectionTestUtils.setField(hlsService, "tmpDir", tempDir.toString());
         ReflectionTestUtils.setField(hlsService, "localNodeName", LOCAL_NODE_NAME);
+        ReflectionTestUtils.setField(hlsService, "uploadDrainTimeoutMs", 5000L);
+    }
+
+    private static final Stopper NOOP_STOPPER = new Stopper() {
+        @Override public void graceStop() {}
+        @Override public void forceStop() {}
+        @Override public void setProcess(Process process) {}
+    };
+
+    private static FFmpegResultFuture completedFFmpegFuture() {
+        return new FFmpegResultFuture(CompletableFuture.completedFuture(null), NOOP_STOPPER);
+    }
+
+    private static FFmpegResultFuture failedFFmpegFuture(Throwable cause) {
+        return new FFmpegResultFuture(CompletableFuture.failedFuture(cause), NOOP_STOPPER);
     }
 
     // ========== Master playlist ==========
@@ -388,8 +412,8 @@ class HlsServiceTest {
             releasePass.await(5, TimeUnit.SECONDS);
             Files.writeString(cacheDir.resolve("seg_video_720p_00000.ts"), "video-data-0");
             Files.writeString(cacheDir.resolve("seg_video_720p_00001.ts"), "video-data-1");
-            return null;
-        }).when(ffmpegMock).execute();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
 
         // Start the pass explicitly (as the event handler would do)
         String generationKey = id + "_video_720p";
@@ -409,7 +433,7 @@ class HlsServiceTest {
         pool.shutdown();
 
         // Only ONE FFmpeg pass started for both segments of the same quality
-        verify(ffmpegMock, times(1)).execute();
+        verify(ffmpegMock, times(1)).executeAsync();
     }
 
     @Test
@@ -427,8 +451,8 @@ class HlsServiceTest {
             for (int i = 0; i < 2; i++) {
                 Files.writeString(cacheDir.resolve(String.format("seg_video_720p_%05d.ts", i)), "data");
             }
-            return null;
-        }).when(ffmpegMock).execute();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
 
         // Start the pass explicitly (as the event handler would do)
         transcodeService.ensurePassStarted(id + "_video_720p",
@@ -466,8 +490,8 @@ class HlsServiceTest {
             } else {
                 Files.writeString(cacheDir.resolve("seg_audio_1_192k_00000.ts"), "audio-data");
             }
-            return null;
-        }).when(ffmpegMock).execute();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
 
         // Start passes explicitly (as the event handler would do)
         transcodeService.ensurePassStarted(id + "_video_720p",
@@ -478,7 +502,7 @@ class HlsServiceTest {
         Path videoResult = hlsService.getVideoSegment(id, "seg_video_720p_00000.ts");
         Path audioResult = hlsService.getAudioSegment(id, "seg_audio_1_192k_00000.ts");
 
-        verify(ffmpegMock, times(2)).execute();
+        verify(ffmpegMock, times(2)).executeAsync();
         assertTrue(videoResult.toString().contains("seg_video_720p_00000.ts"));
         assertTrue(audioResult.toString().contains("seg_audio_1_192k_00000.ts"));
     }
@@ -499,8 +523,8 @@ class HlsServiceTest {
         String segFilename = "seg_audio_0.000000_60.000000_1_copy.ts";
         doAnswer(inv -> {
             Files.writeString(cacheDir.resolve(segFilename), "audio-copy-data");
-            return null;
-        }).when(ffmpegMock).execute();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
 
         Path result = hlsService.getAudioSegment(id, segFilename);
 
@@ -522,14 +546,14 @@ class HlsServiceTest {
         String segFilename = "seg_audio_0.000000_60.000000_1_copy.ts";
         doAnswer(inv -> {
             Files.writeString(cacheDir.resolve(segFilename), "audio-copy-data");
-            return null;
-        }).when(ffmpegMock).execute();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
 
         hlsService.getAudioSegment(id, segFilename);
         hlsService.getAudioSegment(id, segFilename);
 
         // FFmpeg should only be called once (second call hits cache)
-        verify(ffmpegMock, times(1)).execute();
+        verify(ffmpegMock, times(1)).executeAsync();
     }
 
     // ========== SRT subtitle ==========
@@ -641,15 +665,15 @@ class HlsServiceTest {
 
         doAnswer(inv -> {
             Files.writeString(cacheDir.resolve("seg_video_720p_00000.ts"), "video-data");
-            return null;
-        }).when(ffmpegMock).execute();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
 
         transcodeService.ensurePassStarted(id + "_video_720p",
                 () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
         Path result = hlsService.getVideoSegment(id, "seg_video_720p_00000.ts");
 
         assertNotNull(result);
-        verify(ffmpegMock, times(1)).execute();
+        verify(ffmpegMock, times(1)).executeAsync();
     }
 
     @Test
@@ -667,15 +691,15 @@ class HlsServiceTest {
 
         doAnswer(inv -> {
             Files.writeString(cacheDir.resolve("seg_video_720p_00000.ts"), "video-data");
-            return null;
-        }).when(ffmpegMock).execute();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
 
         transcodeService.ensurePassStarted(id + "_video_720p",
                 () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
         Path result = hlsService.getVideoSegment(id, "seg_video_720p_00000.ts");
 
         assertNotNull(result);
-        verify(ffmpegMock, times(1)).execute();
+        verify(ffmpegMock, times(1)).executeAsync();
     }
 
     @Test
@@ -693,15 +717,15 @@ class HlsServiceTest {
 
         doAnswer(inv -> {
             Files.writeString(cacheDir.resolve("seg_audio_1_192k_00000.ts"), "audio-data");
-            return null;
-        }).when(ffmpegMock).execute();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
 
         transcodeService.ensurePassStarted(id + "_audio_1_192k",
                 () -> transcodeService.startAudioPass("/test/video.mkv", cacheDir, 1, AudioQuality.Q192K));
         Path result = hlsService.getAudioSegment(id, "seg_audio_1_192k_00000.ts");
 
         assertNotNull(result);
-        verify(ffmpegMock, times(1)).execute();
+        verify(ffmpegMock, times(1)).executeAsync();
     }
 
     // ========== Concurrent file limit ==========
@@ -724,8 +748,8 @@ class HlsServiceTest {
         doAnswer(inv -> {
             Files.writeString(cacheDir.resolve("seg_video_720p_00000.ts"), "video-data");
             Files.writeString(cacheDir.resolve("seg_audio_1_192k_00000.ts"), "audio-data");
-            return null;
-        }).when(ffmpegMock).execute();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
 
         transcodeService.ensurePassStarted(id + "_video_720p",
                 () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
@@ -774,8 +798,8 @@ class HlsServiceTest {
                 file2RanWhileFile1Active.set(file1PassStarted.getCount() == 0 && releaseFile1.getCount() > 0);
                 Files.writeString(cacheDir2.resolve("seg_video_720p_00000.ts"), "data2");
             }
-            return null;
-        }).when(ffmpegMock).execute();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
 
         ExecutorService pool = Executors.newFixedThreadPool(4);
 
@@ -806,7 +830,7 @@ class HlsServiceTest {
 
         // File 2 must NOT have run while file 1 was still active
         assertFalse(file2RanWhileFile1Active.get(), "File 2 should have waited for file 1's slot to be released");
-        verify(ffmpegMock, times(2)).execute();
+        verify(ffmpegMock, times(2)).executeAsync();
     }
 
     @Test
@@ -824,8 +848,8 @@ class HlsServiceTest {
 
         doAnswer(inv -> {
             Files.writeString(cacheDir.resolve("seg_video_720p_00000.ts"), "data");
-            return null;
-        }).when(ffmpegMock).execute();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
 
         transcodeService.ensurePassStarted(id + "_video_720p",
                 () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
@@ -835,9 +859,14 @@ class HlsServiceTest {
         CompletableFuture<Void> passFuture = transcodeService.getActiveFuture(id + "_video_720p");
         if (passFuture != null) passFuture.get(5, TimeUnit.SECONDS);
 
-        // After all passes for file are done, the slot must be back (1 available)
+        // After all passes for file are done, the slot must be back (1 available).
+        // The slot is released just after the pass future completes, so poll with a deadline.
         Semaphore slots = (Semaphore) ReflectionTestUtils.getField(transcodeService, "concurrentFileSlots");
         assertNotNull(slots);
+        long deadline = System.currentTimeMillis() + 5_000;
+        while (slots.availablePermits() < 1 && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
         assertEquals(1, slots.availablePermits(), "Slot should be released after all passes complete");
     }
 
@@ -855,11 +884,12 @@ class HlsServiceTest {
         AtomicInteger callCount = new AtomicInteger(0);
         doAnswer(inv -> {
             if (callCount.incrementAndGet() == 1) {
-                throw new RuntimeException("Simulated FFmpeg crash");
+                // The production code surfaces this as IllegalStateException("FFmpeg failed: ...")
+                return failedFFmpegFuture(new RuntimeException("Simulated FFmpeg crash"));
             }
             Files.writeString(cacheDir.resolve("seg_video_720p_00000.ts"), "data");
-            return null;
-        }).when(ffmpegMock).execute();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
 
         // First pass: fails
         String generationKey = id + "_video_720p";
@@ -872,7 +902,7 @@ class HlsServiceTest {
                 () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
         Path result = hlsService.getVideoSegment(id, "seg_video_720p_00000.ts");
         assertNotNull(result);
-        verify(ffmpegMock, times(2)).execute();
+        verify(ffmpegMock, times(2)).executeAsync();
     }
 
     // ========== startAllPasses ==========
@@ -895,14 +925,14 @@ class HlsServiceTest {
         CountDownLatch allDone = new CountDownLatch(4);
         doAnswer(inv -> {
             allDone.countDown();
-            return null;
-        }).when(ffmpegMock).execute();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
 
         hlsService.startAllPasses(id, false, true);
         assertTrue(allDone.await(5, TimeUnit.SECONDS), "All 4 passes should have started");
 
         // 720p + 480p video, 192k + 64k audio
-        verify(ffmpegMock, times(4)).execute();
+        verify(ffmpegMock, times(4)).executeAsync();
     }
 
     @Test
@@ -924,14 +954,14 @@ class HlsServiceTest {
         doAnswer(inv -> {
             Files.writeString(cacheDir.resolve("seg_video_copy_00000.ts"), "data");
             copyDone.countDown();
-            return null;
-        }).when(ffmpegMock).execute();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
 
         hlsService.startAllPasses(id, true, false);
         assertTrue(copyDone.await(5, TimeUnit.SECONDS));
 
         // Only COPY video pass — COPY audio is generated on-demand, not via a background pass
-        verify(ffmpegMock, times(1)).execute();
+        verify(ffmpegMock, times(1)).executeAsync();
     }
 
     @Test
@@ -961,8 +991,8 @@ class HlsServiceTest {
             Files.writeString(cacheDir.resolve("seg_audio_1_192k_00000.ts"), "data");
             Files.writeString(cacheDir.resolve("seg_audio_1_64k_00000.ts"), "data");
             allDone.countDown();
-            return null;
-        }).when(ffmpegMock).execute();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
 
         // Start 720p pass manually and wait until it is confirmed running
         transcodeService.ensurePassStarted(id + "_video_720p",
@@ -975,7 +1005,7 @@ class HlsServiceTest {
         assertTrue(allDone.await(5, TimeUnit.SECONDS), "All passes should complete");
 
         // 1 (manual 720p) + 3 (480p + 192k + 64k from startAllPasses) = 4 total; 720p NOT restarted
-        verify(ffmpegMock, times(4)).execute();
+        verify(ffmpegMock, times(4)).executeAsync();
     }
 
     @Test
@@ -997,14 +1027,14 @@ class HlsServiceTest {
         CountDownLatch allDone = new CountDownLatch(6);
         doAnswer(inv -> {
             allDone.countDown();
-            return null;
-        }).when(ffmpegMock).execute();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
 
         hlsService.startAllPasses(id, false, true);
         assertTrue(allDone.await(5, TimeUnit.SECONDS), "All 6 passes should have started");
 
         // 720p + 480p video, 192k×2 + 64k×2 audio
-        verify(ffmpegMock, times(6)).execute();
+        verify(ffmpegMock, times(6)).executeAsync();
     }
 
     // ========== generateAllPlaylists edge cases ==========
@@ -1101,7 +1131,8 @@ class HlsServiceTest {
         // Do not call generateAllPlaylists, so the cache file never appears
         assertThrows(IOException.class,
                 () -> hlsService.getMasterPlaylist(id, true, false, SubtitleFormat.WEBVTT));
-        verify(messageSender).sendTranscodeRequested(any(), any());
+        // Sent once on cache miss, re-sent once after the first wait times out
+        verify(messageSender, times(2)).sendTranscodeRequested(any(), any());
     }
 
     @Test
@@ -1125,7 +1156,8 @@ class HlsServiceTest {
                 () -> hlsService.getMasterPlaylist(id, true, false, SubtitleFormat.WEBVTT));
 
         assertFalse(Files.exists(cacheFile), "Stale cache file should be deleted");
-        verify(messageSender).sendTranscodeRequested(any(), any());
+        // Sent once on cache miss, re-sent once after the first wait times out
+        verify(messageSender, times(2)).sendTranscodeRequested(any(), any());
     }
 
     // ========== getVideoSegment sends TRANSCODE_PASS_REQUESTED ==========
@@ -1182,13 +1214,14 @@ class HlsServiceTest {
     // ========== startPass ==========
 
     @Test
-    void startPassVideoCategoryStartsPass() {
+    void startPassVideoCategoryStartsPass() throws Exception {
         UUID id = UUID.randomUUID();
         MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv");
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
         lenient().when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         lenient().when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        lenient().when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
 
         TranscodePassRequestedData data = TranscodePassRequestedData.builder()
                 .eventType(EventType.TRANSCODE_PASS_REQUESTED)
@@ -1201,16 +1234,20 @@ class HlsServiceTest {
         hlsService.startPass(data);
 
         verify(mediaFileRepository).findById(id);
+        // Await the async pass so it cannot race @TempDir cleanup
+        CompletableFuture<Void> passFuture = transcodeService.getActiveFuture(id + "_video_720p");
+        if (passFuture != null) passFuture.get(5, TimeUnit.SECONDS);
     }
 
     @Test
-    void startPassAudioCategoryStartsPass() {
+    void startPassAudioCategoryStartsPass() throws Exception {
         UUID id = UUID.randomUUID();
         MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv");
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
         lenient().when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         lenient().when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        lenient().when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
 
         TranscodePassRequestedData data = TranscodePassRequestedData.builder()
                 .eventType(EventType.TRANSCODE_PASS_REQUESTED)
@@ -1224,6 +1261,9 @@ class HlsServiceTest {
         hlsService.startPass(data);
 
         verify(mediaFileRepository).findById(id);
+        // Await the async pass so it cannot race @TempDir cleanup
+        CompletableFuture<Void> passFuture = transcodeService.getActiveFuture(id + "_audio_1_192k");
+        if (passFuture != null) passFuture.get(5, TimeUnit.SECONDS);
     }
 
     // ========== startPass remote path ==========
