@@ -6,6 +6,7 @@ import app.ister.core.repository.WatchStatusRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.BatchMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -13,8 +14,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Controller
 @RequiredArgsConstructor
@@ -48,9 +51,12 @@ public class EpisodeController {
         return episodeEntity.getImagesEntities();
     }
 
-    @SchemaMapping(typeName = "Episode", field = "watchStatus")
-    public List<WatchStatusEntity> watchStatus(EpisodeEntity episodeEntity, Authentication authentication) {
-        return watchStatusRepository.findByUserEntityExternalIdAndEpisodeEntity(authentication.getName(), episodeEntity, Sort.by("dateUpdated").descending());
+    @BatchMapping(typeName = "Episode", field = "watchStatus")
+    public Map<EpisodeEntity, List<WatchStatusEntity>> watchStatus(List<EpisodeEntity> episodes, Authentication authentication) {
+        Map<UUID, List<WatchStatusEntity>> byEpisodeId = watchStatusRepository
+                .findByUserEntityExternalIdAndEpisodeEntityIn(authentication.getName(), episodes, Sort.by("dateUpdated").descending()).stream()
+                .collect(Collectors.groupingBy(w -> w.getEpisodeEntity().getId()));
+        return episodes.stream().collect(Collectors.toMap(e -> e, e -> byEpisodeId.getOrDefault(e.getId(), List.of())));
     }
 
     @SchemaMapping(typeName = "Episode", field = "mediaFile")

@@ -9,10 +9,10 @@ import app.ister.core.repository.WatchStatusRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.BatchMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,8 +20,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Controller
@@ -39,16 +41,8 @@ public class MovieController {
             @Argument Optional<SortingEnum> sorting,
             @Argument Optional<SortingOrder> sortingOrder,
             @Argument Optional<UUID> libraryId) {
-        String sortingString = sorting.orElse(SortingEnum.DATE_CREATED).getDatabaseString();
-        Sort sortBy;
-        if (sortingOrder.isPresent()) {
-            sortBy = sortingOrder.get() == SortingOrder.ASCENDING
-                    ? Sort.by(sortingString).ascending()
-                    : Sort.by(sortingString).descending();
-        } else {
-            sortBy = Sort.by(sortingString).descending();
-        }
-        Pageable pageable = PageRequest.of(page.orElse(0), size.orElse(10), sortBy);
+        Pageable pageable = Paging.pageable(page, size, 10,
+                sorting, SortingEnum.DATE_CREATED, sortingOrder, SortingOrder.DESCENDING);
         return libraryId.flatMap(libraryRepository::findById)
                 .map(lib -> movieRepository.findByLibraryEntity(lib, pageable))
                 .orElseGet(() -> movieRepository.findAll(pageable));
@@ -70,9 +64,12 @@ public class MovieController {
         return movieEntity.getImagesEntities();
     }
 
-    @SchemaMapping(typeName = "Movie", field = "watchStatus")
-    public List<WatchStatusEntity> watchStatus(MovieEntity movieEntity, Authentication authentication) {
-        return watchStatusRepository.findByUserEntityExternalIdAndMovieEntity(authentication.getName(), movieEntity, Sort.by("dateUpdated").descending());
+    @BatchMapping(typeName = "Movie", field = "watchStatus")
+    public Map<MovieEntity, List<WatchStatusEntity>> watchStatus(List<MovieEntity> movies, Authentication authentication) {
+        Map<UUID, List<WatchStatusEntity>> byMovieId = watchStatusRepository
+                .findByUserEntityExternalIdAndMovieEntityIn(authentication.getName(), movies, Sort.by("dateUpdated").descending()).stream()
+                .collect(Collectors.groupingBy(w -> w.getMovieEntity().getId()));
+        return movies.stream().collect(Collectors.toMap(m -> m, m -> byMovieId.getOrDefault(m.getId(), List.of())));
     }
 
     @SchemaMapping(typeName = "Movie", field = "mediaFile")

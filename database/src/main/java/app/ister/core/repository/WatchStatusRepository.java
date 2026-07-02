@@ -20,6 +20,11 @@ public interface WatchStatusRepository extends CrudRepository<WatchStatusEntity,
 
     List<WatchStatusEntity> findByUserEntityExternalIdAndMovieEntity(String userEntityExternalId, MovieEntity movieEntity, Sort sort);
 
+    // Batch variants (used by GraphQL @BatchMapping to avoid N+1)
+    List<WatchStatusEntity> findByUserEntityExternalIdAndEpisodeEntityIn(String userEntityExternalId, java.util.Collection<EpisodeEntity> episodeEntities, Sort sort);
+
+    List<WatchStatusEntity> findByUserEntityExternalIdAndMovieEntityIn(String userEntityExternalId, java.util.Collection<MovieEntity> movieEntities, Sort sort);
+
     /**
      * Retrieves the most recent episode and show IDs for a specific user based on their watch status.
      * The method filters the results to include only those watch status records that have been updated

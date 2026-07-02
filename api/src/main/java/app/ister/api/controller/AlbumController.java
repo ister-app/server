@@ -13,9 +13,7 @@ import app.ister.core.repository.ImageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.BatchMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
@@ -52,14 +50,8 @@ public class AlbumController {
             @Argument Optional<SortingOrder> sortingOrder,
             @Argument Optional<UUID> artistId,
             @Argument Optional<UUID> libraryId) {
-        String sortingString = sorting.orElse(SortingEnum.NAME).getDatabaseString();
-        Sort sortBy = Sort.by(sortingString);
-        if (sortingOrder.isPresent()) {
-            sortBy = sortingOrder.get() == SortingOrder.ASCENDING ? sortBy.ascending() : sortBy.descending();
-        } else {
-            sortBy = sortBy.ascending();
-        }
-        Pageable pageable = PageRequest.of(page.orElse(0), size.orElse(20), sortBy);
+        Pageable pageable = Paging.pageable(page, size, 20,
+                sorting, SortingEnum.NAME, sortingOrder, SortingOrder.ASCENDING);
         if (artistId.isPresent()) {
             return artistRepository.findById(artistId.get())
                     .map(artist -> albumRepository.findByArtistEntity(artist, pageable))

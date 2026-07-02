@@ -19,6 +19,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -107,14 +108,15 @@ class EpisodeControllerTest {
     @Test
     void watchStatusReturnsForUserAndEpisode() {
         EpisodeEntity episode = EpisodeEntity.builder().number(1).build();
-        WatchStatusEntity ws = WatchStatusEntity.builder().watched(false).build();
+        org.springframework.test.util.ReflectionTestUtils.setField(episode, "id", UUID.randomUUID());
+        WatchStatusEntity ws = WatchStatusEntity.builder().watched(false).episodeEntity(episode).build();
         when(authentication.getName()).thenReturn("user1");
-        when(watchStatusRepository.findByUserEntityExternalIdAndEpisodeEntity(eq("user1"), eq(episode), any(Sort.class)))
+        when(watchStatusRepository.findByUserEntityExternalIdAndEpisodeEntityIn(eq("user1"), eq(List.of(episode)), any(Sort.class)))
                 .thenReturn(List.of(ws));
 
-        List<WatchStatusEntity> result = subject.watchStatus(episode, authentication);
+        Map<EpisodeEntity, List<WatchStatusEntity>> result = subject.watchStatus(List.of(episode), authentication);
 
-        assertEquals(1, result.size());
+        assertEquals(1, result.get(episode).size());
     }
 
     @Test

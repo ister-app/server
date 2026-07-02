@@ -20,27 +20,26 @@ updated — it is the canonical progress tracker for this effort.
 
 ## Phase 0 — Baseline
 
-- [ ] Commit current working-tree WIP as starting commit
-- [ ] Untrack `core-local.properties` + add to `.gitignore` (token rotation: Gerben)
+- [x] Commit current working-tree WIP as starting commit (c3f6ae4, docs in 1528db6)
+- [x] ~~Untrack `core-local.properties`~~ — **false positive**: the file was never
+      tracked; the existing `**/*-local.*` gitignore pattern covers it and
+      `git log --all` shows no history. No token rotation needed.
 
-## Phase 1 — Security quick wins
+## Phase 1 — Security quick wins ✅
 
-- [ ] Path traversal in `disk/.../FileController.java` (~line 57 download,
-      ~78 upload) and `RemoteNodeClient.java:31`: `fileName` path variable is
-      unsanitized → arbitrary file read (download) and **write** (upload).
-      Reuse the `requireSafeFilename` approach from `transcoder/HlsController`.
-- [ ] `spring.amqp.deserialization.trust.all=true` in `core.properties:47` —
-      restrict allow-list to the `app.ister.core.eventdata` package (RCE/gadget risk).
-- [ ] Node-token expiry race: refresh `fixedRate` is 14h (`NodeTokenManager.java:21`)
-      while token TTL is also 14h (`StreamTokenService.java:56`) → intermittent
-      401s between nodes. Make refresh comfortably shorter than TTL (e.g. 12h).
-- [ ] `/transcode/download/**` missing from `StreamTokenAuthenticationFilter.shouldNotFilter`
-      (`:57-62`) while `FileController` exposes it — align the auth surface.
-- [ ] Split node token: `createNodeToken` (`StreamTokenService.java:51-59`) grants
-      download + upload in one long-lived token; separate into least-privilege tokens.
-- [ ] Default credentials: `DB_PASSWORD:ister` fallback and hardcoded RabbitMQ
-      `user`/`password` + non-parameterized `spring.rabbitmq.host` in
-      `core.properties:38-45` — make all env-overridable, no real defaults.
+- [x] Path traversal: extracted shared `core/.../utils/SafeFilename` (with test),
+      applied to `FileController.uploadTranscode` and refactored `HlsController`
+      to use it (d69be50).
+- [x] `spring.amqp.deserialization.trust.all=true` removed; Jackson type mapper
+      now allow-lists `app.ister.core.eventdata` in worker `QueueConfig` (f28d4b1).
+- [x] Node-token expiry race: refresh now 12h vs 14h TTL → 2h margin (cc23c1b).
+- [x] `/transcode/download` endpoint **removed** — nothing called it (segment
+      transfer is push-based via `/transcode/upload`) and node tokens never
+      authorized it (eb6d21b).
+- [x] Node token split into separate download/upload tokens, least privilege (cc23c1b).
+- [x] RabbitMQ host/port/user/password now env-parameterized (f28d4b1). DB creds
+      were already env-based; kept the localhost dev defaults since
+      docker-compose-local.yml depends on them.
 
 ## Phase 2 — Event-system reliability (highest architectural impact)
 
@@ -90,13 +89,16 @@ Currently ~87 test classes, all Mockito unit tests; zero `@SpringBootTest` /
 
 ## Phase 5 — API quality
 
-- [ ] Extend @BatchMapping to remaining N+1 fields: `Show.seasons`, `Show.metadata`,
-      `Artist.albums`, `Artist.metadata`, and especially `Episode.watchStatus`
-      (`EpisodeController.java:51` — one query per episode in a listing).
-- [ ] Page-size clamp: Movie/Album/Show/Artist controllers accept unbounded `size`.
-      Extract one shared `buildPageable(...)` helper — also removes the 4x
-      copy-pasted sort/pageable/libraryId block.
-- [ ] Bound or paginate `LibraryController.findAll()` / `nodeRepository.findAll()` usages.
+- [x] `Episode.watchStatus` and `Movie.watchStatus` converted to @BatchMapping with
+      `...In` repository variants (the only true per-entity repo queries). The other
+      N+1 fields (`Show.seasons`/`metadata`, `Artist.albums`/`metadata`, etc.) are
+      lazy collections — solved globally with
+      `hibernate.default_batch_fetch_size=50` instead of per-field batch mappings.
+- [x] Page-size clamp (max 200) via shared `Paging.pageable(...)` helper, replacing
+      the 4x copy-pasted sort/pageable block in Movie/Show/Artist/Album controllers.
+- [ ] Bound or paginate `LibraryController.findAll()` / `nodeRepository.findAll()`
+      usages. **Skipped deliberately**: libraries/nodes are config-defined and
+      number a handful; pagination would complicate the API for no real risk.
 
 ## Phase 6 — Maintenance & operations
 

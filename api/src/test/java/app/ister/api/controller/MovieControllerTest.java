@@ -23,6 +23,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -166,14 +167,15 @@ class MovieControllerTest {
     @Test
     void watchStatusReturnsWatchStatusForUser() {
         MovieEntity movie = MovieEntity.builder().name("Test").releaseYear(2020).build();
-        WatchStatusEntity ws = WatchStatusEntity.builder().watched(false).build();
+        org.springframework.test.util.ReflectionTestUtils.setField(movie, "id", UUID.randomUUID());
+        WatchStatusEntity ws = WatchStatusEntity.builder().watched(false).movieEntity(movie).build();
         when(authentication.getName()).thenReturn("user1");
-        when(watchStatusRepository.findByUserEntityExternalIdAndMovieEntity(eq("user1"), eq(movie), any(Sort.class)))
+        when(watchStatusRepository.findByUserEntityExternalIdAndMovieEntityIn(eq("user1"), eq(List.of(movie)), any(Sort.class)))
                 .thenReturn(List.of(ws));
 
-        List<WatchStatusEntity> result = subject.watchStatus(movie, authentication);
+        Map<MovieEntity, List<WatchStatusEntity>> result = subject.watchStatus(List.of(movie), authentication);
 
-        assertEquals(1, result.size());
+        assertEquals(1, result.get(movie).size());
     }
 
     @Test
