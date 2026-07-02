@@ -94,14 +94,13 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
      * - And will create a background image.
      */
     @Override
-    public Boolean handle(app.ister.core.eventdata.MediaFileFoundData mediaFileFoundData) {
+    public void handle(app.ister.core.eventdata.MediaFileFoundData mediaFileFoundData) {
         DirectoryEntity directoryEntity = directoryRepository.findById(mediaFileFoundData.getDirectoryEntityUUID())
                 .orElseThrow(() -> new IllegalStateException("Directory not found: " + mediaFileFoundData.getDirectoryEntityUUID()));
         Optional<EpisodeEntity> episodeEntity = mediaFileFoundData.getEpisodeEntityUUID() != null ? episodeRepository.findById(mediaFileFoundData.getEpisodeEntityUUID()) : Optional.empty();
         Optional<MovieEntity> movieEntity = mediaFileFoundData.getMovieEntityUUID() != null ? movieRepository.findById(mediaFileFoundData.getMovieEntityUUID()) : Optional.empty();
         var mediaFile = checkMediaFile(directoryEntity, mediaFileFoundData.getPath());
         mediaFile.ifPresent(mediaFileEntity -> createBackgroundImage(episodeEntity, movieEntity, mediaFileFoundData.getPath(), mediaFileEntity.getDurationInMilliseconds()));
-        return true;
     }
 
     private Optional<MediaFileEntity> checkMediaFile(DirectoryEntity directoryEntity, String file) {

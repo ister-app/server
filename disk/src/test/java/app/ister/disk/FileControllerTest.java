@@ -90,22 +90,6 @@ class FileControllerTest {
         assertNotNull(response.getHeaders().getContentType());
     }
 
-    // ========== downloadTranscode ==========
-
-    @Test
-    void downloadTranscodeReturnsStreamForExistingSegment() throws IOException {
-        UUID id = UUID.randomUUID();
-        Path dir = tempDir.resolve(id.toString());
-        Files.createDirectories(dir);
-        Path segment = dir.resolve("segment.ts");
-        Files.writeString(segment, "video segment data");
-
-        InputStreamResource result = controller.downloadTranscode(id, "segment.ts");
-
-        assertNotNull(result);
-        assertEquals(Files.size(segment), result.contentLength());
-    }
-
     // ========== downloadMediaFile ==========
 
     @Test

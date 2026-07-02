@@ -42,7 +42,7 @@ public class HandleAlbumFound implements Handle<AlbumFoundData> {
     }
 
     @Override
-    public Boolean handle(AlbumFoundData data) {
+    public void handle(AlbumFoundData data) {
         albumRepository.findById(data.getAlbumId()).ifPresent(album -> {
             metadataRepository.deleteAll(album.getMetadataEntities());
 
@@ -66,6 +66,5 @@ public class HandleAlbumFound implements Handle<AlbumFoundData> {
                                         dir.getName()));
                     });
         });
-        return true;
     }
 }

@@ -30,14 +30,8 @@ public class HandleTranscodePassRequested implements Handle<TranscodePassRequest
     }
 
     @Override
-    public Boolean handle(TranscodePassRequestedData data) {
+    public void handle(TranscodePassRequestedData data) {
         log.debug("Handling TRANSCODE_PASS_REQUESTED: passKey={}", data.getPassKey());
-        try {
-            hlsService.startPass(data);
-        } catch (Exception e) {
-            log.error("Failed to start pass: passKey={}", data.getPassKey(), e);
-            return false;
-        }
-        return true;
+        hlsService.startPass(data);
     }
 }

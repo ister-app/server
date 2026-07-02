@@ -42,7 +42,7 @@ public class HandleUpdateImagesRequested implements Handle<UpdateImagesRequested
     }
 
     @Override
-    public Boolean handle(UpdateImagesRequestedData data) {
+    public void handle(UpdateImagesRequestedData data) {
         List<ImageEntity> toUpdate = new ArrayList<>();
         imageRepository.findAll().forEach(imageEntity -> {
             if (imageEntity.getBlurHash() == null && applyBlurHash(imageEntity)) {
@@ -52,7 +52,6 @@ public class HandleUpdateImagesRequested implements Handle<UpdateImagesRequested
         if (!toUpdate.isEmpty()) {
             imageRepository.saveAll(toUpdate);
         }
-        return true;
     }
 
     private boolean applyBlurHash(ImageEntity imageEntity) {

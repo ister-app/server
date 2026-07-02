@@ -41,10 +41,9 @@ public class HandleSubtitleFileFound implements Handle<SubtitleFileFoundData> {
     }
 
     @Override
-    public Boolean handle(app.ister.core.eventdata.SubtitleFileFoundData subtitleFileFoundData) {
+    public void handle(app.ister.core.eventdata.SubtitleFileFoundData subtitleFileFoundData) {
         var directoryEntity = directoryRepository.findById(subtitleFileFoundData.getDirectoryEntityUUID()).orElseThrow();
         analyze(directoryEntity, subtitleFileFoundData.getPath());
-        return true;
     }
 
     private void analyze(DirectoryEntity directoryEntity, String path) {

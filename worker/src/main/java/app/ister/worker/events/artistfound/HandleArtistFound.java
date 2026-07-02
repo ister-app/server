@@ -45,7 +45,7 @@ public class HandleArtistFound implements Handle<ArtistFoundData> {
     }
 
     @Override
-    public Boolean handle(ArtistFoundData data) {
+    public void handle(ArtistFoundData data) {
         artistRepository.findById(data.getArtistId()).ifPresent(artist -> {
             boolean hasMetadata = !metadataRepository.findByArtistEntityId(artist.getId()).isEmpty();
             boolean hasImage = !imageRepository.findByArtistEntityId(artist.getId()).isEmpty();
@@ -71,6 +71,5 @@ public class HandleArtistFound implements Handle<ArtistFoundData> {
                 }
             });
         });
-        return true;
     }
 }

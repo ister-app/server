@@ -56,7 +56,7 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
     }
 
     @Override
-    public Boolean handle(AnalyzeData data) {
+    public void handle(AnalyzeData data) {
         if (data.getArtistId() != null) {
             handleArtist(data);
         } else if (data.getAlbumId() != null) {
@@ -86,7 +86,6 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
                 startAnalyzeMediaFiles(movieEntity.getMediaFileEntities(), data);
             });
         }
-        return true;
     }
 
     private void handleArtist(AnalyzeData data) {

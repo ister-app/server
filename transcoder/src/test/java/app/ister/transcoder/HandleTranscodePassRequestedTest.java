@@ -9,10 +9,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
@@ -49,18 +48,18 @@ class HandleTranscodePassRequestedTest {
     }
 
     @Test
-    void handleReturnsTrueOnSuccess() {
+    void handleSucceeds() {
         TranscodePassRequestedData data = TranscodePassRequestedData.builder()
                 .eventType(EventType.TRANSCODE_PASS_REQUESTED)
                 .passKey("stream_uuid_video_720p")
                 .build();
 
-        assertTrue(subject.handle(data));
+        assertDoesNotThrow(() -> subject.handle(data));
         verify(hlsService).startPass(data);
     }
 
     @Test
-    void handleReturnsFalseWhenHlsServiceThrows() {
+    void handleThrowsWhenHlsServiceThrows() {
         TranscodePassRequestedData data = TranscodePassRequestedData.builder()
                 .eventType(EventType.TRANSCODE_PASS_REQUESTED)
                 .passKey("stream_uuid_video_720p")
@@ -68,6 +67,6 @@ class HandleTranscodePassRequestedTest {
 
         doThrow(new RuntimeException("FFmpeg error")).when(hlsService).startPass(data);
 
-        assertFalse(subject.handle(data));
+        assertThrows(RuntimeException.class, () -> subject.handle(data));
     }
 }

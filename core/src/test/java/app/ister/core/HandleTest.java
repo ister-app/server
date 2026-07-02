@@ -16,8 +16,8 @@ class HandleTest {
         }
 
         @Override
-        public Boolean handle(MessageData messageData) {
-            return true;
+        public void handle(MessageData messageData) {
+            // success is signaled by returning normally
         }
     }
 

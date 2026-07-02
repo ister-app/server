@@ -1,5 +1,6 @@
 package app.ister.worker.events.moviefound;
 
+import app.ister.core.EventHandlingException;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
@@ -24,9 +25,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -63,13 +62,13 @@ class MovieFoundHandleTest {
     }
 
     @Test
-    void handleReturnsTrueImmediatelyWhenNoApiKey() {
+    void handleSkipsImmediatelyWhenNoApiKey() {
         ReflectionTestUtils.setField(subject, "apikey", "");
         MovieFoundData data = MovieFoundData.builder()
                 .eventType(EventType.MOVIE_FOUND)
                 .build();
 
-        assertTrue(subject.handle(data));
+        assertDoesNotThrow(() -> subject.handle(data));
 
         verifyNoInteractions(movieRepository, movieMetadata, metaDataSave, imageDownloadService);
     }
@@ -93,7 +92,7 @@ class MovieFoundHandleTest {
         when(movieRepository.findById(movieId)).thenReturn(Optional.of(movieEntity));
         when(movieMetadata.getMetadata(eq("Movie"), eq(2024), anyString())).thenReturn(Optional.of(result));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(metaDataSave, times(2)).save(result, movieEntity, null, null);
         verify(imageDownloadService, times(2)).downloadAndSave(
@@ -121,7 +120,7 @@ class MovieFoundHandleTest {
         when(movieRepository.findById(movieId)).thenReturn(Optional.of(movieEntity));
         when(movieMetadata.getMetadata(eq("Movie"), eq(2024), anyString())).thenReturn(Optional.of(result));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(metaDataSave, times(2)).save(result, movieEntity, null, null);
         verifyNoInteractions(imageDownloadService);
@@ -140,13 +139,13 @@ class MovieFoundHandleTest {
         when(movieRepository.findById(movieId)).thenReturn(Optional.of(movieEntity));
         when(movieMetadata.getMetadata(anyString(), anyInt(), anyString())).thenReturn(Optional.empty());
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verifyNoInteractions(metaDataSave, imageDownloadService);
     }
 
     @Test
-    void handleReturnsFalseOnFeignException() {
+    void handleThrowsOnFeignException() {
         ReflectionTestUtils.setField(subject, "apikey", "test-key");
         UUID movieId = UUID.randomUUID();
         MovieEntity movieEntity = MovieEntity.builder().id(movieId).name("Movie").releaseYear(2024).build();
@@ -158,11 +157,11 @@ class MovieFoundHandleTest {
         when(movieRepository.findById(movieId)).thenReturn(Optional.of(movieEntity));
         when(movieMetadata.getMetadata(anyString(), anyInt(), anyString())).thenThrow(mock(FeignException.class));
 
-        assertFalse(subject.handle(data));
+        assertThrows(FeignException.class, () -> subject.handle(data));
     }
 
     @Test
-    void handleReturnsFalseOnIOException() throws IOException {
+    void handleThrowsOnIOException() throws IOException {
         ReflectionTestUtils.setField(subject, "apikey", "test-key");
         UUID movieId = UUID.randomUUID();
         MovieEntity movieEntity = MovieEntity.builder().id(movieId).name("Movie").releaseYear(2024).build();
@@ -180,7 +179,7 @@ class MovieFoundHandleTest {
         doThrow(new IOException("download failed"))
                 .when(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), anyString(), any());
 
-        assertFalse(subject.handle(data));
+        assertThrows(EventHandlingException.class, () -> subject.handle(data));
     }
 
     @Test

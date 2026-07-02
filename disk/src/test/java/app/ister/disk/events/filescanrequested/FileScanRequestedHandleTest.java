@@ -79,7 +79,7 @@ class FileScanRequestedHandleTest {
         when(nfoScanner.analyzable(path, true, 10)).thenReturn(false);
         when(subtitleScanner.analyzable(path, true, 10)).thenReturn(false);
 
-        assertTrue(subject.handle(fileScanRequestedData));
+        subject.handle(fileScanRequestedData);
 
         verify(mediaFileScanner).analyze(directoryEntity, path, true, 10);
     }
@@ -107,7 +107,7 @@ class FileScanRequestedHandleTest {
         when(imageScanner.analyzable(path, true, 5000, directoryEntity)).thenReturn(false);
         when(nfoScanner.analyzable(path, true, 5000, directoryEntity)).thenReturn(false);
 
-        assertTrue(subject.handle(fileScanRequestedData));
+        subject.handle(fileScanRequestedData);
 
         verify(audioScanner).analyze(directoryEntity, path, true, 5000);
     }

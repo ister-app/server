@@ -24,7 +24,6 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -117,7 +116,7 @@ class HandleMediaFileFoundTest {
         when(directoryRepositoryMock.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity)).thenReturn(List.of(cacheDirectory));
         when(mediaFileFoundExtractSubtitlesMock.extractSubtitles(any(), any(), any(), any())).thenReturn(List.of());
 
-        assertTrue(subject.handle(mediaFileFoundData));
+        subject.handle(mediaFileFoundData);
 
         verify(mediaFileRepositoryMock).save(mediaFileEntity);
     }
@@ -139,7 +138,7 @@ class HandleMediaFileFoundTest {
         when(episodeRepositoryMock.findById(episodeId)).thenReturn(Optional.of(episodeEntity));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directoryEntity, filePath)).thenReturn(Optional.empty());
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verifyNoInteractions(nodeServiceMock, mediaFileFoundGetDurationMock, mediaFileFoundCheckForStreamsMock);
     }
@@ -169,7 +168,7 @@ class HandleMediaFileFoundTest {
         when(directoryRepositoryMock.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity)).thenReturn(List.of(cacheDirectory));
         when(mediaFileFoundExtractSubtitlesMock.extractSubtitles(any(), any(), any(), any())).thenReturn(List.of());
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(mediaFileRepositoryMock).save(mediaFileEntity);
     }
@@ -199,7 +198,7 @@ class HandleMediaFileFoundTest {
         when(nodeServiceMock.getOrCreateNodeEntityForThisNode()).thenReturn(nodeEntity);
         when(directoryRepositoryMock.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity)).thenReturn(List.of(cacheDirectory));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(mediaFileRepositoryMock).save(mediaFileEntity);
         verify(messageSenderMock).sendImageFound(any(ImageFoundData.class), eq("cache"));
@@ -230,7 +229,7 @@ class HandleMediaFileFoundTest {
         when(nodeServiceMock.getOrCreateNodeEntityForThisNode()).thenReturn(nodeEntity);
         when(directoryRepositoryMock.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity)).thenReturn(List.of(cacheDirectory));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(mediaFileRepositoryMock).save(mediaFileEntity);
         verify(messageSenderMock).sendImageFound(any(ImageFoundData.class), eq("cache"));
@@ -263,7 +262,7 @@ class HandleMediaFileFoundTest {
         doThrow(mock(JaffreeAbnormalExitException.class))
                 .when(mediaFileFoundCreateBackgroundMock).createBackground(any(), any(), any(), anyLong());
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(mediaFileRepositoryMock).save(mediaFileEntity);
         verifyNoInteractions(messageSenderMock);

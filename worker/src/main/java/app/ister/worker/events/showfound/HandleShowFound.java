@@ -3,16 +3,15 @@ package app.ister.worker.events.showfound;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.repository.ShowRepository;
+import app.ister.core.EventHandlingException;
 import app.ister.core.Handle;
 import app.ister.worker.events.tmdbmetadata.*;
-import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.JacksonException;
 
 import java.io.IOException;
 import java.util.List;
@@ -48,11 +47,11 @@ public class HandleShowFound implements Handle<app.ister.core.eventdata.ShowFoun
     }
 
     @Override
-    public Boolean handle(app.ister.core.eventdata.ShowFoundData showFoundData) {
+    public void handle(app.ister.core.eventdata.ShowFoundData showFoundData) {
         // If no tmdb api key is set. Skip this event.
         if (apikey == null || apikey.isBlank()) {
             log.warn("No TMDB API key configured, skipping metadata fetch");
-            return true;
+            return;
         }
         try {
             var showEntity = showRepository.findById(showFoundData.getShowId()).orElseThrow();
@@ -68,16 +67,8 @@ public class HandleShowFound implements Handle<app.ister.core.eventdata.ShowFoun
                     }
                 }
             }
-        } catch (JacksonException jpe) {
-            log.error("Cannot convert JSON into ShowFoundData", jpe);
-            return false;
-        } catch (FeignException e) {
-            log.error("Cannot get TMDB data", e);
-            return false;
         } catch (IOException e) {
-            log.error("Download and saving image failed", e);
-            return false;
+            throw new EventHandlingException("Download and saving image failed", e);
         }
-        return true;
     }
 }

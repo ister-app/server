@@ -1,5 +1,6 @@
 package app.ister.transcoder;
 
+import app.ister.core.EventHandlingException;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.SubtitleFormat;
 import app.ister.core.eventdata.TranscodeRequestedData;
@@ -11,12 +12,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.IOException;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.*;
@@ -65,7 +66,7 @@ class HandleTranscodeRequestedTest {
     }
 
     @Test
-    void handleReturnsTrueOnSuccess() throws Exception {
+    void handleSucceeds() throws Exception {
         UUID id = UUID.randomUUID();
         TranscodeRequestedData data = TranscodeRequestedData.builder()
                 .eventType(EventType.TRANSCODE_REQUESTED)
@@ -76,12 +77,12 @@ class HandleTranscodeRequestedTest {
                 .preTranscode(false)
                 .build();
 
-        assertTrue(handler.handle(data));
+        assertDoesNotThrow(() -> handler.handle(data));
         verify(hlsService).generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT);
     }
 
     @Test
-    void handleReturnsFalseWhenGeneratePlaylistsThrows() throws Exception {
+    void handleThrowsWhenGeneratePlaylistsThrows() throws Exception {
         UUID id = UUID.randomUUID();
         TranscodeRequestedData data = TranscodeRequestedData.builder()
                 .eventType(EventType.TRANSCODE_REQUESTED)
@@ -92,9 +93,9 @@ class HandleTranscodeRequestedTest {
                 .preTranscode(false)
                 .build();
 
-        doThrow(new RuntimeException("ffprobe failure")).when(hlsService).generateAllPlaylists(any(), anyBoolean(), anyBoolean(), any());
+        doThrow(new IOException("ffprobe failure")).when(hlsService).generateAllPlaylists(any(), anyBoolean(), anyBoolean(), any());
 
-        assertFalse(handler.handle(data));
+        assertThrows(EventHandlingException.class, () -> handler.handle(data));
     }
 
     @Test

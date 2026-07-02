@@ -18,5 +18,11 @@ public interface Handle<T extends MessageData> {
 
     EventType handles();
 
-    Boolean handle(T messageData);
+    /**
+     * Processes the event. Failures must be signaled by throwing an exception (wrap checked
+     * exceptions in {@link EventHandlingException}): the message is then retried with backoff
+     * and, once retries are exhausted, republished to the dead-letter queue for inspection.
+     * Returning normally acknowledges the message.
+     */
+    void handle(T messageData);
 }

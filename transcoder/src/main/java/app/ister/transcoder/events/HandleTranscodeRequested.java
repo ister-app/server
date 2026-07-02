@@ -1,5 +1,6 @@
 package app.ister.transcoder.events;
 
+import app.ister.core.EventHandlingException;
 import app.ister.core.Handle;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.TranscodeRequestedData;
@@ -10,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
+
+import java.io.IOException;
 
 @Service
 @Slf4j
@@ -32,7 +35,7 @@ public class HandleTranscodeRequested implements Handle<TranscodeRequestedData> 
     }
 
     @Override
-    public Boolean handle(TranscodeRequestedData data) {
+    public void handle(TranscodeRequestedData data) {
         log.debug("Handling TRANSCODE_REQUESTED for mediaFileId={}", data.getMediaFileId());
         try {
             hlsService.generateAllPlaylists(data.getMediaFileId(), data.getDirect(), data.getTranscode(), data.getSubtitleFormat());
@@ -43,10 +46,8 @@ public class HandleTranscodeRequested implements Handle<TranscodeRequestedData> 
                     hlsService.startAllPasses(data.getMediaFileId(), data.getDirect(), data.getTranscode());
                 }
             }
-        } catch (Exception e) {
-            log.error("Failed to handle TRANSCODE_REQUESTED for mediaFileId={}", data.getMediaFileId(), e);
-            return false;
+        } catch (IOException e) {
+            throw new EventHandlingException("Failed to handle TRANSCODE_REQUESTED for mediaFileId=" + data.getMediaFileId(), e);
         }
-        return true;
     }
 }

@@ -1,5 +1,6 @@
 package app.ister.disk.events.imagefound;
 
+import app.ister.core.EventHandlingException;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
@@ -20,9 +21,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -70,9 +69,8 @@ class HandleImageFoundTest {
         when(imageRepository.findByDirectoryEntityIdAndPath(directoryId, imageFile.toString()))
                 .thenReturn(Optional.empty());
 
-        boolean result = subject.handle(data);
+        subject.handle(data);
 
-        assertTrue(result);
         verify(imageRepository).save(any(ImageEntity.class));
     }
 
@@ -95,23 +93,21 @@ class HandleImageFoundTest {
         when(imageRepository.findByDirectoryEntityIdAndPath(directoryId, imageFile.toString()))
                 .thenReturn(Optional.of(existing));
 
-        boolean result = subject.handle(data);
+        subject.handle(data);
 
-        assertTrue(result);
         verify(imageRepository).save(any(ImageEntity.class));
     }
 
     @Test
-    void handleReturnsFalseWhenFileDoesNotExist() {
+    void handleThrowsWhenFileDoesNotExist() {
         ImageFoundData data = ImageFoundData.builder()
                 .eventType(EventType.IMAGE_FOUND)
                 .path("/nonexistent/path/image.jpg")
                 .directoryEntityId(UUID.randomUUID())
                 .build();
 
-        boolean result = subject.handle(data);
+        assertThrows(EventHandlingException.class, () -> subject.handle(data));
 
-        assertFalse(result);
         verify(imageRepository, never()).save(any());
     }
 }

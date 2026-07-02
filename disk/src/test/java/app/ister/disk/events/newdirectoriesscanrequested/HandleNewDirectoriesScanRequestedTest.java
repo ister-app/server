@@ -17,7 +17,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -56,7 +55,7 @@ class HandleNewDirectoriesScanRequestedTest {
 
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(libraryScanner).scanDirectory(directoryEntity);
     }

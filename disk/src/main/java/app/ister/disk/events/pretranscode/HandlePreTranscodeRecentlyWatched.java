@@ -44,7 +44,7 @@ public class HandlePreTranscodeRecentlyWatched implements Handle<PreTranscodeRec
     }
 
     @Override
-    public Boolean handle(PreTranscodeRecentlyWatchedData data) {
+    public void handle(PreTranscodeRecentlyWatchedData data) {
         String diskName = data.getDiskName();
         log.info("Handling PRE_TRANSCODE_RECENTLY_WATCHED for disk: {}", diskName);
 
@@ -66,7 +66,6 @@ public class HandlePreTranscodeRecentlyWatched implements Handle<PreTranscodeRec
         );
 
         log.info("Queued {} media files for pre-transcoding on disk: {}", mediaFileIds.size(), diskName);
-        return true;
     }
 
     private void updateKeepFile(String diskName, Set<UUID> mediaFileIds) {

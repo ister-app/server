@@ -47,10 +47,9 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
     }
 
     @Override
-    public Boolean handle(app.ister.core.eventdata.NfoFileFoundData nfoFileFoundData) {
+    public void handle(app.ister.core.eventdata.NfoFileFoundData nfoFileFoundData) {
         var directoryEntity = directoryRepository.findById(nfoFileFoundData.getDirectoryEntityUUID()).orElseThrow();
         analyze(directoryEntity, nfoFileFoundData.getPath());
-        return true;
     }
 
     public void analyze(DirectoryEntity directoryEntity, String path) {

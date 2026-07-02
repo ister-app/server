@@ -48,7 +48,7 @@ public class FileScanRequestedHandle implements Handle<FileScanRequestedData> {
     }
 
     @Override
-    public Boolean handle(app.ister.core.eventdata.FileScanRequestedData messageData) {
+    public void handle(app.ister.core.eventdata.FileScanRequestedData messageData) {
         DirectoryEntity directoryEntity = directoryRepository.findById(messageData.getDirectoryEntityUUID()).orElseThrow();
         boolean isMusic = directoryEntity.getLibraryEntity() != null
                 && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.MUSIC;
@@ -69,6 +69,5 @@ public class FileScanRequestedHandle implements Handle<FileScanRequestedData> {
                 scanner.analyze(directoryEntity, messageData.getPath(), messageData.getRegularFile(), messageData.getSize());
             }
         }
-        return true;
     }
 }

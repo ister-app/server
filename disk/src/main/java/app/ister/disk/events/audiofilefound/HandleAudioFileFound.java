@@ -110,13 +110,13 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
     }
 
     @Override
-    public Boolean handle(AudioFileFoundData messageData) {
+    public void handle(AudioFileFoundData messageData) {
         var directoryEntity = directoryRepository.findById(messageData.getDirectoryEntityUUID()).orElseThrow();
         Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndPathForUpdate(directoryEntity, messageData.getPath());
         if (mediaFile.isEmpty()) {
             log.warn("AudioFileFound: media file entity not found for path={} directoryId={} — skipping analysis",
                     messageData.getPath(), messageData.getDirectoryEntityUUID());
-            return true;
+            return;
         }
         mediaFile.ifPresent(entity -> {
             UUID entityId = entity.getId();
@@ -140,7 +140,6 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
             extractEmbeddedCoverArt(freshDirectory, freshEntity, checkResult.hasAttachedPic());
             deleteHlsCache(freshEntity.getId());
         });
-        return true;
     }
 
     private void saveTrackMetadataFromTags(UUID trackEntityUUID, MediaFileEntity mediaFile) {

@@ -4,9 +4,9 @@ import app.ister.core.entity.ImageEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.ImageFoundData;
 import app.ister.core.repository.ImageRepository;
+import app.ister.core.EventHandlingException;
 import app.ister.core.Handle;
 import io.trbl.blurhash.BlurHash;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,7 +21,6 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Optional;
 
 @Service
-@Slf4j
 @Transactional
 public class HandleImageFound implements Handle<ImageFoundData> {
     private final ImageRepository imageRepository;
@@ -42,15 +41,14 @@ public class HandleImageFound implements Handle<ImageFoundData> {
     }
 
     @Override
-    public Boolean handle(app.ister.core.eventdata.ImageFoundData messageData) {
+    public void handle(app.ister.core.eventdata.ImageFoundData messageData) {
         try {
             BasicFileAttributes basicFileAttributes = Files.readAttributes(Path.of(messageData.getPath()), BasicFileAttributes.class);
 
             File file = new File(messageData.getPath());
             BufferedImage image = ImageIO.read(file);
             if (image == null) {
-                log.error("Failed to read image at {}: unsupported format", messageData.getPath());
-                return false;
+                throw new EventHandlingException("Failed to read image at " + messageData.getPath() + ": unsupported format", null);
             }
             String blurHash = BlurHash.encode(image);
 
@@ -86,14 +84,8 @@ public class HandleImageFound implements Handle<ImageFoundData> {
                         .build();
             }
             imageRepository.save(imageEntity);
-            return true;
         } catch (IOException e) {
-            log.error("Failed to process image at {}: {}", messageData.getPath(), e.getMessage(), e);
-            return false;
-        } catch (Error e) {
-            log.error("Failed to process image at {} (native error): {}", messageData.getPath(), e.getMessage(), e);
-            return false;
+            throw new EventHandlingException("Failed to process image at " + messageData.getPath(), e);
         }
-
     }
 }

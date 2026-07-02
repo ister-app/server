@@ -1,5 +1,6 @@
 package app.ister.worker.events.episodefound;
 
+import app.ister.core.EventHandlingException;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.SeasonEntity;
 import app.ister.core.entity.ShowEntity;
@@ -26,9 +27,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -65,13 +64,13 @@ class HandleEpisodeFoundTest {
     }
 
     @Test
-    void handleReturnsTrueImmediatelyWhenNoApiKey() {
+    void handleSkipsImmediatelyWhenNoApiKey() {
         ReflectionTestUtils.setField(subject, "apikey", "");
         EpisodeFoundData data = EpisodeFoundData.builder()
                 .eventType(EventType.EPISODE_FOUND)
                 .build();
 
-        assertTrue(subject.handle(data));
+        assertDoesNotThrow(() -> subject.handle(data));
 
         verifyNoInteractions(episodeRepository, episodeMetadata, metaDataSave, imageDownloadService);
     }
@@ -98,7 +97,7 @@ class HandleEpisodeFoundTest {
         when(episodeMetadata.getMetadata(eq("Show"), eq(2024), eq(1), eq(1), anyString()))
                 .thenReturn(Optional.of(result));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(metaDataSave, times(2)).save(result, null, null, episodeEntity);
         verify(imageDownloadService, times(2)).downloadAndSave(
@@ -123,7 +122,7 @@ class HandleEpisodeFoundTest {
         when(episodeMetadata.getMetadata(anyString(), anyInt(), anyInt(), anyInt(), anyString()))
                 .thenReturn(Optional.empty());
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verifyNoInteractions(metaDataSave, imageDownloadService);
     }
@@ -150,7 +149,7 @@ class HandleEpisodeFoundTest {
         when(episodeMetadata.getMetadata(eq("Show"), eq(2024), eq(1), eq(1), anyString()))
                 .thenReturn(Optional.of(result));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(imageDownloadService, times(2)).downloadAndSave(
                 eq("https://example.com/poster.jpg"), eq(ImageType.COVER), eq("eng"),
@@ -158,7 +157,7 @@ class HandleEpisodeFoundTest {
     }
 
     @Test
-    void handleReturnsFalseOnFeignException() throws Exception {
+    void handleThrowsOnFeignException() throws Exception {
         ReflectionTestUtils.setField(subject, "apikey", "test-key");
         UUID episodeId = UUID.randomUUID();
         ShowEntity show = ShowEntity.builder().name("Show").releaseYear(2024).build();
@@ -174,11 +173,11 @@ class HandleEpisodeFoundTest {
         when(episodeMetadata.getMetadata(anyString(), anyInt(), anyInt(), anyInt(), anyString()))
                 .thenThrow(mock(FeignException.class));
 
-        assertFalse(subject.handle(data));
+        assertThrows(FeignException.class, () -> subject.handle(data));
     }
 
     @Test
-    void handleReturnsFalseOnIOException() throws IOException {
+    void handleThrowsOnIOException() throws IOException {
         ReflectionTestUtils.setField(subject, "apikey", "test-key");
         UUID episodeId = UUID.randomUUID();
         ShowEntity show = ShowEntity.builder().name("Show").releaseYear(2024).build();
@@ -200,7 +199,7 @@ class HandleEpisodeFoundTest {
         doThrow(new IOException("download failed"))
                 .when(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), anyString(), any());
 
-        assertFalse(subject.handle(data));
+        assertThrows(EventHandlingException.class, () -> subject.handle(data));
     }
 
     @Test

@@ -53,7 +53,7 @@ public class HandleAnalyzeDataDisk implements Handle<AnalyzeData> {
     }
 
     @Override
-    public Boolean handle(AnalyzeData data) {
+    public void handle(AnalyzeData data) {
         DirectoryEntity dir = directoryRepository.findById(data.getDirectoryId()).orElseThrow();
 
         List<MetadataEntity> metadataEntities;
@@ -99,8 +99,6 @@ public class HandleAnalyzeDataDisk implements Handle<AnalyzeData> {
                                                 SubtitleFileFoundData.builder().eventType(EventType.SUBTITLE_FILE_FOUND)
                                                         .directoryEntityUUID(dir.getId()).path(f.getPath()).build(),
                                                 dir.getName()))));
-
-        return true;
     }
 
     private void deleteHlsCache(UUID mediaFileId) {

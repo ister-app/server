@@ -29,7 +29,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -78,7 +77,7 @@ class HandleArtistFoundTest {
 
         when(artistRepository.findById(artistId)).thenReturn(Optional.empty());
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
         verify(metadataRepository, never()).deleteAll(any());
     }
 
@@ -122,10 +121,10 @@ class HandleArtistFoundTest {
         when(otherPathFileRepository.findByDirectoryEntityAndPath(dir, expectedNfoPath))
                 .thenReturn(Optional.of(nfoFile));
 
-        assertTrue(subject.handle(ArtistFoundData.builder()
+        subject.handle(ArtistFoundData.builder()
                 .eventType(EventType.ARTIST_FOUND)
                 .artistId(artistId)
-                .build()));
+                .build());
 
         verify(metadataRepository).deleteAll(List.of(meta));
         verify(messageSender).sendNfoFileFound(any(), anyString());
@@ -167,10 +166,10 @@ class HandleArtistFoundTest {
         when(otherPathFileRepository.findByDirectoryEntityAndPath(dir, expectedNfoPath))
                 .thenReturn(Optional.empty());
 
-        assertTrue(subject.handle(ArtistFoundData.builder()
+        subject.handle(ArtistFoundData.builder()
                 .eventType(EventType.ARTIST_FOUND)
                 .artistId(artistId)
-                .build()));
+                .build());
 
         verify(messageSender, never()).sendNfoFileFound(any(), any());
     }
@@ -221,10 +220,10 @@ class HandleArtistFoundTest {
         when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node))
                 .thenReturn(List.of(wrongLibDir, nullLibDir));
 
-        assertTrue(subject.handle(ArtistFoundData.builder()
+        subject.handle(ArtistFoundData.builder()
                 .eventType(EventType.ARTIST_FOUND)
                 .artistId(artistId)
-                .build()));
+                .build());
 
         verify(otherPathFileRepository, never()).findByDirectoryEntityAndPath(any(), any());
         verify(messageSender, never()).sendNfoFileFound(any(), any());

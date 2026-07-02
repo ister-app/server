@@ -25,7 +25,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -96,7 +95,7 @@ class AnalyzeLibraryRequestedHandleTest {
         when(episodeRepository.findIdsOfEpisodesWithoutMetadataForNode("TestServer")).thenReturn(List.of(episodeId));
         when(movieRepository.findIdsOfMoviesWithoutMetadataForNode("TestServer")).thenReturn(List.of(movieId));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(messageSender).sendUpdateImagesRequested(any(), eq("disk1"));
         verify(messageSender).sendUpdateImagesRequested(any(), eq("disk2"));

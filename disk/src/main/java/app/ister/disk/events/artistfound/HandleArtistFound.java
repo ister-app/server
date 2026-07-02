@@ -42,7 +42,7 @@ public class HandleArtistFound implements Handle<ArtistFoundData> {
     }
 
     @Override
-    public Boolean handle(ArtistFoundData data) {
+    public void handle(ArtistFoundData data) {
         artistRepository.findById(data.getArtistId()).ifPresent(artist -> {
             metadataRepository.deleteAll(artist.getMetadataEntities());
 
@@ -62,6 +62,5 @@ public class HandleArtistFound implements Handle<ArtistFoundData> {
                                         dir.getName()));
                     });
         });
-        return true;
     }
 }

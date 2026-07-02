@@ -60,7 +60,7 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
     }
 
     @Override
-    public Boolean handle(AnalyzeLibraryRequestedData data) {
+    public void handle(AnalyzeLibraryRequestedData data) {
         var nodeEntity = nodeService.getOrCreateNodeEntityForThisNode();
         directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, nodeEntity).forEach(dir ->
                 messageSender.sendUpdateImagesRequested(
@@ -70,7 +70,6 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
                         dir.getName()));
         dispatchMissingMetadataEvents(nodeEntity.getName());
         dispatchMissingMusicMetadataEvents(nodeEntity.getName());
-        return true;
     }
 
     private void dispatchMissingMusicMetadataEvents(String nodeName) {

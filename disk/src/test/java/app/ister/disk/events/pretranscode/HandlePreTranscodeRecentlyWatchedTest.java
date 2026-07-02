@@ -73,7 +73,7 @@ class HandlePreTranscodeRecentlyWatchedTest {
 
         when(preTranscodeService.collectMediaFileIdsToPreTranscode("disk1")).thenReturn(ids);
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         ArgumentCaptor<TranscodeRequestedData> captor = ArgumentCaptor.forClass(TranscodeRequestedData.class);
         verify(messageSender, times(2)).sendTranscodeRequested(captor.capture(), org.mockito.ArgumentMatchers.eq("disk1"));
@@ -113,7 +113,7 @@ class HandlePreTranscodeRecentlyWatchedTest {
 
         when(preTranscodeService.collectMediaFileIdsToPreTranscode("diskB")).thenReturn(Set.of());
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         Path keepFile = tempDir.resolve("pretranscode_keep_diskB.txt");
         assertTrue(Files.exists(keepFile));

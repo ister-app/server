@@ -43,7 +43,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
@@ -151,7 +150,7 @@ class HandleAudioFileFoundTest {
                 .trackEntityUUID(TRACK_ID)
                 .path(PATH).build();
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(mediaFileRepositoryMock).save(mediaFile);
         verify(mediaFileStreamRepositoryMock).deleteAllByMediaFileEntityId(any());
@@ -172,7 +171,7 @@ class HandleAudioFileFoundTest {
                 .trackEntityUUID(TRACK_ID)
                 .path(PATH).build();
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verifyNoInteractions(mediaFileFoundGetDurationMock);
         verifyNoInteractions(mediaFileFoundCheckForStreamsMock);
@@ -229,7 +228,7 @@ class HandleAudioFileFoundTest {
                 .trackEntityUUID(TRACK_ID)
                 .path(PATH).build();
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(metadataRepositoryMock).deleteAll(any());
         verify(metadataRepositoryMock).save(any(MetadataEntity.class));
@@ -257,7 +256,7 @@ class HandleAudioFileFoundTest {
                 .trackEntityUUID(null)
                 .path(PATH).build();
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verifyNoInteractions(trackRepositoryMock);
         verifyNoInteractions(metadataRepositoryMock);
@@ -316,7 +315,7 @@ class HandleAudioFileFoundTest {
                 .trackEntityUUID(TRACK_ID)
                 .path(PATH).build();
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         // Title derived from filename: "01 - Track" → "Track"
         verify(metadataRepositoryMock).save(any(MetadataEntity.class));
@@ -374,7 +373,7 @@ class HandleAudioFileFoundTest {
                 .trackEntityUUID(TRACK_ID)
                 .path(PATH).build();
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         org.junit.jupiter.api.Assertions.assertEquals("NewArtistName", artist.getName());
     }
@@ -430,7 +429,7 @@ class HandleAudioFileFoundTest {
                 .trackEntityUUID(TRACK_ID)
                 .path(PATH).build();
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(artistRepositoryMock, never()).findByLibraryEntityAndName(any(), any());
         org.junit.jupiter.api.Assertions.assertEquals("SameArtist", artist.getName());
@@ -499,7 +498,7 @@ class HandleAudioFileFoundTest {
                 .trackEntityUUID(TRACK_ID)
                 .path(PATH).build();
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(scannerHelperServiceMock).getOrCreateTrack(artist, album, 1, 1);
         verify(mediaFileRepositoryMock, atLeastOnce()).save(any(MediaFileEntity.class));
@@ -533,7 +532,7 @@ class HandleAudioFileFoundTest {
                 .trackEntityUUID(null)
                 .path(PATH).build();
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         // HLS cache dir should be deleted
         org.junit.jupiter.api.Assertions.assertFalse(Files.exists(hlsDir));

@@ -128,7 +128,7 @@ class AnalyzeDataHandleTest {
         when(libraryRepository.findById(libraryId)).thenReturn(Optional.of(library));
         when(showRepository.findIdsByLibraryId(libraryId)).thenReturn(List.of(showId1, showId2));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
         verify(messageSender, times(2)).sendAnalyzeData(captor.capture());
@@ -153,7 +153,7 @@ class AnalyzeDataHandleTest {
         when(libraryRepository.findById(libraryId)).thenReturn(Optional.of(library));
         when(movieRepository.findIdsByLibraryId(libraryId)).thenReturn(List.of(movieId1));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
         verify(messageSender).sendAnalyzeData(captor.capture());
@@ -177,7 +177,7 @@ class AnalyzeDataHandleTest {
         when(showRepository.findById(showId)).thenReturn(Optional.of(show));
         when(episodeRepository.findByShowEntityId(eq(showId), any(Sort.class))).thenReturn(List.of(ep1, ep2));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(messageSender).sendShowFound(any());
         ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
@@ -205,7 +205,7 @@ class AnalyzeDataHandleTest {
 
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(messageSender).sendEpisodeFound(any());
         ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
@@ -232,7 +232,7 @@ class AnalyzeDataHandleTest {
 
         when(movieRepository.findById(movieId)).thenReturn(Optional.of(movie));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(messageSender).sendMovieFound(any());
         ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
@@ -260,7 +260,7 @@ class AnalyzeDataHandleTest {
         when(libraryRepository.findById(libraryId)).thenReturn(Optional.of(library));
         when(artistRepository.findByLibraryEntityId(libraryId)).thenReturn(List.of(artist1, artist2));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
         verify(messageSender, times(2)).sendAnalyzeData(captor.capture());
@@ -293,7 +293,7 @@ class AnalyzeDataHandleTest {
         when(directoryRepository.findByLibraryEntityAndDirectoryType(library, DirectoryType.LIBRARY))
                 .thenReturn(List.of(dir));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(messageSender).sendArtistFound(any(), eq("disk1"));
         ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
@@ -325,7 +325,7 @@ class AnalyzeDataHandleTest {
         when(directoryRepository.findByLibraryEntityAndDirectoryType(library, DirectoryType.LIBRARY))
                 .thenReturn(List.of(dir));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(messageSender).sendAlbumFound(any(), eq("disk1"));
         ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
@@ -353,7 +353,7 @@ class AnalyzeDataHandleTest {
 
         when(trackRepository.findById(trackId)).thenReturn(Optional.of(track));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(messageSender).sendAudioFileFound(any(), eq("music-dir"));
     }
@@ -376,7 +376,7 @@ class AnalyzeDataHandleTest {
 
         when(trackRepository.findById(trackId)).thenReturn(Optional.of(track));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(messageSender, times(0)).sendAudioFileFound(any(), any());
     }

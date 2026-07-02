@@ -35,7 +35,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -102,7 +101,7 @@ class HandleAnalyzeDataDiskTest {
         when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
                 .thenReturn(List.of());
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(mediaFileStreamRepository).deleteAllByMediaFileEntityId(mediaFileId);
         verify(messageSender).sendMediaFileFound(any(), eq("shows"));
@@ -136,7 +135,7 @@ class HandleAnalyzeDataDiskTest {
         when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
                 .thenReturn(List.of());
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(mediaFileStreamRepository).deleteAllByMediaFileEntityId(mediaFileId);
         verify(messageSender).sendMediaFileFound(any(), eq("movies"));
@@ -171,7 +170,7 @@ class HandleAnalyzeDataDiskTest {
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
         when(otherPathFileRepository.findByMetadataEntity(metadata)).thenReturn(Optional.of(nfoFile));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(messageSender).sendNfoFileFound(any(), eq("shows"));
     }
@@ -201,7 +200,7 @@ class HandleAnalyzeDataDiskTest {
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
         when(otherPathFileRepository.findByMetadataEntity(metadata)).thenReturn(Optional.empty());
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(messageSender, never()).sendNfoFileFound(any(), any());
     }
@@ -240,7 +239,7 @@ class HandleAnalyzeDataDiskTest {
                 .thenReturn(List.of(stream));
         when(otherPathFileRepository.findByMediaFileStreamEntity(stream)).thenReturn(Optional.of(subtitleFile));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(messageSender).sendSubtitleFileFound(any(), eq("shows"));
     }
@@ -275,7 +274,7 @@ class HandleAnalyzeDataDiskTest {
                 .thenReturn(List.of(stream));
         when(otherPathFileRepository.findByMediaFileStreamEntity(stream)).thenReturn(Optional.empty());
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(messageSender, never()).sendSubtitleFileFound(any(), any());
     }
@@ -314,7 +313,7 @@ class HandleAnalyzeDataDiskTest {
         when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
                 .thenReturn(List.of());
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         org.junit.jupiter.api.Assertions.assertFalse(Files.exists(hlsDir));
     }
@@ -346,7 +345,7 @@ class HandleAnalyzeDataDiskTest {
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(mediaFileStreamRepository, never()).deleteAllByMediaFileEntityId(any());
     }

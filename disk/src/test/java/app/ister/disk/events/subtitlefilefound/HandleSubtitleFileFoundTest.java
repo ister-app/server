@@ -71,7 +71,7 @@ class HandleSubtitleFileFoundTest {
 
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
     }
 
     @Test
@@ -96,7 +96,7 @@ class HandleSubtitleFileFoundTest {
                 .thenReturn(episodeEntity);
         when(mediaFileStreamRepository.save(any())).thenReturn(MediaFileStreamEntity.builder().build());
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(mediaFileStreamRepository).save(any());
     }
@@ -131,7 +131,7 @@ class HandleSubtitleFileFoundTest {
         when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, subtitlePath))
                 .thenReturn(Optional.of(otherFile));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(otherPathFileRepository).save(otherFile);
         assertEquals(savedStream, otherFile.getMediaFileStreamEntity());

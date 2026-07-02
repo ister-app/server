@@ -30,7 +30,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -79,7 +78,7 @@ class HandleAlbumFoundTest {
 
         when(albumRepository.findById(albumId)).thenReturn(Optional.empty());
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
         verify(metadataRepository, never()).deleteAll(any());
     }
 
@@ -130,10 +129,10 @@ class HandleAlbumFoundTest {
         when(otherPathFileRepository.findByDirectoryEntityAndPath(dir, expectedNfoPath))
                 .thenReturn(Optional.of(nfoFile));
 
-        assertTrue(subject.handle(AlbumFoundData.builder()
+        subject.handle(AlbumFoundData.builder()
                 .eventType(EventType.ALBUM_FOUND)
                 .albumId(albumId)
-                .build()));
+                .build());
 
         verify(metadataRepository).deleteAll(List.of(meta));
         verify(messageSender).sendNfoFileFound(any(), anyString());
@@ -182,10 +181,10 @@ class HandleAlbumFoundTest {
         when(otherPathFileRepository.findByDirectoryEntityAndPath(dir, expectedNfoPath))
                 .thenReturn(Optional.empty());
 
-        assertTrue(subject.handle(AlbumFoundData.builder()
+        subject.handle(AlbumFoundData.builder()
                 .eventType(EventType.ALBUM_FOUND)
                 .albumId(albumId)
-                .build()));
+                .build());
 
         verify(messageSender, never()).sendNfoFileFound(any(), any());
     }
@@ -243,10 +242,10 @@ class HandleAlbumFoundTest {
         when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node))
                 .thenReturn(List.of(wrongLibDir, nullLibDir));
 
-        assertTrue(subject.handle(AlbumFoundData.builder()
+        subject.handle(AlbumFoundData.builder()
                 .eventType(EventType.ALBUM_FOUND)
                 .albumId(albumId)
-                .build()));
+                .build());
 
         verify(otherPathFileRepository, never()).findByDirectoryEntityAndPath(any(), any());
         verify(messageSender, never()).sendNfoFileFound(any(), any());

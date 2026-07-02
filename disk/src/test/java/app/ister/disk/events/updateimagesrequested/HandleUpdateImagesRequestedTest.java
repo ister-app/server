@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -59,7 +58,7 @@ class HandleUpdateImagesRequestedTest {
 
         when(imageRepository.findAll()).thenReturn(List.of(imageWithHash));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(imageRepository, never()).saveAll(any());
     }
@@ -75,7 +74,7 @@ class HandleUpdateImagesRequestedTest {
 
         when(imageRepository.findAll()).thenReturn(List.of(imageWithoutHash));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(imageRepository, never()).saveAll(any());
     }
@@ -105,7 +104,7 @@ class HandleUpdateImagesRequestedTest {
 
         when(imageRepository.findAll()).thenReturn(List.of(imageWithoutHash));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(imageRepository).saveAll(any());
         assertNotNull(imageWithoutHash.getBlurHash());
@@ -128,7 +127,7 @@ class HandleUpdateImagesRequestedTest {
 
         when(imageRepository.findAll()).thenReturn(List.of(withHash, withoutHash));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(imageRepository).saveAll(List.of(withoutHash));
     }

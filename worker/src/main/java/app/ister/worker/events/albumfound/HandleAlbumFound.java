@@ -46,7 +46,7 @@ public class HandleAlbumFound implements Handle<AlbumFoundData> {
     }
 
     @Override
-    public Boolean handle(AlbumFoundData data) {
+    public void handle(AlbumFoundData data) {
         albumRepository.findById(data.getAlbumId()).ifPresent(album -> {
             String artistName = album.getArtistEntity().getName();
             String albumName = album.getName();
@@ -92,6 +92,5 @@ public class HandleAlbumFound implements Handle<AlbumFoundData> {
                 });
             }
         });
-        return true;
     }
 }

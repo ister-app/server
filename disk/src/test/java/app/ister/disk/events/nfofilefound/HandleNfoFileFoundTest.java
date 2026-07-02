@@ -32,7 +32,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -79,7 +78,7 @@ class HandleNfoFileFoundTest {
 
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
     }
 
     @Test
@@ -96,7 +95,7 @@ class HandleNfoFileFoundTest {
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
         when(scannerHelperService.getOrCreateShow(library, "Show", 2024)).thenReturn(show);
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(scannerHelperService).getOrCreateShow(library, "Show", 2024);
     }
@@ -115,7 +114,7 @@ class HandleNfoFileFoundTest {
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
         when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 1, 1)).thenReturn(episode);
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(scannerHelperService).getOrCreateEpisode(library, "Show", 2024, 1, 1);
     }
@@ -141,7 +140,7 @@ class HandleNfoFileFoundTest {
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
         when(scannerHelperService.getOrCreateShow(library, "Show", 2024)).thenReturn(show);
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(metadataRepository).save(any(MetadataEntity.class));
     }
@@ -167,7 +166,7 @@ class HandleNfoFileFoundTest {
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
         when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 1, 1)).thenReturn(episode);
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(metadataRepository).save(any(MetadataEntity.class));
     }
@@ -186,7 +185,7 @@ class HandleNfoFileFoundTest {
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
         when(scannerHelperService.getOrCreateMovie(library, "Movie", 2024)).thenReturn(movie);
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(scannerHelperService).getOrCreateMovie(library, "Movie", 2024);
     }
@@ -210,7 +209,7 @@ class HandleNfoFileFoundTest {
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
         when(scannerHelperService.getOrCreateMovie(library, "Inception", 2010)).thenReturn(movie);
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(metadataRepository).save(any(MetadataEntity.class));
     }
@@ -229,7 +228,7 @@ class HandleNfoFileFoundTest {
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
         when(scannerHelperService.getOrCreateArtist(library, "The Beatles")).thenReturn(artist);
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
         verify(scannerHelperService).getOrCreateArtist(library, "The Beatles");
     }
 
@@ -254,7 +253,7 @@ class HandleNfoFileFoundTest {
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
         when(scannerHelperService.getOrCreateArtist(library, "The Beatles")).thenReturn(artist);
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
         verify(metadataRepository).save(any(MetadataEntity.class));
     }
 
@@ -274,7 +273,7 @@ class HandleNfoFileFoundTest {
         when(scannerHelperService.getOrCreateArtist(library, "The Beatles")).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Abbey Road", 1969)).thenReturn(album);
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
         verify(scannerHelperService).getOrCreateAlbum(library, artist, "Abbey Road", 1969);
     }
 
@@ -301,7 +300,7 @@ class HandleNfoFileFoundTest {
         when(scannerHelperService.getOrCreateArtist(library, "The Beatles")).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Abbey Road", 1969)).thenReturn(album);
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
         verify(metadataRepository).save(any(MetadataEntity.class));
     }
 
@@ -334,7 +333,7 @@ class HandleNfoFileFoundTest {
         when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, nfoFile.toString()))
                 .thenReturn(Optional.of(otherFile));
 
-        assertTrue(subject.handle(data));
+        subject.handle(data);
 
         verify(otherPathFileRepository).save(otherFile);
         assertEquals(savedMetadata, otherFile.getMetadataEntity());
