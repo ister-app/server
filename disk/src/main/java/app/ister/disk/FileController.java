@@ -54,17 +54,6 @@ public class FileController {
                 .body(resource);
     }
 
-    @GetMapping("/transcode/download/{id}/{fileName}")
-    public InputStreamResource downloadTranscode(@PathVariable UUID id, @PathVariable String fileName) throws IOException {
-        String filePath = Path.of(tmpDir, id.toString(), fileName).toString();
-        return new InputStreamResource(new FileInputStream(filePath)) {
-            @Override
-            public long contentLength() throws IOException {
-                return Files.size(Path.of(filePath));
-            }
-        };
-    }
-
     @GetMapping("/mediaFile/{id}/download")
     public InputStreamResource downloadMediaFile(@PathVariable UUID id) throws IOException {
         var mediaFileEntity = mediaFileRepository.findById(id).orElseThrow();
