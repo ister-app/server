@@ -1,9 +1,12 @@
 package app.ister.core.config;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.retry.MessageRecoverer;
 import org.springframework.amqp.rabbit.retry.RepublishMessageRecoverer;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -25,7 +28,16 @@ public class RabbitReliabilityConfig {
     }
 
     @Bean
-    public MessageRecoverer messageRecoverer(RabbitTemplate rabbitTemplate) {
-        return new RepublishMessageRecoverer(rabbitTemplate, "", DEAD_LETTER_QUEUE);
+    public MessageRecoverer messageRecoverer(RabbitTemplate rabbitTemplate, ObjectProvider<MeterRegistry> meterRegistry) {
+        RepublishMessageRecoverer republish = new RepublishMessageRecoverer(rabbitTemplate, "", DEAD_LETTER_QUEUE);
+        return (message, cause) -> {
+            meterRegistry.ifAvailable(registry -> Counter
+                    .builder("ister.events.dead.lettered")
+                    .description("Messages republished to the dead-letter queue after exhausted retries")
+                    .tag("queue", String.valueOf(message.getMessageProperties().getConsumerQueue()))
+                    .register(registry)
+                    .increment());
+            republish.recover(message, cause);
+        };
     }
 }
