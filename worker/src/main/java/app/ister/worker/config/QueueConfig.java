@@ -18,6 +18,9 @@ public class QueueConfig {
     JacksonJsonMessageConverter converter() {
         JacksonJsonMessageConverter converter = new JacksonJsonMessageConverter();
         converter.setNullAsOptionalEmpty(true);
+        // Only event DTOs may be resolved from the inbound __TypeId__ header; replaces the
+        // former global spring.amqp.deserialization.trust.all=true (deserialization gadget risk).
+        converter.getJavaTypeMapper().addTrustedPackages("app.ister.core.eventdata");
         return converter;
     }
 
