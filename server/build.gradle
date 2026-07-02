@@ -23,6 +23,16 @@ dependencies {
     // Monitoring
     implementation 'io.micrometer:micrometer-registry-prometheus'
 
+    // Testing: full-application integration tests against real PostgreSQL + RabbitMQ
+    // (skipped when no container runtime is available)
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-amqp'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
+    testImplementation 'org.testcontainers:testcontainers-rabbitmq'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
     // SpringDoc (commented out)
     // implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.0'
     // implementation 'org.springdoc:springdoc-openapi-starter-webflux-ui:3.0.0'
