@@ -10,7 +10,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server'
     implementation 'org.springframework.security:spring-security-oauth2-jose'
 
-    // Flyway
+    // Flyway. NB: since Spring Boot 4 the flyway auto-configuration lives in its own
+    // spring-boot-flyway module; without it spring.flyway.enabled=true does nothing.
+    implementation 'org.springframework.boot:spring-boot-flyway'
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-database-postgresql'
 
@@ -21,6 +23,13 @@ dependencies {
     // Testing
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // Integration testing against real PostgreSQL (skipped when no container runtime)
+    testImplementation 'org.springframework.boot:spring-boot-data-jpa-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
+    testRuntimeOnly 'org.postgresql:postgresql'
 }
 
 hibernate {
