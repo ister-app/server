@@ -11,7 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class NodeTokenManagerTest {
@@ -22,28 +22,38 @@ class NodeTokenManagerTest {
     @Mock
     private StreamTokenService streamTokenService;
 
-    @Test
-    void initStoresTokenFromService() {
-        UUID tokenId = UUID.randomUUID();
-        StreamTokenEntity tokenEntity = StreamTokenEntity.builder().token(tokenId).build();
-        when(streamTokenService.createNodeToken()).thenReturn(tokenEntity);
-
-        subject.init();
-
-        assertEquals(tokenId.toString(), subject.getToken());
+    private static StreamTokenEntity entity(UUID token) {
+        return StreamTokenEntity.builder().token(token).build();
     }
 
     @Test
-    void refreshUpdatesTokenFromService() {
-        UUID first = UUID.randomUUID();
-        UUID second = UUID.randomUUID();
-        StreamTokenEntity t1 = StreamTokenEntity.builder().token(first).build();
-        StreamTokenEntity t2 = StreamTokenEntity.builder().token(second).build();
-        when(streamTokenService.createNodeToken()).thenReturn(t1).thenReturn(t2);
+    void initStoresSeparateDownloadAndUploadTokens() {
+        UUID download = UUID.randomUUID();
+        UUID upload = UUID.randomUUID();
+        when(streamTokenService.createNodeDownloadToken()).thenReturn(entity(download));
+        when(streamTokenService.createNodeUploadToken()).thenReturn(entity(upload));
+
+        subject.init();
+
+        assertEquals(download.toString(), subject.getDownloadToken());
+        assertEquals(upload.toString(), subject.getUploadToken());
+    }
+
+    @Test
+    void refreshUpdatesTokensFromService() {
+        UUID firstDownload = UUID.randomUUID();
+        UUID secondDownload = UUID.randomUUID();
+        UUID firstUpload = UUID.randomUUID();
+        UUID secondUpload = UUID.randomUUID();
+        when(streamTokenService.createNodeDownloadToken())
+                .thenReturn(entity(firstDownload)).thenReturn(entity(secondDownload));
+        when(streamTokenService.createNodeUploadToken())
+                .thenReturn(entity(firstUpload)).thenReturn(entity(secondUpload));
 
         subject.init();
         subject.refresh();
 
-        assertEquals(second.toString(), subject.getToken());
+        assertEquals(secondDownload.toString(), subject.getDownloadToken());
+        assertEquals(secondUpload.toString(), subject.getUploadToken());
     }
 }

@@ -581,7 +581,7 @@ public class HlsService {
         }
         return mediaFile.getDirectoryEntity().getNodeEntity().getUrl()
                 + "/mediaFile/" + mediaFile.getId()
-                + "/download?token=" + nodeTokenManager.getToken();
+                + "/download?token=" + nodeTokenManager.getDownloadToken();
     }
 
     private void watchAndUpload(Path cacheDirPath, String prefix, String nodeUrl,

@@ -48,12 +48,25 @@ public class StreamTokenService {
         return validateStreamToken(tokenStr).map(StreamTokenEntity::getUserEntity);
     }
 
-    public StreamTokenEntity createNodeToken() {
+    /**
+     * Node tokens authenticate node-to-node traffic. Download and upload are issued as
+     * separate tokens so a leaked download token cannot be used to write files.
+     * {@code NodeTokenManager} refreshes them well before this TTL expires.
+     */
+    public StreamTokenEntity createNodeDownloadToken() {
+        return createNodeToken(true, false);
+    }
+
+    public StreamTokenEntity createNodeUploadToken() {
+        return createNodeToken(false, true);
+    }
+
+    private StreamTokenEntity createNodeToken(boolean download, boolean upload) {
         StreamTokenEntity entity = StreamTokenEntity.builder()
                 .token(UUID.randomUUID())
                 .expiresAt(Instant.now().plus(14, ChronoUnit.HOURS))
-                .download(true)
-                .upload(true)
+                .download(download)
+                .upload(upload)
                 .build();
         return streamTokenRepository.save(entity);
     }

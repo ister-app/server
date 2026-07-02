@@ -125,6 +125,31 @@ class StreamTokenServiceTest {
         verifyNoInteractions(streamTokenRepository);
     }
 
+    // ========== node tokens ==========
+
+    @Test
+    void createNodeDownloadTokenGrantsOnlyDownload() {
+        when(streamTokenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        StreamTokenEntity entity = subject.createNodeDownloadToken();
+
+        assertTrue(entity.isDownload());
+        assertFalse(entity.isUpload());
+        assertNull(entity.getUserEntity());
+        assertTrue(entity.getExpiresAt().isAfter(Instant.now()));
+    }
+
+    @Test
+    void createNodeUploadTokenGrantsOnlyUpload() {
+        when(streamTokenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        StreamTokenEntity entity = subject.createNodeUploadToken();
+
+        assertFalse(entity.isDownload());
+        assertTrue(entity.isUpload());
+        assertNull(entity.getUserEntity());
+    }
+
     // ========== deleteExpiredTokens ==========
 
     @Test

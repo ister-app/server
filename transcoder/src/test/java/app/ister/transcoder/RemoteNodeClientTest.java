@@ -38,7 +38,7 @@ class RemoteNodeClientTest {
     @Test
     void uploadFileSucceedsOnHttp200() throws Exception {
         NodeTokenManager tokenManager = mock(NodeTokenManager.class);
-        when(tokenManager.getToken()).thenReturn("test-token");
+        when(tokenManager.getUploadToken()).thenReturn("test-token");
 
         HttpClient httpClient = mock(HttpClient.class);
         doReturn(mockResponse(200)).when(httpClient).send(any(HttpRequest.class), any());
@@ -56,7 +56,7 @@ class RemoteNodeClientTest {
     @Test
     void uploadFileThrowsOnNon2xxStatus() throws Exception {
         NodeTokenManager tokenManager = mock(NodeTokenManager.class);
-        when(tokenManager.getToken()).thenReturn("test-token");
+        when(tokenManager.getUploadToken()).thenReturn("test-token");
 
         HttpClient httpClient = mock(HttpClient.class);
         doReturn(mockResponse(500)).when(httpClient).send(any(HttpRequest.class), any());
@@ -73,7 +73,7 @@ class RemoteNodeClientTest {
     @Test
     void uploadFileThrowsIOExceptionOnInterrupt() throws Exception {
         NodeTokenManager tokenManager = mock(NodeTokenManager.class);
-        when(tokenManager.getToken()).thenReturn("test-token");
+        when(tokenManager.getUploadToken()).thenReturn("test-token");
 
         HttpClient httpClient = mock(HttpClient.class);
         doThrow(new InterruptedException("interrupted")).when(httpClient).send(any(HttpRequest.class), any());

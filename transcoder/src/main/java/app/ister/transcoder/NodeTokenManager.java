@@ -11,19 +11,27 @@ import org.springframework.stereotype.Component;
 public class NodeTokenManager {
 
     private final StreamTokenService streamTokenService;
-    private volatile String currentToken;
+    private volatile String downloadToken;
+    private volatile String uploadToken;
 
     @PostConstruct
     public void init() {
-        currentToken = streamTokenService.createNodeToken().getToken().toString();
+        refresh();
     }
 
-    @Scheduled(fixedRate = 14 * 60 * 60 * 1000)
+    // Refresh well before the 14h token TTL so a request never races token expiry;
+    // the previous token stays valid for 2h after a refresh for in-flight transcodes.
+    @Scheduled(fixedRate = 12 * 60 * 60 * 1000)
     public void refresh() {
-        currentToken = streamTokenService.createNodeToken().getToken().toString();
+        downloadToken = streamTokenService.createNodeDownloadToken().getToken().toString();
+        uploadToken = streamTokenService.createNodeUploadToken().getToken().toString();
     }
 
-    public String getToken() {
-        return currentToken;
+    public String getDownloadToken() {
+        return downloadToken;
+    }
+
+    public String getUploadToken() {
+        return uploadToken;
     }
 }

@@ -1065,7 +1065,7 @@ class HlsServiceTest {
         ReflectionTestUtils.setField(remoteFile, "id", id);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(remoteFile));
-        when(nodeTokenManager.getToken()).thenReturn("node-token-123");
+        when(nodeTokenManager.getDownloadToken()).thenReturn("node-token-123");
         String remoteUrl = "http://remote:8080/mediaFile/" + id + "/download?token=node-token-123";
         when(ffprobeService.getKeyframes(remoteUrl)).thenReturn(List.of(0.0, 5.0));
         when(ffprobeService.getTotalDuration(remoteUrl)).thenReturn(10.0);
@@ -1250,7 +1250,7 @@ class HlsServiceTest {
         HlsTranscodeService mockTs = mock(HlsTranscodeService.class);
         ReflectionTestUtils.setField(hlsService, "transcodeService", mockTs);
         when(mockTs.getActiveFuture(passKey)).thenReturn(CompletableFuture.completedFuture(null));
-        when(nodeTokenManager.getToken()).thenReturn("test-token");
+        when(nodeTokenManager.getDownloadToken()).thenReturn("test-token");
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(remoteMediaFileEntity(id)));
 
         ExecutorService syncExecutor = Executors.newSingleThreadExecutor();
@@ -1277,7 +1277,7 @@ class HlsServiceTest {
         HlsTranscodeService mockTs = mock(HlsTranscodeService.class);
         ReflectionTestUtils.setField(hlsService, "transcodeService", mockTs);
         when(mockTs.getActiveFuture(passKey)).thenReturn(CompletableFuture.completedFuture(null));
-        when(nodeTokenManager.getToken()).thenReturn("test-token");
+        when(nodeTokenManager.getDownloadToken()).thenReturn("test-token");
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(remoteMediaFileEntity(id)));
 
         Path cacheDir = tempDir.resolve(id.toString());
@@ -1309,7 +1309,7 @@ class HlsServiceTest {
         HlsTranscodeService mockTs = mock(HlsTranscodeService.class);
         ReflectionTestUtils.setField(hlsService, "transcodeService", mockTs);
         when(mockTs.getActiveFuture(passKey)).thenReturn(CompletableFuture.completedFuture(null));
-        when(nodeTokenManager.getToken()).thenReturn("test-token");
+        when(nodeTokenManager.getDownloadToken()).thenReturn("test-token");
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(remoteMediaFileEntity(id)));
 
         Path cacheDir = tempDir.resolve(id.toString());
@@ -1560,7 +1560,7 @@ class HlsServiceTest {
         ReflectionTestUtils.setField(remoteFile, "id", id);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(remoteFile));
-        when(nodeTokenManager.getToken()).thenReturn("token");
+        when(nodeTokenManager.getDownloadToken()).thenReturn("token");
         String remoteUrl = "http://remote:8080/mediaFile/" + id + "/download?token=token";
         when(ffprobeService.getKeyframes(remoteUrl)).thenReturn(List.of(0.0, 5.0));
         when(ffprobeService.getTotalDuration(remoteUrl)).thenReturn(10.0);

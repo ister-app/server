@@ -29,7 +29,7 @@ public class RemoteNodeClient {
 
     public void uploadFile(String nodeUrl, UUID mediaFileId, Path file) throws IOException {
         String url = nodeUrl + "/transcode/upload/" + mediaFileId + "/"
-                + file.getFileName() + "?token=" + nodeTokenManager.getToken();
+                + file.getFileName() + "?token=" + nodeTokenManager.getUploadToken();
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .header("Content-Type", "application/octet-stream")
