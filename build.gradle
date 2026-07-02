@@ -13,7 +13,7 @@ sonar {
 		property "sonar.projectKey", "ister-app_server"
 		property "sonar.organization", "ister-app"
 		property "sonar.host.url", "https://sonarcloud.io"
-		property "sonar.coverage.exclusions", "**/tmdbapi/**,**/core/entity/**,**/core/enums/**,**/core/eventdata/**,**/config/**,**/server/**,**/disk/StartupTasks*,**/disk/FileController*"
+		property "sonar.coverage.exclusions", "**/tmdbapi/**,**/core/entity/**,**/core/enums/**,**/core/eventdata/**,**/config/**,**/server/**,**/disk/StartupTasks*"
 	}
 }
 
