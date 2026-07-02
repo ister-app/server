@@ -1,6 +1,7 @@
 package app.ister.transcoder;
 
 import app.ister.core.enums.SubtitleFormat;
+import app.ister.core.utils.SafeFilename;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
@@ -16,7 +17,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @RestController
@@ -28,17 +28,7 @@ public class HlsController {
     private static final String VTT_CONTENT_TYPE = "text/vtt;charset=utf-8";
     private static final String CACHE_CONTROL_2H = "public, max-age=7200";
 
-    /** Cache filenames are resolved against a disk directory, so restrict to a safe charset (no path separators or "..") . */
-    private static final Pattern SAFE_FILENAME = Pattern.compile("[a-zA-Z0-9._-]+");
-
     private final HlsService hlsService;
-
-    private static String requireSafeFilename(String filename) {
-        if (!SAFE_FILENAME.matcher(filename).matches() || filename.contains("..")) {
-            throw new IllegalArgumentException("Invalid filename: " + filename);
-        }
-        return filename;
-    }
 
     /**
      * @param direct    include the stream-copy (direct) quality variant (default: true)
@@ -64,7 +54,7 @@ public class HlsController {
             @PathVariable UUID mediaFileId,
             @PathVariable String streamFilename,
             @RequestParam(required = false) String token) throws IOException {
-        String content = hlsService.getStreamPlaylist(mediaFileId, requireSafeFilename(streamFilename));
+        String content = hlsService.getStreamPlaylist(mediaFileId, SafeFilename.require(streamFilename));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, M3U8_CONTENT_TYPE)
                 .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_2H)
@@ -75,7 +65,7 @@ public class HlsController {
     public ResponseEntity<InputStreamResource> getTsSegment(
             @PathVariable UUID mediaFileId,
             @PathVariable String segmentFilename) throws IOException {
-        requireSafeFilename(segmentFilename);
+        SafeFilename.require(segmentFilename);
         Path filePath;
         if (segmentFilename.startsWith("seg_video_")) {
             filePath = hlsService.getVideoSegment(mediaFileId, segmentFilename);
@@ -94,7 +84,7 @@ public class HlsController {
     public ResponseEntity<String> getVttSegment(
             @PathVariable UUID mediaFileId,
             @PathVariable String segmentFilename) throws IOException {
-        String content = hlsService.getSubtitleSegment(mediaFileId, requireSafeFilename(segmentFilename));
+        String content = hlsService.getSubtitleSegment(mediaFileId, SafeFilename.require(segmentFilename));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, VTT_CONTENT_TYPE)
                 .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_2H)
@@ -105,7 +95,7 @@ public class HlsController {
     public ResponseEntity<InputStreamResource> getSrtSubtitle(
             @PathVariable UUID mediaFileId,
             @PathVariable String filename) throws IOException {
-        Path filePath = hlsService.getSrtSubtitle(mediaFileId, requireSafeFilename(filename));
+        Path filePath = hlsService.getSrtSubtitle(mediaFileId, SafeFilename.require(filename));
         long size = Files.size(filePath);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, "application/x-subrip")

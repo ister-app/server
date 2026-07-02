@@ -2,6 +2,7 @@ package app.ister.disk;
 
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
+import app.ister.core.utils.SafeFilename;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -83,7 +84,7 @@ public class FileController {
         Path dir = Path.of(tmpDir, id.toString());
         Files.createDirectories(dir);
         try (InputStream in = request.getInputStream()) {
-            Files.copy(in, dir.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(in, dir.resolve(SafeFilename.require(fileName)), StandardCopyOption.REPLACE_EXISTING);
         }
         return ResponseEntity.ok().build();
     }
