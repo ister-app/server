@@ -14,14 +14,17 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.BatchMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Controller
@@ -57,9 +60,12 @@ public class ShowController {
                 .orElseGet(() -> showRepository.findAll(pageable));
     }
 
-    @SchemaMapping(typeName = "Show", field = "episodes")
-    public List<EpisodeEntity> episodes(ShowEntity showEntity) {
-        return episodeRepository.findByShowEntityId(showEntity.getId(), Sort.by("number").ascending());
+    @BatchMapping(typeName = "Show", field = "episodes")
+    public Map<ShowEntity, List<EpisodeEntity>> episodes(List<ShowEntity> shows) {
+        Map<UUID, List<EpisodeEntity>> byShowId = episodeRepository
+                .findByShowEntityIdIn(ids(shows), Sort.by("number").ascending()).stream()
+                .collect(Collectors.groupingBy(e -> e.getShowEntity().getId()));
+        return groupByParent(shows, byShowId);
     }
 
     @SchemaMapping(typeName = "Show", field = "seasons")
@@ -72,9 +78,19 @@ public class ShowController {
         return showEntity.getMetadataEntities();
     }
 
-    @SchemaMapping(typeName = "Show", field = "images")
-    public List<ImageEntity> images(ShowEntity showEntity) {
-        return imageRepository.findByShowEntityId(showEntity.getId());
+    @BatchMapping(typeName = "Show", field = "images")
+    public Map<ShowEntity, List<ImageEntity>> images(List<ShowEntity> shows) {
+        Map<UUID, List<ImageEntity>> byShowId = imageRepository.findByShowEntityIdIn(ids(shows)).stream()
+                .collect(Collectors.groupingBy(ImageEntity::getShowEntityId));
+        return groupByParent(shows, byShowId);
+    }
+
+    private static List<UUID> ids(List<ShowEntity> shows) {
+        return shows.stream().map(ShowEntity::getId).toList();
+    }
+
+    private static <T> Map<ShowEntity, List<T>> groupByParent(List<ShowEntity> shows, Map<UUID, List<T>> byShowId) {
+        return shows.stream().collect(Collectors.toMap(s -> s, s -> byShowId.getOrDefault(s.getId(), List.of())));
     }
 
     @SchemaMapping(typeName = "Image", field = "show")

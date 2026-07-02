@@ -44,3 +44,4 @@ db-data-1/
 ### Local files
 **/*-local.*
 gradle.properties
+.rabbitmq-erlang-cookie

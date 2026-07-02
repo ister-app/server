@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.CrudRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -24,4 +25,11 @@ public interface ImageRepository extends CrudRepository<ImageEntity, UUID> {
     List<ImageEntity> findByArtistEntityId(UUID artistEntityId);
 
     List<ImageEntity> findByAlbumEntityId(UUID albumEntityId);
+
+    // Batch variants (used by GraphQL @BatchMapping to avoid N+1)
+    List<ImageEntity> findByShowEntityIdIn(Collection<UUID> showEntityIds);
+
+    List<ImageEntity> findByArtistEntityIdIn(Collection<UUID> artistEntityIds);
+
+    List<ImageEntity> findByAlbumEntityIdIn(Collection<UUID> albumEntityIds);
 }

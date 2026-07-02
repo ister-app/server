@@ -19,6 +19,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -119,11 +120,12 @@ class AlbumControllerTest {
         AlbumEntity album = AlbumEntity.builder().build();
         org.springframework.test.util.ReflectionTestUtils.setField(album, "id", albumId);
         ImageEntity image = ImageEntity.builder().build();
-        when(imageRepository.findByAlbumEntityId(albumId)).thenReturn(List.of(image));
+        image.setAlbumEntity(album);
+        when(imageRepository.findByAlbumEntityIdIn(List.of(albumId))).thenReturn(List.of(image));
 
-        List<ImageEntity> result = subject.images(album);
+        Map<AlbumEntity, List<ImageEntity>> result = subject.images(List.of(album));
 
-        assertEquals(1, result.size());
+        assertEquals(1, result.get(album).size());
     }
 
     @Test

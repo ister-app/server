@@ -23,6 +23,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -147,12 +148,12 @@ class ShowControllerTest {
         UUID showId = UUID.randomUUID();
         ShowEntity show = ShowEntity.builder().name("Test").releaseYear(2020).build();
         show.setId(showId);
-        EpisodeEntity episode = EpisodeEntity.builder().number(1).build();
-        when(episodeRepository.findByShowEntityId(eq(showId), any(Sort.class))).thenReturn(List.of(episode));
+        EpisodeEntity episode = EpisodeEntity.builder().number(1).showEntity(show).build();
+        when(episodeRepository.findByShowEntityIdIn(eq(List.of(showId)), any(Sort.class))).thenReturn(List.of(episode));
 
-        List<EpisodeEntity> result = subject.episodes(show);
+        Map<ShowEntity, List<EpisodeEntity>> result = subject.episodes(List.of(show));
 
-        assertEquals(1, result.size());
+        assertEquals(1, result.get(show).size());
     }
 
     @Test
@@ -181,11 +182,12 @@ class ShowControllerTest {
         ShowEntity show = ShowEntity.builder().name("Test").releaseYear(2020).build();
         show.setId(showId);
         ImageEntity image = ImageEntity.builder().build();
-        when(imageRepository.findByShowEntityId(showId)).thenReturn(List.of(image));
+        image.setShowEntity(show);
+        when(imageRepository.findByShowEntityIdIn(List.of(showId))).thenReturn(List.of(image));
 
-        List<ImageEntity> result = subject.images(show);
+        Map<ShowEntity, List<ImageEntity>> result = subject.images(List.of(show));
 
-        assertEquals(1, result.size());
+        assertEquals(1, result.get(show).size());
     }
 
     @Test

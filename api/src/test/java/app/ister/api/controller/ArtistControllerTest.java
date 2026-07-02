@@ -20,6 +20,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -113,11 +114,12 @@ class ArtistControllerTest {
         ArtistEntity artist = ArtistEntity.builder().build();
         org.springframework.test.util.ReflectionTestUtils.setField(artist, "id", artistId);
         ImageEntity image = ImageEntity.builder().build();
-        when(imageRepository.findByArtistEntityId(artistId)).thenReturn(List.of(image));
+        image.setArtistEntity(artist);
+        when(imageRepository.findByArtistEntityIdIn(List.of(artistId))).thenReturn(List.of(image));
 
-        List<ImageEntity> result = subject.images(artist);
+        Map<ArtistEntity, List<ImageEntity>> result = subject.images(List.of(artist));
 
-        assertEquals(1, result.size());
+        assertEquals(1, result.get(artist).size());
     }
 
     @Test

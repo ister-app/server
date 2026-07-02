@@ -333,22 +333,7 @@ public class HlsService {
         String[] parts = segmentFilename.replace(".ts", "").split("_");
         String qualityLabel = parts[2];
         String passKey = mediaFileId + "_video_" + qualityLabel;
-        if (!transcodeService.isPassActive(passKey) && !transcodeService.hasCompletedPass(passKey)
-                && !transcodeService.hasFailedPass(passKey)) {
-            MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
-            String inputPath = resolveInputPath(mediaFile);
-            String directoryName = mediaFile.getDirectoryEntity().getName();
-            messageSender.sendTranscodePassRequested(
-                    TranscodePassRequestedData.builder()
-                            .eventType(EventType.TRANSCODE_PASS_REQUESTED)
-                            .mediaFileId(mediaFileId)
-                            .passKey(passKey)
-                            .mediaFilePath(inputPath)
-                            .passCategory(PASS_CATEGORY_VIDEO)
-                            .qualityLabel(qualityLabel)
-                            .build(),
-                    directoryName);
-        }
+        requestPassIfNeeded(mediaFileId, passKey, PASS_CATEGORY_VIDEO, qualityLabel, null);
         return transcodeService.waitForSegment(cacheFile, passKey);
     }
 
@@ -387,24 +372,35 @@ public class HlsService {
         int streamIdx = Integer.parseInt(parts[2]);
         String bitrateLabel = parts[3];
         String passKey = mediaFileId + "_audio_" + streamIdx + "_" + bitrateLabel;
-        if (!transcodeService.isPassActive(passKey) && !transcodeService.hasCompletedPass(passKey)
-                && !transcodeService.hasFailedPass(passKey)) {
-            MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
-            String inputPath = resolveInputPath(mediaFile);
-            String directoryName = mediaFile.getDirectoryEntity().getName();
-            messageSender.sendTranscodePassRequested(
-                    TranscodePassRequestedData.builder()
-                            .eventType(EventType.TRANSCODE_PASS_REQUESTED)
-                            .mediaFileId(mediaFileId)
-                            .passKey(passKey)
-                            .mediaFilePath(inputPath)
-                            .passCategory(PASS_CATEGORY_AUDIO)
-                            .qualityLabel(bitrateLabel)
-                            .audioStreamIndex(streamIdx)
-                            .build(),
-                    directoryName);
-        }
+        requestPassIfNeeded(mediaFileId, passKey, PASS_CATEGORY_AUDIO, bitrateLabel, streamIdx);
         return transcodeService.waitForSegment(cacheFile, passKey);
+    }
+
+    /**
+     * Sends a {@code TRANSCODE_PASS_REQUESTED} event for the given pass unless a pass with this
+     * key is already active, completed, or failed. The media file is only loaded when an event
+     * actually needs to be sent.
+     *
+     * @param audioStreamIndex audio stream index, or {@code null} for video passes
+     */
+    private void requestPassIfNeeded(UUID mediaFileId, String passKey, String passCategory,
+                                     String qualityLabel, Integer audioStreamIndex) {
+        if (transcodeService.isPassActive(passKey) || transcodeService.hasCompletedPass(passKey)
+                || transcodeService.hasFailedPass(passKey)) {
+            return;
+        }
+        MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
+        messageSender.sendTranscodePassRequested(
+                TranscodePassRequestedData.builder()
+                        .eventType(EventType.TRANSCODE_PASS_REQUESTED)
+                        .mediaFileId(mediaFileId)
+                        .passKey(passKey)
+                        .mediaFilePath(resolveInputPath(mediaFile))
+                        .passCategory(passCategory)
+                        .qualityLabel(qualityLabel)
+                        .audioStreamIndex(audioStreamIndex)
+                        .build(),
+                mediaFile.getDirectoryEntity().getName());
     }
 
     /**

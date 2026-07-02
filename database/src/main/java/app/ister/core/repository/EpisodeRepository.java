@@ -29,6 +29,9 @@ public interface EpisodeRepository extends JpaRepository<EpisodeEntity, UUID> {
 
     List<EpisodeEntity> findByShowEntityId(UUID season, Sort sort);
 
+    // Batch variant (used by GraphQL @BatchMapping to avoid N+1)
+    List<EpisodeEntity> findByShowEntityIdIn(java.util.Collection<UUID> showEntityIds, Sort sort);
+
     /**
      * Returns the IDs (UUID) of episodes that have no {@link MetadataEntity} linked to them.
      */

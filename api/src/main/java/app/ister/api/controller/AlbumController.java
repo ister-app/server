@@ -17,14 +17,17 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.BatchMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Controller
@@ -83,8 +86,11 @@ public class AlbumController {
         return albumEntity.getMetadataEntities();
     }
 
-    @SchemaMapping(typeName = "Album", field = "images")
-    public List<ImageEntity> images(AlbumEntity albumEntity) {
-        return imageRepository.findByAlbumEntityId(albumEntity.getId());
+    @BatchMapping(typeName = "Album", field = "images")
+    public Map<AlbumEntity, List<ImageEntity>> images(List<AlbumEntity> albums) {
+        List<UUID> ids = albums.stream().map(AlbumEntity::getId).toList();
+        Map<UUID, List<ImageEntity>> byAlbumId = imageRepository.findByAlbumEntityIdIn(ids).stream()
+                .collect(Collectors.groupingBy(ImageEntity::getAlbumEntityId));
+        return albums.stream().collect(Collectors.toMap(a -> a, a -> byAlbumId.getOrDefault(a.getId(), List.of())));
     }
 }
