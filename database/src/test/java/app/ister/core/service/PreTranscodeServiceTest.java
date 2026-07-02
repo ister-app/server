@@ -3,6 +3,7 @@ package app.ister.core.service;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.MediaFileStreamEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.enums.DirectoryType;
@@ -10,6 +11,7 @@ import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.UserRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -32,6 +34,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PreTranscodeServiceTest {
 
+    private static final int NEXT_EPISODE_RECENT_DAYS = 150;
+
     @InjectMocks
     private PreTranscodeService subject;
 
@@ -39,6 +43,11 @@ class PreTranscodeServiceTest {
     @Mock private WatchStatusRepository watchStatusRepository;
     @Mock private EpisodeRepository episodeRepository;
     @Mock private MovieRepository movieRepository;
+
+    @BeforeEach
+    void setUp() {
+        ReflectionTestUtils.setField(subject, "nextEpisodeRecentDays", NEXT_EPISODE_RECENT_DAYS);
+    }
 
     // ===== Episodes =====
 
@@ -55,13 +64,13 @@ class PreTranscodeServiceTest {
         when(watchStatusRepository.findRecentMovieIdsByUserId(userId)).thenReturn(List.of());
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
 
-        Set<UUID> result = subject.collectMediaFileIdsToPreTranscode("disk1");
+        Set<UUID> result = subject.collectMediaFilesToPreTranscode("disk1").mediaFileIds();
 
         assertTrue(result.contains(mediaFileId));
     }
 
     @Test
-    void nextEpisodeIncludedWhenWatchedWithinSevenDays() {
+    void nextEpisodeIncludedWhenWatchedWithinWindow() {
         UUID userId = UUID.randomUUID();
         UUID showId = UUID.randomUUID();
         UUID ep1Id = UUID.randomUUID();
@@ -73,20 +82,20 @@ class PreTranscodeServiceTest {
 
         when(userRepository.findAll()).thenReturn(List.of(user(userId)));
         when(watchStatusRepository.findRecentEpisodesWithDateByUserId(userId))
-                .thenReturn(rows(ep1Id, showId, daysAgo(1)));
+                .thenReturn(rows(ep1Id, showId, daysAgo(20)));
         when(watchStatusRepository.findRecentMovieIdsByUserId(userId)).thenReturn(List.of());
         when(episodeRepository.findById(ep1Id)).thenReturn(Optional.of(ep1));
         when(episodeRepository.findByShowEntityId(eq(showId), any(Sort.class)))
                 .thenReturn(List.of(ep1, ep2));
 
-        Set<UUID> result = subject.collectMediaFileIdsToPreTranscode("disk1");
+        Set<UUID> result = subject.collectMediaFilesToPreTranscode("disk1").mediaFileIds();
 
         assertTrue(result.contains(mf1Id), "last-watched episode should be included");
-        assertTrue(result.contains(mf2Id), "next episode should be included when watched within 7 days");
+        assertTrue(result.contains(mf2Id), "next episode should be included when watched within window");
     }
 
     @Test
-    void nextEpisodeNotIncludedWhenWatchedMoreThanSevenDaysAgo() {
+    void nextEpisodeNotIncludedWhenWatchedOutsideWindow() {
         UUID userId = UUID.randomUUID();
         UUID showId = UUID.randomUUID();
         UUID ep1Id = UUID.randomUUID();
@@ -100,15 +109,39 @@ class PreTranscodeServiceTest {
 
         when(userRepository.findAll()).thenReturn(List.of(user(userId)));
         when(watchStatusRepository.findRecentEpisodesWithDateByUserId(userId))
+                .thenReturn(rows(ep1Id, showId, daysAgo(NEXT_EPISODE_RECENT_DAYS + 1)));
+        when(watchStatusRepository.findRecentMovieIdsByUserId(userId)).thenReturn(List.of());
+        when(episodeRepository.findById(ep1Id)).thenReturn(Optional.of(ep1));
+
+        Set<UUID> result = subject.collectMediaFilesToPreTranscode("disk1").mediaFileIds();
+
+        assertTrue(result.contains(mf1Id), "last-watched episode should still be included");
+        assertFalse(result.contains(mf2Id), "next episode should NOT be included when watched outside window");
+        verify(episodeRepository, never()).findByShowEntityId(any(), any());
+    }
+
+    @Test
+    void nextEpisodeWindowIsConfigurable() {
+        ReflectionTestUtils.setField(subject, "nextEpisodeRecentDays", 7);
+        UUID userId = UUID.randomUUID();
+        UUID showId = UUID.randomUUID();
+        UUID ep1Id = UUID.randomUUID();
+        UUID mf1Id = UUID.randomUUID();
+        UUID mf2Id = UUID.randomUUID();
+        EpisodeEntity ep1 = episode(ep1Id, mediaFile(mf1Id, "disk1"));
+        EpisodeEntity ep2 = episode(UUID.randomUUID(), mediaFile(mf2Id, "disk1"));
+
+        lenient().when(episodeRepository.findByShowEntityId(any(), any())).thenReturn(List.of(ep1, ep2));
+
+        when(userRepository.findAll()).thenReturn(List.of(user(userId)));
+        when(watchStatusRepository.findRecentEpisodesWithDateByUserId(userId))
                 .thenReturn(rows(ep1Id, showId, daysAgo(8)));
         when(watchStatusRepository.findRecentMovieIdsByUserId(userId)).thenReturn(List.of());
         when(episodeRepository.findById(ep1Id)).thenReturn(Optional.of(ep1));
 
-        Set<UUID> result = subject.collectMediaFileIdsToPreTranscode("disk1");
+        Set<UUID> result = subject.collectMediaFilesToPreTranscode("disk1").mediaFileIds();
 
-        assertTrue(result.contains(mf1Id), "last-watched episode should still be included");
-        assertFalse(result.contains(mf2Id), "next episode should NOT be included when watched >7 days ago");
-        verify(episodeRepository, never()).findByShowEntityId(any(), any());
+        assertFalse(result.contains(mf2Id), "next episode should respect the configured window");
     }
 
     @Test
@@ -127,7 +160,7 @@ class PreTranscodeServiceTest {
         when(episodeRepository.findByShowEntityId(eq(showId), any(Sort.class)))
                 .thenReturn(List.of(ep));
 
-        Set<UUID> result = subject.collectMediaFileIdsToPreTranscode("disk1");
+        Set<UUID> result = subject.collectMediaFilesToPreTranscode("disk1").mediaFileIds();
 
         assertEquals(Set.of(mfId), result);
     }
@@ -147,7 +180,7 @@ class PreTranscodeServiceTest {
                 .thenReturn(List.of(movieId.toString()));
         when(movieRepository.findById(movieId)).thenReturn(Optional.of(movie));
 
-        Set<UUID> result = subject.collectMediaFileIdsToPreTranscode("disk1");
+        Set<UUID> result = subject.collectMediaFilesToPreTranscode("disk1").mediaFileIds();
 
         assertTrue(result.contains(mediaFileId));
     }
@@ -165,9 +198,36 @@ class PreTranscodeServiceTest {
                 .thenReturn(List.of(movieId.toString()));
         when(movieRepository.findById(movieId)).thenReturn(Optional.of(movie));
 
-        Set<UUID> result = subject.collectMediaFileIdsToPreTranscode("disk1");
+        Set<UUID> result = subject.collectMediaFilesToPreTranscode("disk1").mediaFileIds();
 
         assertFalse(result.contains(mediaFileId));
+    }
+
+    // ===== Unanalyzed media files =====
+
+    @Test
+    void unanalyzedMediaFileIsReportedSeparatelyAndNotQueued() {
+        UUID userId = UUID.randomUUID();
+        UUID episodeId = UUID.randomUUID();
+        UUID mediaFileId = UUID.randomUUID();
+        MediaFileEntity mf = mediaFileWithoutStreams(mediaFileId, "disk1");
+        EpisodeEntity episode = episode(episodeId, mf);
+
+        when(userRepository.findAll()).thenReturn(List.of(user(userId)));
+        when(watchStatusRepository.findRecentEpisodesWithDateByUserId(userId))
+                .thenReturn(rows(episodeId, UUID.randomUUID(), daysAgo(30)));
+        when(watchStatusRepository.findRecentMovieIdsByUserId(userId)).thenReturn(List.of());
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+
+        PreTranscodeService.PreTranscodeCollection result = subject.collectMediaFilesToPreTranscode("disk1");
+
+        assertFalse(result.mediaFileIds().contains(mediaFileId), "unanalyzed file should not be queued for transcode");
+        assertEquals(1, result.unanalyzedFiles().size());
+        PreTranscodeService.UnanalyzedMediaFile unanalyzed = result.unanalyzedFiles().iterator().next();
+        assertEquals(mediaFileId, unanalyzed.mediaFileId());
+        assertEquals(episodeId, unanalyzed.episodeId());
+        assertEquals(mf.getPath(), unanalyzed.path());
+        assertNull(unanalyzed.movieId());
     }
 
     // ===== Filtering & deduplication =====
@@ -186,7 +246,7 @@ class PreTranscodeServiceTest {
         when(watchStatusRepository.findRecentMovieIdsByUserId(userId)).thenReturn(List.of());
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(ep));
 
-        Set<UUID> result = subject.collectMediaFileIdsToPreTranscode("disk1");
+        Set<UUID> result = subject.collectMediaFilesToPreTranscode("disk1").mediaFileIds();
 
         assertTrue(result.contains(mfOnDisk1));
         assertFalse(result.contains(mfOnDisk2));
@@ -208,7 +268,7 @@ class PreTranscodeServiceTest {
         when(watchStatusRepository.findRecentMovieIdsByUserId(any())).thenReturn(List.of());
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(ep));
 
-        Set<UUID> result = subject.collectMediaFileIdsToPreTranscode("disk1");
+        Set<UUID> result = subject.collectMediaFilesToPreTranscode("disk1").mediaFileIds();
 
         assertEquals(1, result.size());
         assertTrue(result.contains(mediaFileId));
@@ -233,7 +293,7 @@ class PreTranscodeServiceTest {
         when(episodeRepository.findByShowEntityId(eq(showId), any(Sort.class)))
                 .thenReturn(List.of(ep1, ep2));
 
-        subject.collectMediaFileIdsToPreTranscode("disk1");
+        subject.collectMediaFilesToPreTranscode("disk1");
 
         // Show episodes fetched only once despite two users watching the same show
         verify(episodeRepository, times(1)).findByShowEntityId(eq(showId), any(Sort.class));
@@ -248,6 +308,12 @@ class PreTranscodeServiceTest {
     }
 
     private MediaFileEntity mediaFile(UUID id, String diskName) {
+        MediaFileEntity mf = mediaFileWithoutStreams(id, diskName);
+        ReflectionTestUtils.setField(mf, "mediaFileStreamEntity", List.of(new MediaFileStreamEntity()));
+        return mf;
+    }
+
+    private MediaFileEntity mediaFileWithoutStreams(UUID id, String diskName) {
         DirectoryEntity dir = DirectoryEntity.builder()
                 .name(diskName)
                 .path("/" + diskName)

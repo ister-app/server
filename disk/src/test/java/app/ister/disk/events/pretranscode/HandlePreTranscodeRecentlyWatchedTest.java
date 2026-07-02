@@ -1,10 +1,13 @@
 package app.ister.disk.events.pretranscode;
 
 import app.ister.core.enums.EventType;
+import app.ister.core.eventdata.MediaFileFoundData;
 import app.ister.core.eventdata.PreTranscodeRecentlyWatchedData;
 import app.ister.core.eventdata.TranscodeRequestedData;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.PreTranscodeService;
+import app.ister.core.service.PreTranscodeService.PreTranscodeCollection;
+import app.ister.core.service.PreTranscodeService.UnanalyzedMediaFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +27,9 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -47,6 +53,10 @@ class HandlePreTranscodeRecentlyWatchedTest {
         ReflectionTestUtils.setField(subject, "tmpDir", tempDir.toString());
     }
 
+    private static PreTranscodeCollection collection(Set<UUID> ids) {
+        return new PreTranscodeCollection(ids, Set.of());
+    }
+
     @Test
     void handles() {
         assertEquals(EventType.PRE_TRANSCODE_RECENTLY_WATCHED, subject.handles());
@@ -64,19 +74,18 @@ class HandlePreTranscodeRecentlyWatchedTest {
     void handleSendsTranscodeRequestForEachMediaFile() {
         UUID id1 = UUID.randomUUID();
         UUID id2 = UUID.randomUUID();
-        Set<UUID> ids = Set.of(id1, id2);
 
         PreTranscodeRecentlyWatchedData data = PreTranscodeRecentlyWatchedData.builder()
                 .eventType(EventType.PRE_TRANSCODE_RECENTLY_WATCHED)
                 .diskName("disk1")
                 .build();
 
-        when(preTranscodeService.collectMediaFileIdsToPreTranscode("disk1")).thenReturn(ids);
+        when(preTranscodeService.collectMediaFilesToPreTranscode("disk1")).thenReturn(collection(Set.of(id1, id2)));
 
         subject.handle(data);
 
         ArgumentCaptor<TranscodeRequestedData> captor = ArgumentCaptor.forClass(TranscodeRequestedData.class);
-        verify(messageSender, times(2)).sendTranscodeRequested(captor.capture(), org.mockito.ArgumentMatchers.eq("disk1"));
+        verify(messageSender, times(2)).sendTranscodeRequested(captor.capture(), eq("disk1"));
 
         List<TranscodeRequestedData> sent = captor.getAllValues();
         assertTrue(sent.stream().allMatch(d -> Boolean.TRUE.equals(d.getPreTranscode())));
@@ -87,14 +96,13 @@ class HandlePreTranscodeRecentlyWatchedTest {
     @Test
     void handleWritesKeepFile() throws IOException {
         UUID id1 = UUID.randomUUID();
-        Set<UUID> ids = Set.of(id1);
 
         PreTranscodeRecentlyWatchedData data = PreTranscodeRecentlyWatchedData.builder()
                 .eventType(EventType.PRE_TRANSCODE_RECENTLY_WATCHED)
                 .diskName("diskA")
                 .build();
 
-        when(preTranscodeService.collectMediaFileIdsToPreTranscode("diskA")).thenReturn(ids);
+        when(preTranscodeService.collectMediaFilesToPreTranscode("diskA")).thenReturn(collection(Set.of(id1)));
 
         subject.handle(data);
 
@@ -111,12 +119,58 @@ class HandlePreTranscodeRecentlyWatchedTest {
                 .diskName("diskB")
                 .build();
 
-        when(preTranscodeService.collectMediaFileIdsToPreTranscode("diskB")).thenReturn(Set.of());
+        when(preTranscodeService.collectMediaFilesToPreTranscode("diskB")).thenReturn(collection(Set.of()));
 
         subject.handle(data);
 
         Path keepFile = tempDir.resolve("pretranscode_keep_diskB.txt");
         assertTrue(Files.exists(keepFile));
         assertEquals("", Files.readString(keepFile));
+    }
+
+    @Test
+    void unanalyzedFileTriggersAnalysisInsteadOfTranscode() {
+        UUID mediaFileId = UUID.randomUUID();
+        UUID directoryId = UUID.randomUUID();
+        UUID episodeId = UUID.randomUUID();
+        UnanalyzedMediaFile unanalyzed = new UnanalyzedMediaFile(mediaFileId, directoryId, "/test/file.mkv", episodeId, null);
+
+        PreTranscodeRecentlyWatchedData data = PreTranscodeRecentlyWatchedData.builder()
+                .eventType(EventType.PRE_TRANSCODE_RECENTLY_WATCHED)
+                .diskName("disk1")
+                .build();
+
+        when(preTranscodeService.collectMediaFilesToPreTranscode("disk1"))
+                .thenReturn(new PreTranscodeCollection(Set.of(), Set.of(unanalyzed)));
+
+        subject.handle(data);
+
+        verify(messageSender, never()).sendTranscodeRequested(any(), any());
+        ArgumentCaptor<MediaFileFoundData> captor = ArgumentCaptor.forClass(MediaFileFoundData.class);
+        verify(messageSender).sendMediaFileFound(captor.capture(), eq("disk1"));
+        MediaFileFoundData sent = captor.getValue();
+        assertEquals(EventType.MEDIA_FILE_FOUND, sent.getEventType());
+        assertEquals(directoryId, sent.getDirectoryEntityUUID());
+        assertEquals(episodeId, sent.getEpisodeEntityUUID());
+        assertEquals("/test/file.mkv", sent.getPath());
+    }
+
+    @Test
+    void analysisForUnanalyzedFileIsOnlyRequestedOnce() {
+        UnanalyzedMediaFile unanalyzed = new UnanalyzedMediaFile(
+                UUID.randomUUID(), UUID.randomUUID(), "/test/file.mkv", UUID.randomUUID(), null);
+
+        PreTranscodeRecentlyWatchedData data = PreTranscodeRecentlyWatchedData.builder()
+                .eventType(EventType.PRE_TRANSCODE_RECENTLY_WATCHED)
+                .diskName("disk1")
+                .build();
+
+        when(preTranscodeService.collectMediaFilesToPreTranscode("disk1"))
+                .thenReturn(new PreTranscodeCollection(Set.of(), Set.of(unanalyzed)));
+
+        subject.handle(data);
+        subject.handle(data);
+
+        verify(messageSender, times(1)).sendMediaFileFound(any(), eq("disk1"));
     }
 }

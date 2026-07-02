@@ -155,6 +155,7 @@ flowchart TD
     A["PRE_TRANSCODE_RECENTLY_WATCHED\n.{diskName}"]
     A --> PA["HandlePreTranscodeRecentlyWatched\n📦 disk"]
     PA -->|"verzamelt recent bekeken\nbijwerken keep-bestand"| B
+    PA -->|"bestand zonder geanalyseerde\nstreams → her-analyse"| MFF["MEDIA_FILE_FOUND\n.{dirName}"]
 
     B["TRANSCODE_REQUESTED\n.{dirName}  preTranscode=true/false"]
     B --> PB["HandleTranscodeRequested\n📦 transcoder"]
@@ -262,7 +263,7 @@ graph LR
 | `HandleNfoFileFound` | disk | `NFO_FILE_FOUND` | — |
 | `HandleUpdateImagesRequested` | disk | `UPDATE_IMAGES_REQUESTED` | — |
 | `HandleAnalyzeDataDisk` | disk | `ANALYZE_DATA` | `MEDIA_FILE_FOUND` / `AUDIO_FILE_FOUND` / `NFO_FILE_FOUND` / `SUBTITLE_FILE_FOUND` |
-| `HandlePreTranscodeRecentlyWatched` | disk | `PRE_TRANSCODE_RECENTLY_WATCHED` | `TRANSCODE_REQUESTED` |
+| `HandlePreTranscodeRecentlyWatched` | disk | `PRE_TRANSCODE_RECENTLY_WATCHED` | `TRANSCODE_REQUESTED`, `MEDIA_FILE_FOUND` (voor bestanden zonder geanalyseerde streams) |
 | `HandleArtistFound` | disk | `ARTIST_FOUND` | `NFO_FILE_FOUND` |
 | `HandleAlbumFound` | disk | `ALBUM_FOUND` | `NFO_FILE_FOUND` |
 | `AnalyzeLibraryRequestedHandle` | worker | `ANALYZE_LIBRARY_REQUESTED` | `UPDATE_IMAGES_REQUESTED`, `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `ARTIST_FOUND`, `ALBUM_FOUND`, `AUDIO_FILE_FOUND` |

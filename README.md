@@ -57,6 +57,7 @@ Everything is env-overridable; the most important settings:
 | Node identity | `app.ister.server.name`, `app.ister.server.url`, `app.ister.cluster.name` | unique per node |
 | Libraries | `app.ister.disk.libraries[n].*`, `app.ister.disk.directories[n].*` | see `disk/src/main/resources/disk.properties` |
 | Transcoder | `app.ister.transcoder.hls.*` | hwaccel (`vaapi`/`nvdec`), concurrency, timeouts |
+| Pre-transcode | `app.ister.server.pretranscode.next-episode-recent-days` | how recently an episode must have been watched for the next episode to be pre-transcoded (default 150, the max the watch-history query looks back) |
 
 ## Multi-node
 
