@@ -1,5 +1,5 @@
 plugins {
-    id "com.gorylenko.gradle-git-properties" version "2.5.7"
+    id "com.gorylenko.gradle-git-properties" version "4.0.1"
 }
 
 dependencies {
