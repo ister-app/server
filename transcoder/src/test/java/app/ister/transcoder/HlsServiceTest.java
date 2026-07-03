@@ -35,6 +35,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -85,9 +86,9 @@ class HlsServiceTest {
     }
 
     private static final Stopper NOOP_STOPPER = new Stopper() {
-        @Override public void graceStop() {}
-        @Override public void forceStop() {}
-        @Override public void setProcess(Process process) {}
+        @Override public void graceStop() { /* no-op: test double never runs a real process */ }
+        @Override public void forceStop() { /* no-op: test double never runs a real process */ }
+        @Override public void setProcess(Process process) { /* no-op: test double never runs a real process */ }
     };
 
     private static FFmpegResultFuture completedFFmpegFuture() {
@@ -863,11 +864,9 @@ class HlsServiceTest {
         // The slot is released just after the pass future completes, so poll with a deadline.
         Semaphore slots = (Semaphore) ReflectionTestUtils.getField(transcodeService, "concurrentFileSlots");
         assertNotNull(slots);
-        long deadline = System.currentTimeMillis() + 5_000;
-        while (slots.availablePermits() < 1 && System.currentTimeMillis() < deadline) {
-            Thread.sleep(10);
-        }
-        assertEquals(1, slots.availablePermits(), "Slot should be released after all passes complete");
+        await().atMost(5, TimeUnit.SECONDS)
+                .untilAsserted(() -> assertEquals(1, slots.availablePermits(),
+                        "Slot should be released after all passes complete"));
     }
 
     @Test
@@ -1175,7 +1174,7 @@ class HlsServiceTest {
 
         // Write the segment after a short delay to simulate FFmpeg producing it externally
         CompletableFuture.delayedExecutor(200, TimeUnit.MILLISECONDS).execute(() -> {
-            try { Files.writeString(segFile, "segment-data"); } catch (IOException _) {}
+            try { Files.writeString(segFile, "segment-data"); } catch (IOException _) { /* test writer failure surfaces as a missing segment, asserted below */ }
         });
 
         // No pass is active — getVideoSegment must send TRANSCODE_PASS_REQUESTED
@@ -1202,7 +1201,7 @@ class HlsServiceTest {
         ReflectionTestUtils.setField(hlsService, "masterPlaylistTimeoutMs", 2000L);
 
         CompletableFuture.delayedExecutor(200, TimeUnit.MILLISECONDS).execute(() -> {
-            try { Files.writeString(cacheFile, masterContent); } catch (IOException _) {}
+            try { Files.writeString(cacheFile, masterContent); } catch (IOException _) { /* test writer failure surfaces as a missing segment, asserted below */ }
         });
 
         String result = hlsService.getMasterPlaylist(id, true, false, SubtitleFormat.WEBVTT);
@@ -1390,7 +1389,7 @@ class HlsServiceTest {
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
 
         CompletableFuture.delayedExecutor(200, TimeUnit.MILLISECONDS).execute(() -> {
-            try { Files.writeString(segFile, "audio-segment-data"); } catch (IOException _) {}
+            try { Files.writeString(segFile, "audio-segment-data"); } catch (IOException _) { /* test writer failure surfaces as a missing segment, asserted below */ }
         });
 
         Path result = hlsService.getAudioSegment(id, "seg_audio_1_192k_00000.ts");

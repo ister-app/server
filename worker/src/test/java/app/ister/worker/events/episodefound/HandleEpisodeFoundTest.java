@@ -101,8 +101,8 @@ class HandleEpisodeFoundTest {
 
         verify(metaDataSave, times(2)).save(result, null, null, episodeEntity);
         verify(imageDownloadService, times(2)).downloadAndSave(
-                eq("https://example.com/still.jpg"), eq(ImageType.BACKGROUND), eq("eng"),
-                eq("TMDB://https://example.com/still.jpg"), eq(new ImageSave.MediaEntityRef(null, null, episodeEntity, null, null)));
+                "https://example.com/still.jpg", ImageType.BACKGROUND, "eng",
+                "TMDB://https://example.com/still.jpg", new ImageSave.MediaEntityRef(null, null, episodeEntity, null, null));
     }
 
     @Test
@@ -152,8 +152,8 @@ class HandleEpisodeFoundTest {
         subject.handle(data);
 
         verify(imageDownloadService, times(2)).downloadAndSave(
-                eq("https://example.com/poster.jpg"), eq(ImageType.COVER), eq("eng"),
-                eq("TMDB://https://example.com/poster.jpg"), eq(new ImageSave.MediaEntityRef(null, null, episodeEntity, null, null)));
+                "https://example.com/poster.jpg", ImageType.COVER, "eng",
+                "TMDB://https://example.com/poster.jpg", new ImageSave.MediaEntityRef(null, null, episodeEntity, null, null));
     }
 
     @Test

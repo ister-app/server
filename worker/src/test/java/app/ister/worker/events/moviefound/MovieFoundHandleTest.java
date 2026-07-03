@@ -96,11 +96,11 @@ class MovieFoundHandleTest {
 
         verify(metaDataSave, times(2)).save(result, movieEntity, null, null);
         verify(imageDownloadService, times(2)).downloadAndSave(
-                eq("https://example.com/bg.jpg"), eq(ImageType.BACKGROUND), eq("eng"),
-                eq("TMDB://https://example.com/bg.jpg"), eq(new ImageSave.MediaEntityRef(movieEntity, null, null, null, null)));
+                "https://example.com/bg.jpg", ImageType.BACKGROUND, "eng",
+                "TMDB://https://example.com/bg.jpg", new ImageSave.MediaEntityRef(movieEntity, null, null, null, null));
         verify(imageDownloadService, times(2)).downloadAndSave(
-                eq("https://example.com/poster.jpg"), eq(ImageType.COVER), eq("eng"),
-                eq("TMDB://https://example.com/poster.jpg"), eq(new ImageSave.MediaEntityRef(movieEntity, null, null, null, null)));
+                "https://example.com/poster.jpg", ImageType.COVER, "eng",
+                "TMDB://https://example.com/poster.jpg", new ImageSave.MediaEntityRef(movieEntity, null, null, null, null));
     }
 
     @Test

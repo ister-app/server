@@ -24,26 +24,23 @@ public interface MediaFileStreamRepository extends JpaRepository<MediaFileStream
     @Query(value = "DELETE FROM media_file_stream_entity WHERE media_file_entity_id = :mediaFileEntityId", nativeQuery = true)
     void deleteAllByMediaFileEntityId(@Param("mediaFileEntityId") UUID mediaFileEntityId);
 
+    /** Bundles the columns of a single {@code media_file_stream_entity} row for {@link #upsert}. */
+    record StreamUpsert(String codecName, String codecType, int height, String language,
+                        UUID mediaFileEntityId, String path, int streamIndex, String title, int width) {
+    }
+
     @Modifying
     @Query(value = """
             INSERT INTO media_file_stream_entity
                 (id, codec_name, codec_type, date_created, date_updated, height, language,
                  media_file_entity_id, path, stream_index, title, width)
             VALUES
-                (gen_random_uuid(), :codecName, :codecType, now(), now(), :height, :language,
-                 :mediaFileEntityId, :path, :streamIndex, :title, :width)
+                (gen_random_uuid(), :#{#s.codecName}, :#{#s.codecType}, now(), now(), :#{#s.height}, :#{#s.language},
+                 :#{#s.mediaFileEntityId}, :#{#s.path}, :#{#s.streamIndex}, :#{#s.title}, :#{#s.width})
             ON CONFLICT (media_file_entity_id, stream_index, path) DO UPDATE SET
                 codec_name = EXCLUDED.codec_name,
                 codec_type = EXCLUDED.codec_type,
                 date_updated = now()
             """, nativeQuery = true)
-    void upsert(@Param("codecName") String codecName,
-                @Param("codecType") String codecType,
-                @Param("height") int height,
-                @Param("language") String language,
-                @Param("mediaFileEntityId") UUID mediaFileEntityId,
-                @Param("path") String path,
-                @Param("streamIndex") int streamIndex,
-                @Param("title") String title,
-                @Param("width") int width);
+    void upsert(@Param("s") StreamUpsert s);
 }

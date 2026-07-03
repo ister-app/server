@@ -19,8 +19,8 @@ public class NodeTokenManager {
         refresh();
     }
 
-    // Refresh well before the 14h token TTL so a request never races token expiry;
-    // the previous token stays valid for 2h after a refresh for in-flight transcodes.
+    // Refresh well before the 14h token TTL so a request never races token expiry.
+    // The previous token stays valid for 2h after a refresh, covering in-flight transcodes.
     @Scheduled(fixedRate = 12 * 60 * 60 * 1000)
     public void refresh() {
         downloadToken = streamTokenService.createNodeDownloadToken().getToken().toString();

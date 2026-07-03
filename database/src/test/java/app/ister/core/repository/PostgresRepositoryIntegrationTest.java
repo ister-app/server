@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Runs the Flyway migrations against a real PostgreSQL and exercises the repository
@@ -63,7 +63,9 @@ class PostgresRepositoryIntegrationTest {
     @Test
     void flywayMigrationsMatchEntityMappings() {
         // Context startup already ran Flyway V1..Vn and validated the JPA mappings
-        // against the migrated schema (ddl-auto=validate); nothing more to assert.
+        // against the migrated schema (ddl-auto=validate). Querying a migrated table
+        // proves the schema is reachable and the mapping resolves against it.
+        assertEquals(0, mediaFileStreamRepository.count());
     }
 
     @Test
@@ -99,7 +101,7 @@ class PostgresRepositoryIntegrationTest {
 
         assertEquals(1, result.size());
         assertEquals(episode.getId().toString(), String.valueOf(result.get(0)[0]));
-        assertTrue(result.get(0)[2] != null, "date_updated column should be returned");
+        assertNotNull(result.get(0)[2], "date_updated column should be returned");
     }
 
     @Test
@@ -118,10 +120,12 @@ class PostgresRepositoryIntegrationTest {
     void mediaFileStreamUpsertInsertsThenUpdatesOnConflict() {
         MediaFileEntity mediaFile = persistMediaFile("media/file.mkv");
 
-        mediaFileStreamRepository.upsert("h264", StreamCodecType.VIDEO.name(), 1080, "en",
-                mediaFile.getId(), "file.mkv", 0, "title", 1920);
-        mediaFileStreamRepository.upsert("hevc", StreamCodecType.VIDEO.name(), 1080, "en",
-                mediaFile.getId(), "file.mkv", 0, "title", 1920);
+        mediaFileStreamRepository.upsert(new MediaFileStreamRepository.StreamUpsert(
+                "h264", StreamCodecType.VIDEO.name(), 1080, "en",
+                mediaFile.getId(), "file.mkv", 0, "title", 1920));
+        mediaFileStreamRepository.upsert(new MediaFileStreamRepository.StreamUpsert(
+                "hevc", StreamCodecType.VIDEO.name(), 1080, "en",
+                mediaFile.getId(), "file.mkv", 0, "title", 1920));
 
         var streams = mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFile.getId(), StreamCodecType.VIDEO);
         assertEquals(1, streams.size(), "second upsert should update, not insert");
@@ -131,8 +135,9 @@ class PostgresRepositoryIntegrationTest {
     @Test
     void deleteAllByMediaFileEntityIdRemovesStreams() {
         MediaFileEntity mediaFile = persistMediaFile("media/other.mkv");
-        mediaFileStreamRepository.upsert("aac", StreamCodecType.AUDIO.name(), 0, "nl",
-                mediaFile.getId(), "other.mkv", 1, "audio", 0);
+        mediaFileStreamRepository.upsert(new MediaFileStreamRepository.StreamUpsert(
+                "aac", StreamCodecType.AUDIO.name(), 0, "nl",
+                mediaFile.getId(), "other.mkv", 1, "audio", 0));
 
         mediaFileStreamRepository.deleteAllByMediaFileEntityId(mediaFile.getId());
 

@@ -18,6 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.util.List;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.when;
@@ -54,7 +55,9 @@ class ShowControllerGraphQlTest {
         when(episodeRepository.findByShowEntityIdIn(anyCollection(), any(Sort.class))).thenReturn(List.of(episode));
         when(imageRepository.findByShowEntityIdIn(anyCollection())).thenReturn(List.of());
 
-        graphQlTester.document("""
+        // Each GraphQlTester path check throws AssertionError on mismatch, so a clean run
+        // asserts the schema wiring resolved the page and batched episodes/images correctly.
+        assertDoesNotThrow(() -> graphQlTester.document("""
                         { shows(size: 10) {
                             totalElements
                             content { name releaseYear episodes { number } images { id } }
@@ -64,17 +67,18 @@ class ShowControllerGraphQlTest {
                 .path("shows.totalElements").entity(Long.class).isEqualTo(1L)
                 .path("shows.content[0].name").entity(String.class).isEqualTo("Test show")
                 .path("shows.content[0].episodes[0].number").entity(Integer.class).isEqualTo(1)
-                .path("shows.content[0].images").entityList(Object.class).hasSize(0);
+                .path("shows.content[0].images").entityList(Object.class).hasSize(0));
     }
 
     @Test
     void showByIdReturnsNullWhenNotFound() {
         when(showRepository.findById(any(UUID.class))).thenReturn(java.util.Optional.empty());
 
-        graphQlTester.document("""
+        // valueIsNull() throws AssertionError if showById is not null, so a clean run is the assertion.
+        assertDoesNotThrow(() -> graphQlTester.document("""
                         { showById(id: "%s") { name } }
                         """.formatted(UUID.randomUUID()))
                 .execute()
-                .path("showById").valueIsNull();
+                .path("showById").valueIsNull());
     }
 }

@@ -34,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -79,6 +80,9 @@ class HandleNfoFileFoundTest {
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
 
         subject.handle(data);
+
+        // The NFO file does not exist on disk, so parsing yields nothing and no metadata is persisted.
+        verifyNoInteractions(metadataRepository, otherPathFileRepository);
     }
 
     @Test

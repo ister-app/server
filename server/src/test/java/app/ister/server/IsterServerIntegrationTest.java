@@ -63,7 +63,10 @@ class IsterServerIntegrationTest {
     @Test
     void contextLoadsWithRealDatabaseAndBroker() {
         // Full context: Flyway migrations applied, JPA mappings validated
-        // (ddl-auto=validate), all @RabbitListener containers started.
+        // (ddl-auto=validate), all @RabbitListener containers started. If any of that
+        // failed the context would not refresh; these beans being wired proves it did.
+        assertNotNull(messageSender);
+        assertNotNull(rabbitTemplate);
     }
 
     @Test

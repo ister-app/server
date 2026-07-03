@@ -24,7 +24,9 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.RETURNS_SELF;
@@ -57,9 +59,9 @@ class HlsTranscodeServiceTest {
 
     private static FFmpegResultFuture completedFFmpegFuture() {
         return new FFmpegResultFuture(CompletableFuture.completedFuture(null), new Stopper() {
-            @Override public void graceStop() {}
-            @Override public void forceStop() {}
-            @Override public void setProcess(Process process) {}
+            @Override public void graceStop() { /* no-op: test double never runs a real process */ }
+            @Override public void forceStop() { /* no-op: test double never runs a real process */ }
+            @Override public void setProcess(Process process) { /* no-op: test double never runs a real process */ }
         });
     }
 
@@ -238,7 +240,7 @@ class HlsTranscodeServiceTest {
     }
 
     @Test
-    void stableSegmentOrNullReturnsPathWhenFileSizeIsStable() throws IOException, InterruptedException {
+    void stableSegmentOrNullReturnsPathWhenFileSizeIsStable() throws IOException {
         ReflectionTestUtils.setField(service, "segmentStabilityMs", 20L);
         Path seg = tempDir.resolve("stable.ts");
         Files.writeString(seg, "video segment data");
@@ -246,9 +248,9 @@ class HlsTranscodeServiceTest {
         // Non-blocking contract: the first call only records the size sample and returns null
         assertNull(service.stableSegmentOrNull(seg));
 
-        Thread.sleep(30);
+        // Same size after >= segmentStabilityMs -> stable. Poll instead of sleeping on a fixed delay.
+        await().atMost(1, TimeUnit.SECONDS).until(() -> service.stableSegmentOrNull(seg) != null);
 
-        // Same size after >= segmentStabilityMs -> stable
         Path result = service.stableSegmentOrNull(seg);
         assertNotNull(result);
         assertEquals(seg, result);

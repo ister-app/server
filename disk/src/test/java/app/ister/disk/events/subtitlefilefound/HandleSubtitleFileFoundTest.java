@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -72,6 +73,9 @@ class HandleSubtitleFileFoundTest {
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
 
         subject.handle(data);
+
+        // A non-episode path must not touch the episode/stream/other-file collaborators.
+        verifyNoInteractions(scannerHelperService, mediaFileStreamRepository, otherPathFileRepository);
     }
 
     @Test

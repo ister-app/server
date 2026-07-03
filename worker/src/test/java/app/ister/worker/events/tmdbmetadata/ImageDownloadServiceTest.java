@@ -87,8 +87,9 @@ class ImageDownloadServiceTest {
         when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node))
                 .thenReturn(List.of());
 
+        ImageSave.MediaEntityRef ref = new ImageSave.MediaEntityRef(null, null, null, null, null);
         assertThrows(IllegalStateException.class, () ->
                 subject.downloadAndSave("http://example.com/img.jpg", ImageType.COVER, "nl",
-                        "TMDB://http://example.com/img.jpg", new ImageSave.MediaEntityRef(null, null, null, null, null)));
+                        "TMDB://http://example.com/img.jpg", ref));
     }
 }

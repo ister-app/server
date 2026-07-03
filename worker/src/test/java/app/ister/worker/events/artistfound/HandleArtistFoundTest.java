@@ -29,7 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -115,9 +114,9 @@ class HandleArtistFoundTest {
         assertEquals(artist, saved.getArtistEntity());
         assertEquals("musicbrainz://artist/Artist", saved.getSourceUri());
         verify(imageDownloadService).downloadAndSave(
-                eq(IMAGE_URL), eq(ImageType.COVER), eq("eng"),
-                eq("wikipedia://" + IMAGE_URL),
-                eq(new ImageSave.MediaEntityRef(null, null, null, artist, null)));
+                IMAGE_URL, ImageType.COVER, "eng",
+                "wikipedia://" + IMAGE_URL,
+                new ImageSave.MediaEntityRef(null, null, null, artist, null));
     }
 
     @Test
@@ -176,9 +175,9 @@ class HandleArtistFoundTest {
 
         verify(metadataRepository, never()).save(any());
         verify(imageDownloadService).downloadAndSave(
-                eq(IMAGE_URL), eq(ImageType.COVER), eq("eng"),
-                eq("wikipedia://" + IMAGE_URL),
-                eq(new ImageSave.MediaEntityRef(null, null, null, artist, null)));
+                IMAGE_URL, ImageType.COVER, "eng",
+                "wikipedia://" + IMAGE_URL,
+                new ImageSave.MediaEntityRef(null, null, null, artist, null));
     }
 
     @Test

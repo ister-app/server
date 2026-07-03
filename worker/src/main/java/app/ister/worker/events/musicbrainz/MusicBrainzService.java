@@ -17,6 +17,7 @@ public class MusicBrainzService {
     private static final String COVER_ART_BASE = "https://coverartarchive.org/release";
     private static final String WIKIPEDIA_API_BASE = "https://en.wikipedia.org/api/rest_v1/page/summary";
     private static final String USER_AGENT = "IsterServer/1.0 (info@ister.app)";
+    private static final String ARTIST_QUERY_PREFIX = "artist:";
 
     private final RestClient restClient;
 
@@ -34,7 +35,7 @@ public class MusicBrainzService {
     public Optional<String> getCoverArtUrl(String artistName, String albumName) {
         try {
             Thread.sleep(1000);
-            String query = "artist:" + encode(artistName) + " AND release:" + encode(albumName);
+            String query = ARTIST_QUERY_PREFIX + encode(artistName) + " AND release:" + encode(albumName);
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restClient.get()
                     .uri(MUSICBRAINZ_BASE + "/release?query={query}&fmt=json&limit=1", query)
@@ -70,7 +71,7 @@ public class MusicBrainzService {
     public Optional<ArtistInfo> getArtistInfo(String artistName) {
         try {
             Thread.sleep(1000);
-            String query = "artist:" + encode(artistName);
+            String query = ARTIST_QUERY_PREFIX + encode(artistName);
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restClient.get()
                     .uri(MUSICBRAINZ_BASE + "/artist?query={query}&fmt=json&limit=1&inc=annotation+url-rels+tags", query)
@@ -105,7 +106,7 @@ public class MusicBrainzService {
     public Optional<AlbumInfo> getAlbumInfo(String artistName, String albumName) {
         try {
             Thread.sleep(1000);
-            String query = "artist:" + encode(artistName) + " AND releasegroup:" + encode(albumName);
+            String query = ARTIST_QUERY_PREFIX + encode(artistName) + " AND releasegroup:" + encode(albumName);
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restClient.get()
                     .uri(MUSICBRAINZ_BASE + "/release-group?query={query}&fmt=json&limit=1&inc=annotation", query)
@@ -162,13 +163,7 @@ public class MusicBrainzService {
         if (!(relations instanceof List<?> relList)) return null;
 
         for (Object rel : relList) {
-            if (!(rel instanceof Map<?, ?> relMap)) continue;
-            Map<String, Object> relation = (Map<String, Object>) relMap;
-            String type = (String) relation.get("type");
-            if (!"wikipedia".equals(type)) continue;
-            Object urlObj = relation.get("url");
-            if (!(urlObj instanceof Map<?, ?> urlMap)) continue;
-            String resource = (String) ((Map<String, Object>) urlMap).get("resource");
+            String resource = wikipediaResource(rel);
             if (resource == null) continue;
 
             // Extract the page title from the Wikipedia URL
@@ -176,6 +171,16 @@ public class MusicBrainzService {
             return fetchWikipediaThumbnail(title);
         }
         return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String wikipediaResource(Object rel) {
+        if (!(rel instanceof Map<?, ?> relMap)) return null;
+        Map<String, Object> relation = (Map<String, Object>) relMap;
+        if (!"wikipedia".equals(relation.get("type"))) return null;
+        Object urlObj = relation.get("url");
+        if (!(urlObj instanceof Map<?, ?> urlMap)) return null;
+        return (String) ((Map<String, Object>) urlMap).get("resource");
     }
 
     private String fetchWikipediaThumbnail(String pageTitle) {

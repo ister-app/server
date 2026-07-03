@@ -598,7 +598,8 @@ public class HlsService {
                                  UUID mediaFileId, CompletableFuture<Void> passFuture) {
         Set<String> uploaded = new HashSet<>();
         long drainDeadline = -1;
-        while (!passFuture.isDone() || !allUploaded(cacheDirPath, prefix, uploaded)) {
+        boolean running = true;
+        while (running && (!passFuture.isDone() || !allUploaded(cacheDirPath, prefix, uploaded))) {
             if (passFuture.isDone()) {
                 // Pass finished but uploads are incomplete (e.g. peer unreachable): keep
                 // retrying for a bounded drain window instead of looping forever.
@@ -606,11 +607,11 @@ public class HlsService {
                     drainDeadline = System.currentTimeMillis() + uploadDrainTimeoutMs;
                 } else if (System.currentTimeMillis() > drainDeadline) {
                     log.warn("Giving up uploading remaining segments for {} after {} ms", cacheDirPath, uploadDrainTimeoutMs);
-                    break;
+                    running = false;
                 }
             }
-            if (!scanAndUploadBatch(cacheDirPath, prefix, nodeUrl, mediaFileId, uploaded)) {
-                break;
+            if (running && !scanAndUploadBatch(cacheDirPath, prefix, nodeUrl, mediaFileId, uploaded)) {
+                running = false;
             }
         }
     }

@@ -35,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Objects;
 import java.nio.file.Path;
@@ -47,6 +48,8 @@ import java.util.UUID;
 @Service
 @Transactional
 public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
+    private static final String FILE_URI_SCHEME = "file://";
+
     private final DirectoryRepository directoryRepository;
     private final MediaFileRepository mediaFileRepository;
     private final MediaFileStreamRepository mediaFileStreamRepository;
@@ -133,8 +136,9 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
             freshEntity.setDurationInMilliseconds(duration);
             mediaFileRepository.save(freshEntity);
             checkResult.streams().forEach(s -> mediaFileStreamRepository.upsert(
-                    s.getCodecName(), s.getCodecType().name(), s.getHeight(), s.getLanguage(),
-                    freshEntity.getId(), s.getPath(), s.getStreamIndex(), s.getTitle(), s.getWidth()));
+                    new MediaFileStreamRepository.StreamUpsert(
+                            s.getCodecName(), s.getCodecType().name(), s.getHeight(), s.getLanguage(),
+                            freshEntity.getId(), s.getPath(), s.getStreamIndex(), s.getTitle(), s.getWidth())));
 
             saveTrackMetadataFromTags(messageData.getTrackEntityUUID(), freshEntity);
             extractEmbeddedCoverArt(freshDirectory, freshEntity, checkResult.hasAttachedPic());
@@ -170,7 +174,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                     .released(extractReleaseDate(format))
                     .genre(extractGenreTag(format))
                     .trackEntity(track)
-                    .sourceUri("file://" + mediaFile.getPath())
+                    .sourceUri(FILE_URI_SCHEME + mediaFile.getPath())
                     .build());
         }
 
@@ -193,7 +197,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                 .released(released)
                 .genre(genre)
                 .albumEntity(album)
-                .sourceUri("file://" + mediaFile.getPath())
+                .sourceUri(FILE_URI_SCHEME + mediaFile.getPath())
                 .build());
     }
 
@@ -351,11 +355,17 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         if (tag == null) tag = format.getTag("YEAR");
         if (tag == null || tag.isBlank()) return null;
         tag = tag.strip();
-        try { return LocalDate.parse(tag); } catch (Exception _) {}
+        try {
+            return LocalDate.parse(tag);
+        } catch (Exception _) {
+            // Not a full ISO date; fall back to parsing just the year below.
+        }
         try {
             String year = tag.length() >= 4 ? tag.substring(0, 4) : tag;
-            return LocalDate.of(Integer.parseInt(year), 1, 1);
-        } catch (Exception _) {}
+            return LocalDate.of(Integer.parseInt(year), Month.JANUARY, 1);
+        } catch (Exception _) {
+            // Tag holds no parseable year; give up and return null.
+        }
         return null;
     }
 
@@ -402,7 +412,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                 .directoryEntityId(cacheDir.getId())
                 .path(outputPath.toString())
                 .imageType(ImageType.COVER)
-                .sourceUri("file://" + mediaFile.getPath())
+                .sourceUri(FILE_URI_SCHEME + mediaFile.getPath())
                 .albumEntityId(albumId)
                 .build(), cacheDir.getName());
     }

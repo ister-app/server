@@ -22,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,7 +32,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -112,9 +112,9 @@ class HandleAlbumFoundTest {
         subject.handle(data);
 
         verify(imageDownloadService).downloadAndSave(
-                eq(COVER_URL), eq(ImageType.COVER), eq("eng"),
-                eq("MusicBrainz://" + COVER_URL),
-                eq(new ImageSave.MediaEntityRef(null, null, null, null, album)));
+                COVER_URL, ImageType.COVER, "eng",
+                "MusicBrainz://" + COVER_URL,
+                new ImageSave.MediaEntityRef(null, null, null, null, album));
         ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
         verify(metadataRepository).save(captor.capture());
         MetadataEntity saved = captor.getValue();
@@ -171,7 +171,7 @@ class HandleAlbumFoundTest {
     void handleMergesDescriptionIntoExistingMetadataWithoutDescription() {
         MetadataEntity existing = MetadataEntity.builder()
                 .title("Album Title")
-                .released(LocalDate.of(2020, 1, 1))
+                .released(LocalDate.of(2020, Month.JANUARY, 1))
                 .genre("Rock")
                 .language("eng")
                 .sourceUri("tag://album")
@@ -190,7 +190,7 @@ class HandleAlbumFoundTest {
         MetadataEntity saved = captor.getValue();
         assertEquals("Album Title", saved.getTitle());
         assertEquals("New description", saved.getDescription());
-        assertEquals(LocalDate.of(2020, 1, 1), saved.getReleased());
+        assertEquals(LocalDate.of(2020, Month.JANUARY, 1), saved.getReleased());
         assertEquals("Rock", saved.getGenre());
         assertEquals("eng", saved.getLanguage());
         assertEquals("tag://album", saved.getSourceUri());

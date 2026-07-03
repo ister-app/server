@@ -221,7 +221,7 @@ public class HlsTranscodeService {
                 try {
                     passStarter.run();
                     future.complete(null);
-                } catch (Throwable t) {
+                } catch (Exception t) {
                     future.completeExceptionally(t);
                 } finally {
                     releaseTranscodeSlotIfDone(mediaFileId);
@@ -369,7 +369,7 @@ public class HlsTranscodeService {
         var future = ffmpeg.executeAsync();
         try {
             future.get(timeoutSeconds, java.util.concurrent.TimeUnit.SECONDS);
-        } catch (java.util.concurrent.TimeoutException e) {
+        } catch (java.util.concurrent.TimeoutException _) {
             future.forceStop();
             throw new IllegalStateException("FFmpeg timed out after " + timeoutSeconds + "s: " + what);
         } catch (java.util.concurrent.ExecutionException e) {
