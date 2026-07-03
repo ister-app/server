@@ -1,5 +1,5 @@
 plugins {
-    id 'org.openapi.generator' version '7.22.0'
+    id 'org.openapi.generator' version '7.23.0'
 }
 
 
@@ -47,6 +47,13 @@ openApiGenerate {
     apiPackage.set('app.ister.tmdbapi.api') // Package for API classes
     nameMappings.set(["_id": "underscoreId"])
 
+    // openapi-generator 7.23.0 reuses the first structurally-identical schema for
+    // inline response bodies, which renames e.g. searchMovie's response to
+    // AccountGetFavorites200Response. Keep stable per-operation inline model names.
+    inlineSchemaOptions.set([
+            SKIP_SCHEMA_REUSE: 'true'
+    ])
+
     configOptions.set([
             library: 'spring-cloud',
             delegatePattern: 'true',
@@ -65,7 +72,7 @@ openApiGenerate {
 sourceSets {
     main {
         java {
-            srcDirs += "${buildDir}/generated/src/main/java"
+            srcDirs += layout.buildDirectory.dir("generated/src/main/java").get().asFile
         }
     }
 }
