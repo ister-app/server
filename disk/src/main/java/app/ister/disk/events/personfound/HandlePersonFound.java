@@ -1,11 +1,11 @@
-package app.ister.disk.events.artistfound;
+package app.ister.disk.events.personfound;
 
 import app.ister.core.Handle;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
-import app.ister.core.eventdata.ArtistFoundData;
+import app.ister.core.eventdata.PersonFoundData;
 import app.ister.core.eventdata.NfoFileFoundData;
-import app.ister.core.repository.ArtistRepository;
+import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.OtherPathFileRepository;
@@ -21,9 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional
 @RequiredArgsConstructor
-public class HandleArtistFound implements Handle<ArtistFoundData> {
+public class HandlePersonFound implements Handle<PersonFoundData> {
 
-    private final ArtistRepository artistRepository;
+    private final PersonRepository personRepository;
     private final MetadataRepository metadataRepository;
     private final DirectoryRepository directoryRepository;
     private final OtherPathFileRepository otherPathFileRepository;
@@ -32,18 +32,18 @@ public class HandleArtistFound implements Handle<ArtistFoundData> {
 
     @Override
     public EventType handles() {
-        return EventType.ARTIST_FOUND;
+        return EventType.PERSON_FOUND;
     }
 
-    @RabbitListener(queues = "#{@diskQueueNamingConfig.getArtistFoundQueue()}")
+    @RabbitListener(queues = "#{@diskQueueNamingConfig.getPersonFoundQueue()}")
     @Override
-    public void listener(ArtistFoundData data) {
+    public void listener(PersonFoundData data) {
         Handle.super.listener(data);
     }
 
     @Override
-    public void handle(ArtistFoundData data) {
-        artistRepository.findById(data.getArtistId()).ifPresent(artist -> {
+    public void handle(PersonFoundData data) {
+        personRepository.findById(data.getPersonId()).ifPresent(artist -> {
             metadataRepository.deleteAll(artist.getMetadataEntities());
 
             var node = nodeService.getOrCreateNodeEntityForThisNode();

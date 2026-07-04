@@ -33,7 +33,7 @@ public class DiskQueueConfig {
         );
         String cacheDirName = nodeName + "-cache-directory";
         List<Queue> nodeQueues = List.of(
-                new Queue(APP_ISTER_SERVER_ARTIST_FOUND + "." + nodeName),
+                new Queue(APP_ISTER_SERVER_PERSON_FOUND + "." + nodeName),
                 new Queue(APP_ISTER_SERVER_ALBUM_FOUND + "." + nodeName)
         );
         return new Declarables(

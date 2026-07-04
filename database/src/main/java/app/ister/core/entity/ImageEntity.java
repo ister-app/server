@@ -85,15 +85,15 @@ public class ImageEntity extends FileFromPathEntity {
 
     @Getter(onMethod = @__(@JsonBackReference))
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "artist_entity_id", referencedColumnName = "id", insertable = false, updatable = false)
-    private ArtistEntity artistEntity;
+    @JoinColumn(name = "person_entity_id", referencedColumnName = "id", insertable = false, updatable = false)
+    private PersonEntity personEntity;
 
-    @Column(name = "artist_entity_id")
-    private UUID artistEntityId;
+    @Column(name = "person_entity_id")
+    private UUID personEntityId;
 
-    public void setArtistEntity(ArtistEntity artistEntity) {
-        this.artistEntity = artistEntity;
-        this.artistEntityId = (artistEntity != null) ? artistEntity.getId() : null;
+    public void setPersonEntity(PersonEntity personEntity) {
+        this.personEntity = personEntity;
+        this.personEntityId = (personEntity != null) ? personEntity.getId() : null;
     }
 
     @Getter(onMethod = @__(@JsonBackReference))

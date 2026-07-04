@@ -94,12 +94,12 @@ public class MessageSender {
         send(APP_ISTER_SERVER_PRE_TRANSCODE_RECENTLY_WATCHED, diskName, data);
     }
 
-    public void sendArtistFound(ArtistFoundData artistFoundData) {
-        send(APP_ISTER_SERVER_ARTIST_FOUND, artistFoundData);
+    public void sendPersonFound(PersonFoundData personFoundData) {
+        send(APP_ISTER_SERVER_PERSON_FOUND, personFoundData);
     }
 
-    public void sendArtistFound(ArtistFoundData artistFoundData, String nodeName) {
-        send(APP_ISTER_SERVER_ARTIST_FOUND, nodeName, artistFoundData);
+    public void sendPersonFound(PersonFoundData personFoundData, String nodeName) {
+        send(APP_ISTER_SERVER_PERSON_FOUND, nodeName, personFoundData);
     }
 
     public void sendAlbumFound(AlbumFoundData albumFoundData) {

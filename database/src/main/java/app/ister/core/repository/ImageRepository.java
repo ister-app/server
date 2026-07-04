@@ -22,14 +22,14 @@ public interface ImageRepository extends CrudRepository<ImageEntity, UUID> {
 
     List<ImageEntity> findByShowEntityId(UUID showEntityId);
 
-    List<ImageEntity> findByArtistEntityId(UUID artistEntityId);
+    List<ImageEntity> findByPersonEntityId(UUID personEntityId);
 
     List<ImageEntity> findByAlbumEntityId(UUID albumEntityId);
 
     // Batch variants (used by GraphQL @BatchMapping to avoid N+1)
     List<ImageEntity> findByShowEntityIdIn(Collection<UUID> showEntityIds);
 
-    List<ImageEntity> findByArtistEntityIdIn(Collection<UUID> artistEntityIds);
+    List<ImageEntity> findByPersonEntityIdIn(Collection<UUID> personEntityIds);
 
     List<ImageEntity> findByAlbumEntityIdIn(Collection<UUID> albumEntityIds);
 }

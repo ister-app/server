@@ -12,6 +12,6 @@ import java.util.UUID;
 @Getter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
-public class ArtistFoundData extends MessageData {
-    private UUID artistId;
+public class PersonFoundData extends MessageData {
+    private UUID personId;
 }

@@ -136,17 +136,17 @@ class MessageSenderTest {
     }
 
     @Test
-    void sendArtistFoundWithoutNode() {
-        ArtistFoundData data = ArtistFoundData.builder().build();
-        subject.sendArtistFound(data);
-        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_ARTIST_FOUND, data);
+    void sendPersonFoundWithoutNode() {
+        PersonFoundData data = PersonFoundData.builder().build();
+        subject.sendPersonFound(data);
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_PERSON_FOUND, data);
     }
 
     @Test
-    void sendArtistFoundWithNode() {
-        ArtistFoundData data = ArtistFoundData.builder().build();
-        subject.sendArtistFound(data, "node1");
-        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_ARTIST_FOUND + ".node1", data);
+    void sendPersonFoundWithNode() {
+        PersonFoundData data = PersonFoundData.builder().build();
+        subject.sendPersonFound(data, "node1");
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_PERSON_FOUND + ".node1", data);
     }
 
     @Test

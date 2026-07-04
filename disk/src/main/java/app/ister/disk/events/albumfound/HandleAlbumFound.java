@@ -55,7 +55,7 @@ public class HandleAlbumFound implements Handle<AlbumFoundData> {
                     .filter(dir -> dir.getLibraryEntity() != null &&
                             dir.getLibraryEntity().getId().equals(album.getLibraryEntity().getId()))
                     .forEach(dir -> {
-                        String nfoPath = java.nio.file.Path.of(dir.getPath(), album.getArtistEntity().getName(), albumDir, "album.nfo").toString();
+                        String nfoPath = java.nio.file.Path.of(dir.getPath(), album.getPersonEntity().getName(), albumDir, "album.nfo").toString();
                         otherPathFileRepository.findByDirectoryEntityAndPath(dir, nfoPath)
                                 .ifPresent(nfo -> messageSender.sendNfoFileFound(
                                         NfoFileFoundData.builder()

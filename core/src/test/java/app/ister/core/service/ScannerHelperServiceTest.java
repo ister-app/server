@@ -28,7 +28,7 @@ class ScannerHelperServiceTest {
     @Mock
     private EpisodeRepository episodeRepository;
     @Mock
-    private ArtistRepository artistRepository;
+    private PersonRepository personRepository;
     @Mock
     private AlbumRepository albumRepository;
     @Mock
@@ -149,33 +149,49 @@ class ScannerHelperServiceTest {
     }
 
     @Test
-    void getOrCreateArtistReturnsExistingArtist() {
-        ArtistEntity existing = ArtistEntity.builder().name("The Beatles").build();
-        when(artistRepository.findByLibraryEntityAndName(library, "The Beatles"))
+    void getOrCreatePersonReturnsExistingArtist() {
+        PersonEntity existing = PersonEntity.builder().name("The Beatles").build();
+        when(personRepository.findByLibraryEntityAndName(library, "The Beatles"))
                 .thenReturn(Optional.of(existing));
 
-        assertEquals(existing, subject.getOrCreateArtist(library, "The Beatles"));
-        verify(artistRepository, never()).save(any());
-        verify(serverEventService, never()).createArtistFoundEvent(any());
+        assertEquals(existing, subject.getOrCreatePerson(library, "The Beatles"));
+        verify(personRepository, never()).save(any());
+        verify(serverEventService, never()).createPersonFoundEvent(any());
     }
 
     @Test
-    void getOrCreateArtistCreatesNewArtist() {
-        when(artistRepository.findByLibraryEntityAndName(library, "The Beatles"))
+    void getOrCreatePersonCreatesNewArtist() {
+        when(personRepository.findByLibraryEntityAndName(library, "The Beatles"))
                 .thenReturn(Optional.empty());
 
-        ArtistEntity result = subject.getOrCreateArtist(library, "The Beatles");
+        PersonEntity result = subject.getOrCreatePerson(library, "The Beatles");
 
         assertEquals("The Beatles", result.getName());
-        verify(artistRepository).save(result);
-        verify(serverEventService).createArtistFoundEvent(result.getId());
+        verify(personRepository).save(result);
+        verify(serverEventService).createPersonFoundEvent(result.getId());
+    }
+
+    @Test
+    void getOrCreatePersonClaimsLibrarylessTmdbPerson() {
+        PersonEntity actor = PersonEntity.builder().name("Lady Gaga").tmdbId(90633L).build();
+        when(personRepository.findByLibraryEntityAndName(library, "Lady Gaga"))
+                .thenReturn(Optional.empty());
+        when(personRepository.findFirstByNameAndLibraryEntityIsNull("Lady Gaga"))
+                .thenReturn(Optional.of(actor));
+
+        PersonEntity result = subject.getOrCreatePerson(library, "Lady Gaga");
+
+        assertEquals(actor, result);
+        assertEquals(library, result.getLibraryEntity());
+        verify(personRepository).save(actor);
+        verify(serverEventService).createPersonFoundEvent(actor.getId());
     }
 
     @Test
     void getOrCreateAlbumReturnsExistingAlbum() {
-        ArtistEntity artist = ArtistEntity.builder().name("The Beatles").build();
+        PersonEntity artist = PersonEntity.builder().name("The Beatles").build();
         AlbumEntity existing = AlbumEntity.builder().name("Abbey Road").releaseYear(1969).build();
-        when(albumRepository.findByArtistEntityAndNameAndReleaseYear(artist, "Abbey Road", 1969))
+        when(albumRepository.findByPersonEntityAndNameAndReleaseYear(artist, "Abbey Road", 1969))
                 .thenReturn(Optional.of(existing));
 
         assertEquals(existing, subject.getOrCreateAlbum(library, artist, "Abbey Road", 1969));
@@ -185,8 +201,8 @@ class ScannerHelperServiceTest {
 
     @Test
     void getOrCreateAlbumCreatesNewAlbum() {
-        ArtistEntity artist = ArtistEntity.builder().name("The Beatles").build();
-        when(albumRepository.findByArtistEntityAndNameAndReleaseYear(artist, "Abbey Road", 1969))
+        PersonEntity artist = PersonEntity.builder().name("The Beatles").build();
+        when(albumRepository.findByPersonEntityAndNameAndReleaseYear(artist, "Abbey Road", 1969))
                 .thenReturn(Optional.empty());
 
         AlbumEntity result = subject.getOrCreateAlbum(library, artist, "Abbey Road", 1969);
@@ -199,7 +215,7 @@ class ScannerHelperServiceTest {
 
     @Test
     void getOrCreateTrackReturnsExistingTrack() {
-        ArtistEntity artist = ArtistEntity.builder().build();
+        PersonEntity artist = PersonEntity.builder().build();
         AlbumEntity album = AlbumEntity.builder().build();
         TrackEntity existing = TrackEntity.builder().number(1).discNumber(1).build();
         when(trackRepository.findByAlbumEntityAndNumberAndDiscNumber(album, 1, 1))
@@ -212,7 +228,7 @@ class ScannerHelperServiceTest {
 
     @Test
     void getOrCreateTrackCreatesNewTrack() {
-        ArtistEntity artist = ArtistEntity.builder().build();
+        PersonEntity artist = PersonEntity.builder().build();
         AlbumEntity album = AlbumEntity.builder().build();
         when(trackRepository.findByAlbumEntityAndNumberAndDiscNumber(album, 1, 1))
                 .thenReturn(Optional.empty());

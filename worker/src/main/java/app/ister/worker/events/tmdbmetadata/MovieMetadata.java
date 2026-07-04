@@ -43,6 +43,7 @@ public class MovieMetadata {
                     .title(movieDb.getTitle())
                     .released(LocalDate.parse(movieDb.getReleaseDate()))
                     .sourceUri("TMDB://" + movieDb.getId())
+                    .tmdbId(movieDb.getId())
                     .description(movieDb.getOverview().trim().isEmpty() ? null : movieDb.getOverview())
                     .posterUrl(movieDb.getPosterPath() == null ? null : "https://image.tmdb.org/t/p/original" + movieDb.getPosterPath())
                     .backgroundUrl(movieDb.getBackdropPath() == null ? null : "https://image.tmdb.org/t/p/original" + movieDb.getBackdropPath())

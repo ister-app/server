@@ -9,7 +9,7 @@ import app.ister.core.enums.EventType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.AlbumFoundData;
 import app.ister.core.eventdata.AnalyzeData;
-import app.ister.core.eventdata.ArtistFoundData;
+import app.ister.core.eventdata.PersonFoundData;
 import app.ister.core.eventdata.AudioFileFoundData;
 import app.ister.core.eventdata.EpisodeFoundData;
 import app.ister.core.eventdata.MovieFoundData;
@@ -35,7 +35,7 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
     private final MovieRepository movieRepository;
     private final ShowRepository showRepository;
     private final LibraryRepository libraryRepository;
-    private final ArtistRepository artistRepository;
+    private final PersonRepository personRepository;
     private final AlbumRepository albumRepository;
     private final TrackRepository trackRepository;
     private final DirectoryRepository directoryRepository;
@@ -57,8 +57,8 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
 
     @Override
     public void handle(AnalyzeData data) {
-        if (data.getArtistId() != null) {
-            handleArtist(data);
+        if (data.getPersonId() != null) {
+            handlePerson(data);
         } else if (data.getAlbumId() != null) {
             handleAlbum(data);
         } else if (data.getTrackId() != null) {
@@ -88,16 +88,16 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
         }
     }
 
-    private void handleArtist(AnalyzeData data) {
-        artistRepository.findById(data.getArtistId()).ifPresent(artist -> {
+    private void handlePerson(AnalyzeData data) {
+        personRepository.findById(data.getPersonId()).ifPresent(artist -> {
             metadataRepository.deleteAll(artist.getMetadataEntities());
             imageRepository.deleteAll(artist.getImageEntities());
             directoryRepository.findByLibraryEntityAndDirectoryType(artist.getLibraryEntity(), DirectoryType.LIBRARY)
                     .stream()
                     .map(dir -> dir.getNodeEntity().getName())
                     .distinct()
-                    .forEach(nodeName -> messageSender.sendArtistFound(
-                            ArtistFoundData.builder().eventType(EventType.ARTIST_FOUND).artistId(data.getArtistId()).build(),
+                    .forEach(nodeName -> messageSender.sendPersonFound(
+                            PersonFoundData.builder().eventType(EventType.PERSON_FOUND).personId(data.getPersonId()).build(),
                             nodeName));
             artist.getAlbumEntities().forEach(album -> messageSender.sendAnalyzeData(
                     AnalyzeData.builder().eventType(EventType.ANALYZE_DATA).albumId(album.getId()).build()));
@@ -142,11 +142,11 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
                                     .showId(showId)
                                     .build()));
         } else if (library.getLibraryType() == LibraryType.MUSIC) {
-            artistRepository.findByLibraryEntityId(data.getLibraryId())
+            personRepository.findByLibraryEntityId(data.getLibraryId())
                     .forEach(artist -> messageSender.sendAnalyzeData(
                             AnalyzeData.builder()
                                     .eventType(EventType.ANALYZE_DATA)
-                                    .artistId(artist.getId())
+                                    .personId(artist.getId())
                                     .build()));
         } else {
             movieRepository.findIdsByLibraryId(data.getLibraryId())

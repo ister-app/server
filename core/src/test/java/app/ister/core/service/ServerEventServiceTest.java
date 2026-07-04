@@ -1,7 +1,7 @@
 package app.ister.core.service;
 
 import app.ister.core.eventdata.AlbumFoundData;
-import app.ister.core.eventdata.ArtistFoundData;
+import app.ister.core.eventdata.PersonFoundData;
 import app.ister.core.eventdata.EpisodeFoundData;
 import app.ister.core.eventdata.MovieFoundData;
 import app.ister.core.eventdata.ShowFoundData;
@@ -61,14 +61,14 @@ class ServerEventServiceTest {
     }
 
     @Test
-    void createArtistFoundEventSendsCorrectData() {
-        UUID artistId = UUID.randomUUID();
+    void createPersonFoundEventSendsCorrectData() {
+        UUID personId = UUID.randomUUID();
 
-        subject.createArtistFoundEvent(artistId);
+        subject.createPersonFoundEvent(personId);
 
-        ArgumentCaptor<ArtistFoundData> captor = ArgumentCaptor.forClass(ArtistFoundData.class);
-        verify(messageSender).sendArtistFound(captor.capture());
-        assertEquals(artistId, captor.getValue().getArtistId());
+        ArgumentCaptor<PersonFoundData> captor = ArgumentCaptor.forClass(PersonFoundData.class);
+        verify(messageSender).sendPersonFound(captor.capture());
+        assertEquals(personId, captor.getValue().getPersonId());
     }
 
     @Test

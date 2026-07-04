@@ -36,10 +36,10 @@ public class ServerEventService {
                 .build());
     }
 
-    public void createArtistFoundEvent(UUID artistId) {
-        messageSender.sendArtistFound(ArtistFoundData.builder()
-                .eventType(EventType.ARTIST_FOUND)
-                .artistId(artistId)
+    public void createPersonFoundEvent(UUID personId) {
+        messageSender.sendPersonFound(PersonFoundData.builder()
+                .eventType(EventType.PERSON_FOUND)
+                .personId(personId)
                 .build());
     }
 

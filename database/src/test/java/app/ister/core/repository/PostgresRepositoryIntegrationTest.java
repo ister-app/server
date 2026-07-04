@@ -1,15 +1,18 @@
 package app.ister.core.repository;
 
+import app.ister.core.entity.CreditEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.NodeEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.SeasonEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
+import app.ister.core.enums.CreditType;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.StreamCodecType;
@@ -143,6 +146,26 @@ class PostgresRepositoryIntegrationTest {
 
         assertEquals(0, mediaFileStreamRepository
                 .findByMediaFileEntity_IdAndCodecType(mediaFile.getId(), StreamCodecType.AUDIO).size());
+    }
+
+    @Test
+    void personWithoutLibraryAndCreditCanBePersisted() {
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.MOVIE).name("Movies-p").build());
+        MovieEntity movie = em.persist(MovieEntity.builder().libraryEntity(library).name("Movie-p").releaseYear(2020).build());
+        // A TMDB cast person has no music library but does have a tmdbId and birth year.
+        PersonEntity person = em.persist(PersonEntity.builder().name("Lady Gaga").tmdbId(90633L).birthYear(1986).build());
+        CreditEntity credit = CreditEntity.builder()
+                .personEntity(person).characterName("Ally").creditType(CreditType.CAST).castOrder(0).tmdbCreditId("c1").build();
+        credit.setMovieEntity(movie);
+        em.persistAndFlush(credit);
+        em.clear();
+
+        CreditEntity found = em.find(CreditEntity.class, credit.getId());
+        assertEquals("Ally", found.getCharacterName());
+        assertEquals(CreditType.CAST, found.getCreditType());
+        assertEquals(movie.getId(), found.getMovieEntityId());
+        assertEquals("Lady Gaga", found.getPersonEntity().getName());
+        assertEquals(1986, found.getPersonEntity().getBirthYear());
     }
 
     private MediaFileEntity persistMediaFile(String path) {

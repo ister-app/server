@@ -39,7 +39,7 @@ core/         - Shared infra: Handle<T> interface, MessageQueue base names, Mess
 database/     - JPA entities, repositories, and the EventType enum (NB: same package "app.ister.core.*" as core — split package)
 api/          - REST controllers + GraphQL schema/resolvers
 disk/         - File system scanning, startup tasks, media-file/image/subtitle/nfo/audio event handlers
-worker/       - Async job handlers: metadata fetch (TMDB) for movie/show/episode/artist/album
+worker/       - Async job handlers: metadata fetch (TMDB) for movie/show/episode, (MusicBrainz) for person/album
 transcoder/   - FFmpeg-based HLS transcoding via Jaffree library
 ```
 
@@ -61,7 +61,7 @@ All significant work is done asynchronously through RabbitMQ message queues. The
 **Event categories** (see `EVENT_FLOWS.md` for full per-flow mermaid diagrams — keep it as the canonical reference):
 - `FILE_SCAN_REQUESTED`, `NEW_DIRECTORIES_SCAN_REQUEST` — disk scanning
 - `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `IMAGE_FOUND`, `SUBTITLE_FILE_FOUND`, `NFO_FILE_FOUND` — file-type-specific processing
-- `MOVIE_FOUND`, `SHOW_FOUND`, `EPISODE_FOUND`, `ARTIST_FOUND`, `ALBUM_FOUND`, `TRACK_FOUND` — metadata fetching from TMDB / tag parsing
+- `MOVIE_FOUND`, `SHOW_FOUND`, `EPISODE_FOUND`, `PERSON_FOUND`, `ALBUM_FOUND`, `TRACK_FOUND` — metadata fetching from TMDB (incl. cast credits) / MusicBrainz / tag parsing. A `PersonEntity` is both a music artist and an actor; TMDB cast members are deduplicated on exact name + birth year.
 - `ANALYZE_DATA`, `ANALYZE_LIBRARY_REQUEST`, `UPDATE_IMAGES_REQUESTED` — analysis & image refresh
 - `TRANSCODE_REQUESTED`, `TRANSCODE_PASS_REQUESTED`, `PRE_TRANSCODE_RECENTLY_WATCHED` — HLS transcoding (see below)
 
@@ -100,7 +100,7 @@ Essential runtime config:
 
 ## API Surface
 
-- **REST**: controllers under `api/` for movies, shows, episodes, seasons, music (artist/album/track), scanner, play queue, watch status, stream tokens, server info. Errors are mapped centrally in `api/.../error/` (`RestExceptionHandler`, `GraphQlExceptionResolver`).
+- **REST**: controllers under `api/` for movies, shows, episodes, seasons, music (person/album/track), scanner, play queue, watch status, stream tokens, server info. Errors are mapped centrally in `api/.../error/` (`RestExceptionHandler`, `GraphQlExceptionResolver`).
 - **GraphQL**: Schema at `api/src/main/resources/graphql/schema.graphqls`; GraphQL IDE enabled in dev
 - **Auth**: OAuth2 JWT via Spring Security Resource Server (Keycloak-compatible OIDC). HLS segment/playlist requests can also authenticate via a short-lived `?token=` stream token (`StreamTokenAuthenticationFilter`), which is injected into playlist URIs server-side.
 
@@ -108,5 +108,5 @@ Essential runtime config:
 
 - Unit tests use JUnit 5 + Mockito
 - `jimfs` (in-memory filesystem) used in disk/file-path tests
-- H2 in-memory database for integration tests; production uses PostgreSQL
+- Integration tests use Testcontainers PostgreSQL (set `DOCKER_HOST` to the podman socket locally); production uses PostgreSQL
 - SonarQube + Jacoco configured for CI coverage reporting

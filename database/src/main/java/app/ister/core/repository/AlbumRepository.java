@@ -1,7 +1,7 @@
 package app.ister.core.repository;
 
 import app.ister.core.entity.AlbumEntity;
-import app.ister.core.entity.ArtistEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.enums.LibraryType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,9 +12,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface AlbumRepository extends JpaRepository<AlbumEntity, UUID> {
-    Optional<AlbumEntity> findByArtistEntityAndNameAndReleaseYear(ArtistEntity artistEntity, String name, int releaseYear);
+    Optional<AlbumEntity> findByPersonEntityAndNameAndReleaseYear(PersonEntity personEntity, String name, int releaseYear);
 
-    Page<AlbumEntity> findByArtistEntity(ArtistEntity artistEntity, Pageable pageable);
+    Page<AlbumEntity> findByPersonEntity(PersonEntity personEntity, Pageable pageable);
 
     Page<AlbumEntity> findByLibraryEntityId(UUID libraryId, Pageable pageable);
 

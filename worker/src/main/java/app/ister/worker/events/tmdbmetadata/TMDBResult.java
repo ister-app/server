@@ -17,4 +17,8 @@ public class TMDBResult {
     String description;
     String posterUrl;
     String backgroundUrl;
+    // TMDB id of the movie/show/episode itself.
+    Integer tmdbId;
+    // Only set for episodes: the TMDB id of the series, needed for episode credits.
+    Integer seriesTmdbId;
 }

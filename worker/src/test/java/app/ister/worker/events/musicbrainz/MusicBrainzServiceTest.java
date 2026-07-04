@@ -116,6 +116,38 @@ class MusicBrainzServiceTest {
     }
 
     @Test
+    void getArtistInfoExtractsTypeAndLifeSpanBegin() {
+        server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
+                .andRespond(withSuccess("""
+                        {"artists":[{
+                            "type":"Person",
+                            "life-span":{"begin":"1946-05-31"},
+                            "annotation":{"text":"A singer."}
+                        }]}
+                        """, MediaType.APPLICATION_JSON));
+
+        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Cher");
+
+        assertTrue(result.isPresent());
+        assertEquals("Person", result.get().type());
+        assertEquals("1946-05-31", result.get().lifeSpanBegin());
+    }
+
+    @Test
+    void getArtistInfoReturnsNullTypeAndLifeSpanWhenAbsent() {
+        server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
+                .andRespond(withSuccess("""
+                        {"artists":[{"annotation":{"text":"A band."}}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Some Band");
+
+        assertTrue(result.isPresent());
+        assertNull(result.get().type());
+        assertNull(result.get().lifeSpanBegin());
+    }
+
+    @Test
     void getArtistInfoReturnsEmptyWhenNoArtists() {
         server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
                 .andRespond(withSuccess("{\"artists\":[]}", MediaType.APPLICATION_JSON));

@@ -55,6 +55,8 @@ public class EpisodeMetadata {
                     .title(String.format(noTitleSetMap.get(language), episode.getEpisodeNumber()).equals(episode.getName()) ? null : episode.getName())
                     .released(LocalDate.parse(episode.getAirDate()))
                     .sourceUri("TMDB://" + episode.getId())
+                    .tmdbId(episode.getId())
+                    .seriesTmdbId(tvSeriesResultsPage.getId())
                     .description(episode.getOverview().trim().isEmpty() ? null : episode.getOverview())
                     .backgroundUrl(episode.getStillPath() == null ? null : "https://image.tmdb.org/t/p/original" + episode.getStillPath())
                     .build());

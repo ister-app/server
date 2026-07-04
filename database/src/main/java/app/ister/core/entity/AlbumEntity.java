@@ -10,7 +10,7 @@ import lombok.experimental.SuperBuilder;
 import java.util.List;
 
 @Entity
-@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"artistEntityId", "name", "releaseYear"}))
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"personEntityId", "name", "releaseYear"}))
 @Getter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
@@ -20,7 +20,7 @@ public class AlbumEntity extends BaseEntity {
     private LibraryEntity libraryEntity;
 
     @ManyToOne(optional = false)
-    private ArtistEntity artistEntity;
+    private PersonEntity personEntity;
 
     @Setter
     @Column(nullable = false)

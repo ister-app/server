@@ -32,6 +32,7 @@ public class MovieFoundHandle implements Handle<MovieFoundData> {
     private final MovieMetadata movieMetadata;
     private final MetadataSave metaDataSave;
     private final ImageDownloadService imageDownloadService;
+    private final CreditsService creditsService;
 
     @Value("${app.ister.server.TMDB.apikey:}")
     private String apikey;
@@ -56,6 +57,7 @@ public class MovieFoundHandle implements Handle<MovieFoundData> {
         }
         try {
             var movieEntity = movieRepository.findById(movieFoundData.getMovieId()).orElseThrow();
+            Integer tmdbMovieId = null;
             for (String language : supportLanguages) {
                 Optional<TMDBResult> tmdbResult = movieMetadata.getMetadata(movieEntity.getName(), movieEntity.getReleaseYear(), language);
                 if (tmdbResult.isPresent()) {
@@ -66,7 +68,14 @@ public class MovieFoundHandle implements Handle<MovieFoundData> {
                     if (tmdbResult.get().getPosterUrl() != null) {
                         imageDownloadService.downloadAndSave(tmdbResult.get().getPosterUrl(), ImageType.COVER, tmdbResult.get().getLanguage(), "TMDB://" + tmdbResult.get().getPosterUrl(), new ImageSave.MediaEntityRef(movieEntity, null, null, null, null));
                     }
+                    if (tmdbMovieId == null) {
+                        tmdbMovieId = tmdbResult.get().getTmdbId();
+                    }
                 }
+            }
+            // Credits are language independent: fetch once.
+            if (tmdbMovieId != null) {
+                creditsService.fetchForMovie(movieEntity, tmdbMovieId);
             }
         } catch (IOException e) {
             throw new EventHandlingException("Download and saving image failed", e);

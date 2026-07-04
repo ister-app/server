@@ -1,13 +1,15 @@
 package app.ister.api.controller;
 
 import app.ister.core.entity.AlbumEntity;
-import app.ister.core.entity.ArtistEntity;
+import app.ister.core.entity.CreditEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
-import app.ister.core.repository.ArtistRepository;
+import app.ister.core.repository.CreditRepository;
+import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
 import org.junit.jupiter.api.Test;
@@ -30,13 +32,13 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class ArtistControllerTest {
+class PersonControllerTest {
 
     @InjectMocks
-    private ArtistController subject;
+    private PersonController subject;
 
     @Mock
-    private ArtistRepository artistRepository;
+    private PersonRepository personRepository;
 
     @Mock
     private ImageRepository imageRepository;
@@ -44,52 +46,69 @@ class ArtistControllerTest {
     @Mock
     private LibraryRepository libraryRepository;
 
-    @Test
-    void artistByIdReturnsFromRepository() {
-        UUID id = UUID.randomUUID();
-        ArtistEntity artist = ArtistEntity.builder().name("The Beatles").build();
-        when(artistRepository.findById(id)).thenReturn(Optional.of(artist));
+    @Mock
+    private CreditRepository creditRepository;
 
-        Optional<ArtistEntity> result = subject.artistById(id);
+    @Test
+    void creditsSchemaMappingReturnsFromRepository() {
+        UUID id = UUID.randomUUID();
+        PersonEntity person = PersonEntity.builder().build();
+        org.springframework.test.util.ReflectionTestUtils.setField(person, "id", id);
+        CreditEntity credit = CreditEntity.builder().characterName("Neo").build();
+        when(creditRepository.findByPersonEntityId(eq(id), any(org.springframework.data.domain.Sort.class)))
+                .thenReturn(List.of(credit));
+
+        List<CreditEntity> result = subject.credits(person);
+
+        assertEquals(List.of(credit), result);
+    }
+
+    @Test
+    void personByIdReturnsFromRepository() {
+        UUID id = UUID.randomUUID();
+        PersonEntity artist = PersonEntity.builder().name("The Beatles").build();
+        when(personRepository.findById(id)).thenReturn(Optional.of(artist));
+
+        Optional<PersonEntity> result = subject.personById(id);
 
         assertTrue(result.isPresent());
         assertEquals("The Beatles", result.get().getName());
     }
 
     @Test
-    void artistByIdReturnsEmptyWhenNotFound() {
+    void personByIdReturnsEmptyWhenNotFound() {
         UUID id = UUID.randomUUID();
-        when(artistRepository.findById(id)).thenReturn(Optional.empty());
+        when(personRepository.findById(id)).thenReturn(Optional.empty());
 
-        assertTrue(subject.artistById(id).isEmpty());
+        assertTrue(subject.personById(id).isEmpty());
     }
 
     @Test
-    void artistsWithoutLibraryFilterReturnsAll() {
-        ArtistEntity artist = ArtistEntity.builder().name("Artist A").build();
-        Page<ArtistEntity> page = new PageImpl<>(List.of(artist));
-        when(artistRepository.findAll(any(Pageable.class))).thenReturn(page);
+    void personsWithoutLibraryFilterReturnsAll() {
+        PersonEntity artist = PersonEntity.builder().name("Artist A").build();
+        Page<PersonEntity> page = new PageImpl<>(List.of(artist));
+        when(personRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        Page<ArtistEntity> result = subject.artists(
+        Page<PersonEntity> result = subject.persons(
                 Optional.of(0), Optional.of(10),
                 Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.ASCENDING),
                 Optional.empty());
 
         assertEquals(1, result.getContent().size());
-        verify(artistRepository).findAll(any(Pageable.class));
+        verify(personRepository).findAll(any(Pageable.class));
         verify(libraryRepository, never()).findById(any());
     }
 
     @Test
-    void artistsWithLibraryFilterFiltersOnLibrary() {
+    void personsWithLibraryFilterFiltersOnLibrary() {
         UUID libraryId = UUID.randomUUID();
         LibraryEntity library = LibraryEntity.builder().name("Music").build();
-        ArtistEntity artist = ArtistEntity.builder().name("Artist A").build();
-        Page<ArtistEntity> page = new PageImpl<>(List.of(artist));
+        PersonEntity artist = PersonEntity.builder().name("Artist A").build();
+        Page<PersonEntity> page = new PageImpl<>(List.of(artist));
         when(libraryRepository.findById(libraryId)).thenReturn(Optional.of(library));
-        when(artistRepository.findByLibraryEntity(eq(library), any(Pageable.class))).thenReturn(page);
+        when(personRepository.findByLibraryEntity(eq(library), any(Pageable.class))).thenReturn(page);
 
-        Page<ArtistEntity> result = subject.artists(
+        Page<PersonEntity> result = subject.persons(
                 Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(),
                 Optional.of(libraryId));
@@ -100,7 +119,7 @@ class ArtistControllerTest {
     @Test
     void albumsSchemaMappingReturnsAlbumList() {
         AlbumEntity album = AlbumEntity.builder().name("Abbey Road").releaseYear(1969).build();
-        ArtistEntity artist = ArtistEntity.builder().name("The Beatles").albumEntities(List.of(album)).build();
+        PersonEntity artist = PersonEntity.builder().name("The Beatles").albumEntities(List.of(album)).build();
 
         List<AlbumEntity> result = subject.albums(artist);
 
@@ -110,14 +129,14 @@ class ArtistControllerTest {
 
     @Test
     void imagesSchemaMappingQueriesRepository() {
-        UUID artistId = UUID.randomUUID();
-        ArtistEntity artist = ArtistEntity.builder().build();
-        org.springframework.test.util.ReflectionTestUtils.setField(artist, "id", artistId);
+        UUID personId = UUID.randomUUID();
+        PersonEntity artist = PersonEntity.builder().build();
+        org.springframework.test.util.ReflectionTestUtils.setField(artist, "id", personId);
         ImageEntity image = ImageEntity.builder().build();
-        image.setArtistEntity(artist);
-        when(imageRepository.findByArtistEntityIdIn(List.of(artistId))).thenReturn(List.of(image));
+        image.setPersonEntity(artist);
+        when(imageRepository.findByPersonEntityIdIn(List.of(personId))).thenReturn(List.of(image));
 
-        Map<ArtistEntity, List<ImageEntity>> result = subject.images(List.of(artist));
+        Map<PersonEntity, List<ImageEntity>> result = subject.images(List.of(artist));
 
         assertEquals(1, result.get(artist).size());
     }
@@ -125,7 +144,7 @@ class ArtistControllerTest {
     @Test
     void metadataSchemaMappingReturnsMetadata() {
         MetadataEntity meta = MetadataEntity.builder().title("The Beatles bio").build();
-        ArtistEntity artist = ArtistEntity.builder().name("The Beatles").metadataEntities(List.of(meta)).build();
+        PersonEntity artist = PersonEntity.builder().name("The Beatles").metadataEntities(List.of(meta)).build();
 
         List<MetadataEntity> result = subject.metadata(artist);
 

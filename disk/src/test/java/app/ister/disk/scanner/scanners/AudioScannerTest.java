@@ -1,7 +1,7 @@
 package app.ister.disk.scanner.scanners;
 
 import app.ister.core.entity.AlbumEntity;
-import app.ister.core.entity.ArtistEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
@@ -116,11 +116,11 @@ class AudioScannerTest {
         Path audioPath = Path.of("/music/Artist/Album (2024)/01 - Track.flac");
 
         LibraryEntity library = dir.getLibraryEntity();
-        ArtistEntity artist = buildArtist(library);
+        PersonEntity artist = buildArtist(library);
         AlbumEntity album = buildAlbum(library, artist);
         TrackEntity track = buildTrack(album);
 
-        when(scannerHelperService.getOrCreateArtist(library, "Artist")).thenReturn(artist);
+        when(scannerHelperService.getOrCreatePerson(library, "Artist")).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Album", 2024)).thenReturn(album);
         when(scannerHelperService.getOrCreateTrack(artist, album, 1, 1)).thenReturn(track);
         when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath.toString()))
@@ -149,7 +149,7 @@ class AudioScannerTest {
         Path audioPath = Path.of("/music/Artist/Album (2024)/01 - Track.flac");
 
         LibraryEntity library = dir.getLibraryEntity();
-        ArtistEntity artist = buildArtist(library);
+        PersonEntity artist = buildArtist(library);
         AlbumEntity album = buildAlbum(library, artist);
         TrackEntity track = buildTrack(album);
         UUID trackId = UUID.randomUUID();
@@ -160,7 +160,7 @@ class AudioScannerTest {
                 .trackEntity(track)
                 .build();
 
-        when(scannerHelperService.getOrCreateArtist(library, "Artist")).thenReturn(artist);
+        when(scannerHelperService.getOrCreatePerson(library, "Artist")).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Album", 2024)).thenReturn(album);
         when(scannerHelperService.getOrCreateTrack(artist, album, 1, 1)).thenReturn(track);
         when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath.toString()))
@@ -178,7 +178,7 @@ class AudioScannerTest {
         Path audioPath = Path.of("/music/Artist/Album (2024)/01 - Track.flac");
 
         LibraryEntity library = dir.getLibraryEntity();
-        ArtistEntity artist = buildArtist(library);
+        PersonEntity artist = buildArtist(library);
         AlbumEntity album = buildAlbum(library, artist);
         TrackEntity correctTrack = buildTrack(album);
         UUID correctTrackId = UUID.randomUUID();
@@ -193,7 +193,7 @@ class AudioScannerTest {
                 .trackEntity(wrongTrack)
                 .build();
 
-        when(scannerHelperService.getOrCreateArtist(library, "Artist")).thenReturn(artist);
+        when(scannerHelperService.getOrCreatePerson(library, "Artist")).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Album", 2024)).thenReturn(album);
         when(scannerHelperService.getOrCreateTrack(artist, album, 1, 1)).thenReturn(correctTrack);
         when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath.toString()))
@@ -211,7 +211,7 @@ class AudioScannerTest {
         Path audioPath = Path.of("/music/Artist/Album (2024)/01 - Track.flac");
 
         LibraryEntity library = dir.getLibraryEntity();
-        ArtistEntity artist = buildArtist(library);
+        PersonEntity artist = buildArtist(library);
         AlbumEntity album = buildAlbum(library, artist);
         TrackEntity track = buildTrack(album);
         UUID trackId = UUID.randomUUID();
@@ -222,7 +222,7 @@ class AudioScannerTest {
                 .trackEntity(null)
                 .build();
 
-        when(scannerHelperService.getOrCreateArtist(library, "Artist")).thenReturn(artist);
+        when(scannerHelperService.getOrCreatePerson(library, "Artist")).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Album", 2024)).thenReturn(album);
         when(scannerHelperService.getOrCreateTrack(artist, album, 1, 1)).thenReturn(track);
         when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath.toString()))
@@ -248,26 +248,26 @@ class AudioScannerTest {
                 .build();
     }
 
-    private ArtistEntity buildArtist(LibraryEntity library) {
-        return ArtistEntity.builder()
+    private PersonEntity buildArtist(LibraryEntity library) {
+        return PersonEntity.builder()
                 .libraryEntity(library)
                 .name("Artist")
                 .build();
     }
 
-    private AlbumEntity buildAlbum(LibraryEntity library, ArtistEntity artist) {
+    private AlbumEntity buildAlbum(LibraryEntity library, PersonEntity artist) {
         return AlbumEntity.builder()
                 .libraryEntity(library)
-                .artistEntity(artist)
+                .personEntity(artist)
                 .name("Album")
                 .releaseYear(2024)
                 .build();
     }
 
     private TrackEntity buildTrack(AlbumEntity album) {
-        ArtistEntity artist = album.getArtistEntity();
+        PersonEntity artist = album.getPersonEntity();
         return TrackEntity.builder()
-                .artistEntity(artist)
+                .personEntity(artist)
                 .albumEntity(album)
                 .number(1)
                 .discNumber(1)

@@ -79,7 +79,7 @@ flowchart TD
     B -->|"series zonder metadata"| D["SHOW_FOUND"]
     B -->|"afleveringen zonder metadata"| E["EPISODE_FOUND"]
     B -->|"films zonder metadata"| F["MOVIE_FOUND"]
-    B -->|"artiesten zonder metadata"| G["ARTIST_FOUND"]
+    B -->|"artiesten zonder metadata"| G["PERSON_FOUND"]
     B -->|"albums zonder afbeelding"| H["ALBUM_FOUND"]
     B -->|"tracks zonder metadata"| I["AUDIO_FILE_FOUND\n.{dirName}"]
 
@@ -87,15 +87,18 @@ flowchart TD
 
     D --> D1["HandleShowFound\n📦 worker"]
     D1 -->|"TMDB: titel, beschrijving\nposter + achtergrond downloaden"| IMG1["IMAGE_FOUND\n.{dirName}"]
+    D1 -->|"TMDB aggregate credits:\ncast → persons + credits"| CR1["credit_entity\n(direct in DB)"]
 
     E --> E1["HandleEpisodeFound\n📦 worker"]
     E1 -->|"TMDB: afleveringsinfo\nafbeeldingen downloaden"| IMG2["IMAGE_FOUND\n.{dirName}"]
+    E1 -->|"TMDB episode credits:\ncast + guest stars → persons + credits"| CR2["credit_entity\n(direct in DB)"]
 
     F --> F1["MovieFoundHandle\n📦 worker"]
     F1 -->|"TMDB: filminfo\nafbeeldingen downloaden"| IMG3["IMAGE_FOUND\n.{dirName}"]
+    F1 -->|"TMDB movie credits:\ncast → persons + credits"| CR3["credit_entity\n(direct in DB)"]
 
-    G --> G1["HandleArtistFound\n📦 worker\ncheckt bestaande afbeeldingen"]
-    G --> G2["HandleArtistFound\n📦 disk"]
+    G --> G1["HandlePersonFound\n📦 worker\ncheckt bestaande afbeeldingen"]
+    G --> G2["HandlePersonFound\n📦 disk"]
     G2 -->|"zoekt artist.nfo"| NFO1["NFO_FILE_FOUND\n.{dirName}"]
 
     H --> H1["HandleAlbumFound\n📦 worker"]
@@ -128,7 +131,7 @@ flowchart TD
     W -->|Show| W2["wist metadata\nSHOW_FOUND\n+ cascade naar afleveringen"]
     W -->|Episode| W3["wist metadata +\nafbeeldingen + streams\nEPISODE_FOUND\n+ ANALYZE_DATA.{dirName}"]
     W -->|Movie| W4["wist metadata +\nafbeeldingen + streams\nMOVIE_FOUND\n+ ANALYZE_DATA.{dirName}"]
-    W -->|Artist| W5["ARTIST_FOUND\n+ cascade naar albums"]
+    W -->|Artist| W5["PERSON_FOUND\n+ cascade naar albums"]
     W -->|Album| W6["ALBUM_FOUND\n+ cascade naar tracks"]
     W -->|Track| W7["AUDIO_FILE_FOUND.{dirName}"]
 
@@ -192,7 +195,7 @@ graph LR
         H8[HandleUpdateImagesRequested]
         H9[HandleAnalyzeDataDisk]
         H10[HandlePreTranscodeRecentlyWatched]
-        H11[HandleArtistFound]
+        H11[HandlePersonFound]
         H12[HandleAlbumFound]
     end
 
@@ -202,7 +205,7 @@ graph LR
         W3[HandleShowFound]
         W4[HandleEpisodeFound]
         W5[MovieFoundHandle]
-        W6[HandleArtistFound]
+        W6[HandlePersonFound]
         W7[HandleAlbumFound]
     end
 
@@ -246,7 +249,7 @@ graph LR
 |-------|--------|
 | **Node** `.{nodeName}` | `ANALYZE_LIBRARY_REQUESTED` |
 | **Directory** `.{dirName}` | `NEW_DIRECTORIES_SCAN_REQUESTED`, `FILE_SCAN_REQUESTED`, `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `SUBTITLE_FILE_FOUND`, `IMAGE_FOUND`, `NFO_FILE_FOUND`, `UPDATE_IMAGES_REQUESTED`, `ANALYZE_DATA` (disk), `PRE_TRANSCODE_RECENTLY_WATCHED`, `TRANSCODE_REQUESTED`, `TRANSCODE_PASS_REQUESTED` |
-| **Globaal** | `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `ARTIST_FOUND`, `ALBUM_FOUND`, `ANALYZE_DATA` (worker) |
+| **Globaal** | `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND`, `ALBUM_FOUND`, `ANALYZE_DATA` (worker) |
 
 ---
 
@@ -264,14 +267,14 @@ graph LR
 | `HandleUpdateImagesRequested` | disk | `UPDATE_IMAGES_REQUESTED` | — |
 | `HandleAnalyzeDataDisk` | disk | `ANALYZE_DATA` | `MEDIA_FILE_FOUND` / `AUDIO_FILE_FOUND` / `NFO_FILE_FOUND` / `SUBTITLE_FILE_FOUND` |
 | `HandlePreTranscodeRecentlyWatched` | disk | `PRE_TRANSCODE_RECENTLY_WATCHED` | `TRANSCODE_REQUESTED`, `MEDIA_FILE_FOUND` (voor bestanden zonder geanalyseerde streams) |
-| `HandleArtistFound` | disk | `ARTIST_FOUND` | `NFO_FILE_FOUND` |
+| `HandlePersonFound` | disk | `PERSON_FOUND` | `NFO_FILE_FOUND` |
 | `HandleAlbumFound` | disk | `ALBUM_FOUND` | `NFO_FILE_FOUND` |
-| `AnalyzeLibraryRequestedHandle` | worker | `ANALYZE_LIBRARY_REQUESTED` | `UPDATE_IMAGES_REQUESTED`, `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `ARTIST_FOUND`, `ALBUM_FOUND`, `AUDIO_FILE_FOUND` |
+| `AnalyzeLibraryRequestedHandle` | worker | `ANALYZE_LIBRARY_REQUESTED` | `UPDATE_IMAGES_REQUESTED`, `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND`, `ALBUM_FOUND`, `AUDIO_FILE_FOUND` |
 | `AnalyzeDataHandle` | worker | `ANALYZE_DATA` | cascade per entiteitstype |
-| `HandleShowFound` | worker | `SHOW_FOUND` | `IMAGE_FOUND` |
-| `HandleEpisodeFound` | worker | `EPISODE_FOUND` | `IMAGE_FOUND` |
-| `MovieFoundHandle` | worker | `MOVIE_FOUND` | `IMAGE_FOUND` |
-| `HandleArtistFound` | worker | `ARTIST_FOUND` | — |
+| `HandleShowFound` | worker | `SHOW_FOUND` | `IMAGE_FOUND` (+ cast credits direct in DB) |
+| `HandleEpisodeFound` | worker | `EPISODE_FOUND` | `IMAGE_FOUND` (+ cast/guest star credits direct in DB) |
+| `MovieFoundHandle` | worker | `MOVIE_FOUND` | `IMAGE_FOUND` (+ cast credits direct in DB) |
+| `HandlePersonFound` | worker | `PERSON_FOUND` | — |
 | `HandleAlbumFound` | worker | `ALBUM_FOUND` | `IMAGE_FOUND` |
 | `HandleTranscodeRequested` | transcoder | `TRANSCODE_REQUESTED` | `TRANSCODE_PASS_REQUESTED` |
 | `HandleTranscodePassRequested` | transcoder | `TRANSCODE_PASS_REQUESTED` | — |

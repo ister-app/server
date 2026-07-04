@@ -31,6 +31,7 @@ public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
     private final EpisodeMetadata episodeMetadata;
     private final MetadataSave metaDataSave;
     private final ImageDownloadService imageDownloadService;
+    private final CreditsService creditsService;
 
     @Value("${app.ister.server.TMDB.apikey:}")
     private String apikey;
@@ -55,6 +56,7 @@ public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
         }
         try {
             var episodeEntity = episodeRepository.findById(episodeFoundData.getEpisodeId()).orElseThrow();
+            Integer tmdbSeriesId = null;
             for (String language : supportLanguages) {
                 var showEntity = episodeEntity.getShowEntity();
                 Optional<TMDBResult> tmdbResult = episodeMetadata.getMetadata(showEntity.getName(), showEntity.getReleaseYear(), episodeEntity.getSeasonEntity().getNumber(), episodeEntity.getNumber(), language);
@@ -66,7 +68,15 @@ public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
                     if (tmdbResult.get().getPosterUrl() != null) {
                         imageDownloadService.downloadAndSave(tmdbResult.get().getPosterUrl(), ImageType.COVER, tmdbResult.get().getLanguage(), "TMDB://" + tmdbResult.get().getPosterUrl(), new ImageSave.MediaEntityRef(null, null, episodeEntity, null, null));
                     }
+                    if (tmdbSeriesId == null) {
+                        tmdbSeriesId = tmdbResult.get().getSeriesTmdbId();
+                    }
                 }
+            }
+            // Credits are language independent: fetch once, incl. guest stars for this episode.
+            if (tmdbSeriesId != null) {
+                creditsService.fetchForEpisode(episodeEntity, tmdbSeriesId,
+                        episodeEntity.getSeasonEntity().getNumber(), episodeEntity.getNumber());
             }
         } catch (IOException e) {
             throw new EventHandlingException("Download and saving image failed", e);

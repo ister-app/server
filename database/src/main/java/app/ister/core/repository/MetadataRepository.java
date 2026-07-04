@@ -10,7 +10,7 @@ import java.util.UUID;
 @Repository
 public interface MetadataRepository extends JpaRepository<MetadataEntity, UUID> {
 
-    List<MetadataEntity> findByArtistEntityId(UUID artistId);
+    List<MetadataEntity> findByPersonEntityId(UUID personId);
 
     List<MetadataEntity> findByAlbumEntityId(UUID albumId);
 }

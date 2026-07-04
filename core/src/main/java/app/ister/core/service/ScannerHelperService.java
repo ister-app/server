@@ -15,7 +15,7 @@ public class ScannerHelperService {
     private final ShowRepository showRepository;
     private final SeasonRepository seasonRepository;
     private final EpisodeRepository episodeRepository;
-    private final ArtistRepository artistRepository;
+    private final PersonRepository personRepository;
     private final AlbumRepository albumRepository;
     private final TrackRepository trackRepository;
     private final ServerEventService serverEventService;
@@ -75,19 +75,22 @@ public class ScannerHelperService {
     }
 
     /**
-     * Check if the database contains an artist with the given parameters.
+     * Check if the database contains a person with the given parameters.
      * - If it exists return it.
+     * - Else, if a library-less person with the same name exists (created from TMDB cast
+     *   credits), claim that person for this library. Deduplication is on exact name, so a
+     *   band named exactly like an actor would be merged — accepted trade-off.
      * - Else create and return it.
      */
-    public ArtistEntity getOrCreateArtist(LibraryEntity libraryEntity, String artistName) {
-        return artistRepository.findByLibraryEntityAndName(libraryEntity, artistName)
+    public PersonEntity getOrCreatePerson(LibraryEntity libraryEntity, String artistName) {
+        return personRepository.findByLibraryEntityAndName(libraryEntity, artistName)
                 .orElseGet(() -> {
-                    ArtistEntity artistEntity = ArtistEntity.builder()
-                            .libraryEntity(libraryEntity)
-                            .name(artistName).build();
-                    artistRepository.save(artistEntity);
-                    serverEventService.createArtistFoundEvent(artistEntity.getId());
-                    return artistEntity;
+                    PersonEntity personEntity = personRepository.findFirstByNameAndLibraryEntityIsNull(artistName)
+                            .orElseGet(() -> PersonEntity.builder().name(artistName).build());
+                    personEntity.setLibraryEntity(libraryEntity);
+                    personRepository.save(personEntity);
+                    serverEventService.createPersonFoundEvent(personEntity.getId());
+                    return personEntity;
                 });
     }
 
@@ -96,12 +99,12 @@ public class ScannerHelperService {
      * - If it exists return it.
      * - Else create and return it.
      */
-    public AlbumEntity getOrCreateAlbum(LibraryEntity libraryEntity, ArtistEntity artistEntity, String albumName, int releaseYear) {
-        return albumRepository.findByArtistEntityAndNameAndReleaseYear(artistEntity, albumName, releaseYear)
+    public AlbumEntity getOrCreateAlbum(LibraryEntity libraryEntity, PersonEntity personEntity, String albumName, int releaseYear) {
+        return albumRepository.findByPersonEntityAndNameAndReleaseYear(personEntity, albumName, releaseYear)
                 .orElseGet(() -> {
                     AlbumEntity albumEntity = AlbumEntity.builder()
                             .libraryEntity(libraryEntity)
-                            .artistEntity(artistEntity)
+                            .personEntity(personEntity)
                             .name(albumName)
                             .releaseYear(releaseYear).build();
                     albumRepository.save(albumEntity);
@@ -115,11 +118,11 @@ public class ScannerHelperService {
      * - If it exists return it.
      * - Else create and return it.
      */
-    public TrackEntity getOrCreateTrack(ArtistEntity artistEntity, AlbumEntity albumEntity, int trackNumber, int discNumber) {
+    public TrackEntity getOrCreateTrack(PersonEntity personEntity, AlbumEntity albumEntity, int trackNumber, int discNumber) {
         return trackRepository.findByAlbumEntityAndNumberAndDiscNumber(albumEntity, trackNumber, discNumber)
                 .orElseGet(() -> {
                     TrackEntity trackEntity = TrackEntity.builder()
-                            .artistEntity(artistEntity)
+                            .personEntity(personEntity)
                             .albumEntity(albumEntity)
                             .number(trackNumber)
                             .discNumber(discNumber).build();

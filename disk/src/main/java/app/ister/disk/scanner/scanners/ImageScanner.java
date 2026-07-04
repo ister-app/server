@@ -102,12 +102,12 @@ public class ImageScanner implements Scanner {
         MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), path.toString());
         if (musicPath.getDirType() == DirType.ARTIST && musicPath.isFlatAlbumStructure()) {
             String artistName = readAlbumArtistFromDirectory(path.getParent(), musicPath.getArtistName());
-            var artist = scannerHelperService.getOrCreateArtist(directoryEntity.getLibraryEntity(), artistName);
+            var artist = scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), artistName);
             imageEntity.albumEntity(scannerHelperService.getOrCreateAlbum(directoryEntity.getLibraryEntity(), artist, musicPath.getAlbumName(), musicPath.getAlbumYear()));
         } else if (musicPath.getDirType() == DirType.ARTIST) {
-            imageEntity.artistEntity(scannerHelperService.getOrCreateArtist(directoryEntity.getLibraryEntity(), musicPath.getArtistName()));
+            imageEntity.personEntity(scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), musicPath.getArtistName()));
         } else if (musicPath.getDirType() == DirType.ALBUM) {
-            var artist = scannerHelperService.getOrCreateArtist(directoryEntity.getLibraryEntity(), musicPath.getArtistName());
+            var artist = scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), musicPath.getArtistName());
             imageEntity.albumEntity(scannerHelperService.getOrCreateAlbum(directoryEntity.getLibraryEntity(), artist, musicPath.getAlbumName(), musicPath.getAlbumYear()));
         }
     }

@@ -1,14 +1,14 @@
 package app.ister.api.controller;
 
 import app.ister.core.entity.AlbumEntity;
-import app.ister.core.entity.ArtistEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.repository.AlbumRepository;
-import app.ister.core.repository.ArtistRepository;
+import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.ImageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AlbumController {
     private final AlbumRepository albumRepository;
-    private final ArtistRepository artistRepository;
+    private final PersonRepository personRepository;
     private final ImageRepository imageRepository;
 
     @PreAuthorize("hasRole('user')")
@@ -53,8 +53,8 @@ public class AlbumController {
         Pageable pageable = Paging.pageable(page, size, 20,
                 sorting, SortingEnum.NAME, sortingOrder, SortingOrder.ASCENDING);
         if (artistId.isPresent()) {
-            return artistRepository.findById(artistId.get())
-                    .map(artist -> albumRepository.findByArtistEntity(artist, pageable))
+            return personRepository.findById(artistId.get())
+                    .map(artist -> albumRepository.findByPersonEntity(artist, pageable))
                     .orElseGet(() -> Page.empty(pageable));
         }
         if (libraryId.isPresent()) {
@@ -64,8 +64,8 @@ public class AlbumController {
     }
 
     @SchemaMapping(typeName = "Album", field = "artist")
-    public ArtistEntity artist(AlbumEntity albumEntity) {
-        return albumEntity.getArtistEntity();
+    public PersonEntity artist(AlbumEntity albumEntity) {
+        return albumEntity.getPersonEntity();
     }
 
     @SchemaMapping(typeName = "Album", field = "tracks")

@@ -34,7 +34,7 @@ public class MetadataEntity extends BaseEntity {
 
     @Getter(onMethod = @__(@JsonBackReference))
     @ManyToOne
-    private ArtistEntity artistEntity;
+    private PersonEntity personEntity;
 
     @Getter(onMethod = @__(@JsonBackReference))
     @ManyToOne

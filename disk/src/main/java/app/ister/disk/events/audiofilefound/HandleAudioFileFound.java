@@ -1,7 +1,7 @@
 package app.ister.disk.events.audiofilefound;
 
 import app.ister.core.entity.AlbumEntity;
-import app.ister.core.entity.ArtistEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
@@ -12,7 +12,7 @@ import app.ister.core.enums.ImageType;
 import app.ister.core.eventdata.AudioFileFoundData;
 import app.ister.core.eventdata.ImageFoundData;
 import app.ister.core.repository.AlbumRepository;
-import app.ister.core.repository.ArtistRepository;
+import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
@@ -55,7 +55,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final MetadataRepository metadataRepository;
     private final TrackRepository trackRepository;
-    private final ArtistRepository artistRepository;
+    private final PersonRepository personRepository;
     private final AlbumRepository albumRepository;
     private final ImageRepository imageRepository;
     private final ScannerHelperService scannerHelperService;
@@ -76,7 +76,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                                 MediaFileStreamRepository mediaFileStreamRepository,
                                 MetadataRepository metadataRepository,
                                 TrackRepository trackRepository,
-                                ArtistRepository artistRepository,
+                                PersonRepository personRepository,
                                 AlbumRepository albumRepository,
                                 ImageRepository imageRepository,
                                 ScannerHelperService scannerHelperService,
@@ -90,7 +90,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         this.mediaFileStreamRepository = mediaFileStreamRepository;
         this.metadataRepository = metadataRepository;
         this.trackRepository = trackRepository;
-        this.artistRepository = artistRepository;
+        this.personRepository = personRepository;
         this.albumRepository = albumRepository;
         this.imageRepository = imageRepository;
         this.scannerHelperService = scannerHelperService;
@@ -238,7 +238,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
 
     private UUID reassignTrackNumber(MediaFileEntity mediaFile, TrackEntity currentTrack, int newNumber, int newDisc) {
         TrackEntity correctTrack = scannerHelperService.getOrCreateTrack(
-                currentTrack.getArtistEntity(), currentTrack.getAlbumEntity(), newNumber, newDisc);
+                currentTrack.getPersonEntity(), currentTrack.getAlbumEntity(), newNumber, newDisc);
         mediaFile.setTrackEntity(correctTrack);
         mediaFileRepository.save(mediaFile);
         if (!mediaFileRepository.existsByTrackEntityId(currentTrack.getId())) {
@@ -280,9 +280,9 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         String albumArtist = format.getTag("album_artist");
         if (albumArtist == null) albumArtist = format.getTag("ALBUM_ARTIST");
         if (albumArtist == null || albumArtist.isBlank()) return;
-        ArtistEntity artist = track.getArtistEntity();
+        PersonEntity artist = track.getPersonEntity();
         if (albumArtist.equals(artist.getName())) return;
-        boolean exists = artistRepository
+        boolean exists = personRepository
                 .findByLibraryEntityAndName(track.getAlbumEntity().getLibraryEntity(), albumArtist)
                 .isPresent();
         if (!exists) {
@@ -309,7 +309,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
 
         // Only update if the target (name, year) doesn't conflict with another album
         boolean conflict = albumRepository
-                .findByArtistEntityAndNameAndReleaseYear(album.getArtistEntity(), newName, newYear)
+                .findByPersonEntityAndNameAndReleaseYear(album.getPersonEntity(), newName, newYear)
                 .filter(other -> !other.getId().equals(album.getId()))
                 .isPresent();
         if (conflict) return;

@@ -43,6 +43,7 @@ public class ShowMetadata {
                     .title(tvSeries1.getName())
                     .released(LocalDate.parse(tvSeries1.getFirstAirDate()))
                     .sourceUri("TMDB://" + tvSeries1.getId())
+                    .tmdbId(tvSeries1.getId())
                     .description(tvSeries1.getOverview().trim().isEmpty() ? null : tvSeries1.getOverview())
                     .posterUrl(tvSeries1.getPosterPath() == null ? null : "https://image.tmdb.org/t/p/original" + tvSeries1.getPosterPath())
                     .backgroundUrl(tvSeries1.getBackdropPath() == null ? null : "https://image.tmdb.org/t/p/original" + tvSeries1.getBackdropPath())

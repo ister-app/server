@@ -1,7 +1,7 @@
 package app.ister.disk.events.nfofilefound;
 
 import app.ister.core.entity.AlbumEntity;
-import app.ister.core.entity.ArtistEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.LibraryEntity;
@@ -223,17 +223,17 @@ class HandleNfoFileFoundTest {
         UUID uuid = UUID.randomUUID();
         LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
         DirectoryEntity directoryEntity = DirectoryEntity.builder().id(uuid).path("/music").libraryEntity(library).build();
-        ArtistEntity artist = ArtistEntity.builder().libraryEntity(library).name("The Beatles").build();
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("The Beatles").build();
         NfoFileFoundData data = NfoFileFoundData.builder()
                 .directoryEntityUUID(uuid)
                 .path("/music/The Beatles/artist.nfo")
                 .build();
 
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
-        when(scannerHelperService.getOrCreateArtist(library, "The Beatles")).thenReturn(artist);
+        when(scannerHelperService.getOrCreatePerson(library, "The Beatles")).thenReturn(artist);
 
         subject.handle(data);
-        verify(scannerHelperService).getOrCreateArtist(library, "The Beatles");
+        verify(scannerHelperService).getOrCreatePerson(library, "The Beatles");
     }
 
     @Test
@@ -248,14 +248,14 @@ class HandleNfoFileFoundTest {
         UUID uuid = UUID.randomUUID();
         LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
         DirectoryEntity directoryEntity = DirectoryEntity.builder().id(uuid).path(tempDir.toString()).libraryEntity(library).build();
-        ArtistEntity artist = ArtistEntity.builder().libraryEntity(library).name("The Beatles").build();
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("The Beatles").build();
         NfoFileFoundData data = NfoFileFoundData.builder()
                 .directoryEntityUUID(uuid)
                 .path(nfoFile.toString())
                 .build();
 
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
-        when(scannerHelperService.getOrCreateArtist(library, "The Beatles")).thenReturn(artist);
+        when(scannerHelperService.getOrCreatePerson(library, "The Beatles")).thenReturn(artist);
 
         subject.handle(data);
         verify(metadataRepository).save(any(MetadataEntity.class));
@@ -266,15 +266,15 @@ class HandleNfoFileFoundTest {
         UUID uuid = UUID.randomUUID();
         LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
         DirectoryEntity directoryEntity = DirectoryEntity.builder().id(uuid).path("/music").libraryEntity(library).build();
-        ArtistEntity artist = ArtistEntity.builder().libraryEntity(library).name("The Beatles").build();
-        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).artistEntity(artist).name("Abbey Road").releaseYear(1969).build();
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("The Beatles").build();
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Abbey Road").releaseYear(1969).build();
         NfoFileFoundData data = NfoFileFoundData.builder()
                 .directoryEntityUUID(uuid)
                 .path("/music/The Beatles/Abbey Road (1969)/album.nfo")
                 .build();
 
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
-        when(scannerHelperService.getOrCreateArtist(library, "The Beatles")).thenReturn(artist);
+        when(scannerHelperService.getOrCreatePerson(library, "The Beatles")).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Abbey Road", 1969)).thenReturn(album);
 
         subject.handle(data);
@@ -293,15 +293,15 @@ class HandleNfoFileFoundTest {
         UUID uuid = UUID.randomUUID();
         LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
         DirectoryEntity directoryEntity = DirectoryEntity.builder().id(uuid).path(tempDir.toString()).libraryEntity(library).build();
-        ArtistEntity artist = ArtistEntity.builder().libraryEntity(library).name("The Beatles").build();
-        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).artistEntity(artist).name("Abbey Road").releaseYear(1969).build();
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("The Beatles").build();
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Abbey Road").releaseYear(1969).build();
         NfoFileFoundData data = NfoFileFoundData.builder()
                 .directoryEntityUUID(uuid)
                 .path(nfoFile.toString())
                 .build();
 
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
-        when(scannerHelperService.getOrCreateArtist(library, "The Beatles")).thenReturn(artist);
+        when(scannerHelperService.getOrCreatePerson(library, "The Beatles")).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Abbey Road", 1969)).thenReturn(album);
 
         subject.handle(data);

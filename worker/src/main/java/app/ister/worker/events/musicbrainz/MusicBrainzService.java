@@ -28,7 +28,12 @@ public class MusicBrainzService {
                 .build();
     }
 
-    public record ArtistInfo(String bio, String genre, String imageUrl) {}
+    /**
+     * type is MusicBrainz's artist type ("Person", "Group", ...); lifeSpanBegin is the
+     * begin date of the artist's life-span (birth date for persons, founding date for
+     * groups), possibly just a year ("1946") or year-month.
+     */
+    public record ArtistInfo(String bio, String genre, String imageUrl, String type, String lifeSpanBegin) {}
 
     public record AlbumInfo(String description) {}
 
@@ -91,9 +96,11 @@ public class MusicBrainzService {
             String bio = extractAnnotation(artist);
             String genre = extractTopTag(artist);
             String imageUrl = extractWikipediaImageUrl(artist);
+            String type = artist.get("type") instanceof String s ? s : null;
+            String lifeSpanBegin = extractLifeSpanBegin(artist);
 
             if (bio == null && genre == null && imageUrl == null) return Optional.empty();
-            return Optional.of(new ArtistInfo(bio, genre, imageUrl));
+            return Optional.of(new ArtistInfo(bio, genre, imageUrl, type, lifeSpanBegin));
         } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return Optional.empty();
@@ -140,6 +147,16 @@ public class MusicBrainzService {
         if (annotation instanceof Map<?, ?> ann) {
             Object text = ((Map<String, Object>) ann).get("text");
             if (text instanceof String s && !s.isBlank()) return s;
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String extractLifeSpanBegin(Map<String, Object> entity) {
+        Object lifeSpan = entity.get("life-span");
+        if (lifeSpan instanceof Map<?, ?> span) {
+            Object begin = ((Map<String, Object>) span).get("begin");
+            if (begin instanceof String s && !s.isBlank()) return s;
         }
         return null;
     }

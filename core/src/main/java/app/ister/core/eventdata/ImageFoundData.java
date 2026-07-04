@@ -31,7 +31,7 @@ public class ImageFoundData extends MessageData {
     @Nullable
     private UUID seasonEntityId;
     @Nullable
-    private UUID artistEntityId;
+    private UUID personEntityId;
     @Nullable
     private UUID albumEntityId;
 
@@ -47,7 +47,7 @@ public class ImageFoundData extends MessageData {
                 .showEntityId(imageEntity.getShowEntity() == null ? imageEntity.getShowEntityId() : imageEntity.getShowEntity().getId())
                 .episodeEntityId(imageEntity.getEpisodeEntity() == null ? imageEntity.getEpisodeEntityId() : imageEntity.getEpisodeEntity().getId())
                 .seasonEntityId(imageEntity.getSeasonEntity() == null ? imageEntity.getSeasonEntityId() : imageEntity.getSeasonEntity().getId())
-                .artistEntityId(imageEntity.getArtistEntity() == null ? imageEntity.getArtistEntityId() : imageEntity.getArtistEntity().getId())
+                .personEntityId(imageEntity.getPersonEntity() == null ? imageEntity.getPersonEntityId() : imageEntity.getPersonEntity().getId())
                 .albumEntityId(imageEntity.getAlbumEntity() == null ? imageEntity.getAlbumEntityId() : imageEntity.getAlbumEntity().getId())
                 .build();
     }

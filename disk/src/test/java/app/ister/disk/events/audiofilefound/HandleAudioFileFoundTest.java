@@ -1,7 +1,7 @@
 package app.ister.disk.events.audiofilefound;
 
 import app.ister.core.entity.AlbumEntity;
-import app.ister.core.entity.ArtistEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
@@ -11,7 +11,7 @@ import app.ister.core.enums.EventType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.AudioFileFoundData;
 import app.ister.core.repository.AlbumRepository;
-import app.ister.core.repository.ArtistRepository;
+import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
@@ -67,7 +67,7 @@ class HandleAudioFileFoundTest {
     @Mock
     private TrackRepository trackRepositoryMock;
     @Mock
-    private ArtistRepository artistRepositoryMock;
+    private PersonRepository personRepositoryMock;
     @Mock
     private AlbumRepository albumRepositoryMock;
     @Mock
@@ -102,7 +102,7 @@ class HandleAudioFileFoundTest {
                 mediaFileStreamRepositoryMock,
                 metadataRepositoryMock,
                 trackRepositoryMock,
-                artistRepositoryMock,
+                personRepositoryMock,
                 albumRepositoryMock,
                 imageRepositoryMock,
                 scannerHelperServiceMock,
@@ -189,9 +189,9 @@ class HandleAudioFileFoundTest {
         ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
 
         LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
-        ArtistEntity artist = ArtistEntity.builder().libraryEntity(library).name("Artist").build();
-        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).artistEntity(artist).name("Album").releaseYear(2024).build();
-        TrackEntity track = TrackEntity.builder().artistEntity(artist).albumEntity(album).number(1).discNumber(1)
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("Artist").build();
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Album").releaseYear(2024).build();
+        TrackEntity track = TrackEntity.builder().personEntity(artist).albumEntity(album).number(1).discNumber(1)
                 .metadataEntities(new ArrayList<>()).build();
 
         FFprobe ffprobe = mock(FFprobe.class, RETURNS_SELF);
@@ -274,9 +274,9 @@ class HandleAudioFileFoundTest {
         ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
 
         LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
-        ArtistEntity artist = ArtistEntity.builder().libraryEntity(library).name("Artist").build();
-        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).artistEntity(artist).name("Album").releaseYear(2024).build();
-        TrackEntity track = TrackEntity.builder().artistEntity(artist).albumEntity(album).number(1).discNumber(1)
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("Artist").build();
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Album").releaseYear(2024).build();
+        TrackEntity track = TrackEntity.builder().personEntity(artist).albumEntity(album).number(1).discNumber(1)
                 .metadataEntities(new ArrayList<>()).build();
 
         FFprobe ffprobe = mock(FFprobe.class, RETURNS_SELF);
@@ -333,9 +333,9 @@ class HandleAudioFileFoundTest {
         ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
 
         LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
-        ArtistEntity artist = ArtistEntity.builder().libraryEntity(library).name("OldArtistName").build();
-        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).artistEntity(artist).name("Album").releaseYear(2024).build();
-        TrackEntity track = TrackEntity.builder().artistEntity(artist).albumEntity(album).number(1).discNumber(1)
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("OldArtistName").build();
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Album").releaseYear(2024).build();
+        TrackEntity track = TrackEntity.builder().personEntity(artist).albumEntity(album).number(1).discNumber(1)
                 .metadataEntities(new ArrayList<>()).build();
 
         FFprobe ffprobe = mock(FFprobe.class, RETURNS_SELF);
@@ -359,7 +359,7 @@ class HandleAudioFileFoundTest {
         when(format.getTag("DATE")).thenReturn(null);
         when(format.getTag("year")).thenReturn(null);
         when(format.getTag("YEAR")).thenReturn(null);
-        when(artistRepositoryMock.findByLibraryEntityAndName(library, "NewArtistName")).thenReturn(Optional.empty());
+        when(personRepositoryMock.findByLibraryEntityAndName(library, "NewArtistName")).thenReturn(Optional.empty());
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
@@ -390,9 +390,9 @@ class HandleAudioFileFoundTest {
         ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
 
         LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
-        ArtistEntity artist = ArtistEntity.builder().libraryEntity(library).name("SameArtist").build();
-        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).artistEntity(artist).name("Album").releaseYear(2024).build();
-        TrackEntity track = TrackEntity.builder().artistEntity(artist).albumEntity(album).number(1).discNumber(1)
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("SameArtist").build();
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Album").releaseYear(2024).build();
+        TrackEntity track = TrackEntity.builder().personEntity(artist).albumEntity(album).number(1).discNumber(1)
                 .metadataEntities(new ArrayList<>()).build();
 
         FFprobe ffprobe = mock(FFprobe.class, RETURNS_SELF);
@@ -431,7 +431,7 @@ class HandleAudioFileFoundTest {
 
         subject.handle(data);
 
-        verify(artistRepositoryMock, never()).findByLibraryEntityAndName(any(), any());
+        verify(personRepositoryMock, never()).findByLibraryEntityAndName(any(), any());
         org.junit.jupiter.api.Assertions.assertEquals("SameArtist", artist.getName());
     }
 
@@ -444,14 +444,14 @@ class HandleAudioFileFoundTest {
         UUID correctedTrackId = UUID.randomUUID();
 
         LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
-        ArtistEntity artist = ArtistEntity.builder().libraryEntity(library).name("Artist").build();
-        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).artistEntity(artist).name("Album").releaseYear(2024).build();
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("Artist").build();
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Album").releaseYear(2024).build();
 
-        TrackEntity wrongTrack = TrackEntity.builder().artistEntity(artist).albumEntity(album).number(0).discNumber(1)
+        TrackEntity wrongTrack = TrackEntity.builder().personEntity(artist).albumEntity(album).number(0).discNumber(1)
                 .metadataEntities(new ArrayList<>()).build();
         ReflectionTestUtils.setField(wrongTrack, "id", TRACK_ID);
 
-        TrackEntity correctTrack = TrackEntity.builder().artistEntity(artist).albumEntity(album).number(1).discNumber(1)
+        TrackEntity correctTrack = TrackEntity.builder().personEntity(artist).albumEntity(album).number(1).discNumber(1)
                 .metadataEntities(new ArrayList<>()).build();
         ReflectionTestUtils.setField(correctTrack, "id", correctedTrackId);
 

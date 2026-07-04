@@ -1,11 +1,11 @@
-package app.ister.worker.events.artistfound;
+package app.ister.worker.events.personfound;
 
 import app.ister.core.Handle;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
-import app.ister.core.eventdata.ArtistFoundData;
-import app.ister.core.repository.ArtistRepository;
+import app.ister.core.eventdata.PersonFoundData;
+import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.worker.events.musicbrainz.MusicBrainzService;
@@ -19,15 +19,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 
-import static app.ister.core.MessageQueue.APP_ISTER_SERVER_ARTIST_FOUND;
+import static app.ister.core.MessageQueue.APP_ISTER_SERVER_PERSON_FOUND;
 
 @Slf4j
-@Service("workerHandleArtistFound")
+@Service("workerHandlePersonFound")
 @Transactional
 @RequiredArgsConstructor
-public class HandleArtistFound implements Handle<ArtistFoundData> {
+public class HandlePersonFound implements Handle<PersonFoundData> {
 
-    private final ArtistRepository artistRepository;
+    private final PersonRepository personRepository;
     private final ImageRepository imageRepository;
     private final MetadataRepository metadataRepository;
     private final MusicBrainzService musicBrainzService;
@@ -35,28 +35,39 @@ public class HandleArtistFound implements Handle<ArtistFoundData> {
 
     @Override
     public EventType handles() {
-        return EventType.ARTIST_FOUND;
+        return EventType.PERSON_FOUND;
     }
 
-    @RabbitListener(queues = APP_ISTER_SERVER_ARTIST_FOUND)
+    @RabbitListener(queues = APP_ISTER_SERVER_PERSON_FOUND)
     @Override
-    public void listener(ArtistFoundData data) {
+    public void listener(PersonFoundData data) {
         Handle.super.listener(data);
     }
 
     @Override
-    public void handle(ArtistFoundData data) {
-        artistRepository.findById(data.getArtistId()).ifPresent(artist -> {
-            boolean hasMetadata = !metadataRepository.findByArtistEntityId(artist.getId()).isEmpty();
-            boolean hasImage = !imageRepository.findByArtistEntityId(artist.getId()).isEmpty();
+    public void handle(PersonFoundData data) {
+        personRepository.findById(data.getPersonId()).ifPresent(artist -> {
+            boolean hasMetadata = !metadataRepository.findByPersonEntityId(artist.getId()).isEmpty();
+            boolean hasImage = !imageRepository.findByPersonEntityId(artist.getId()).isEmpty();
             if (hasMetadata && hasImage) return;
 
             musicBrainzService.getArtistInfo(artist.getName()).ifPresent(info -> {
+                // Only individual persons get a birth year; groups keep NULL so a TMDB
+                // actor with the same name can still claim/enrich the record.
+                if (artist.getBirthYear() == null && "Person".equals(info.type())
+                        && info.lifeSpanBegin() != null && info.lifeSpanBegin().length() >= 4) {
+                    try {
+                        artist.setBirthYear(Integer.parseInt(info.lifeSpanBegin().substring(0, 4)));
+                        personRepository.save(artist);
+                    } catch (NumberFormatException _) {
+                        log.debug("Unparsable life-span begin '{}' for artist={}", info.lifeSpanBegin(), artist.getName());
+                    }
+                }
                 if (!hasMetadata && info.bio() != null) {
                     metadataRepository.save(MetadataEntity.builder()
                             .description(info.bio())
                             .genre(info.genre())
-                            .artistEntity(artist)
+                            .personEntity(artist)
                             .sourceUri("musicbrainz://artist/" + artist.getName())
                             .build());
                 }

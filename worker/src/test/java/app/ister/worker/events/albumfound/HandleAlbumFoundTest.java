@@ -1,7 +1,7 @@
 package app.ister.worker.events.albumfound;
 
 import app.ister.core.entity.AlbumEntity;
-import app.ister.core.entity.ArtistEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.enums.EventType;
@@ -65,7 +65,7 @@ class HandleAlbumFoundTest {
     private final AlbumEntity album = AlbumEntity.builder()
             .id(albumId)
             .name("Album")
-            .artistEntity(ArtistEntity.builder().name("Artist").build())
+            .personEntity(PersonEntity.builder().name("Artist").build())
             .build();
     private final AlbumFoundData data = AlbumFoundData.builder()
             .eventType(EventType.ALBUM_FOUND)

@@ -48,7 +48,7 @@ public class HandleAlbumFound implements Handle<AlbumFoundData> {
     @Override
     public void handle(AlbumFoundData data) {
         albumRepository.findById(data.getAlbumId()).ifPresent(album -> {
-            String artistName = album.getArtistEntity().getName();
+            String artistName = album.getPersonEntity().getName();
             String albumName = album.getName();
 
             if (imageRepository.findByAlbumEntityId(album.getId()).isEmpty()) {

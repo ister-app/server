@@ -9,8 +9,8 @@ type Query {
     showById(id: ID): Show
     getPlayQueue(id: ID!): PlayQueue
     libraries: [Library!]
-    artists(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): ArtistPage
-    artistById(id: ID): Artist
+    persons(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): PersonPage
+    personById(id: ID): Person
     albums(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, artistId: ID, libraryId: ID): AlbumPage
     albumById(id: ID): Album
     trackById(id: ID): Track
@@ -28,7 +28,7 @@ type Mutation {
     analyzeDataForMovie(movieId: ID!): Boolean!
     analyzeDataForShow(showId: ID!): Boolean!
     analyzeDataForLibrary(libraryId: ID!): Boolean!
-    analyzeDataForArtist(artistId: ID!): Boolean!
+    analyzeDataForPerson(personId: ID!): Boolean!
     analyzeDataForAlbum(albumId: ID!): Boolean!
     analyzeDataForTrack(trackId: ID!): Boolean!
 }
@@ -82,6 +82,7 @@ type Episode {
     metadata: [Metadata!]
     watchStatus: [WatchStatus!]
     mediaFile: [MediaFile!]
+    cast: [Credit!]
 }
 
 type Image {
@@ -150,6 +151,7 @@ type Movie {
     metadata: [Metadata!]
     watchStatus: [WatchStatus!]
     mediaFile: [MediaFile!]
+    cast: [Credit!]
 }
 
 type PlayQueue {
@@ -193,19 +195,34 @@ type ShowPage {
     size: Int!
 }
 
-type Artist {
+type Person {
     id: ID!
     name: String!
+    birthYear: Int
     albums: [Album!]
     images: [Image!]
     metadata: [Metadata!]
+    credits: [Credit!]
+}
+
+enum CreditType {
+    CAST
+    GUEST_STAR
+}
+
+type Credit {
+    id: ID!
+    person: Person!
+    characterName: String
+    creditType: CreditType!
+    castOrder: Int
 }
 
 type Album {
     id: ID!
     name: String!
     releaseYear: Int!
-    artist: Artist!
+    artist: Person!
     tracks: [Track!]
     images: [Image!]
     metadata: [Metadata!]
@@ -215,14 +232,14 @@ type Track {
     id: ID!
     number: Int!
     discNumber: Int!
-    artist: Artist!
+    artist: Person!
     album: Album!
     metadata: [Metadata!]
     mediaFile: [MediaFile!]
 }
 
-type ArtistPage {
-    content: [Artist!]!
+type PersonPage {
+    content: [Person!]!
     totalPages: Int!
     totalElements: Int!
     number: Int!
@@ -245,6 +262,7 @@ type Show {
     seasons: [Season!]
     images: [Image!]
     metadata: [Metadata!]
+    cast: [Credit!]
 }
 
 type RecentlyWatched {

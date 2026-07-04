@@ -6,14 +6,14 @@ import app.ister.core.enums.EventType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.AlbumFoundData;
 import app.ister.core.eventdata.AnalyzeLibraryRequestedData;
-import app.ister.core.eventdata.ArtistFoundData;
+import app.ister.core.eventdata.PersonFoundData;
 import app.ister.core.eventdata.AudioFileFoundData;
 import app.ister.core.eventdata.EpisodeFoundData;
 import app.ister.core.eventdata.MovieFoundData;
 import app.ister.core.eventdata.ShowFoundData;
 import app.ister.core.eventdata.UpdateImagesRequestedData;
 import app.ister.core.repository.AlbumRepository;
-import app.ister.core.repository.ArtistRepository;
+import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
@@ -41,7 +41,7 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
     private final ShowRepository showRepository;
     private final EpisodeRepository episodeRepository;
     private final MovieRepository movieRepository;
-    private final ArtistRepository artistRepository;
+    private final PersonRepository personRepository;
     private final AlbumRepository albumRepository;
     private final TrackRepository trackRepository;
     private final MessageSender messageSender;
@@ -73,9 +73,9 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
     }
 
     private void dispatchMissingMusicMetadataEvents(String nodeName) {
-        artistRepository.findByLibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(LibraryType.MUSIC)
-                .forEach(a -> messageSender.sendArtistFound(
-                        ArtistFoundData.builder().eventType(EventType.ARTIST_FOUND).artistId(a.getId()).build(),
+        personRepository.findByLibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(LibraryType.MUSIC)
+                .forEach(a -> messageSender.sendPersonFound(
+                        PersonFoundData.builder().eventType(EventType.PERSON_FOUND).personId(a.getId()).build(),
                         nodeName));
 
         albumRepository.findByLibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(LibraryType.MUSIC)

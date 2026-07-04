@@ -1,7 +1,7 @@
 package app.ister.api.controller;
 
 import app.ister.core.entity.AlbumEntity;
-import app.ister.core.entity.ArtistEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.TrackEntity;
@@ -31,8 +31,8 @@ public class TrackController {
     }
 
     @SchemaMapping(typeName = "Track", field = "artist")
-    public ArtistEntity artist(TrackEntity trackEntity) {
-        return trackEntity.getArtistEntity();
+    public PersonEntity artist(TrackEntity trackEntity) {
+        return trackEntity.getPersonEntity();
     }
 
     @SchemaMapping(typeName = "Track", field = "album")

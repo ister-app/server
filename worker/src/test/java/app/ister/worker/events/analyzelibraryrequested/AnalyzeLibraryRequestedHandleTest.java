@@ -6,7 +6,7 @@ import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.AnalyzeLibraryRequestedData;
 import app.ister.core.repository.AlbumRepository;
-import app.ister.core.repository.ArtistRepository;
+import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
@@ -55,7 +55,7 @@ class AnalyzeLibraryRequestedHandleTest {
     private DirectoryRepository directoryRepository;
 
     @Mock
-    private ArtistRepository artistRepository;
+    private PersonRepository personRepository;
 
     @Mock
     private AlbumRepository albumRepository;

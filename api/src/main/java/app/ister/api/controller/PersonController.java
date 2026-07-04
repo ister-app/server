@@ -1,18 +1,21 @@
 package app.ister.api.controller;
 
 import app.ister.core.entity.AlbumEntity;
-import app.ister.core.entity.ArtistEntity;
+import app.ister.core.entity.CreditEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
-import app.ister.core.repository.ArtistRepository;
+import app.ister.core.repository.CreditRepository;
+import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.BatchMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
@@ -29,20 +32,21 @@ import java.util.stream.Collectors;
 @Slf4j
 @Controller
 @RequiredArgsConstructor
-public class ArtistController {
-    private final ArtistRepository artistRepository;
+public class PersonController {
+    private final PersonRepository personRepository;
     private final ImageRepository imageRepository;
     private final LibraryRepository libraryRepository;
+    private final CreditRepository creditRepository;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public Optional<ArtistEntity> artistById(@Argument UUID id) {
-        return artistRepository.findById(id);
+    public Optional<PersonEntity> personById(@Argument UUID id) {
+        return personRepository.findById(id);
     }
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public Page<ArtistEntity> artists(
+    public Page<PersonEntity> persons(
             @Argument Optional<Integer> page,
             @Argument Optional<Integer> size,
             @Argument Optional<SortingEnum> sorting,
@@ -51,25 +55,30 @@ public class ArtistController {
         Pageable pageable = Paging.pageable(page, size, 10,
                 sorting, SortingEnum.NAME, sortingOrder, SortingOrder.ASCENDING);
         return libraryId.flatMap(libraryRepository::findById)
-                .map(lib -> artistRepository.findByLibraryEntity(lib, pageable))
-                .orElseGet(() -> artistRepository.findAll(pageable));
+                .map(lib -> personRepository.findByLibraryEntity(lib, pageable))
+                .orElseGet(() -> personRepository.findAll(pageable));
     }
 
-    @SchemaMapping(typeName = "Artist", field = "albums")
-    public List<AlbumEntity> albums(ArtistEntity artistEntity) {
-        return artistEntity.getAlbumEntities();
+    @SchemaMapping(typeName = "Person", field = "albums")
+    public List<AlbumEntity> albums(PersonEntity personEntity) {
+        return personEntity.getAlbumEntities();
     }
 
-    @SchemaMapping(typeName = "Artist", field = "metadata")
-    public List<MetadataEntity> metadata(ArtistEntity artistEntity) {
-        return artistEntity.getMetadataEntities();
+    @SchemaMapping(typeName = "Person", field = "metadata")
+    public List<MetadataEntity> metadata(PersonEntity personEntity) {
+        return personEntity.getMetadataEntities();
     }
 
-    @BatchMapping(typeName = "Artist", field = "images")
-    public Map<ArtistEntity, List<ImageEntity>> images(List<ArtistEntity> artists) {
-        List<UUID> ids = artists.stream().map(ArtistEntity::getId).toList();
-        Map<UUID, List<ImageEntity>> byArtistId = imageRepository.findByArtistEntityIdIn(ids).stream()
-                .collect(Collectors.groupingBy(ImageEntity::getArtistEntityId));
-        return artists.stream().collect(Collectors.toMap(a -> a, a -> byArtistId.getOrDefault(a.getId(), List.of())));
+    @SchemaMapping(typeName = "Person", field = "credits")
+    public List<CreditEntity> credits(PersonEntity personEntity) {
+        return creditRepository.findByPersonEntityId(personEntity.getId(), Sort.by("castOrder"));
+    }
+
+    @BatchMapping(typeName = "Person", field = "images")
+    public Map<PersonEntity, List<ImageEntity>> images(List<PersonEntity> persons) {
+        List<UUID> ids = persons.stream().map(PersonEntity::getId).toList();
+        Map<UUID, List<ImageEntity>> byPersonId = imageRepository.findByPersonEntityIdIn(ids).stream()
+                .collect(Collectors.groupingBy(ImageEntity::getPersonEntityId));
+        return persons.stream().collect(Collectors.toMap(a -> a, a -> byPersonId.getOrDefault(a.getId(), List.of())));
     }
 }

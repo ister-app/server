@@ -1,7 +1,7 @@
 package app.ister.worker.events.analyzedata;
 
 import app.ister.core.entity.AlbumEntity;
-import app.ister.core.entity.ArtistEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.LibraryEntity;
@@ -15,7 +15,7 @@ import app.ister.core.enums.EventType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.AnalyzeData;
 import app.ister.core.repository.AlbumRepository;
-import app.ister.core.repository.ArtistRepository;
+import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.ImageRepository;
@@ -63,7 +63,7 @@ class AnalyzeDataHandleTest {
     @Mock
     private LibraryRepository libraryRepository;
     @Mock
-    private ArtistRepository artistRepository;
+    private PersonRepository personRepository;
     @Mock
     private AlbumRepository albumRepository;
     @Mock
@@ -244,41 +244,41 @@ class AnalyzeDataHandleTest {
     @Test
     void handleLibraryIdMusicTypeSendsArtistFanOut() {
         UUID libraryId = UUID.randomUUID();
-        UUID artistId1 = UUID.randomUUID();
-        UUID artistId2 = UUID.randomUUID();
+        UUID personId1 = UUID.randomUUID();
+        UUID personId2 = UUID.randomUUID();
         LibraryEntity library = LibraryEntity.builder()
                 .id(libraryId)
                 .libraryType(LibraryType.MUSIC)
                 .build();
-        ArtistEntity artist1 = ArtistEntity.builder().id(artistId1).build();
-        ArtistEntity artist2 = ArtistEntity.builder().id(artistId2).build();
+        PersonEntity artist1 = PersonEntity.builder().id(personId1).build();
+        PersonEntity artist2 = PersonEntity.builder().id(personId2).build();
         AnalyzeData data = AnalyzeData.builder()
                 .eventType(EventType.ANALYZE_DATA)
                 .libraryId(libraryId)
                 .build();
 
         when(libraryRepository.findById(libraryId)).thenReturn(Optional.of(library));
-        when(artistRepository.findByLibraryEntityId(libraryId)).thenReturn(List.of(artist1, artist2));
+        when(personRepository.findByLibraryEntityId(libraryId)).thenReturn(List.of(artist1, artist2));
 
         subject.handle(data);
 
         ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
         verify(messageSender, times(2)).sendAnalyzeData(captor.capture());
-        List<UUID> sentArtistIds = captor.getAllValues().stream().map(AnalyzeData::getArtistId).toList();
-        assertTrue(sentArtistIds.contains(artistId1));
-        assertTrue(sentArtistIds.contains(artistId2));
+        List<UUID> sentPersonIds = captor.getAllValues().stream().map(AnalyzeData::getPersonId).toList();
+        assertTrue(sentPersonIds.contains(personId1));
+        assertTrue(sentPersonIds.contains(personId2));
     }
 
     @Test
-    void handleArtistIdSendsArtistFoundAndAlbumFanOut() {
-        UUID artistId = UUID.randomUUID();
+    void handlePersonIdSendsPersonFoundAndAlbumFanOut() {
+        UUID personId = UUID.randomUUID();
         UUID albumId1 = UUID.randomUUID();
         LibraryEntity library = LibraryEntity.builder().build();
         NodeEntity node = NodeEntity.builder().name("disk1").build();
         DirectoryEntity dir = DirectoryEntity.builder().nodeEntity(node).build();
         AlbumEntity album1 = AlbumEntity.builder().id(albumId1).build();
-        ArtistEntity artist = ArtistEntity.builder()
-                .id(artistId)
+        PersonEntity artist = PersonEntity.builder()
+                .id(personId)
                 .libraryEntity(library)
                 .metadataEntities(List.of())
                 .imageEntities(List.of())
@@ -286,16 +286,16 @@ class AnalyzeDataHandleTest {
                 .build();
         AnalyzeData data = AnalyzeData.builder()
                 .eventType(EventType.ANALYZE_DATA)
-                .artistId(artistId)
+                .personId(personId)
                 .build();
 
-        when(artistRepository.findById(artistId)).thenReturn(Optional.of(artist));
+        when(personRepository.findById(personId)).thenReturn(Optional.of(artist));
         when(directoryRepository.findByLibraryEntityAndDirectoryType(library, DirectoryType.LIBRARY))
                 .thenReturn(List.of(dir));
 
         subject.handle(data);
 
-        verify(messageSender).sendArtistFound(any(), eq("disk1"));
+        verify(messageSender).sendPersonFound(any(), eq("disk1"));
         ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
         verify(messageSender).sendAnalyzeData(captor.capture());
         assertEquals(albumId1, captor.getValue().getAlbumId());

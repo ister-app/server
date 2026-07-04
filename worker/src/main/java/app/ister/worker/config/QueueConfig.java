@@ -50,8 +50,8 @@ public class QueueConfig {
     }
 
     @Bean
-    public Queue queueArtistFound() {
-        return new Queue(APP_ISTER_SERVER_ARTIST_FOUND);
+    public Queue queuePersonFound() {
+        return new Queue(APP_ISTER_SERVER_PERSON_FOUND);
     }
 
     @Bean

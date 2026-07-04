@@ -1,13 +1,13 @@
 package app.ister.api.controller;
 
 import app.ister.core.entity.AlbumEntity;
-import app.ister.core.entity.ArtistEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.repository.AlbumRepository;
-import app.ister.core.repository.ArtistRepository;
+import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.ImageRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,7 +38,7 @@ class AlbumControllerTest {
     private AlbumRepository albumRepository;
 
     @Mock
-    private ArtistRepository artistRepository;
+    private PersonRepository personRepository;
 
     @Mock
     private ImageRepository imageRepository;
@@ -64,30 +64,30 @@ class AlbumControllerTest {
     }
 
     @Test
-    void albumsWithArtistIdFiltersOnArtist() {
-        UUID artistId = UUID.randomUUID();
-        ArtistEntity artist = ArtistEntity.builder().name("The Beatles").build();
+    void albumsWithPersonIdFiltersOnArtist() {
+        UUID personId = UUID.randomUUID();
+        PersonEntity artist = PersonEntity.builder().name("The Beatles").build();
         AlbumEntity album = AlbumEntity.builder().name("Abbey Road").releaseYear(1969).build();
         Page<AlbumEntity> page = new PageImpl<>(List.of(album));
-        when(artistRepository.findById(artistId)).thenReturn(Optional.of(artist));
-        when(albumRepository.findByArtistEntity(eq(artist), any(Pageable.class))).thenReturn(page);
+        when(personRepository.findById(personId)).thenReturn(Optional.of(artist));
+        when(albumRepository.findByPersonEntity(eq(artist), any(Pageable.class))).thenReturn(page);
 
         Page<AlbumEntity> result = subject.albums(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.of(artistId), Optional.empty());
+                Optional.of(personId), Optional.empty());
 
         assertEquals(1, result.getContent().size());
         assertEquals("Abbey Road", result.getContent().get(0).getName());
     }
 
     @Test
-    void albumsWithUnknownArtistIdReturnsEmpty() {
-        UUID artistId = UUID.randomUUID();
-        when(artistRepository.findById(artistId)).thenReturn(Optional.empty());
+    void albumsWithUnknownPersonIdReturnsEmpty() {
+        UUID personId = UUID.randomUUID();
+        when(personRepository.findById(personId)).thenReturn(Optional.empty());
 
         Page<AlbumEntity> result = subject.albums(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.of(artistId), Optional.empty());
+                Optional.of(personId), Optional.empty());
 
         assertTrue(result.isEmpty());
     }
@@ -108,8 +108,8 @@ class AlbumControllerTest {
 
     @Test
     void artistSchemaMappingReturnsArtist() {
-        ArtistEntity artist = ArtistEntity.builder().name("The Beatles").build();
-        AlbumEntity album = AlbumEntity.builder().name("Abbey Road").artistEntity(artist).build();
+        PersonEntity artist = PersonEntity.builder().name("The Beatles").build();
+        AlbumEntity album = AlbumEntity.builder().name("Abbey Road").personEntity(artist).build();
 
         assertEquals(artist, subject.artist(album));
     }

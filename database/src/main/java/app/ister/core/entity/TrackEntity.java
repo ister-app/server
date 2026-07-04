@@ -16,7 +16,7 @@ import java.util.List;
 public class TrackEntity extends BaseEntity {
 
     @ManyToOne(optional = false)
-    private ArtistEntity artistEntity;
+    private PersonEntity personEntity;
 
     @ManyToOne(optional = false)
     private AlbumEntity albumEntity;

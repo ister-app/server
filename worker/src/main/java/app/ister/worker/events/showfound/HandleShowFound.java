@@ -31,6 +31,7 @@ public class HandleShowFound implements Handle<app.ister.core.eventdata.ShowFoun
     private final ShowMetadata showMetadata;
     private final MetadataSave metaDataSave;
     private final ImageDownloadService imageDownloadService;
+    private final CreditsService creditsService;
 
     @Value("${app.ister.server.TMDB.apikey:}")
     private String apikey;
@@ -55,6 +56,7 @@ public class HandleShowFound implements Handle<app.ister.core.eventdata.ShowFoun
         }
         try {
             var showEntity = showRepository.findById(showFoundData.getShowId()).orElseThrow();
+            Integer tmdbSeriesId = null;
             for (String language : supportLanguages) {
                 Optional<TMDBResult> tmdbResult = showMetadata.getMetadata(showEntity.getName(), showEntity.getReleaseYear(), language);
                 if (tmdbResult.isPresent()) {
@@ -65,7 +67,14 @@ public class HandleShowFound implements Handle<app.ister.core.eventdata.ShowFoun
                     if (tmdbResult.get().getPosterUrl() != null) {
                         imageDownloadService.downloadAndSave(tmdbResult.get().getPosterUrl(), ImageType.COVER, tmdbResult.get().getLanguage(), "TMDB://" + tmdbResult.get().getPosterUrl(), new ImageSave.MediaEntityRef(null, showEntity, null, null, null));
                     }
+                    if (tmdbSeriesId == null) {
+                        tmdbSeriesId = tmdbResult.get().getTmdbId();
+                    }
                 }
+            }
+            // Credits are language independent: fetch once.
+            if (tmdbSeriesId != null) {
+                creditsService.fetchForShow(showEntity, tmdbSeriesId);
             }
         } catch (IOException e) {
             throw new EventHandlingException("Download and saving image failed", e);

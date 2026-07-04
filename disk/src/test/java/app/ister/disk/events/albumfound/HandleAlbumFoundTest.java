@@ -1,7 +1,7 @@
 package app.ister.disk.events.albumfound;
 
 import app.ister.core.entity.AlbumEntity;
-import app.ister.core.entity.ArtistEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MetadataEntity;
@@ -94,7 +94,7 @@ class HandleAlbumFoundTest {
                 .build();
         ReflectionTestUtils.setField(library, "id", libraryId);
 
-        ArtistEntity artist = ArtistEntity.builder()
+        PersonEntity artist = PersonEntity.builder()
                 .libraryEntity(library)
                 .name("ArtistName")
                 .build();
@@ -102,7 +102,7 @@ class HandleAlbumFoundTest {
         MetadataEntity meta = MetadataEntity.builder().build();
         AlbumEntity album = AlbumEntity.builder()
                 .libraryEntity(library)
-                .artistEntity(artist)
+                .personEntity(artist)
                 .name("AlbumName")
                 .releaseYear(2024)
                 .metadataEntities(List.of(meta))
@@ -149,14 +149,14 @@ class HandleAlbumFoundTest {
                 .build();
         ReflectionTestUtils.setField(library, "id", libraryId);
 
-        ArtistEntity artist = ArtistEntity.builder()
+        PersonEntity artist = PersonEntity.builder()
                 .libraryEntity(library)
                 .name("ArtistName")
                 .build();
 
         AlbumEntity album = AlbumEntity.builder()
                 .libraryEntity(library)
-                .artistEntity(artist)
+                .personEntity(artist)
                 .name("AlbumName")
                 .releaseYear(0)
                 .metadataEntities(List.of())
@@ -207,14 +207,14 @@ class HandleAlbumFoundTest {
                 .build();
         ReflectionTestUtils.setField(otherLibrary, "id", otherLibraryId);
 
-        ArtistEntity artist = ArtistEntity.builder()
+        PersonEntity artist = PersonEntity.builder()
                 .libraryEntity(library)
                 .name("ArtistName")
                 .build();
 
         AlbumEntity album = AlbumEntity.builder()
                 .libraryEntity(library)
-                .artistEntity(artist)
+                .personEntity(artist)
                 .name("AlbumName")
                 .releaseYear(2024)
                 .metadataEntities(List.of())

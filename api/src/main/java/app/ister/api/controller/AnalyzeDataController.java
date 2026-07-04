@@ -63,11 +63,11 @@ public class AnalyzeDataController {
 
     @MutationMapping
     @PreAuthorize("hasRole('user')")
-    public Boolean analyzeDataForArtist(@Argument UUID artistId) {
+    public Boolean analyzeDataForPerson(@Argument UUID personId) {
         messageSender.sendAnalyzeData(
                 AnalyzeData.builder()
                         .eventType(EventType.ANALYZE_DATA)
-                        .artistId(artistId)
+                        .personId(personId)
                         .build());
         return true;
     }

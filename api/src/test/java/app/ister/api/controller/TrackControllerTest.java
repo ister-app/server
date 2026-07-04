@@ -1,7 +1,7 @@
 package app.ister.api.controller;
 
 import app.ister.core.entity.AlbumEntity;
-import app.ister.core.entity.ArtistEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.TrackEntity;
@@ -31,10 +31,10 @@ class TrackControllerTest {
     @Test
     void trackByIdReturnsFromRepository() {
         UUID id = UUID.randomUUID();
-        ArtistEntity artist = ArtistEntity.builder().name("The Beatles").build();
+        PersonEntity artist = PersonEntity.builder().name("The Beatles").build();
         AlbumEntity album = AlbumEntity.builder().name("Abbey Road").releaseYear(1969).build();
         TrackEntity track = TrackEntity.builder().number(1).discNumber(1)
-                .artistEntity(artist).albumEntity(album).build();
+                .personEntity(artist).albumEntity(album).build();
         when(trackRepository.findById(id)).thenReturn(Optional.of(track));
 
         Optional<TrackEntity> result = subject.trackById(id);
@@ -54,8 +54,8 @@ class TrackControllerTest {
 
     @Test
     void artistSchemaMappingReturnsArtist() {
-        ArtistEntity artist = ArtistEntity.builder().name("The Beatles").build();
-        TrackEntity track = TrackEntity.builder().artistEntity(artist).build();
+        PersonEntity artist = PersonEntity.builder().name("The Beatles").build();
+        TrackEntity track = TrackEntity.builder().personEntity(artist).build();
 
         assertEquals(artist, subject.artist(track));
     }

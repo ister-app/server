@@ -18,7 +18,7 @@ public class AnalyzeData extends MessageData {
     private UUID showId;
     private UUID libraryId;
     private UUID directoryId;
-    private UUID artistId;
+    private UUID personId;
     private UUID albumId;
     private UUID trackId;
 }

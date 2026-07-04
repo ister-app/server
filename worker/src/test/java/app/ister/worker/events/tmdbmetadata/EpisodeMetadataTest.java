@@ -57,6 +57,8 @@ class EpisodeMetadataTest {
                 .sourceUri("")
                 .description("overview")
                 .sourceUri("TMDB://1")
+                .tmdbId(1)
+                .seriesTmdbId(1)
                 .backgroundUrl("https://image.tmdb.org/t/p/original/still-path").build();
 
         Optional<TMDBResult> result = subject.getMetadata("Showname", 2024, 1, 1, "en");

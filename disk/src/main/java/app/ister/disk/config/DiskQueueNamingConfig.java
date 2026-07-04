@@ -99,8 +99,8 @@ public class DiskQueueNamingConfig {
         ).toArray(String[]::new);
     }
 
-    public String getArtistFoundQueue() {
-        return APP_ISTER_SERVER_ARTIST_FOUND + "." + nodeName;
+    public String getPersonFoundQueue() {
+        return APP_ISTER_SERVER_PERSON_FOUND + "." + nodeName;
     }
 
     public String getAlbumFoundQueue() {

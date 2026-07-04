@@ -78,16 +78,16 @@ class AnalyzeDataControllerTest {
     }
 
     @Test
-    void analyzeDataForArtistSendsCorrectMessage() {
-        UUID artistId = UUID.randomUUID();
+    void analyzeDataForPersonSendsCorrectMessage() {
+        UUID personId = UUID.randomUUID();
 
-        Boolean result = subject.analyzeDataForArtist(artistId);
+        Boolean result = subject.analyzeDataForPerson(personId);
 
         assertTrue(result);
         ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
         verify(messageSender).sendAnalyzeData(captor.capture());
         assertEquals(EventType.ANALYZE_DATA, captor.getValue().getEventType());
-        assertEquals(artistId, captor.getValue().getArtistId());
+        assertEquals(personId, captor.getValue().getPersonId());
     }
 
     @Test

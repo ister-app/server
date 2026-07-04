@@ -1,6 +1,6 @@
-package app.ister.disk.events.artistfound;
+package app.ister.disk.events.personfound;
 
-import app.ister.core.entity.ArtistEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MetadataEntity;
@@ -9,8 +9,8 @@ import app.ister.core.entity.OtherPathFileEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.LibraryType;
-import app.ister.core.eventdata.ArtistFoundData;
-import app.ister.core.repository.ArtistRepository;
+import app.ister.core.eventdata.PersonFoundData;
+import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.OtherPathFileRepository;
@@ -36,13 +36,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class HandleArtistFoundTest {
+class HandlePersonFoundTest {
 
     @InjectMocks
-    private HandleArtistFound subject;
+    private HandlePersonFound subject;
 
     @Mock
-    private ArtistRepository artistRepository;
+    private PersonRepository personRepository;
     @Mock
     private MetadataRepository metadataRepository;
     @Mock
@@ -56,12 +56,12 @@ class HandleArtistFoundTest {
 
     @Test
     void handles() {
-        assertEquals(EventType.ARTIST_FOUND, subject.handles());
+        assertEquals(EventType.PERSON_FOUND, subject.handles());
     }
 
     @Test
     void listenerThrowsOnWrongEventType() {
-        ArtistFoundData data = ArtistFoundData.builder()
+        PersonFoundData data = PersonFoundData.builder()
                 .eventType(EventType.MEDIA_FILE_FOUND)
                 .build();
         assertThrows(IllegalArgumentException.class, () -> subject.listener(data));
@@ -69,13 +69,13 @@ class HandleArtistFoundTest {
 
     @Test
     void handleReturnsTrueWhenArtistNotFound() {
-        UUID artistId = UUID.randomUUID();
-        ArtistFoundData data = ArtistFoundData.builder()
-                .eventType(EventType.ARTIST_FOUND)
-                .artistId(artistId)
+        UUID personId = UUID.randomUUID();
+        PersonFoundData data = PersonFoundData.builder()
+                .eventType(EventType.PERSON_FOUND)
+                .personId(personId)
                 .build();
 
-        when(artistRepository.findById(artistId)).thenReturn(Optional.empty());
+        when(personRepository.findById(personId)).thenReturn(Optional.empty());
 
         subject.handle(data);
         verify(metadataRepository, never()).deleteAll(any());
@@ -83,7 +83,7 @@ class HandleArtistFoundTest {
 
     @Test
     void handleDeletesMetadataAndSendsNfoEventWhenNfoExists() {
-        UUID artistId = UUID.randomUUID();
+        UUID personId = UUID.randomUUID();
         UUID libraryId = UUID.randomUUID();
         UUID dirId = UUID.randomUUID();
 
@@ -94,12 +94,12 @@ class HandleArtistFoundTest {
         ReflectionTestUtils.setField(library, "id", libraryId);
 
         MetadataEntity meta = MetadataEntity.builder().build();
-        ArtistEntity artist = ArtistEntity.builder()
+        PersonEntity artist = PersonEntity.builder()
                 .libraryEntity(library)
                 .name("ArtistName")
                 .metadataEntities(List.of(meta))
                 .build();
-        ReflectionTestUtils.setField(artist, "id", artistId);
+        ReflectionTestUtils.setField(artist, "id", personId);
 
         NodeEntity node = NodeEntity.builder().name("node1").url("http://localhost").build();
         DirectoryEntity dir = DirectoryEntity.builder()
@@ -114,16 +114,16 @@ class HandleArtistFoundTest {
         String expectedNfoPath = "/music/ArtistName/artist.nfo";
         OtherPathFileEntity nfoFile = new OtherPathFileEntity();
 
-        when(artistRepository.findById(artistId)).thenReturn(Optional.of(artist));
+        when(personRepository.findById(personId)).thenReturn(Optional.of(artist));
         when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
         when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node))
                 .thenReturn(List.of(dir));
         when(otherPathFileRepository.findByDirectoryEntityAndPath(dir, expectedNfoPath))
                 .thenReturn(Optional.of(nfoFile));
 
-        subject.handle(ArtistFoundData.builder()
-                .eventType(EventType.ARTIST_FOUND)
-                .artistId(artistId)
+        subject.handle(PersonFoundData.builder()
+                .eventType(EventType.PERSON_FOUND)
+                .personId(personId)
                 .build());
 
         verify(metadataRepository).deleteAll(List.of(meta));
@@ -132,7 +132,7 @@ class HandleArtistFoundTest {
 
     @Test
     void handleSkipsWhenNfoNotFound() {
-        UUID artistId = UUID.randomUUID();
+        UUID personId = UUID.randomUUID();
         UUID libraryId = UUID.randomUUID();
 
         LibraryEntity library = LibraryEntity.builder()
@@ -141,12 +141,12 @@ class HandleArtistFoundTest {
                 .build();
         ReflectionTestUtils.setField(library, "id", libraryId);
 
-        ArtistEntity artist = ArtistEntity.builder()
+        PersonEntity artist = PersonEntity.builder()
                 .libraryEntity(library)
                 .name("BandName")
                 .metadataEntities(List.of())
                 .build();
-        ReflectionTestUtils.setField(artist, "id", artistId);
+        ReflectionTestUtils.setField(artist, "id", personId);
 
         NodeEntity node = NodeEntity.builder().name("node1").url("http://localhost").build();
         DirectoryEntity dir = DirectoryEntity.builder()
@@ -159,16 +159,16 @@ class HandleArtistFoundTest {
 
         String expectedNfoPath = "/music/BandName/artist.nfo";
 
-        when(artistRepository.findById(artistId)).thenReturn(Optional.of(artist));
+        when(personRepository.findById(personId)).thenReturn(Optional.of(artist));
         when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
         when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node))
                 .thenReturn(List.of(dir));
         when(otherPathFileRepository.findByDirectoryEntityAndPath(dir, expectedNfoPath))
                 .thenReturn(Optional.empty());
 
-        subject.handle(ArtistFoundData.builder()
-                .eventType(EventType.ARTIST_FOUND)
-                .artistId(artistId)
+        subject.handle(PersonFoundData.builder()
+                .eventType(EventType.PERSON_FOUND)
+                .personId(personId)
                 .build());
 
         verify(messageSender, never()).sendNfoFileFound(any(), any());
@@ -176,7 +176,7 @@ class HandleArtistFoundTest {
 
     @Test
     void handleSkipsDirectoriesFromOtherLibraries() {
-        UUID artistId = UUID.randomUUID();
+        UUID personId = UUID.randomUUID();
         UUID libraryId = UUID.randomUUID();
         UUID otherLibraryId = UUID.randomUUID();
 
@@ -192,12 +192,12 @@ class HandleArtistFoundTest {
                 .build();
         ReflectionTestUtils.setField(otherLibrary, "id", otherLibraryId);
 
-        ArtistEntity artist = ArtistEntity.builder()
+        PersonEntity artist = PersonEntity.builder()
                 .libraryEntity(library)
                 .name("ArtistName")
                 .metadataEntities(List.of())
                 .build();
-        ReflectionTestUtils.setField(artist, "id", artistId);
+        ReflectionTestUtils.setField(artist, "id", personId);
 
         NodeEntity node = NodeEntity.builder().name("node1").url("http://localhost").build();
         DirectoryEntity wrongLibDir = DirectoryEntity.builder()
@@ -215,14 +215,14 @@ class HandleArtistFoundTest {
                 .nodeEntity(node)
                 .build();
 
-        when(artistRepository.findById(artistId)).thenReturn(Optional.of(artist));
+        when(personRepository.findById(personId)).thenReturn(Optional.of(artist));
         when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
         when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node))
                 .thenReturn(List.of(wrongLibDir, nullLibDir));
 
-        subject.handle(ArtistFoundData.builder()
-                .eventType(EventType.ARTIST_FOUND)
-                .artistId(artistId)
+        subject.handle(PersonFoundData.builder()
+                .eventType(EventType.PERSON_FOUND)
+                .personId(personId)
                 .build());
 
         verify(otherPathFileRepository, never()).findByDirectoryEntityAndPath(any(), any());
