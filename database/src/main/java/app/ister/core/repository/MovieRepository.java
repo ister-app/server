@@ -22,6 +22,16 @@ public interface MovieRepository extends JpaRepository<MovieEntity, UUID> {
     List<UUID> findIdsByLibraryId(@Param("libraryId") UUID libraryId);
 
     /**
+     * Returns a page of movie IDs of a whole library in a deterministic shuffled order derived from the seed.
+     */
+    @Query(value = """
+            SELECT m.id FROM movie_entity m
+            WHERE m.library_entity_id = :libraryId AND m.id <> :excludeId
+            ORDER BY md5(m.id::text || :seed), m.id
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findMovieIdsForLibraryShuffled(@Param("libraryId") UUID libraryId, @Param("seed") String seed, @Param("excludeId") UUID excludeId, @Param("limit") int limit, @Param("offset") int offset);
+
+    /**
      * Returns the IDs (UUID) of movies that have no {@link MetadataEntity} linked to them.
      */
     @Query("SELECT s.id FROM MovieEntity s LEFT JOIN s.metadataEntities m " +

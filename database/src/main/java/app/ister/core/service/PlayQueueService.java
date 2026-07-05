@@ -1,23 +1,31 @@
 package app.ister.core.service;
 
+import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.PlayQueueEntity;
 import app.ister.core.entity.PlayQueueItemEntity;
 import app.ister.core.entity.TrackEntity;
+import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.MediaType;
+import app.ister.core.enums.PlayQueueSourceType;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.PlayQueueRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -33,6 +41,8 @@ public class PlayQueueService {
 
     private final TrackRepository trackRepository;
 
+    private final LibraryRepository libraryRepository;
+
     private final UserService userService;
 
     private final WatchStatusRepository watchStatusRepository;
@@ -40,19 +50,183 @@ public class PlayQueueService {
     private final WatchStatusService watchStatusService;
 
     private static final BigDecimal GAP = new BigDecimal("1000");
+    private static final BigDecimal TWO = new BigDecimal("2");
+    private static final int POSITION_SCALE = 10;
+    // Number of source items materialized per append.
+    private static final int CHUNK_SIZE = 50;
+    // Append a new chunk when fewer than this many items remain after the current item.
+    private static final int EXTEND_THRESHOLD = 15;
+    // How many already-played items to keep before the start item when creating a queue mid-source.
+    private static final int BACK_WINDOW = 10;
+    // Bound for the shuffle exclusion parameter when there is no start item; matches no row.
+    private static final UUID NIL_UUID = new UUID(0, 0);
 
-    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService) {
+    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, LibraryRepository libraryRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService) {
         this.playQueueRepository = playQueueRepository;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
         this.trackRepository = trackRepository;
+        this.libraryRepository = libraryRepository;
         this.userService = userService;
         this.watchStatusRepository = watchStatusRepository;
         this.watchStatusService = watchStatusService;
     }
 
-    public Optional<PlayQueueEntity> getPlayQueue(UUID id) {
-        return playQueueRepository.findById(id);
+    @Transactional
+    public Optional<PlayQueueEntity> getPlayQueue(UUID id, Authentication authentication) {
+        Optional<PlayQueueEntity> playQueueEntityOptional = playQueueRepository.findById(id);
+        playQueueEntityOptional.ifPresent(playQueueEntity -> {
+            checkOwnership(playQueueEntity, authentication);
+            maybeExtend(playQueueEntity);
+        });
+        return playQueueEntityOptional;
+    }
+
+    /**
+     * Creates a play queue from a source. Only an initial window of items is materialized;
+     * more items are appended lazily while the user plays through the queue.
+     *
+     * @param startId the episode/track to start at (ignored for MOVIE, optional otherwise)
+     * @param shuffle play the source in a stable seeded random order; required for LIBRARY sources
+     */
+    @Transactional
+    public PlayQueueEntity createPlayQueue(PlayQueueSourceType sourceType, UUID sourceId, UUID startId, boolean shuffle, Authentication authentication) {
+        log.debug("Creating play queue for user: {}, source type: {}, source: {}, shuffle: {}", authentication.getName(), sourceType, sourceId, shuffle);
+
+        PlayQueueEntity queue = PlayQueueEntity.builder()
+                .userEntity(userService.getOrCreateUser(authentication))
+                .sourceType(sourceType)
+                .sourceId(sourceId)
+                .items(new ArrayList<>())
+                .build();
+
+        if (sourceType == PlayQueueSourceType.MOVIE) {
+            addItem(queue, buildItem(queue, MediaType.MOVIE, sourceId, GAP));
+            queue.setSourceExhausted(true);
+        } else {
+            MediaType mediaType = mediaTypeForSource(sourceType, sourceId, shuffle);
+            queue.setShuffle(shuffle);
+            if (shuffle) {
+                queue.setShuffleSeed(UUID.randomUUID().toString());
+                if (startId != null) {
+                    // Materialize the start item up-front; chunk queries exclude it so the
+                    // seeded permutation never emits it again.
+                    queue.setSourceStartId(startId);
+                    addItem(queue, buildItem(queue, mediaType, startId, GAP));
+                }
+            } else if (startId != null) {
+                // Start the materialized window a bit before the start item so the client
+                // still has some back-scroll context. Earlier items are never materialized.
+                queue.setSourceOffset(Math.max(0, orderedIndexOf(sourceType, sourceId, startId) - BACK_WINDOW));
+            }
+            appendChunk(queue);
+        }
+
+        playQueueRepository.save(queue);
+        queue.setCurrentItem(findStartItem(queue, startId).getId());
+        playQueueRepository.save(queue);
+        return queue;
+    }
+
+    /**
+     * Find the PlayQueue and then update it.
+     */
+    @Transactional
+    public Optional<PlayQueueEntity> updatePlayQueue(UUID id, long progressInMilliseconds, UUID playQueueItemId, Authentication authentication) {
+        log.debug("Updating play queue for user: {}", authentication.getName());
+        // Update the current playing episode
+        Optional<PlayQueueEntity> playQueueEntityOptional = playQueueRepository.findById(id);
+        playQueueEntityOptional.ifPresent(playQueueEntity -> {
+            checkOwnership(playQueueEntity, authentication);
+            updatePlayQueueItemWithProgress(progressInMilliseconds, playQueueItemId, authentication, playQueueEntity);
+        });
+        return playQueueEntityOptional;
+    }
+
+    /**
+     * Moves an item to directly after another item, or to the front of the queue when
+     * afterItemId is null. Uses the gap-based position column: the new position is the
+     * midpoint between the two neighbours; when the gap is exhausted the whole queue is
+     * renumbered first.
+     */
+    @Transactional
+    public PlayQueueEntity movePlayQueueItem(UUID playQueueId, UUID playQueueItemId, UUID afterItemId, Authentication authentication) {
+        log.debug("Moving play queue item {} in queue {}", playQueueItemId, playQueueId);
+        PlayQueueEntity queue = getOwnedQueue(playQueueId, authentication);
+        if (playQueueItemId.equals(afterItemId)) {
+            throw new IllegalArgumentException("Cannot move an item after itself");
+        }
+        PlayQueueItemEntity moving = itemById(queue, playQueueItemId)
+                .orElseThrow(() -> new IllegalArgumentException("Item not in queue"));
+
+        BigDecimal newPosition = targetPosition(queue, afterItemId, playQueueItemId);
+        if (newPosition == null) {
+            rebalance(queue);
+            newPosition = targetPosition(queue, afterItemId, playQueueItemId);
+        }
+        moving.setPosition(newPosition);
+        sortItems(queue);
+        playQueueRepository.save(queue);
+        return queue;
+    }
+
+    /**
+     * Removes an item from the queue. When the current item is removed, the next item (or
+     * the previous one at the end of the queue) becomes current and progress is reset.
+     */
+    @Transactional
+    public PlayQueueEntity removePlayQueueItem(UUID playQueueId, UUID playQueueItemId, Authentication authentication) {
+        log.debug("Removing play queue item {} from queue {}", playQueueItemId, playQueueId);
+        PlayQueueEntity queue = getOwnedQueue(playQueueId, authentication);
+        List<PlayQueueItemEntity> items = queue.getItems();
+        int index = -1;
+        for (int i = 0; i < items.size(); i++) {
+            if (items.get(i).getId().equals(playQueueItemId)) {
+                index = i;
+                break;
+            }
+        }
+        if (index == -1) {
+            throw new IllegalArgumentException("Item not in queue");
+        }
+
+        if (playQueueItemId.equals(queue.getCurrentItem())) {
+            PlayQueueItemEntity newCurrent = index + 1 < items.size() ? items.get(index + 1)
+                    : (index > 0 ? items.get(index - 1) : null);
+            queue.setCurrentItem(newCurrent != null ? newCurrent.getId() : null);
+            queue.setProgressInMilliseconds(0);
+        }
+        items.remove(index); // orphanRemoval deletes the row
+        playQueueRepository.save(queue);
+        maybeExtend(queue);
+        return queue;
+    }
+
+    /**
+     * Adds a single media item to the queue, at the end (afterItemId null) or directly
+     * after another item. Manually added items are independent of the source cursor, so
+     * they may show up a second time when the source later materializes the same media.
+     */
+    @Transactional
+    public PlayQueueEntity addPlayQueueItem(UUID playQueueId, MediaType mediaType, UUID mediaId, UUID afterItemId, Authentication authentication) {
+        log.debug("Adding {} {} to queue {}", mediaType, mediaId, playQueueId);
+        PlayQueueEntity queue = getOwnedQueue(playQueueId, authentication);
+        validateMediaExists(mediaType, mediaId);
+
+        BigDecimal position;
+        if (afterItemId == null) {
+            position = nextPosition(maxPosition(queue));
+        } else {
+            position = targetPosition(queue, afterItemId, null);
+            if (position == null) {
+                rebalance(queue);
+                position = targetPosition(queue, afterItemId, null);
+            }
+        }
+        addItem(queue, buildItem(queue, mediaType, mediaId, position));
+        sortItems(queue);
+        playQueueRepository.save(queue);
+        return queue;
     }
 
     /**
@@ -62,130 +236,251 @@ public class PlayQueueService {
         return (previous == null) ? GAP : previous.add(GAP);
     }
 
-    public PlayQueueEntity createPlayQueueForShow(UUID showId,
-                                                  UUID episodeId,
-                                                  Authentication authentication) {
-        log.debug("Creating play queue for user: {}, show: {}", authentication.getName(), showId);
-
-        // Fetch episode IDs
-        List<UUID> episodeIds = episodeRepository
-                .findIdsOnlyByShowEntityId(
-                        showId,
-                        Sort.by("seasonEntity.number").ascending()
-                                .and(Sort.by("number").ascending()))
-                .stream()
-                .map(EpisodeRepository.IdOnly::getId)
-                .toList();
-
-        List<PlayQueueItemEntity> items = new ArrayList<>();
-        BigDecimal pos = null;
-        PlayQueueEntity queue = PlayQueueEntity.builder()
-                .userEntity(userService.getOrCreateUser(authentication))
-                .build();
-
-        for (UUID epId : episodeIds) {
-            pos = nextPosition(pos);
-            PlayQueueItemEntity item = PlayQueueItemEntity.builder()
-                    .position(pos)
-                    .type(MediaType.EPISODE)
-                    .episodeEntityId(epId)
-                    .playQueueEntity(queue) // Set the PlayQueueEntity reference
-                    .build();
-            items.add(item);
+    /**
+     * Appends the next chunk of source items to the queue and advances the source cursor.
+     * Marks the source exhausted when it returns fewer items than a full chunk.
+     */
+    private void appendChunk(PlayQueueEntity queue) {
+        MediaType mediaType = mediaTypeForSource(queue.getSourceType(), queue.getSourceId(), queue.isShuffle());
+        List<UUID> mediaIds = fetchNextChunk(queue, mediaType);
+        BigDecimal position = maxPosition(queue);
+        for (UUID mediaId : mediaIds) {
+            position = nextPosition(position);
+            addItem(queue, buildItem(queue, mediaType, mediaId, position));
         }
-
-        queue.setItems(items);
-        playQueueRepository.save(queue); // Save the queue with its items now properly linked
-
-        // Set current item
-        UUID currentItemId = queue.getItems().stream()
-                .filter(i -> i.getEpisodeEntityId().equals(episodeId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Episode not in queue"))
-                .getId();
-        queue.setCurrentItem(currentItemId);
-        playQueueRepository.save(queue);
-
-        return queue;
-    }
-
-
-    public PlayQueueEntity createPlayQueueForMovie(UUID movieId,
-                                                   Authentication authentication) {
-        log.debug("Creating play queue for user: {}, movie: {}", authentication.getName(), movieId);
-
-        PlayQueueItemEntity item = PlayQueueItemEntity.builder()
-                .position(GAP)
-                .type(MediaType.MOVIE)
-                .movieEntityId(movieId)
-                .build();
-
-        PlayQueueEntity queue = PlayQueueEntity.builder()
-                .userEntity(userService.getOrCreateUser(authentication))
-                .items(List.of(item))
-                .build();
-        playQueueRepository.save(queue);
-
-        UUID currentItemId = queue.getItems().stream()
-                .filter(i -> i.getMovieEntityId().equals(movieId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Movie not in queue"))
-                .getId();
-        queue.setCurrentItem(currentItemId);
-        playQueueRepository.save(queue);
-
-        return queue;
-    }
-
-    public PlayQueueEntity createPlayQueueForAlbum(UUID albumId,
-                                                    UUID trackId,
-                                                    Authentication authentication) {
-        log.debug("Creating play queue for user: {}, album: {}", authentication.getName(), albumId);
-
-        List<TrackEntity> tracks = trackRepository.findByAlbumEntity_Id(
-                albumId,
-                Sort.by("discNumber").ascending().and(Sort.by("number").ascending()));
-
-        List<PlayQueueItemEntity> items = new ArrayList<>();
-        BigDecimal pos = null;
-        PlayQueueEntity queue = PlayQueueEntity.builder()
-                .userEntity(userService.getOrCreateUser(authentication))
-                .build();
-
-        for (TrackEntity track : tracks) {
-            pos = nextPosition(pos);
-            PlayQueueItemEntity item = PlayQueueItemEntity.builder()
-                    .position(pos)
-                    .type(MediaType.TRACK)
-                    .trackEntityId(track.getId())
-                    .playQueueEntity(queue)
-                    .build();
-            items.add(item);
+        queue.setSourceOffset(queue.getSourceOffset() + mediaIds.size());
+        if (mediaIds.size() < CHUNK_SIZE) {
+            queue.setSourceExhausted(true);
         }
-
-        queue.setItems(items);
-        playQueueRepository.save(queue);
-
-        UUID currentItemId = queue.getItems().stream()
-                .filter(i -> i.getTrackEntityId().equals(trackId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Track not in queue"))
-                .getId();
-        queue.setCurrentItem(currentItemId);
-        playQueueRepository.save(queue);
-
-        return queue;
     }
 
     /**
-     * Find the PlayQueue and then update it.
+     * Appends a chunk when the queue has a non-exhausted source and fewer than
+     * EXTEND_THRESHOLD materialized items remain after the current item.
      */
-    public Optional<PlayQueueEntity> updatePlayQueue(UUID id, long progressInMilliseconds, UUID playQueueItemId, Authentication authentication) {
-        log.debug("Updating play queue for user: {}", authentication.getName());
-        // Update the current playing episode
-        Optional<PlayQueueEntity> playQueueEntityOptional = playQueueRepository.findById(id);
-        playQueueEntityOptional.ifPresent(playQueueEntity -> updatePlayQueueItemWithProgress(progressInMilliseconds, playQueueItemId, authentication, playQueueEntity));
-        return playQueueEntityOptional;
+    private void maybeExtend(PlayQueueEntity queue) {
+        if (queue.getSourceType() == null || queue.isSourceExhausted()) {
+            return;
+        }
+        List<PlayQueueItemEntity> items = queue.getItems();
+        int currentIndex = -1;
+        for (int i = 0; i < items.size(); i++) {
+            if (items.get(i).getId().equals(queue.getCurrentItem())) {
+                currentIndex = i;
+                break;
+            }
+        }
+        int itemsAfterCurrent = currentIndex == -1 ? 0 : items.size() - 1 - currentIndex;
+        if (itemsAfterCurrent < EXTEND_THRESHOLD) {
+            appendChunk(queue);
+            playQueueRepository.save(queue);
+        }
+    }
+
+    private List<UUID> fetchNextChunk(PlayQueueEntity queue, MediaType mediaType) {
+        UUID sourceId = queue.getSourceId();
+        int offset = queue.getSourceOffset();
+        if (queue.isShuffle()) {
+            String seed = queue.getShuffleSeed();
+            UUID excludeId = queue.getSourceStartId() != null ? queue.getSourceStartId() : NIL_UUID;
+            return switch (queue.getSourceType()) {
+                case SHOW -> episodeRepository.findEpisodeIdsForShowShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset);
+                case ALBUM -> trackRepository.findTrackIdsForAlbumShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset);
+                case LIBRARY -> mediaType == MediaType.MOVIE
+                        ? movieRepository.findMovieIdsForLibraryShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset)
+                        : trackRepository.findTrackIdsForLibraryShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset);
+                case MOVIE -> List.of();
+            };
+        }
+        return switch (queue.getSourceType()) {
+            case SHOW -> episodeRepository.findEpisodeIdsForShowOrdered(sourceId, CHUNK_SIZE, offset);
+            case ALBUM -> trackRepository.findTrackIdsForAlbumOrdered(sourceId, CHUNK_SIZE, offset);
+            default -> List.of();
+        };
+    }
+
+    private MediaType mediaTypeForSource(PlayQueueSourceType sourceType, UUID sourceId, boolean shuffle) {
+        return switch (sourceType) {
+            case MOVIE -> MediaType.MOVIE;
+            case SHOW -> MediaType.EPISODE;
+            case ALBUM -> MediaType.TRACK;
+            case LIBRARY -> {
+                if (!shuffle) {
+                    throw new IllegalArgumentException("Library play queues require shuffle");
+                }
+                LibraryEntity library = libraryRepository.findById(sourceId)
+                        .orElseThrow(() -> new IllegalArgumentException("Library not found"));
+                yield switch (library.getLibraryType()) {
+                    case MOVIE -> MediaType.MOVIE;
+                    case MUSIC -> MediaType.TRACK;
+                    case SHOW -> throw new IllegalArgumentException("Show libraries cannot be shuffled; shuffle a single show instead");
+                };
+            }
+        };
+    }
+
+    /**
+     * Index of the start item in the full natural order of an ordered (non-shuffled) source.
+     */
+    private int orderedIndexOf(PlayQueueSourceType sourceType, UUID sourceId, UUID startId) {
+        List<UUID> ids = switch (sourceType) {
+            case SHOW -> episodeRepository
+                    .findIdsOnlyByShowEntityId(
+                            sourceId,
+                            Sort.by("seasonEntity.number").ascending()
+                                    .and(Sort.by("number").ascending()))
+                    .stream()
+                    .map(EpisodeRepository.IdOnly::getId)
+                    .toList();
+            case ALBUM -> trackRepository.findByAlbumEntity_Id(
+                            sourceId,
+                            Sort.by("discNumber").ascending().and(Sort.by("number").ascending()))
+                    .stream()
+                    .map(TrackEntity::getId)
+                    .toList();
+            default -> List.of();
+        };
+        int index = ids.indexOf(startId);
+        if (index == -1) {
+            throw new IllegalArgumentException("Start item not part of the source");
+        }
+        return index;
+    }
+
+    private PlayQueueItemEntity findStartItem(PlayQueueEntity queue, UUID startId) {
+        List<PlayQueueItemEntity> items = queue.getItems();
+        if (items.isEmpty()) {
+            throw new IllegalArgumentException("Source contains no items");
+        }
+        if (startId == null || queue.getSourceType() == PlayQueueSourceType.MOVIE) {
+            return items.getFirst();
+        }
+        return items.stream()
+                .filter(item -> startId.equals(item.getMovieEntityId())
+                        || startId.equals(item.getEpisodeEntityId())
+                        || startId.equals(item.getTrackEntityId()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Start item not in queue"));
+    }
+
+    /**
+     * Hibernate association management (bytecode enhancement) may already have inserted the
+     * item into the queue's collection when its owning side was set; only add it when absent.
+     * Checks by identity: BaseEntity's Lombok equals treats all unsaved (id-less) items as equal.
+     */
+    private void addItem(PlayQueueEntity queue, PlayQueueItemEntity item) {
+        for (PlayQueueItemEntity existing : queue.getItems()) {
+            if (existing == item) {
+                return;
+            }
+        }
+        queue.getItems().add(item);
+    }
+
+    private PlayQueueItemEntity buildItem(PlayQueueEntity queue, MediaType mediaType, UUID mediaId, BigDecimal position) {
+        PlayQueueItemEntity item = PlayQueueItemEntity.builder()
+                .playQueueEntity(queue)
+                .type(mediaType)
+                .position(position)
+                .build();
+        switch (mediaType) {
+            case MOVIE -> item.setMovieEntityId(mediaId);
+            case EPISODE -> item.setEpisodeEntityId(mediaId);
+            case TRACK -> item.setTrackEntityId(mediaId);
+        }
+        return item;
+    }
+
+    private void validateMediaExists(MediaType mediaType, UUID mediaId) {
+        boolean exists = switch (mediaType) {
+            case MOVIE -> movieRepository.existsById(mediaId);
+            case EPISODE -> episodeRepository.existsById(mediaId);
+            case TRACK -> trackRepository.existsById(mediaId);
+        };
+        if (!exists) {
+            throw new IllegalArgumentException("Media item not found");
+        }
+    }
+
+    private BigDecimal maxPosition(PlayQueueEntity queue) {
+        return queue.getItems().stream()
+                .map(PlayQueueItemEntity::getPosition)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
+    }
+
+    private Optional<PlayQueueItemEntity> itemById(PlayQueueEntity queue, UUID itemId) {
+        return queue.getItems().stream().filter(item -> item.getId().equals(itemId)).findFirst();
+    }
+
+    private void sortItems(PlayQueueEntity queue) {
+        queue.getItems().sort(Comparator.comparing(PlayQueueItemEntity::getPosition));
+    }
+
+    /**
+     * Position for placing an item directly after afterItemId (or at the front when null),
+     * ignoring the item being moved. Returns null when the gap between the neighbours is
+     * exhausted and the queue needs a rebalance first.
+     */
+    private BigDecimal targetPosition(PlayQueueEntity queue, UUID afterItemId, UUID movingItemId) {
+        List<PlayQueueItemEntity> others = queue.getItems().stream()
+                .filter(item -> !item.getId().equals(movingItemId))
+                .sorted(Comparator.comparing(PlayQueueItemEntity::getPosition))
+                .toList();
+        if (others.isEmpty()) {
+            return GAP;
+        }
+        if (afterItemId == null) {
+            BigDecimal first = others.getFirst().getPosition();
+            BigDecimal candidate = first.divide(TWO, POSITION_SCALE, RoundingMode.HALF_UP);
+            return (candidate.signum() > 0 && candidate.compareTo(first) < 0) ? candidate : null;
+        }
+        int afterIndex = -1;
+        for (int i = 0; i < others.size(); i++) {
+            if (others.get(i).getId().equals(afterItemId)) {
+                afterIndex = i;
+                break;
+            }
+        }
+        if (afterIndex == -1) {
+            throw new IllegalArgumentException("After-item not in queue");
+        }
+        BigDecimal previous = others.get(afterIndex).getPosition();
+        if (afterIndex == others.size() - 1) {
+            return previous.add(GAP);
+        }
+        BigDecimal next = others.get(afterIndex + 1).getPosition();
+        BigDecimal candidate = previous.add(next).divide(TWO, POSITION_SCALE, RoundingMode.HALF_UP);
+        return (candidate.compareTo(previous) > 0 && candidate.compareTo(next) < 0) ? candidate : null;
+    }
+
+    /**
+     * Renumbers all items of the queue, in their current order, back to whole GAP multiples.
+     */
+    private void rebalance(PlayQueueEntity queue) {
+        log.debug("Rebalancing positions of play queue {}", queue.getId());
+        List<PlayQueueItemEntity> sorted = queue.getItems().stream()
+                .sorted(Comparator.comparing(PlayQueueItemEntity::getPosition))
+                .toList();
+        BigDecimal position = null;
+        for (PlayQueueItemEntity item : sorted) {
+            position = nextPosition(position);
+            item.setPosition(position);
+        }
+    }
+
+    private PlayQueueEntity getOwnedQueue(UUID playQueueId, Authentication authentication) {
+        PlayQueueEntity queue = playQueueRepository.findById(playQueueId)
+                .orElseThrow(() -> new IllegalArgumentException("Play queue not found"));
+        checkOwnership(queue, authentication);
+        return queue;
+    }
+
+    private void checkOwnership(PlayQueueEntity queue, Authentication authentication) {
+        UserEntity user = userService.getOrCreateUser(authentication);
+        if (!queue.getUserEntity().getId().equals(user.getId())) {
+            throw new AccessDeniedException("Play queue does not belong to the authenticated user");
+        }
     }
 
     private void updatePlayQueueItemWithProgress(long progressInMilliseconds, UUID playQueueItemId, Authentication authentication, PlayQueueEntity playQueueEntity) {
@@ -193,6 +488,7 @@ public class PlayQueueService {
             playQueueEntity.setCurrentItem(playQueueItemEntity.getId());
             playQueueEntity.setProgressInMilliseconds(progressInMilliseconds);
             playQueueRepository.save(playQueueEntity);
+            maybeExtend(playQueueEntity);
             // Update the watch status of an episode if it's played for more then one minute
             if (progressInMilliseconds > 60000) {
                 if (playQueueItemEntity.getType() == MediaType.EPISODE) {

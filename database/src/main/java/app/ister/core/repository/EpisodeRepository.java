@@ -33,6 +33,27 @@ public interface EpisodeRepository extends JpaRepository<EpisodeEntity, UUID> {
     List<EpisodeEntity> findByShowEntityIdIn(java.util.Collection<UUID> showEntityIds, Sort sort);
 
     /**
+     * Returns a page of episode IDs of a show in natural play order (season number, episode number).
+     */
+    @Query(value = """
+            SELECT e.id FROM episode_entity e
+            JOIN season_entity s ON e.season_entity_id = s.id
+            WHERE e.show_entity_id = :showId
+            ORDER BY s.number, e.number, e.id
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findEpisodeIdsForShowOrdered(@Param("showId") UUID showId, @Param("limit") int limit, @Param("offset") int offset);
+
+    /**
+     * Returns a page of episode IDs of a show in a deterministic shuffled order derived from the seed.
+     */
+    @Query(value = """
+            SELECT e.id FROM episode_entity e
+            WHERE e.show_entity_id = :showId AND e.id <> :excludeId
+            ORDER BY md5(e.id::text || :seed), e.id
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findEpisodeIdsForShowShuffled(@Param("showId") UUID showId, @Param("seed") String seed, @Param("excludeId") UUID excludeId, @Param("limit") int limit, @Param("offset") int offset);
+
+    /**
      * Returns the IDs (UUID) of episodes that have no {@link MetadataEntity} linked to them.
      */
     @Query("SELECT s.id FROM EpisodeEntity s LEFT JOIN s.metadataEntities m " +

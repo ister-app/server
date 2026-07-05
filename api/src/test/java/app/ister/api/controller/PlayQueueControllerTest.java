@@ -1,10 +1,12 @@
 package app.ister.api.controller;
 
+import app.ister.api.dto.CreatePlayQueueInput;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PlayQueueEntity;
 import app.ister.core.entity.PlayQueueItemEntity;
 import app.ister.core.enums.MediaType;
+import app.ister.core.enums.PlayQueueSourceType;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.service.PlayQueueService;
@@ -56,33 +58,72 @@ class PlayQueueControllerTest {
     void getPlayQueueDelegatesToService() {
         UUID id = UUID.randomUUID();
         PlayQueueEntity queue = PlayQueueEntity.builder().build();
-        when(playQueueService.getPlayQueue(id)).thenReturn(Optional.of(queue));
+        when(playQueueService.getPlayQueue(id, authentication)).thenReturn(Optional.of(queue));
 
         Optional<PlayQueueEntity> result = subject.getPlayQueue(id, authentication);
 
         assertTrue(result.isPresent());
-        verify(playQueueService).getPlayQueue(id);
+        verify(playQueueService).getPlayQueue(id, authentication);
     }
 
     @Test
-    void createPlayQueueForShowDelegatesToService() {
+    void createPlayQueueDelegatesToService() {
         UUID showId = UUID.randomUUID();
         UUID episodeId = UUID.randomUUID();
+        CreatePlayQueueInput input = new CreatePlayQueueInput(PlayQueueSourceType.SHOW, showId, episodeId, true);
         PlayQueueEntity queue = PlayQueueEntity.builder().build();
-        when(playQueueService.createPlayQueueForShow(showId, episodeId, authentication)).thenReturn(queue);
+        when(playQueueService.createPlayQueue(PlayQueueSourceType.SHOW, showId, episodeId, true, authentication)).thenReturn(queue);
 
-        PlayQueueEntity result = subject.createPlayQueueForShow(showId, episodeId, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(input, authentication);
 
         assertEquals(queue, result);
     }
 
     @Test
-    void createPlayQueueForMovieDelegatesToService() {
+    void createPlayQueueDefaultsShuffleToFalse() {
         UUID movieId = UUID.randomUUID();
+        CreatePlayQueueInput input = new CreatePlayQueueInput(PlayQueueSourceType.MOVIE, movieId, null, null);
         PlayQueueEntity queue = PlayQueueEntity.builder().build();
-        when(playQueueService.createPlayQueueForMovie(movieId, authentication)).thenReturn(queue);
+        when(playQueueService.createPlayQueue(PlayQueueSourceType.MOVIE, movieId, null, false, authentication)).thenReturn(queue);
 
-        PlayQueueEntity result = subject.createPlayQueueForMovie(movieId, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(input, authentication);
+
+        assertEquals(queue, result);
+    }
+
+    @Test
+    void movePlayQueueItemDelegatesToService() {
+        UUID queueId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        UUID afterId = UUID.randomUUID();
+        PlayQueueEntity queue = PlayQueueEntity.builder().build();
+        when(playQueueService.movePlayQueueItem(queueId, itemId, afterId, authentication)).thenReturn(queue);
+
+        PlayQueueEntity result = subject.movePlayQueueItem(queueId, itemId, afterId, authentication);
+
+        assertEquals(queue, result);
+    }
+
+    @Test
+    void removePlayQueueItemDelegatesToService() {
+        UUID queueId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        PlayQueueEntity queue = PlayQueueEntity.builder().build();
+        when(playQueueService.removePlayQueueItem(queueId, itemId, authentication)).thenReturn(queue);
+
+        PlayQueueEntity result = subject.removePlayQueueItem(queueId, itemId, authentication);
+
+        assertEquals(queue, result);
+    }
+
+    @Test
+    void addPlayQueueItemDelegatesToService() {
+        UUID queueId = UUID.randomUUID();
+        UUID mediaId = UUID.randomUUID();
+        PlayQueueEntity queue = PlayQueueEntity.builder().build();
+        when(playQueueService.addPlayQueueItem(queueId, MediaType.TRACK, mediaId, null, authentication)).thenReturn(queue);
+
+        PlayQueueEntity result = subject.addPlayQueueItem(queueId, MediaType.TRACK, mediaId, null, authentication);
 
         assertEquals(queue, result);
     }
@@ -208,49 +249,41 @@ class PlayQueueControllerTest {
     }
 
     @Test
-    void currentItemEpisodeReturnsEpisodeWhenCurrentItemSet() {
-        UUID episodeId = UUID.randomUUID();
-        EpisodeEntity episode = EpisodeEntity.builder().number(1).build();
-        PlayQueueEntity queue = PlayQueueEntity.builder().currentItem(episodeId).build();
-        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+    void currentItemResolvesItemFromQueue() {
+        UUID currentId = UUID.randomUUID();
+        PlayQueueItemEntity current = buildItem(currentId);
+        PlayQueueEntity queue = PlayQueueEntity.builder()
+                .items(new ArrayList<>(List.of(buildItem(UUID.randomUUID()), current)))
+                .currentItem(currentId)
+                .build();
 
-        Optional<EpisodeEntity> result = subject.currentItemEpisode(queue);
-
-        assertTrue(result.isPresent());
-        assertEquals(episode, result.get());
-    }
-
-    @Test
-    void currentItemEpisodeReturnsEmptyWhenNoCurrentItem() {
-        PlayQueueEntity queue = PlayQueueEntity.builder().build();
-
-        Optional<EpisodeEntity> result = subject.currentItemEpisode(queue);
-
-        assertTrue(result.isEmpty());
-        verifyNoInteractions(episodeRepository);
-    }
-
-    @Test
-    void currentItemMovieReturnsMovieWhenCurrentItemSet() {
-        UUID movieId = UUID.randomUUID();
-        MovieEntity movie = MovieEntity.builder().name("Test").releaseYear(2020).build();
-        PlayQueueEntity queue = PlayQueueEntity.builder().currentItem(movieId).build();
-        when(movieRepository.findById(movieId)).thenReturn(Optional.of(movie));
-
-        Optional<MovieEntity> result = subject.currentItemMovie(queue);
+        Optional<PlayQueueItemEntity> result = subject.currentItem(queue);
 
         assertTrue(result.isPresent());
-        assertEquals(movie, result.get());
+        assertEquals(current, result.get());
     }
 
     @Test
-    void currentItemMovieReturnsEmptyWhenNoCurrentItem() {
-        PlayQueueEntity queue = PlayQueueEntity.builder().build();
+    void currentItemReturnsEmptyWhenNoCurrentItem() {
+        PlayQueueEntity queue = PlayQueueEntity.builder()
+                .items(new ArrayList<>(List.of(buildItem(UUID.randomUUID()))))
+                .build();
 
-        Optional<MovieEntity> result = subject.currentItemMovie(queue);
+        Optional<PlayQueueItemEntity> result = subject.currentItem(queue);
 
         assertTrue(result.isEmpty());
-        verifyNoInteractions(movieRepository);
+    }
+
+    @Test
+    void currentItemReturnsEmptyWhenCurrentItemNotInQueue() {
+        PlayQueueEntity queue = PlayQueueEntity.builder()
+                .items(new ArrayList<>(List.of(buildItem(UUID.randomUUID()))))
+                .currentItem(UUID.randomUUID())
+                .build();
+
+        Optional<PlayQueueItemEntity> result = subject.currentItem(queue);
+
+        assertTrue(result.isEmpty());
     }
 
     @Test

@@ -1,10 +1,12 @@
 package app.ister.api.controller;
 
+import app.ister.api.dto.CreatePlayQueueInput;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PlayQueueEntity;
 import app.ister.core.entity.PlayQueueItemEntity;
 import app.ister.core.entity.TrackEntity;
+import app.ister.core.enums.MediaType;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.TrackRepository;
@@ -44,31 +46,37 @@ public class PlayQueueController {
     @QueryMapping
     public Optional<PlayQueueEntity> getPlayQueue(@Argument UUID id, Authentication authentication) {
         log.debug("Getting play queue for user: {}, play queue id: {}", authentication.getName(), id);
-        return playQueueService.getPlayQueue(id);
+        return playQueueService.getPlayQueue(id, authentication);
     }
 
     @PreAuthorize("hasRole('user')")
     @MutationMapping
-    public PlayQueueEntity createPlayQueueForShow(@Argument UUID showId, @Argument UUID episodeId, Authentication authentication) {
-        return playQueueService.createPlayQueueForShow(showId, episodeId, authentication);
-    }
-
-    @PreAuthorize("hasRole('user')")
-    @MutationMapping
-    public PlayQueueEntity createPlayQueueForMovie(@Argument UUID movieId, Authentication authentication) {
-        return playQueueService.createPlayQueueForMovie(movieId, authentication);
-    }
-
-    @PreAuthorize("hasRole('user')")
-    @MutationMapping
-    public PlayQueueEntity createPlayQueueForAlbum(@Argument UUID albumId, @Argument UUID trackId, Authentication authentication) {
-        return playQueueService.createPlayQueueForAlbum(albumId, trackId, authentication);
+    public PlayQueueEntity createPlayQueue(@Argument CreatePlayQueueInput input, Authentication authentication) {
+        return playQueueService.createPlayQueue(input.sourceType(), input.sourceId(), input.startId(), Boolean.TRUE.equals(input.shuffle()), authentication);
     }
 
     @PreAuthorize("hasRole('user')")
     @MutationMapping
     public Optional<PlayQueueEntity> updatePlayQueue(@Argument UUID id, @Argument long progressInMilliseconds, @Argument UUID playQueueItemId, Authentication authentication) {
         return playQueueService.updatePlayQueue(id, progressInMilliseconds, playQueueItemId, authentication);
+    }
+
+    @PreAuthorize("hasRole('user')")
+    @MutationMapping
+    public PlayQueueEntity movePlayQueueItem(@Argument UUID playQueueId, @Argument UUID playQueueItemId, @Argument UUID afterPlayQueueItemId, Authentication authentication) {
+        return playQueueService.movePlayQueueItem(playQueueId, playQueueItemId, afterPlayQueueItemId, authentication);
+    }
+
+    @PreAuthorize("hasRole('user')")
+    @MutationMapping
+    public PlayQueueEntity removePlayQueueItem(@Argument UUID playQueueId, @Argument UUID playQueueItemId, Authentication authentication) {
+        return playQueueService.removePlayQueueItem(playQueueId, playQueueItemId, authentication);
+    }
+
+    @PreAuthorize("hasRole('user')")
+    @MutationMapping
+    public PlayQueueEntity addPlayQueueItem(@Argument UUID playQueueId, @Argument MediaType mediaType, @Argument UUID mediaId, @Argument UUID afterPlayQueueItemId, Authentication authentication) {
+        return playQueueService.addPlayQueueItem(playQueueId, mediaType, mediaId, afterPlayQueueItemId, authentication);
     }
 
     @SchemaMapping(typeName = "PlayQueue", field = "currentItemId")
@@ -110,22 +118,15 @@ public class PlayQueueController {
         return all.subList(from, to);
     }
 
-    @SchemaMapping(typeName = "PlayQueue", field = "currentItemEpisode")
-    public Optional<EpisodeEntity> currentItemEpisode(PlayQueueEntity playQueueEntity) {
+    @SchemaMapping(typeName = "PlayQueue", field = "currentItem")
+    public Optional<PlayQueueItemEntity> currentItem(PlayQueueEntity playQueueEntity) {
         UUID currentItem = playQueueEntity.getCurrentItem();
-        return currentItem != null ? episodeRepository.findById(currentItem) : Optional.empty();
-    }
-
-    @SchemaMapping(typeName = "PlayQueue", field = "currentItemMovie")
-    public Optional<MovieEntity> currentItemMovie(PlayQueueEntity playQueueEntity) {
-        UUID currentItem = playQueueEntity.getCurrentItem();
-        return currentItem != null ? movieRepository.findById(currentItem) : Optional.empty();
-    }
-
-    @SchemaMapping(typeName = "PlayQueue", field = "currentItemTrack")
-    public Optional<TrackEntity> currentItemTrack(PlayQueueEntity playQueueEntity) {
-        UUID currentItem = playQueueEntity.getCurrentItem();
-        return currentItem != null ? trackRepository.findById(currentItem) : Optional.empty();
+        if (currentItem == null) {
+            return Optional.empty();
+        }
+        return playQueueEntity.getItems().stream()
+                .filter(item -> item.getId().equals(currentItem))
+                .findFirst();
     }
 
     @SchemaMapping(typeName = "PlayQueueItem", field = "episode")
