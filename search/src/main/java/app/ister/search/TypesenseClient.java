@@ -2,7 +2,7 @@ package app.ister.search;
 
 import app.ister.search.config.TypesenseProperties;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.aot.hint.annotation.RegisterReflectionForBinding;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
  */
 @Component
 @Slf4j
-@ConditionalOnProperty(prefix = "app.ister.typesense", name = "enabled", havingValue = "true")
+@RegisterReflectionForBinding(SearchDocument.class) // Jackson binding in the GraalVM native image
 public class TypesenseClient {
 
     private static final String SCHEMA_TEMPLATE = """

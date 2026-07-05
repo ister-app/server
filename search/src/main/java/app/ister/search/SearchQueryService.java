@@ -3,7 +3,6 @@ package app.ister.search;
 import app.ister.core.enums.SearchEntityType;
 import app.ister.search.config.TypesenseProperties;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
@@ -13,7 +12,6 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "app.ister.typesense", name = "enabled", havingValue = "true")
 public class SearchQueryService {
 
     private final TypesenseClient typesenseClient;
@@ -21,6 +19,10 @@ public class SearchQueryService {
 
     /** A search hit in Typesense relevance order; the entity itself lives in PostgreSQL. */
     public record SearchHit(SearchEntityType entityType, UUID entityId) {
+    }
+
+    public boolean isEnabled() {
+        return properties.isEnabled();
     }
 
     public List<SearchHit> search(String term, int size, UUID libraryId) {

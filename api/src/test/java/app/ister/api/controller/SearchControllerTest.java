@@ -17,7 +17,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
 import java.util.Optional;
@@ -30,8 +29,6 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class SearchControllerTest {
 
-    @Mock
-    private ObjectProvider<SearchQueryService> searchQueryServiceProvider;
     @Mock
     private SearchQueryService searchQueryService;
     @Mock
@@ -54,7 +51,7 @@ class SearchControllerTest {
 
     @Test
     void searchThrowsWhenTypesenseIsNotConfigured() {
-        when(searchQueryServiceProvider.getIfAvailable()).thenReturn(null);
+        when(searchQueryService.isEnabled()).thenReturn(false);
 
         assertThrows(SearchUnavailableException.class,
                 () -> subject.search("matrix", Optional.empty(), Optional.empty()));
@@ -67,7 +64,7 @@ class SearchControllerTest {
         ShowEntity show = ShowEntity.builder().name("Matrix Show").releaseYear(2003).build();
         show.setId(UUID.randomUUID());
 
-        when(searchQueryServiceProvider.getIfAvailable()).thenReturn(searchQueryService);
+        when(searchQueryService.isEnabled()).thenReturn(true);
         // Show ranks above movie in Typesense; hydration must keep that order.
         when(searchQueryService.search("matrix", 20, null)).thenReturn(List.of(
                 new SearchQueryService.SearchHit(SearchEntityType.SHOW, show.getId()),
@@ -83,7 +80,7 @@ class SearchControllerTest {
     @Test
     void searchDropsHitsThatNoLongerExistInTheDatabase() {
         UUID goneId = UUID.randomUUID();
-        when(searchQueryServiceProvider.getIfAvailable()).thenReturn(searchQueryService);
+        when(searchQueryService.isEnabled()).thenReturn(true);
         when(searchQueryService.search("matrix", 20, null)).thenReturn(List.of(
                 new SearchQueryService.SearchHit(SearchEntityType.MOVIE, goneId)));
         when(movieRepository.findAllById(List.of(goneId))).thenReturn(List.of());
@@ -95,7 +92,7 @@ class SearchControllerTest {
 
     @Test
     void reindexSearchSendsEvent() {
-        when(searchQueryServiceProvider.getIfAvailable()).thenReturn(searchQueryService);
+        when(searchQueryService.isEnabled()).thenReturn(true);
 
         assertTrue(subject.reindexSearch());
 
@@ -104,7 +101,7 @@ class SearchControllerTest {
 
     @Test
     void reindexSearchThrowsWhenTypesenseIsNotConfigured() {
-        when(searchQueryServiceProvider.getIfAvailable()).thenReturn(null);
+        when(searchQueryService.isEnabled()).thenReturn(false);
 
         assertThrows(SearchUnavailableException.class, () -> subject.reindexSearch());
     }

@@ -9,7 +9,6 @@ import app.ister.core.repository.ShowRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.search.config.TypesenseProperties;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -25,7 +24,6 @@ import java.util.function.Function;
 
 @Service
 @Slf4j
-@ConditionalOnProperty(prefix = "app.ister.typesense", name = "enabled", havingValue = "true")
 public class SearchIndexService {
     private static final int PAGE_SIZE = 200;
 

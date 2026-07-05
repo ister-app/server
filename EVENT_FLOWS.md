@@ -175,8 +175,9 @@ flowchart TD
 ## Flow 5: Zoeken (Typesense)
 
 **Trigger:** entiteit-creatie of metadata-verrijking; volledige reindex via GraphQL mutation `reindexSearch()`.
-Alleen actief als Typesense geconfigureerd is (`app.ister.typesense.enabled=true`); anders worden de events
-door de broker gedropt (queue bestaat niet).
+De enabled-vlag (`app.ister.typesense.enabled`) wordt **op runtime** in de handlers gecheckt (disabled →
+event geconsumeerd en genegeerd, zoals de TMDB-key-check). Geen bean-conditions: die worden bij de
+GraalVM native-image build bevroren.
 
 ```mermaid
 flowchart TD

@@ -2,15 +2,18 @@ package app.ister.search.config;
 
 import lombok.Getter;
 import lombok.Setter;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * The enabled flag is checked at runtime (not via bean conditions): GraalVM native images
+ * evaluate bean conditions at build time, so conditional beans would be baked out of the
+ * image and {@code TYPESENSE_ENABLED=true} on a deployment would do nothing.
+ */
 @Getter
 @Setter
 @Configuration
 @ConfigurationProperties(prefix = "app.ister.typesense")
-@ConditionalOnProperty(prefix = "app.ister.typesense", name = "enabled", havingValue = "true")
 public class TypesenseProperties {
     private boolean enabled;
     private String host;

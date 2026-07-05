@@ -1,7 +1,6 @@
 package app.ister.search.config;
 
 import org.springframework.amqp.core.Queue;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -9,14 +8,14 @@ import static app.ister.core.MessageQueue.APP_ISTER_SERVER_SEARCH_INDEX_REQUESTE
 import static app.ister.core.MessageQueue.APP_ISTER_SERVER_SEARCH_REINDEX_REQUESTED;
 
 /**
- * Declares the search queues when Typesense is enabled. When disabled the queues are never
- * declared, so index events are unroutable and dropped by the broker.
+ * Declares the search queues. The queues exist regardless of the enabled flag (bean conditions
+ * are frozen at native-image build time); when Typesense is disabled the handlers consume and
+ * discard the events, so no backlog builds up.
  *
  * <p>No {@code JacksonJsonMessageConverter} bean here: the worker module's QueueConfig already
  * provides the single trusted converter, and the server application always includes worker.
  */
 @Configuration
-@ConditionalOnProperty(prefix = "app.ister.typesense", name = "enabled", havingValue = "true")
 public class SearchQueueConfig {
 
     @Bean

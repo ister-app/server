@@ -13,7 +13,6 @@ import app.ister.core.service.ServerEventService;
 import app.ister.search.SearchQueryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
@@ -35,8 +34,7 @@ import java.util.stream.Collectors;
 public class SearchController {
     private static final int DEFAULT_SIZE = 20;
 
-    // Provider instead of direct injection: the service only exists when Typesense is enabled.
-    private final ObjectProvider<SearchQueryService> searchQueryService;
+    private final SearchQueryService searchQueryService;
     private final ServerEventService serverEventService;
     private final MovieRepository movieRepository;
     private final ShowRepository showRepository;
@@ -51,19 +49,18 @@ public class SearchController {
             @Argument String term,
             @Argument Optional<Integer> size,
             @Argument Optional<UUID> libraryId) {
-        SearchQueryService service = searchQueryService.getIfAvailable();
-        if (service == null) {
+        if (!searchQueryService.isEnabled()) {
             throw new SearchUnavailableException();
         }
         List<SearchQueryService.SearchHit> hits =
-                service.search(term, size.orElse(DEFAULT_SIZE), libraryId.orElse(null));
+                searchQueryService.search(term, size.orElse(DEFAULT_SIZE), libraryId.orElse(null));
         return hydrate(hits);
     }
 
     @PreAuthorize("hasRole('user')")
     @MutationMapping
     public Boolean reindexSearch() {
-        if (searchQueryService.getIfAvailable() == null) {
+        if (!searchQueryService.isEnabled()) {
             throw new SearchUnavailableException();
         }
         log.debug("Start reindexSearch");

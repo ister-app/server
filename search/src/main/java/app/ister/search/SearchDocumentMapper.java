@@ -9,13 +9,11 @@ import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.SearchEntityType;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
-@ConditionalOnProperty(prefix = "app.ister.typesense", name = "enabled", havingValue = "true")
 public class SearchDocumentMapper {
 
     public SearchDocument toDocument(MovieEntity movie) {

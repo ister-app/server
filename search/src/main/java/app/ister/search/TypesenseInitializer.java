@@ -1,10 +1,10 @@
 package app.ister.search;
 
+import app.ister.search.config.TypesenseProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
@@ -15,13 +15,16 @@ import org.springframework.stereotype.Component;
 @Component
 @Slf4j
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "app.ister.typesense", name = "enabled", havingValue = "true")
 public class TypesenseInitializer implements ApplicationRunner {
 
     private final SearchIndexService searchIndexService;
+    private final TypesenseProperties properties;
 
     @Override
     public void run(ApplicationArguments args) {
+        if (!properties.isEnabled()) {
+            return;
+        }
         try {
             searchIndexService.ensureCollection();
         } catch (Exception e) {
