@@ -122,4 +122,14 @@ public class MessageSender {
     public void sendAnalyzeData(AnalyzeData data, String directoryName) {
         send(APP_ISTER_SERVER_ANALYZE_DATA, directoryName, data);
     }
+
+    // search module (no suffix; dropped when no search node consumes the queue)
+
+    public void sendSearchIndexRequested(SearchIndexRequestedData searchIndexRequestedData) {
+        send(APP_ISTER_SERVER_SEARCH_INDEX_REQUESTED, searchIndexRequestedData);
+    }
+
+    public void sendSearchReindexRequested(SearchReindexRequestedData searchReindexRequestedData) {
+        send(APP_ISTER_SERVER_SEARCH_REINDEX_REQUESTED, searchReindexRequestedData);
+    }
 }

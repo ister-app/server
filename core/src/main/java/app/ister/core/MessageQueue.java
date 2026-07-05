@@ -21,6 +21,8 @@ public class MessageQueue {
     public static final String APP_ISTER_SERVER_ALBUM_FOUND = "app.ister.server.AlbumFound";
     public static final String APP_ISTER_SERVER_TRACK_FOUND = "app.ister.server.TrackFound";
     public static final String APP_ISTER_SERVER_AUDIO_FILE_FOUND = "app.ister.server.AudioFileFound";
+    public static final String APP_ISTER_SERVER_SEARCH_INDEX_REQUESTED = "app.ister.server.SearchIndexRequested";
+    public static final String APP_ISTER_SERVER_SEARCH_REINDEX_REQUESTED = "app.ister.server.SearchReindexRequested";
 
     private MessageQueue() {
         throw new IllegalStateException("Utility class");

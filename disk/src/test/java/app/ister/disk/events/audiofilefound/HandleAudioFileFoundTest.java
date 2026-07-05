@@ -20,6 +20,7 @@ import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
+import app.ister.core.service.ServerEventService;
 import app.ister.core.utils.Jaffree;
 import app.ister.disk.events.mediafilefound.MediaFileFoundCheckForStreams;
 import app.ister.disk.events.mediafilefound.MediaFileFoundGetDuration;
@@ -84,6 +85,8 @@ class HandleAudioFileFoundTest {
     private AudioFileFoundExtractCoverArt audioFileFoundExtractCoverArtMock;
     @Mock
     private MessageSender messageSenderMock;
+    @Mock
+    private ServerEventService serverEventServiceMock;
 
     @TempDir
     Path tempDir;
@@ -110,6 +113,7 @@ class HandleAudioFileFoundTest {
                 mediaFileFoundCheckForStreamsMock,
                 audioFileFoundExtractCoverArtMock,
                 messageSenderMock,
+                serverEventServiceMock,
                 jaffreeMock);
         ReflectionTestUtils.setField(subject, "dirOfFFmpeg", "/usr/bin");
         ReflectionTestUtils.setField(subject, "tmpDir", tempDir.toString());

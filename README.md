@@ -52,6 +52,7 @@ Everything is env-overridable; the most important settings:
 | RabbitMQ | `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD` | |
 | OIDC issuer | `OIDC_URL` | Keycloak-compatible; JWT resource server |
 | TMDB | `app.ister.server.TMDB.apikey` | API read access token; metadata is skipped without it |
+| Typesense | `TYPESENSE_ENABLED`, `TYPESENSE_HOST`, `TYPESENSE_PORT`, `TYPESENSE_API_KEY` | optional full-text search (GraphQL `search` query); run the `reindexSearch` mutation once after enabling to build the initial index |
 | FFmpeg | `FFMPEG_DIR`, `MKVEXTRACT`, `SUBTILE_OCR` | binary locations |
 | Cache/tmp | `CACHE_DIR`, `TMP_DIR` | HLS segments and image cache |
 | Node identity | `app.ister.server.name`, `app.ister.server.url`, `app.ister.cluster.name` | unique per node |

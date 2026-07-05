@@ -6,6 +6,7 @@ dependencies {
     implementation project(':core')
     implementation project(':api')
     implementation project(':disk')
+    implementation project(':search')
     implementation project(':transcoder')
     implementation project(':worker')
 

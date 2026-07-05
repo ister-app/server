@@ -9,6 +9,7 @@ import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
+import app.ister.core.enums.SearchEntityType;
 import app.ister.core.eventdata.AudioFileFoundData;
 import app.ister.core.eventdata.ImageFoundData;
 import app.ister.core.repository.AlbumRepository;
@@ -21,6 +22,7 @@ import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
+import app.ister.core.service.ServerEventService;
 import app.ister.core.Handle;
 import app.ister.core.utils.Jaffree;
 import app.ister.disk.events.mediafilefound.MediaFileFoundCheckForStreams;
@@ -63,6 +65,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
     private final MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams;
     private final AudioFileFoundExtractCoverArt audioFileFoundExtractCoverArt;
     private final MessageSender messageSender;
+    private final ServerEventService serverEventService;
     private final Jaffree jaffree;
 
     @Value("${app.ister.server.ffmpeg-dir}")
@@ -84,6 +87,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                                 MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams,
                                 AudioFileFoundExtractCoverArt audioFileFoundExtractCoverArt,
                                 MessageSender messageSender,
+                                ServerEventService serverEventService,
                                 Jaffree jaffree) {
         this.directoryRepository = directoryRepository;
         this.mediaFileRepository = mediaFileRepository;
@@ -98,6 +102,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         this.mediaFileFoundCheckForStreams = mediaFileFoundCheckForStreams;
         this.audioFileFoundExtractCoverArt = audioFileFoundExtractCoverArt;
         this.messageSender = messageSender;
+        this.serverEventService = serverEventService;
         this.jaffree = jaffree;
     }
 
@@ -176,6 +181,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                     .trackEntity(track)
                     .sourceUri(FILE_URI_SCHEME + mediaFile.getPath())
                     .build());
+            serverEventService.createSearchIndexEvent(SearchEntityType.TRACK, track.getId());
         }
 
         saveAlbumMetadataFromTags(track, mediaFile, format);
@@ -199,6 +205,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                 .albumEntity(album)
                 .sourceUri(FILE_URI_SCHEME + mediaFile.getPath())
                 .build());
+        serverEventService.createSearchIndexEvent(SearchEntityType.ALBUM, album.getId());
     }
 
     private UUID correctTrackNumberFromTags(MediaFileEntity mediaFile, TrackEntity currentTrack, Format format) {
@@ -243,6 +250,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         mediaFileRepository.save(mediaFile);
         if (!mediaFileRepository.existsByTrackEntityId(currentTrack.getId())) {
             trackRepository.delete(currentTrack);
+            serverEventService.createSearchDeleteEvent(SearchEntityType.TRACK, currentTrack.getId());
         }
         return correctTrack.getId();
     }
@@ -287,6 +295,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                 .isPresent();
         if (!exists) {
             artist.setName(albumArtist);
+            serverEventService.createSearchIndexEvent(SearchEntityType.PERSON, artist.getId());
         }
     }
 
@@ -323,6 +332,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
             album.setReleaseYear(newYear);
         }
         albumRepository.save(album);
+        serverEventService.createSearchIndexEvent(SearchEntityType.ALBUM, album.getId());
     }
 
     private String extractTitle(Format format, String path) {

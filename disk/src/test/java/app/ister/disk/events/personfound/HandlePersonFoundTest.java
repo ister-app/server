@@ -16,6 +16,7 @@ import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.NodeService;
+import app.ister.core.service.ServerEventService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -37,6 +38,9 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class HandlePersonFoundTest {
+
+    @Mock
+    private ServerEventService serverEventServiceMock;
 
     @InjectMocks
     private HandlePersonFound subject;

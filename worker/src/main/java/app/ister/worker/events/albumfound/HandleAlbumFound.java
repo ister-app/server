@@ -5,9 +5,11 @@ import app.ister.core.entity.MetadataEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.eventdata.AlbumFoundData;
+import app.ister.core.enums.SearchEntityType;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MetadataRepository;
+import app.ister.core.service.ServerEventService;
 import app.ister.worker.events.musicbrainz.MusicBrainzService;
 import app.ister.worker.events.tmdbmetadata.ImageDownloadService;
 import app.ister.worker.events.tmdbmetadata.ImageSave;
@@ -33,6 +35,7 @@ public class HandleAlbumFound implements Handle<AlbumFoundData> {
     private final MetadataRepository metadataRepository;
     private final MusicBrainzService musicBrainzService;
     private final ImageDownloadService imageDownloadService;
+    private final ServerEventService serverEventService;
 
     @Override
     public EventType handles() {
@@ -89,6 +92,7 @@ public class HandleAlbumFound implements Handle<AlbumFoundData> {
                                 .sourceUri(existing.getSourceUri())
                                 .build());
                     }
+                    serverEventService.createSearchIndexEvent(SearchEntityType.ALBUM, album.getId());
                 });
             }
         });

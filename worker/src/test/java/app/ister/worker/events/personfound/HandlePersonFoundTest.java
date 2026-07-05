@@ -12,6 +12,7 @@ import app.ister.core.repository.MetadataRepository;
 import app.ister.worker.events.musicbrainz.MusicBrainzService;
 import app.ister.worker.events.tmdbmetadata.ImageDownloadService;
 import app.ister.worker.events.tmdbmetadata.ImageSave;
+import app.ister.core.service.ServerEventService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -39,6 +40,9 @@ import static org.mockito.Mockito.when;
 class HandlePersonFoundTest {
 
     private static final String IMAGE_URL = "https://upload.wikimedia.org/artist.jpg";
+
+    @Mock
+    private ServerEventService serverEventServiceMock;
 
     @InjectMocks
     private HandlePersonFound subject;

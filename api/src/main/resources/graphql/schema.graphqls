@@ -14,7 +14,10 @@ type Query {
     albums(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, artistId: ID, libraryId: ID): AlbumPage
     albumById(id: ID): Album
     trackById(id: ID): Track
+    search(term: String!, size: Int, libraryId: ID): [SearchResult!]!
 }
+
+union SearchResult = Movie | Show | Episode | Person | Album | Track
 
 type Mutation {
     scanLibrary: Boolean!
@@ -31,6 +34,7 @@ type Mutation {
     analyzeDataForPerson(personId: ID!): Boolean!
     analyzeDataForAlbum(albumId: ID!): Boolean!
     analyzeDataForTrack(trackId: ID!): Boolean!
+    reindexSearch: Boolean!
 }
 
 enum SortingEnum {

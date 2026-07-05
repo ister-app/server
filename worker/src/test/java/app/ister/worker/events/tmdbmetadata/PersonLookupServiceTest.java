@@ -5,6 +5,7 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.tmdbapi.model.PersonDetails200Response;
 import app.ister.worker.clients.TmdbClient;
+import app.ister.core.service.ServerEventService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,11 +40,14 @@ class PersonLookupServiceTest {
     @Mock
     private PlatformTransactionManager transactionManager;
 
+    @Mock
+    private ServerEventService serverEventServiceMock;
+
     private PersonLookupService subject;
 
     @BeforeEach
     void setUp() {
-        subject = new PersonLookupService(personRepository, imageRepository, imageDownloadService, tmdbClient, transactionManager);
+        subject = new PersonLookupService(personRepository, imageRepository, imageDownloadService, tmdbClient, serverEventServiceMock, transactionManager);
     }
 
     @Test

@@ -5,9 +5,11 @@ import app.ister.core.entity.MetadataEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.eventdata.PersonFoundData;
+import app.ister.core.enums.SearchEntityType;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MetadataRepository;
+import app.ister.core.service.ServerEventService;
 import app.ister.worker.events.musicbrainz.MusicBrainzService;
 import app.ister.worker.events.tmdbmetadata.ImageDownloadService;
 import app.ister.worker.events.tmdbmetadata.ImageSave;
@@ -32,6 +34,7 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
     private final MetadataRepository metadataRepository;
     private final MusicBrainzService musicBrainzService;
     private final ImageDownloadService imageDownloadService;
+    private final ServerEventService serverEventService;
 
     @Override
     public EventType handles() {
@@ -80,6 +83,7 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
                         log.warn("Failed to download artist image for artist={}: {}", artist.getName(), e.getMessage());
                     }
                 }
+                serverEventService.createSearchIndexEvent(SearchEntityType.PERSON, artist.getId());
             });
         });
     }

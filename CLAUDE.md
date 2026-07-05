@@ -40,10 +40,11 @@ database/     - JPA entities, repositories, and the EventType enum (NB: same pac
 api/          - REST controllers + GraphQL schema/resolvers
 disk/         - File system scanning, startup tasks, media-file/image/subtitle/nfo/audio event handlers
 worker/       - Async job handlers: metadata fetch (TMDB) for movie/show/episode, (MusicBrainz) for person/album
+search/       - Optional Typesense full-text search: index event handlers + query service (package app.ister.search)
 transcoder/   - FFmpeg-based HLS transcoding via Jaffree library
 ```
 
-**Dependency flow:** `server` → `{api, disk, worker, transcoder}` → `database` → `core` (no other internal deps).
+**Dependency flow:** `server` → `{api, disk, worker, search, transcoder}` → `database` → `core`; additionally `api` → `search` (no other internal deps).
 Note: `core/` and `database/` both contribute to package `app.ister.core.*`; entities/repositories live in `database/`, not `core/`.
 
 ## Architecture: Event-Driven via RabbitMQ
@@ -64,6 +65,7 @@ All significant work is done asynchronously through RabbitMQ message queues. The
 - `MOVIE_FOUND`, `SHOW_FOUND`, `EPISODE_FOUND`, `PERSON_FOUND`, `ALBUM_FOUND`, `TRACK_FOUND` — metadata fetching from TMDB (incl. cast credits) / MusicBrainz / tag parsing. A `PersonEntity` is both a music artist and an actor; TMDB cast members are deduplicated on exact name + birth year.
 - `ANALYZE_DATA`, `ANALYZE_LIBRARY_REQUEST`, `UPDATE_IMAGES_REQUESTED` — analysis & image refresh
 - `TRANSCODE_REQUESTED`, `TRANSCODE_PASS_REQUESTED`, `PRE_TRANSCODE_RECENTLY_WATCHED` — HLS transcoding (see below)
+- `SEARCH_INDEX_REQUESTED`, `SEARCH_REINDEX_REQUESTED` — Typesense indexing (search module; only consumed when `app.ister.typesense.enabled=true`, otherwise dropped). Creation events come free via `ServerEventService.createXFoundEvent`; enrichment handlers emit after metadata saves; any code deleting a searchable entity must call `createSearchDeleteEvent`. GraphQL: `search(term)` returns a `SearchResult` union hydrated from PostgreSQL; `reindexSearch` rebuilds into a fresh collection + alias swap.
 
 **Directory/node-scoped queues:** transcode queues are not global. `TranscoderQueueNamingConfig` appends the directory (or disk) name, e.g. `app.ister.server.transcode_requested.<directoryName>`. Each node listens only on the queues for the directories it owns, so transcode work routes to the node that holds the source file.
 

@@ -17,6 +17,7 @@ import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.ScannerHelperService;
+import app.ister.core.service.ServerEventService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
@@ -39,6 +40,9 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class HandleNfoFileFoundTest {
+
+    @Mock
+    private ServerEventService serverEventServiceMock;
 
     @InjectMocks
     private HandleNfoFileFound subject;

@@ -2,8 +2,10 @@ package app.ister.worker.events.tmdbmetadata;
 
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.enums.ImageType;
+import app.ister.core.enums.SearchEntityType;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.PersonRepository;
+import app.ister.core.service.ServerEventService;
 import app.ister.tmdbapi.model.PersonDetails200Response;
 import app.ister.worker.clients.TmdbClient;
 import lombok.extern.slf4j.Slf4j;
@@ -39,17 +41,20 @@ public class PersonLookupService {
     private final ImageRepository imageRepository;
     private final ImageDownloadService imageDownloadService;
     private final TmdbClient tmdbClient;
+    private final ServerEventService serverEventService;
     private final TransactionTemplate newTransaction;
 
     public PersonLookupService(PersonRepository personRepository,
                                ImageRepository imageRepository,
                                ImageDownloadService imageDownloadService,
                                TmdbClient tmdbClient,
+                               ServerEventService serverEventService,
                                PlatformTransactionManager transactionManager) {
         this.personRepository = personRepository;
         this.imageRepository = imageRepository;
         this.imageDownloadService = imageDownloadService;
         this.tmdbClient = tmdbClient;
+        this.serverEventService = serverEventService;
         this.newTransaction = new TransactionTemplate(transactionManager);
         this.newTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -64,7 +69,9 @@ public class PersonLookupService {
     private PersonEntity findByNameAndBirthYearOrCreate(long tmdbPersonId, String name) {
         Integer birthYear = fetchBirthYear(tmdbPersonId);
         try {
-            return newTransaction.execute(status -> saveWithTmdbId(tmdbPersonId, name, birthYear));
+            PersonEntity person = newTransaction.execute(status -> saveWithTmdbId(tmdbPersonId, name, birthYear));
+            serverEventService.createSearchIndexEvent(SearchEntityType.PERSON, person.getId());
+            return person;
         } catch (DataIntegrityViolationException e) {
             // A concurrent handler created this person first (unique tmdb_id index): use the winner.
             log.debug("Concurrent person creation for tmdbId={}, re-querying", tmdbPersonId);

@@ -41,6 +41,9 @@ out/
 db-data/
 db-data-1/
 
+### Typesense data
+typesense-data/
+
 ### Local files
 **/*-local.*
 gradle.properties

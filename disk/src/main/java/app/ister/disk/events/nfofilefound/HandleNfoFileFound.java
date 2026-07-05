@@ -4,11 +4,13 @@ import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.LibraryType;
+import app.ister.core.enums.SearchEntityType;
 import app.ister.core.eventdata.NfoFileFoundData;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.ScannerHelperService;
+import app.ister.core.service.ServerEventService;
 import app.ister.core.Handle;
 import app.ister.disk.nfo.Parser;
 import app.ister.disk.scanner.MusicPathObject;
@@ -34,6 +36,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
     private final MetadataRepository metadataRepository;
     private final OtherPathFileRepository otherPathFileRepository;
     private final ScannerHelperService scannerHelperService;
+    private final ServerEventService serverEventService;
 
     @Override
     public EventType handles() {
@@ -89,6 +92,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
                         .personEntity(artist)
                         .sourceUri(FILE_URI_PREFIX + path).build());
                 setMetadataFk(directoryEntity, path, saved);
+                serverEventService.createSearchIndexEvent(SearchEntityType.PERSON, artist.getId());
             });
         } catch (java.io.FileNotFoundException _) {
             log.error(NFO_PARSE_ERROR, path);
@@ -117,6 +121,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
                         .albumEntity(album)
                         .sourceUri(FILE_URI_PREFIX + path).build());
                 setMetadataFk(directoryEntity, path, saved);
+                serverEventService.createSearchIndexEvent(SearchEntityType.ALBUM, album.getId());
             });
         } catch (java.io.FileNotFoundException _) {
             log.error(NFO_PARSE_ERROR, path);
@@ -134,6 +139,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
                         .movieEntity(movie)
                         .sourceUri(FILE_URI_PREFIX + path).build());
                 setMetadataFk(directoryEntity, path, saved);
+                serverEventService.createSearchIndexEvent(SearchEntityType.MOVIE, movie.getId());
             });
         } catch (FileNotFoundException _) {
             log.error(NFO_PARSE_ERROR, path);
@@ -151,6 +157,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
                         .showEntity(show)
                         .sourceUri(FILE_URI_PREFIX + path).build());
                 setMetadataFk(directoryEntity, path, saved);
+                serverEventService.createSearchIndexEvent(SearchEntityType.SHOW, show.getId());
             });
         } catch (FileNotFoundException _) {
             log.error(NFO_PARSE_ERROR, path);
@@ -168,6 +175,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
                         .episodeEntity(episode)
                         .sourceUri(FILE_URI_PREFIX + path).build());
                 setMetadataFk(directoryEntity, path, saved);
+                serverEventService.createSearchIndexEvent(SearchEntityType.EPISODE, episode.getId());
             });
         } catch (FileNotFoundException _) {
             log.error(NFO_PARSE_ERROR, path);

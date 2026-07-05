@@ -25,7 +25,7 @@ public class GraphQlExceptionResolver extends DataFetcherExceptionResolverAdapte
         if (ex instanceof NoSuchElementException || ex instanceof EntityNotFoundException) {
             return error(env, ErrorType.NOT_FOUND, "Not found");
         }
-        if (ex instanceof IllegalArgumentException) {
+        if (ex instanceof IllegalArgumentException || ex instanceof SearchUnavailableException) {
             return error(env, ErrorType.BAD_REQUEST, ex.getMessage());
         }
         // Let the framework handle everything else (incl. AccessDeniedException → FORBIDDEN).

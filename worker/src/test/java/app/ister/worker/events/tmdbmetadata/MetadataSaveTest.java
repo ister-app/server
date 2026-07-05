@@ -4,6 +4,7 @@ import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.repository.MetadataRepository;
+import app.ister.core.service.ServerEventService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -18,6 +19,9 @@ import static org.mockito.Mockito.verify;
 class MetadataSaveTest {
     @Mock
     private MetadataRepository metadataRepositoryMock;
+
+    @Mock
+    private ServerEventService serverEventServiceMock;
 
     @InjectMocks
     private MetadataSave subject;

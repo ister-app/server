@@ -1,6 +1,7 @@
 
 dependencies {
     implementation project(':core')
+    implementation project(':search')
     implementation project(':transcoder')
 
     // Spring Boot Starters

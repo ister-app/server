@@ -1,6 +1,7 @@
 package app.ister.core.service;
 
 import app.ister.core.enums.EventType;
+import app.ister.core.enums.SearchEntityType;
 import app.ister.core.eventdata.*;
 
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ public class ServerEventService {
                 .eventType(EventType.MOVIE_FOUND)
                 .movieId(movieId)
                 .build());
+        createSearchIndexEvent(SearchEntityType.MOVIE, movieId);
     }
 
     public void createShowFoundEvent(UUID showId) {
@@ -27,6 +29,7 @@ public class ServerEventService {
                 .eventType(EventType.SHOW_FOUND)
                 .showId(showId)
                 .build());
+        createSearchIndexEvent(SearchEntityType.SHOW, showId);
     }
 
     public void createEpisodeFoundEvent(UUID episodeId) {
@@ -34,6 +37,7 @@ public class ServerEventService {
                 .eventType(EventType.EPISODE_FOUND)
                 .episodeId(episodeId)
                 .build());
+        createSearchIndexEvent(SearchEntityType.EPISODE, episodeId);
     }
 
     public void createPersonFoundEvent(UUID personId) {
@@ -41,6 +45,7 @@ public class ServerEventService {
                 .eventType(EventType.PERSON_FOUND)
                 .personId(personId)
                 .build());
+        createSearchIndexEvent(SearchEntityType.PERSON, personId);
     }
 
     public void createAlbumFoundEvent(UUID albumId) {
@@ -48,12 +53,37 @@ public class ServerEventService {
                 .eventType(EventType.ALBUM_FOUND)
                 .albumId(albumId)
                 .build());
+        createSearchIndexEvent(SearchEntityType.ALBUM, albumId);
     }
 
     public void createTrackFoundEvent(UUID trackId) {
         messageSender.sendTrackFound(TrackFoundData.builder()
                 .eventType(EventType.TRACK_FOUND)
                 .trackId(trackId)
+                .build());
+        createSearchIndexEvent(SearchEntityType.TRACK, trackId);
+    }
+
+    public void createSearchIndexEvent(SearchEntityType entityType, UUID entityId) {
+        sendSearchIndexEvent(entityType, entityId, SearchIndexRequestedData.Action.UPSERT);
+    }
+
+    public void createSearchDeleteEvent(SearchEntityType entityType, UUID entityId) {
+        sendSearchIndexEvent(entityType, entityId, SearchIndexRequestedData.Action.DELETE);
+    }
+
+    private void sendSearchIndexEvent(SearchEntityType entityType, UUID entityId, SearchIndexRequestedData.Action action) {
+        messageSender.sendSearchIndexRequested(SearchIndexRequestedData.builder()
+                .eventType(EventType.SEARCH_INDEX_REQUESTED)
+                .entityType(entityType)
+                .entityId(entityId)
+                .action(action)
+                .build());
+    }
+
+    public void createSearchReindexEvent() {
+        messageSender.sendSearchReindexRequested(SearchReindexRequestedData.builder()
+                .eventType(EventType.SEARCH_REINDEX_REQUESTED)
                 .build());
     }
 }

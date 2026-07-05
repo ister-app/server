@@ -3,6 +3,7 @@ package app.ister.disk.events.personfound;
 import app.ister.core.Handle;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
+import app.ister.core.enums.SearchEntityType;
 import app.ister.core.eventdata.PersonFoundData;
 import app.ister.core.eventdata.NfoFileFoundData;
 import app.ister.core.repository.PersonRepository;
@@ -11,6 +12,7 @@ import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.NodeService;
+import app.ister.core.service.ServerEventService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -29,6 +31,7 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
     private final OtherPathFileRepository otherPathFileRepository;
     private final MessageSender messageSender;
     private final NodeService nodeService;
+    private final ServerEventService serverEventService;
 
     @Override
     public EventType handles() {
@@ -45,6 +48,8 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
     public void handle(PersonFoundData data) {
         personRepository.findById(data.getPersonId()).ifPresent(artist -> {
             metadataRepository.deleteAll(artist.getMetadataEntities());
+            // Keep the search index in line with the removed metadata; the NFO re-parse below re-enriches it.
+            serverEventService.createSearchIndexEvent(SearchEntityType.PERSON, artist.getId());
 
             var node = nodeService.getOrCreateNodeEntityForThisNode();
             directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node).stream()

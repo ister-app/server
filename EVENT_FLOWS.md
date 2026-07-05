@@ -172,6 +172,33 @@ flowchart TD
 
 ---
 
+## Flow 5: Zoeken (Typesense)
+
+**Trigger:** entiteit-creatie of metadata-verrijking; volledige reindex via GraphQL mutation `reindexSearch()`.
+Alleen actief als Typesense geconfigureerd is (`app.ister.typesense.enabled=true`); anders worden de events
+door de broker gedropt (queue bestaat niet).
+
+```mermaid
+flowchart TD
+    C["ScannerHelperService\n(getOrCreate* → *_FOUND)"] -->|"createXFoundEvent stuurt óók"| A
+    E["Verrijkings-handlers\n(MetadataSave, NFO, audio-tags,\nMusicBrainz, TMDB-cast)"] -->|na metadata-save| A
+    D["Track-delete\n(HandleAudioFileFound.reassignTrackNumber)"] -->|action=DELETE| A
+
+    A["SEARCH_INDEX_REQUESTED\n(entityType, entityId, action)"]
+    A --> H["HandleSearchIndexRequested\n📦 search"]
+    H -->|"entity laden + mappen\nupsert/delete document"| TS[(Typesense\nalias 'media')]
+
+    API([reindexSearch API]) --> R["SEARCH_REINDEX_REQUESTED"]
+    R --> RH["HandleSearchReindexRequested\n📦 search"]
+    RH -->|"nieuwe collection media_v<ts>\nalle entiteiten pagineren + importeren\nalias omzetten, oude collections droppen"| TS
+```
+
+**Regel:** elke plek die een doorzoekbare entiteit (movie/show/episode/person/album/track) verwijdert,
+moet `serverEventService.createSearchDeleteEvent(...)` aanroepen. Vangnetten: de upsert-handler verwijdert
+het document als de entiteit niet meer bestaat, en `reindexSearch` bouwt de index volledig opnieuw op.
+
+---
+
 ## Volledig Event Overzicht
 
 ```mermaid
@@ -249,7 +276,7 @@ graph LR
 |-------|--------|
 | **Node** `.{nodeName}` | `ANALYZE_LIBRARY_REQUESTED` |
 | **Directory** `.{dirName}` | `NEW_DIRECTORIES_SCAN_REQUESTED`, `FILE_SCAN_REQUESTED`, `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `SUBTITLE_FILE_FOUND`, `IMAGE_FOUND`, `NFO_FILE_FOUND`, `UPDATE_IMAGES_REQUESTED`, `ANALYZE_DATA` (disk), `PRE_TRANSCODE_RECENTLY_WATCHED`, `TRANSCODE_REQUESTED`, `TRANSCODE_PASS_REQUESTED` |
-| **Globaal** | `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND`, `ALBUM_FOUND`, `ANALYZE_DATA` (worker) |
+| **Globaal** | `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND`, `ALBUM_FOUND`, `ANALYZE_DATA` (worker), `SEARCH_INDEX_REQUESTED`, `SEARCH_REINDEX_REQUESTED` |
 
 ---
 
@@ -278,3 +305,10 @@ graph LR
 | `HandleAlbumFound` | worker | `ALBUM_FOUND` | `IMAGE_FOUND` |
 | `HandleTranscodeRequested` | transcoder | `TRANSCODE_REQUESTED` | `TRANSCODE_PASS_REQUESTED` |
 | `HandleTranscodePassRequested` | transcoder | `TRANSCODE_PASS_REQUESTED` | — |
+| `HandleSearchIndexRequested` | search | `SEARCH_INDEX_REQUESTED` | — (upsert/delete in Typesense) |
+| `HandleSearchReindexRequested` | search | `SEARCH_REINDEX_REQUESTED` | — (volledige rebuild + alias-swap) |
+
+`SEARCH_INDEX_REQUESTED` wordt verstuurd door: `ServerEventService.createXFoundEvent` (alle zes, bij creatie),
+`MetadataSave` (worker, TMDB), `HandlePersonFound`/`HandleAlbumFound` (worker, MusicBrainz),
+`PersonLookupService` (worker, TMDB-cast), `HandleNfoFileFound`, `HandleAudioFileFound` (incl. DELETE bij
+track-dedup) en `HandlePersonFound`/`HandleAlbumFound` (disk, na metadata-delete).
