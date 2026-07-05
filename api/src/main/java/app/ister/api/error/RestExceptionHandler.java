@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import java.io.IOException;
 import java.util.NoSuchElementException;
@@ -27,6 +28,18 @@ public class RestExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail handleBadRequest(IllegalArgumentException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    /**
+     * A client that aborts mid-stream (HLS seek/stop/quality-switch) surfaces as an
+     * {@link AsyncRequestNotUsableException} — which is an {@link IOException}, so without this
+     * handler it would be caught by {@link #handleIo} and try to write a {@link ProblemDetail} into
+     * a response already committed with a media content-type, throwing a secondary "No converter"
+     * error. The client is already gone, so there is nothing to write: swallow it at debug level.
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleClientDisconnect(AsyncRequestNotUsableException ex) {
+        log.debug("Client disconnected before response completed: {}", ex.getMessage());
     }
 
     @ExceptionHandler(IOException.class)
