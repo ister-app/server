@@ -241,6 +241,9 @@ type Credit {
     characterName: String
     creditType: CreditType!
     castOrder: Int
+    movie: Movie
+    show: Show
+    episode: Episode
 }
 
 type Album {
