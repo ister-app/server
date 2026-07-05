@@ -5,8 +5,10 @@ import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.enums.CreditType;
 import app.ister.core.repository.CreditRepository;
+import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.MovieRepository;
+import app.ister.core.repository.ShowRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,8 +21,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyIterable;
 import static org.mockito.Mockito.when;
 
 /**
@@ -43,6 +45,12 @@ class CreditControllerGraphQlTest {
 
     @MockitoBean
     private CreditRepository creditRepository;
+
+    @MockitoBean
+    private ShowRepository showRepository;
+
+    @MockitoBean
+    private EpisodeRepository episodeRepository;
 
     @Test
     void movieCastResolvesCreditsAndPersons() {
@@ -68,5 +76,31 @@ class CreditControllerGraphQlTest {
                 .path("movieById.cast[0].creditType").entity(String.class).isEqualTo("CAST")
                 .path("movieById.cast[0].person.name").entity(String.class).isEqualTo("Lady Gaga")
                 .path("movieById.cast[0].person.birthYear").entity(Integer.class).isEqualTo(1986));
+    }
+
+    @Test
+    void creditResolvesBackReferenceToMovie() {
+        MovieEntity movie = MovieEntity.builder().name("A Star Is Born").releaseYear(2018).build();
+        movie.setId(UUID.randomUUID());
+        PersonEntity person = PersonEntity.builder().name("Lady Gaga").birthYear(1986).build();
+        person.setId(UUID.randomUUID());
+        CreditEntity credit = CreditEntity.builder()
+                .personEntity(person).characterName("Ally").creditType(CreditType.CAST).castOrder(1).build();
+        credit.setId(UUID.randomUUID());
+        credit.setMovieEntity(movie);
+        when(movieRepository.findById(movie.getId())).thenReturn(Optional.of(movie));
+        when(creditRepository.findByMovieEntityIdIn(anyCollection())).thenReturn(List.of(credit));
+        when(movieRepository.findAllById(anyIterable())).thenReturn(List.of(movie));
+
+        assertDoesNotThrow(() -> graphQlTester.document("""
+                        { movieById(id: "%s") {
+                            cast { movie { name releaseYear } show { name } episode { number } }
+                        } }
+                        """.formatted(movie.getId()))
+                .execute()
+                .path("movieById.cast[0].movie.name").entity(String.class).isEqualTo("A Star Is Born")
+                .path("movieById.cast[0].movie.releaseYear").entity(Integer.class).isEqualTo(2018)
+                .path("movieById.cast[0].show").valueIsNull()
+                .path("movieById.cast[0].episode").valueIsNull());
     }
 }

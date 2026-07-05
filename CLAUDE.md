@@ -61,7 +61,7 @@ All significant work is done asynchronously through RabbitMQ message queues. The
 **Event categories** (see `EVENT_FLOWS.md` for full per-flow mermaid diagrams — keep it as the canonical reference):
 - `FILE_SCAN_REQUESTED`, `NEW_DIRECTORIES_SCAN_REQUEST` — disk scanning
 - `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `IMAGE_FOUND`, `SUBTITLE_FILE_FOUND`, `NFO_FILE_FOUND` — file-type-specific processing
-- `MOVIE_FOUND`, `SHOW_FOUND`, `EPISODE_FOUND`, `PERSON_FOUND`, `ALBUM_FOUND`, `TRACK_FOUND` — metadata fetching from TMDB (incl. cast credits) / MusicBrainz / tag parsing. A `PersonEntity` is both a music artist and an actor; TMDB cast members are deduplicated on exact name + birth year.
+- `MOVIE_FOUND`, `SHOW_FOUND`, `EPISODE_FOUND`, `PERSON_FOUND`, `ALBUM_FOUND`, `TRACK_FOUND` — metadata fetching from TMDB (incl. cast credits) / MusicBrainz / tag parsing. A `PersonEntity` is both a music artist and an actor; TMDB cast members are deduplicated on exact name + birth year. A `CreditEntity` links a person to exactly one of movie/show/episode; the GraphQL `Credit` type exposes those back-references (`movie`/`show`/`episode`, batch-resolved in `CreditController`) so a person's filmography is queryable via `personById { credits { movie/show/episode } }`.
 - `ANALYZE_DATA`, `ANALYZE_LIBRARY_REQUEST`, `UPDATE_IMAGES_REQUESTED` — analysis & image refresh
 - `TRANSCODE_REQUESTED`, `TRANSCODE_PASS_REQUESTED`, `PRE_TRANSCODE_RECENTLY_WATCHED` — HLS transcoding (see below)
 
