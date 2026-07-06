@@ -41,6 +41,7 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
     private final DirectoryRepository directoryRepository;
     private final MessageSender messageSender;
     private final MetadataRepository metadataRepository;
+    private final MediaFileRepository mediaFileRepository;
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final ImageRepository imageRepository;
 
@@ -69,29 +70,31 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
             handleShow(data);
         } else if (data.getEpisodeId() != null) {
             episodeRepository.findById(data.getEpisodeId()).ifPresent(episodeEntity -> {
-                metadataRepository.deleteAll(episodeEntity.getMetadataEntities());
-                imageRepository.deleteAll(episodeEntity.getImagesEntities());
-                episodeEntity.getMediaFileEntities().forEach(mediaFileEntity -> mediaFileStreamRepository.deleteAll(mediaFileEntity.getMediaFileStreamEntity()));
+                metadataRepository.deleteAll(metadataRepository.findByEpisodeEntityId(data.getEpisodeId()));
+                imageRepository.deleteAll(imageRepository.findByEpisodeEntityId(data.getEpisodeId()));
+                List<MediaFileEntity> mediaFiles = mediaFileRepository.findByEpisodeEntityId(data.getEpisodeId());
+                mediaFiles.forEach(mediaFileEntity -> mediaFileStreamRepository.deleteAllByMediaFileEntityId(mediaFileEntity.getId()));
                 messageSender.sendEpisodeFound(
                         EpisodeFoundData.builder().eventType(EventType.EPISODE_FOUND).episodeId(data.getEpisodeId()).build());
-                startAnalyzeMediaFiles(episodeEntity.getMediaFileEntities(), data);
+                startAnalyzeMediaFiles(mediaFiles, data);
             });
         } else if (data.getMovieId() != null) {
             movieRepository.findById(data.getMovieId()).ifPresent(movieEntity -> {
-                metadataRepository.deleteAll(movieEntity.getMetadataEntities());
-                imageRepository.deleteAll(movieEntity.getImagesEntities());
-                movieEntity.getMediaFileEntities().forEach(mediaFileEntity -> mediaFileStreamRepository.deleteAll(mediaFileEntity.getMediaFileStreamEntity()));
+                metadataRepository.deleteAll(metadataRepository.findByMovieEntityId(data.getMovieId()));
+                imageRepository.deleteAll(imageRepository.findByMovieEntityId(data.getMovieId()));
+                List<MediaFileEntity> mediaFiles = mediaFileRepository.findByMovieEntityId(data.getMovieId());
+                mediaFiles.forEach(mediaFileEntity -> mediaFileStreamRepository.deleteAllByMediaFileEntityId(mediaFileEntity.getId()));
                 messageSender.sendMovieFound(
                         MovieFoundData.builder().eventType(EventType.MOVIE_FOUND).movieId(data.getMovieId()).build());
-                startAnalyzeMediaFiles(movieEntity.getMediaFileEntities(), data);
+                startAnalyzeMediaFiles(mediaFiles, data);
             });
         }
     }
 
     private void handlePerson(AnalyzeData data) {
         personRepository.findById(data.getPersonId()).ifPresent(artist -> {
-            metadataRepository.deleteAll(artist.getMetadataEntities());
-            imageRepository.deleteAll(artist.getImageEntities());
+            metadataRepository.deleteAll(metadataRepository.findByPersonEntityId(artist.getId()));
+            imageRepository.deleteAll(imageRepository.findByPersonEntityId(artist.getId()));
             directoryRepository.findByLibraryEntityAndDirectoryType(artist.getLibraryEntity(), DirectoryType.LIBRARY)
                     .stream()
                     .map(dir -> dir.getNodeEntity().getName())
@@ -99,15 +102,15 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
                     .forEach(nodeName -> messageSender.sendPersonFound(
                             PersonFoundData.builder().eventType(EventType.PERSON_FOUND).personId(data.getPersonId()).build(),
                             nodeName));
-            artist.getAlbumEntities().forEach(album -> messageSender.sendAnalyzeData(
+            albumRepository.findByPersonEntityId(artist.getId()).forEach(album -> messageSender.sendAnalyzeData(
                     AnalyzeData.builder().eventType(EventType.ANALYZE_DATA).albumId(album.getId()).build()));
         });
     }
 
     private void handleAlbum(AnalyzeData data) {
         albumRepository.findById(data.getAlbumId()).ifPresent(album -> {
-            metadataRepository.deleteAll(album.getMetadataEntities());
-            imageRepository.deleteAll(album.getImageEntities());
+            metadataRepository.deleteAll(metadataRepository.findByAlbumEntityId(album.getId()));
+            imageRepository.deleteAll(imageRepository.findByAlbumEntityId(album.getId()));
             directoryRepository.findByLibraryEntityAndDirectoryType(album.getLibraryEntity(), DirectoryType.LIBRARY)
                     .stream()
                     .map(dir -> dir.getNodeEntity().getName())
@@ -117,18 +120,19 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
                             nodeName));
             messageSender.sendAlbumFound(
                     AlbumFoundData.builder().eventType(EventType.ALBUM_FOUND).albumId(data.getAlbumId()).build());
-            album.getTrackEntities().forEach(track -> messageSender.sendAnalyzeData(
+            trackRepository.findByAlbumEntity_Id(album.getId(), Sort.unsorted()).forEach(track -> messageSender.sendAnalyzeData(
                     AnalyzeData.builder().eventType(EventType.ANALYZE_DATA).trackId(track.getId()).build()));
         });
     }
 
     private void handleTrack(AnalyzeData data) {
         trackRepository.findById(data.getTrackId()).ifPresent(track -> {
-            metadataRepository.deleteAll(track.getMetadataEntities());
-            track.getMediaFileEntities().stream()
-                    .filter(m -> m.getDirectoryEntity() != null)
-                    .forEach(m -> messageSender.sendAudioFileFound(
-                            AudioFileFoundData.fromMediaFileEntity(m), m.getDirectoryEntity().getName()));
+            metadataRepository.deleteAll(metadataRepository.findByTrackEntityId(track.getId()));
+            mediaFileRepository.findByTrackEntityId(track.getId()).stream()
+                    .filter(m -> m.getDirectoryEntityId() != null)
+                    .forEach(m -> directoryRepository.findById(m.getDirectoryEntityId())
+                            .ifPresent(dir -> messageSender.sendAudioFileFound(
+                                    AudioFileFoundData.fromMediaFileEntity(m), dir.getName())));
         });
     }
 
@@ -160,8 +164,8 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
 
     private void handleShow(AnalyzeData data) {
         showRepository.findById(data.getShowId()).ifPresent(showEntity -> {
-            metadataRepository.deleteAll(showEntity.getMetadataEntities());
-            imageRepository.deleteAll(showEntity.getImageEntities());
+            metadataRepository.deleteAll(metadataRepository.findByShowEntityId(data.getShowId()));
+            imageRepository.deleteAll(imageRepository.findByShowEntityId(data.getShowId()));
             messageSender.sendShowFound(
                     ShowFoundData.builder()
                             .eventType(EventType.SHOW_FOUND)
@@ -179,16 +183,16 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
     private void startAnalyzeMediaFiles(List<MediaFileEntity> mediaFileEntityList, AnalyzeData data) {
         // One event per unique directory (images/NFO/subtitles are directory-level resources)
         mediaFileEntityList.stream()
-                .map(MediaFileEntity::getDirectoryEntity)
+                .map(MediaFileEntity::getDirectoryEntityId)
                 .distinct()
-                .forEach(dir -> messageSender.sendAnalyzeData(
+                .forEach(dirId -> directoryRepository.findById(dirId).ifPresent(dir -> messageSender.sendAnalyzeData(
                         AnalyzeData.builder()
                                 .eventType(EventType.ANALYZE_DATA)
                                 .episodeId(data.getEpisodeId())
                                 .movieId(data.getMovieId())
                                 .directoryId(dir.getId())
                                 .build(),
-                        dir.getName()));
+                        dir.getName())));
 
     }
 }

@@ -47,7 +47,7 @@ public class HandleAlbumFound implements Handle<AlbumFoundData> {
     @Override
     public void handle(AlbumFoundData data) {
         albumRepository.findById(data.getAlbumId()).ifPresent(album -> {
-            metadataRepository.deleteAll(album.getMetadataEntities());
+            metadataRepository.deleteAll(metadataRepository.findByAlbumEntityId(album.getId()));
             // Keep the search index in line with the removed metadata; the NFO re-parse below re-enriches it.
             serverEventService.createSearchIndexEvent(SearchEntityType.ALBUM, album.getId());
 

@@ -26,6 +26,10 @@ public interface ImageRepository extends CrudRepository<ImageEntity, UUID> {
 
     boolean existsByMovieEntityId(UUID movieEntityId);
 
+    List<ImageEntity> findByEpisodeEntityId(UUID episodeEntityId);
+
+    List<ImageEntity> findByMovieEntityId(UUID movieEntityId);
+
     List<ImageEntity> findByPersonEntityId(UUID personEntityId);
 
     List<ImageEntity> findByAlbumEntityId(UUID albumEntityId);

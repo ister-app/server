@@ -34,6 +34,8 @@ public class HandleAnalyzeDataDisk implements Handle<AnalyzeData> {
     private final DirectoryRepository directoryRepository;
     private final EpisodeRepository episodeRepository;
     private final MovieRepository movieRepository;
+    private final MediaFileRepository mediaFileRepository;
+    private final MetadataRepository metadataRepository;
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final OtherPathFileRepository otherPathFileRepository;
     private final MessageSender messageSender;
@@ -59,15 +61,15 @@ public class HandleAnalyzeDataDisk implements Handle<AnalyzeData> {
         List<MetadataEntity> metadataEntities;
         List<MediaFileEntity> localFiles;
         if (data.getEpisodeId() != null) {
-            EpisodeEntity episode = episodeRepository.findById(data.getEpisodeId()).orElseThrow();
-            localFiles = episode.getMediaFileEntities().stream()
+            episodeRepository.findById(data.getEpisodeId()).orElseThrow();
+            localFiles = mediaFileRepository.findByEpisodeEntityId(data.getEpisodeId()).stream()
                     .filter(mf -> mf.getDirectoryEntityId().equals(dir.getId())).toList();
-            metadataEntities = episode.getMetadataEntities();
+            metadataEntities = metadataRepository.findByEpisodeEntityId(data.getEpisodeId());
         } else {
-            MovieEntity movie = movieRepository.findById(data.getMovieId()).orElseThrow();
-            localFiles = movie.getMediaFileEntities().stream()
+            movieRepository.findById(data.getMovieId()).orElseThrow();
+            localFiles = mediaFileRepository.findByMovieEntityId(data.getMovieId()).stream()
                     .filter(mf -> mf.getDirectoryEntityId().equals(dir.getId())).toList();
-            metadataEntities = movie.getMetadataEntities();
+            metadataEntities = metadataRepository.findByMovieEntityId(data.getMovieId());
         }
 
         for (MediaFileEntity mf : localFiles) {

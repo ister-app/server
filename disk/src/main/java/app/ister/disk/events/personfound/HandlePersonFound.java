@@ -47,7 +47,7 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
     @Override
     public void handle(PersonFoundData data) {
         personRepository.findById(data.getPersonId()).ifPresent(artist -> {
-            metadataRepository.deleteAll(artist.getMetadataEntities());
+            metadataRepository.deleteAll(metadataRepository.findByPersonEntityId(artist.getId()));
             // Keep the search index in line with the removed metadata; the NFO re-parse below re-enriches it.
             serverEventService.createSearchIndexEvent(SearchEntityType.PERSON, artist.getId());
 

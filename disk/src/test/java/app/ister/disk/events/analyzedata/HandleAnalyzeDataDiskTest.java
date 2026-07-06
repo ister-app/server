@@ -13,7 +13,9 @@ import app.ister.core.enums.StreamCodecType;
 import app.ister.core.eventdata.AnalyzeData;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
+import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.MessageSender;
@@ -54,6 +56,10 @@ class HandleAnalyzeDataDiskTest {
     @Mock
     private MovieRepository movieRepository;
     @Mock
+    private MediaFileRepository mediaFileRepository;
+    @Mock
+    private MetadataRepository metadataRepository;
+    @Mock
     private MediaFileStreamRepository mediaFileStreamRepository;
     @Mock
     private OtherPathFileRepository otherPathFileRepository;
@@ -83,12 +89,7 @@ class HandleAnalyzeDataDiskTest {
         DirectoryEntity dir = DirectoryEntity.builder().id(dirId).name("shows").build();
         MediaFileEntity mf = MediaFileEntity.builder().id(mediaFileId).path("/shows/episode.mkv").build();
         mf.setDirectoryEntity(dir);
-        EpisodeEntity episode = EpisodeEntity.builder()
-                .id(episodeId)
-                .mediaFileEntities(List.of(mf))
-                .metadataEntities(List.of())
-                .imagesEntities(List.of())
-                .build();
+        EpisodeEntity episode = EpisodeEntity.builder().id(episodeId).build();
 
         AnalyzeData data = AnalyzeData.builder()
                 .eventType(EventType.ANALYZE_DATA)
@@ -98,6 +99,7 @@ class HandleAnalyzeDataDiskTest {
 
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(mf));
         when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
                 .thenReturn(List.of());
 
@@ -117,12 +119,7 @@ class HandleAnalyzeDataDiskTest {
         DirectoryEntity dir = DirectoryEntity.builder().id(dirId).name("movies").build();
         MediaFileEntity mf = MediaFileEntity.builder().id(mediaFileId).path("/movies/film.mkv").build();
         mf.setDirectoryEntity(dir);
-        MovieEntity movie = MovieEntity.builder()
-                .id(movieId)
-                .mediaFileEntities(List.of(mf))
-                .metadataEntities(List.of())
-                .imagesEntities(List.of())
-                .build();
+        MovieEntity movie = MovieEntity.builder().id(movieId).build();
 
         AnalyzeData data = AnalyzeData.builder()
                 .eventType(EventType.ANALYZE_DATA)
@@ -132,6 +129,7 @@ class HandleAnalyzeDataDiskTest {
 
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(movieRepository.findById(movieId)).thenReturn(Optional.of(movie));
+        when(mediaFileRepository.findByMovieEntityId(movieId)).thenReturn(List.of(mf));
         when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
                 .thenReturn(List.of());
 
@@ -153,12 +151,7 @@ class HandleAnalyzeDataDiskTest {
                 .path("/shows/episode.nfo")
                 .pathFileType(PathFileType.NFO)
                 .build();
-        EpisodeEntity episode = EpisodeEntity.builder()
-                .id(episodeId)
-                .mediaFileEntities(List.of())
-                .metadataEntities(List.of(metadata))
-                .imagesEntities(List.of())
-                .build();
+        EpisodeEntity episode = EpisodeEntity.builder().id(episodeId).build();
 
         AnalyzeData data = AnalyzeData.builder()
                 .eventType(EventType.ANALYZE_DATA)
@@ -168,6 +161,7 @@ class HandleAnalyzeDataDiskTest {
 
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        when(metadataRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(metadata));
         when(otherPathFileRepository.findByMetadataEntity(metadata)).thenReturn(Optional.of(nfoFile));
 
         subject.handle(data);
@@ -183,12 +177,7 @@ class HandleAnalyzeDataDiskTest {
 
         DirectoryEntity dir = DirectoryEntity.builder().id(dirId).name("shows").build();
         MetadataEntity metadata = MetadataEntity.builder().build();
-        EpisodeEntity episode = EpisodeEntity.builder()
-                .id(episodeId)
-                .mediaFileEntities(List.of())
-                .metadataEntities(List.of(metadata))
-                .imagesEntities(List.of())
-                .build();
+        EpisodeEntity episode = EpisodeEntity.builder().id(episodeId).build();
 
         AnalyzeData data = AnalyzeData.builder()
                 .eventType(EventType.ANALYZE_DATA)
@@ -198,6 +187,7 @@ class HandleAnalyzeDataDiskTest {
 
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        when(metadataRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(metadata));
         when(otherPathFileRepository.findByMetadataEntity(metadata)).thenReturn(Optional.empty());
 
         subject.handle(data);
@@ -220,12 +210,7 @@ class HandleAnalyzeDataDiskTest {
                 .path("/shows/episode.en.srt")
                 .pathFileType(PathFileType.SUBTITLE)
                 .build();
-        EpisodeEntity episode = EpisodeEntity.builder()
-                .id(episodeId)
-                .mediaFileEntities(List.of(mf))
-                .metadataEntities(List.of())
-                .imagesEntities(List.of())
-                .build();
+        EpisodeEntity episode = EpisodeEntity.builder().id(episodeId).build();
 
         AnalyzeData data = AnalyzeData.builder()
                 .eventType(EventType.ANALYZE_DATA)
@@ -235,6 +220,7 @@ class HandleAnalyzeDataDiskTest {
 
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(mf));
         when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
                 .thenReturn(List.of(stream));
         when(otherPathFileRepository.findByMediaFileStreamEntity(stream)).thenReturn(Optional.of(subtitleFile));
@@ -255,12 +241,7 @@ class HandleAnalyzeDataDiskTest {
         MediaFileEntity mf = MediaFileEntity.builder().id(mediaFileId).path("/shows/episode.mkv").build();
         mf.setDirectoryEntity(dir);
         MediaFileStreamEntity stream = MediaFileStreamEntity.builder().build();
-        EpisodeEntity episode = EpisodeEntity.builder()
-                .id(episodeId)
-                .mediaFileEntities(List.of(mf))
-                .metadataEntities(List.of())
-                .imagesEntities(List.of())
-                .build();
+        EpisodeEntity episode = EpisodeEntity.builder().id(episodeId).build();
 
         AnalyzeData data = AnalyzeData.builder()
                 .eventType(EventType.ANALYZE_DATA)
@@ -270,6 +251,7 @@ class HandleAnalyzeDataDiskTest {
 
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(mf));
         when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
                 .thenReturn(List.of(stream));
         when(otherPathFileRepository.findByMediaFileStreamEntity(stream)).thenReturn(Optional.empty());
@@ -295,12 +277,7 @@ class HandleAnalyzeDataDiskTest {
         DirectoryEntity dir = DirectoryEntity.builder().id(dirId).name("shows").build();
         MediaFileEntity mf = MediaFileEntity.builder().id(mediaFileId).path("/shows/episode.mkv").build();
         mf.setDirectoryEntity(dir);
-        EpisodeEntity episode = EpisodeEntity.builder()
-                .id(episodeId)
-                .mediaFileEntities(List.of(mf))
-                .metadataEntities(List.of())
-                .imagesEntities(List.of())
-                .build();
+        EpisodeEntity episode = EpisodeEntity.builder().id(episodeId).build();
 
         AnalyzeData data = AnalyzeData.builder()
                 .eventType(EventType.ANALYZE_DATA)
@@ -310,6 +287,7 @@ class HandleAnalyzeDataDiskTest {
 
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(mf));
         when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
                 .thenReturn(List.of());
 
@@ -329,12 +307,7 @@ class HandleAnalyzeDataDiskTest {
         DirectoryEntity otherDir = DirectoryEntity.builder().id(otherDirId).name("other").build();
         MediaFileEntity mfOtherDir = MediaFileEntity.builder().path("/other/episode.mkv").build();
         mfOtherDir.setDirectoryEntity(otherDir);
-        EpisodeEntity episode = EpisodeEntity.builder()
-                .id(episodeId)
-                .mediaFileEntities(List.of(mfOtherDir))
-                .metadataEntities(List.of())
-                .imagesEntities(List.of())
-                .build();
+        EpisodeEntity episode = EpisodeEntity.builder().id(episodeId).build();
 
         AnalyzeData data = AnalyzeData.builder()
                 .eventType(EventType.ANALYZE_DATA)
@@ -344,6 +317,7 @@ class HandleAnalyzeDataDiskTest {
 
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(mfOtherDir));
 
         subject.handle(data);
 

@@ -16,6 +16,7 @@ import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.ShowRepository;
 import app.ister.core.repository.TrackRepository;
@@ -44,6 +45,7 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
     private final PersonRepository personRepository;
     private final AlbumRepository albumRepository;
     private final TrackRepository trackRepository;
+    private final MediaFileRepository mediaFileRepository;
     private final MessageSender messageSender;
     private final NodeService nodeService;
     private final DirectoryRepository directoryRepository;
@@ -88,10 +90,11 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
                         AlbumFoundData.builder().eventType(EventType.ALBUM_FOUND).albumId(a.getId()).build()));
 
         trackRepository.findByAlbumEntity_LibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(LibraryType.MUSIC)
-                .forEach(t -> t.getMediaFileEntities().stream()
-                        .filter(m -> m.getDirectoryEntity() != null)
-                        .forEach(m -> messageSender.sendAudioFileFound(
-                                AudioFileFoundData.fromMediaFileEntity(m), m.getDirectoryEntity().getName())));
+                .forEach(t -> mediaFileRepository.findByTrackEntityId(t.getId()).stream()
+                        .filter(m -> m.getDirectoryEntityId() != null)
+                        .forEach(m -> directoryRepository.findById(m.getDirectoryEntityId())
+                                .ifPresent(dir -> messageSender.sendAudioFileFound(
+                                        AudioFileFoundData.fromMediaFileEntity(m), dir.getName()))));
     }
 
     private void dispatchMissingMetadataEvents(String nodeName) {

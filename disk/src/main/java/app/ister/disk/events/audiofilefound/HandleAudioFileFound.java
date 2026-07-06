@@ -169,10 +169,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
 
         String title = extractTitle(format, mediaFile.getPath());
         if (title != null) {
-            var existingMetadata = track.getMetadataEntities();
-            if (existingMetadata != null) {
-                metadataRepository.deleteAll(existingMetadata);
-            }
+            metadataRepository.deleteAll(metadataRepository.findByTrackEntityId(track.getId()));
             metadataRepository.save(MetadataEntity.builder()
                     .title(title)
                     .description(extractDescription(format))
@@ -190,7 +187,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
     private void saveAlbumMetadataFromTags(TrackEntity track, MediaFileEntity mediaFile, Format format) {
         AlbumEntity album = track.getAlbumEntity();
         if (album == null) return;
-        if (album.getMetadataEntities() != null && !album.getMetadataEntities().isEmpty()) return;
+        if (!metadataRepository.findByAlbumEntityId(album.getId()).isEmpty()) return;
 
         String albumTitle = extractAlbumTitle(format);
         LocalDate released = extractReleaseDate(format);

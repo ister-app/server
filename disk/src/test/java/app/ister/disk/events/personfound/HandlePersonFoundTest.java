@@ -119,6 +119,7 @@ class HandlePersonFoundTest {
         OtherPathFileEntity nfoFile = new OtherPathFileEntity();
 
         when(personRepository.findById(personId)).thenReturn(Optional.of(artist));
+        when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of(meta));
         when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
         when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node))
                 .thenReturn(List.of(dir));

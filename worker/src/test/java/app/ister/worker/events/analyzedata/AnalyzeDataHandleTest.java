@@ -20,6 +20,7 @@ import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
+import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.MovieRepository;
@@ -70,6 +71,8 @@ class AnalyzeDataHandleTest {
     private TrackRepository trackRepository;
     @Mock
     private DirectoryRepository directoryRepository;
+    @Mock
+    private MediaFileRepository mediaFileRepository;
     @Mock
     private MetadataRepository metadataRepository;
     @Mock
@@ -191,19 +194,17 @@ class AnalyzeDataHandleTest {
     void handleEpisodeIdSendsEpisodeFoundAndDirectoryFanOut() {
         UUID episodeId = UUID.randomUUID();
         DirectoryEntity dir = DirectoryEntity.builder().id(UUID.randomUUID()).name("dir1").build();
-        MediaFileEntity mf = MediaFileEntity.builder()
-                .directoryEntity(dir)
-                .build();
-        EpisodeEntity episode = EpisodeEntity.builder()
-                .id(episodeId)
-                .mediaFileEntities(List.of(mf))
-                .build();
+        MediaFileEntity mf = MediaFileEntity.builder().build();
+        mf.setDirectoryEntity(dir);
+        EpisodeEntity episode = EpisodeEntity.builder().id(episodeId).build();
         AnalyzeData data = AnalyzeData.builder()
                 .eventType(EventType.ANALYZE_DATA)
                 .episodeId(episodeId)
                 .build();
 
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(mf));
+        when(directoryRepository.findById(dir.getId())).thenReturn(Optional.of(dir));
 
         subject.handle(data);
 
@@ -218,19 +219,17 @@ class AnalyzeDataHandleTest {
     void handleMovieIdSendsMovieFoundAndDirectoryFanOut() {
         UUID movieId = UUID.randomUUID();
         DirectoryEntity dir = DirectoryEntity.builder().id(UUID.randomUUID()).name("movies").build();
-        MediaFileEntity mf = MediaFileEntity.builder()
-                .directoryEntity(dir)
-                .build();
-        MovieEntity movie = MovieEntity.builder()
-                .id(movieId)
-                .mediaFileEntities(List.of(mf))
-                .build();
+        MediaFileEntity mf = MediaFileEntity.builder().build();
+        mf.setDirectoryEntity(dir);
+        MovieEntity movie = MovieEntity.builder().id(movieId).build();
         AnalyzeData data = AnalyzeData.builder()
                 .eventType(EventType.ANALYZE_DATA)
                 .movieId(movieId)
                 .build();
 
         when(movieRepository.findById(movieId)).thenReturn(Optional.of(movie));
+        when(mediaFileRepository.findByMovieEntityId(movieId)).thenReturn(List.of(mf));
+        when(directoryRepository.findById(dir.getId())).thenReturn(Optional.of(dir));
 
         subject.handle(data);
 
@@ -290,6 +289,7 @@ class AnalyzeDataHandleTest {
                 .build();
 
         when(personRepository.findById(personId)).thenReturn(Optional.of(artist));
+        when(albumRepository.findByPersonEntityId(personId)).thenReturn(List.of(album1));
         when(directoryRepository.findByLibraryEntityAndDirectoryType(library, DirectoryType.LIBRARY))
                 .thenReturn(List.of(dir));
 
@@ -322,6 +322,7 @@ class AnalyzeDataHandleTest {
                 .build();
 
         when(albumRepository.findById(albumId)).thenReturn(Optional.of(album));
+        when(trackRepository.findByAlbumEntity_Id(eq(albumId), any(Sort.class))).thenReturn(List.of(track1));
         when(directoryRepository.findByLibraryEntityAndDirectoryType(library, DirectoryType.LIBRARY))
                 .thenReturn(List.of(dir));
 
@@ -336,22 +337,20 @@ class AnalyzeDataHandleTest {
     @Test
     void handleTrackIdSendsAudioFileFoundForEachMediaFile() {
         UUID trackId = UUID.randomUUID();
-        DirectoryEntity dir = DirectoryEntity.builder().name("music-dir").build();
+        DirectoryEntity dir = DirectoryEntity.builder().id(UUID.randomUUID()).name("music-dir").build();
         MediaFileEntity mf = MediaFileEntity.builder()
-                .directoryEntity(dir)
                 .path("/music/track.mp3")
                 .build();
-        TrackEntity track = TrackEntity.builder()
-                .id(trackId)
-                .metadataEntities(List.of())
-                .mediaFileEntities(List.of(mf))
-                .build();
+        mf.setDirectoryEntity(dir);
+        TrackEntity track = TrackEntity.builder().id(trackId).build();
         AnalyzeData data = AnalyzeData.builder()
                 .eventType(EventType.ANALYZE_DATA)
                 .trackId(trackId)
                 .build();
 
         when(trackRepository.findById(trackId)).thenReturn(Optional.of(track));
+        when(mediaFileRepository.findByTrackEntityId(trackId)).thenReturn(List.of(mf));
+        when(directoryRepository.findById(dir.getId())).thenReturn(Optional.of(dir));
 
         subject.handle(data);
 
@@ -364,17 +363,14 @@ class AnalyzeDataHandleTest {
         MediaFileEntity mfNoDir = MediaFileEntity.builder()
                 .path("/music/track.mp3")
                 .build(); // no directoryEntity set
-        TrackEntity track = TrackEntity.builder()
-                .id(trackId)
-                .metadataEntities(List.of())
-                .mediaFileEntities(List.of(mfNoDir))
-                .build();
+        TrackEntity track = TrackEntity.builder().id(trackId).build();
         AnalyzeData data = AnalyzeData.builder()
                 .eventType(EventType.ANALYZE_DATA)
                 .trackId(trackId)
                 .build();
 
         when(trackRepository.findById(trackId)).thenReturn(Optional.of(track));
+        when(mediaFileRepository.findByTrackEntityId(trackId)).thenReturn(List.of(mfNoDir));
 
         subject.handle(data);
 

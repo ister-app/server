@@ -127,6 +127,7 @@ class HandleAlbumFoundTest {
         OtherPathFileEntity nfoFile = new OtherPathFileEntity();
 
         when(albumRepository.findById(albumId)).thenReturn(Optional.of(album));
+        when(metadataRepository.findByAlbumEntityId(albumId)).thenReturn(List.of(meta));
         when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
         when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node))
                 .thenReturn(List.of(dir));

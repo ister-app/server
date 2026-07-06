@@ -25,4 +25,10 @@ public interface MediaFileRepository extends CrudRepository<MediaFileEntity, UUI
     boolean existsByTrackEntityId(UUID trackId);
 
     List<MediaFileEntity> findByTrackEntity_AlbumEntityId(UUID albumId);
+
+    List<MediaFileEntity> findByEpisodeEntityId(UUID episodeId);
+
+    List<MediaFileEntity> findByMovieEntityId(UUID movieId);
+
+    List<MediaFileEntity> findByTrackEntityId(UUID trackId);
 }

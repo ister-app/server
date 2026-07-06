@@ -18,6 +18,8 @@ public interface AlbumRepository extends JpaRepository<AlbumEntity, UUID> {
 
     Page<AlbumEntity> findByLibraryEntityId(UUID libraryId, Pageable pageable);
 
+    List<AlbumEntity> findByPersonEntityId(UUID personId);
+
     List<AlbumEntity> findByLibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(LibraryType libraryType);
 
     List<AlbumEntity> findByLibraryEntity_LibraryTypeAndImageEntitiesIsEmpty(LibraryType libraryType);

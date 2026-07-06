@@ -6,6 +6,7 @@ import app.ister.core.enums.EventType;
 import app.ister.core.enums.StreamCodecType;
 import app.ister.core.eventdata.SubtitleFileFoundData;
 import app.ister.core.repository.DirectoryRepository;
+import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.ScannerHelperService;
@@ -26,6 +27,7 @@ import static app.ister.disk.events.subtitlefilefound.SubtitleFilePathParser.med
 public class HandleSubtitleFileFound implements Handle<SubtitleFileFoundData> {
     private final DirectoryRepository directoryRepository;
     private final ScannerHelperService scannerHelperService;
+    private final MediaFileRepository mediaFileRepository;
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final OtherPathFileRepository otherPathFileRepository;
 
@@ -56,8 +58,8 @@ public class HandleSubtitleFileFound implements Handle<SubtitleFileFoundData> {
 
     private void analyzeSubtitleFile(DirectoryEntity directoryEntity, String path, PathObject pathObject) {
         var episode = scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear(), pathObject.getSeason(), pathObject.getEpisode());
-        episode.getMediaFileEntities().forEach(mediaFileEntity -> {
-            if (directoryEntity.getId().equals(mediaFileEntity.getDirectoryEntity().getId()) && mediaFileAndSubtitleFileBelongTogether(mediaFileEntity.getPath(), path)
+        mediaFileRepository.findByEpisodeEntityId(episode.getId()).forEach(mediaFileEntity -> {
+            if (directoryEntity.getId().equals(mediaFileEntity.getDirectoryEntityId()) && mediaFileAndSubtitleFileBelongTogether(mediaFileEntity.getPath(), path)
                     && !mediaFileStreamRepository.existsByMediaFileEntityAndStreamIndexAndPath(mediaFileEntity, 0, path)) {
                 var saved = mediaFileStreamRepository.save(MediaFileStreamEntity.builder()
                         .mediaFileEntity(mediaFileEntity)

@@ -10,6 +10,7 @@ import app.ister.core.enums.EventType;
 import app.ister.core.enums.PathFileType;
 import app.ister.core.eventdata.SubtitleFileFoundData;
 import app.ister.core.repository.DirectoryRepository;
+import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.ScannerHelperService;
@@ -41,6 +42,9 @@ class HandleSubtitleFileFoundTest {
 
     @Mock
     private ScannerHelperService scannerHelperService;
+
+    @Mock
+    private MediaFileRepository mediaFileRepository;
 
     @Mock
     private MediaFileStreamRepository mediaFileStreamRepository;
@@ -84,12 +88,11 @@ class HandleSubtitleFileFoundTest {
         LibraryEntity library = LibraryEntity.builder().build();
         DirectoryEntity directoryEntity = DirectoryEntity.builder().id(dirId).libraryEntity(library).build();
         MediaFileEntity mediaFileEntity = MediaFileEntity.builder()
-                .directoryEntity(directoryEntity)
                 .path("/disk/shows/Show (2024)/Season 01/s01e01.mkv")
                 .build();
-        EpisodeEntity episodeEntity = EpisodeEntity.builder()
-                .mediaFileEntities(List.of(mediaFileEntity))
-                .build();
+        mediaFileEntity.setDirectoryEntity(directoryEntity);
+        UUID episodeId = UUID.randomUUID();
+        EpisodeEntity episodeEntity = EpisodeEntity.builder().id(episodeId).build();
         SubtitleFileFoundData data = SubtitleFileFoundData.builder()
                 .directoryEntityUUID(dirId)
                 .path("/disk/shows/Show (2024)/Season 01/s01e01.nl.srt")
@@ -98,6 +101,7 @@ class HandleSubtitleFileFoundTest {
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(directoryEntity));
         when(scannerHelperService.getOrCreateEpisode(any(), any(), anyInt(), anyInt(), anyInt()))
                 .thenReturn(episodeEntity);
+        when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(mediaFileEntity));
         when(mediaFileStreamRepository.save(any())).thenReturn(MediaFileStreamEntity.builder().build());
 
         subject.handle(data);
@@ -111,12 +115,11 @@ class HandleSubtitleFileFoundTest {
         LibraryEntity library = LibraryEntity.builder().build();
         DirectoryEntity directoryEntity = DirectoryEntity.builder().id(dirId).libraryEntity(library).build();
         MediaFileEntity mediaFileEntity = MediaFileEntity.builder()
-                .directoryEntity(directoryEntity)
                 .path("/disk/shows/Show (2024)/Season 01/s01e01.mkv")
                 .build();
-        EpisodeEntity episodeEntity = EpisodeEntity.builder()
-                .mediaFileEntities(List.of(mediaFileEntity))
-                .build();
+        mediaFileEntity.setDirectoryEntity(directoryEntity);
+        UUID episodeId = UUID.randomUUID();
+        EpisodeEntity episodeEntity = EpisodeEntity.builder().id(episodeId).build();
         String subtitlePath = "/disk/shows/Show (2024)/Season 01/s01e01.nl.srt";
         MediaFileStreamEntity savedStream = MediaFileStreamEntity.builder().build();
         OtherPathFileEntity otherFile = OtherPathFileEntity.builder()
@@ -131,6 +134,7 @@ class HandleSubtitleFileFoundTest {
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(directoryEntity));
         when(scannerHelperService.getOrCreateEpisode(any(), any(), anyInt(), anyInt(), anyInt()))
                 .thenReturn(episodeEntity);
+        when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(mediaFileEntity));
         when(mediaFileStreamRepository.save(any())).thenReturn(savedStream);
         when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, subtitlePath))
                 .thenReturn(Optional.of(otherFile));

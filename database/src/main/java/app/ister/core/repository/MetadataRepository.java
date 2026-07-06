@@ -13,4 +13,12 @@ public interface MetadataRepository extends JpaRepository<MetadataEntity, UUID> 
     List<MetadataEntity> findByPersonEntityId(UUID personId);
 
     List<MetadataEntity> findByAlbumEntityId(UUID albumId);
+
+    List<MetadataEntity> findByEpisodeEntityId(UUID episodeId);
+
+    List<MetadataEntity> findByMovieEntityId(UUID movieId);
+
+    List<MetadataEntity> findByTrackEntityId(UUID trackId);
+
+    List<MetadataEntity> findByShowEntityId(UUID showId);
 }
