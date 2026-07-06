@@ -46,6 +46,8 @@ class HandleMediaFileFoundTest {
     @Mock
     private MediaFileStreamRepository mediaFileStreamRepositoryMock;
     @Mock
+    private ImageRepository imageRepositoryMock;
+    @Mock
     private MediaFileFoundCheckForStreams mediaFileFoundCheckForStreamsMock;
     @Mock
     private MediaFileFoundCreateBackground mediaFileFoundCreateBackgroundMock;
@@ -72,6 +74,7 @@ class HandleMediaFileFoundTest {
                 episodeRepositoryMock,
                 movieRepositoryMock,
                 mediaFileStreamRepositoryMock,
+                imageRepositoryMock,
                 mediaFileFoundCheckForStreamsMock,
                 mediaFileFoundCreateBackgroundMock,
                 mediaFileFoundGetDurationMock,
@@ -112,6 +115,7 @@ class HandleMediaFileFoundTest {
         when(episodeRepositoryMock.findById(episodeEntity.getId())).thenReturn(Optional.of(episodeEntity));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directoryEntity, filePath)).thenReturn(Optional.of(mediaFileEntity));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(mediaFileEntity, null)).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(mediaFileStreamEntity), false, 10L));
+        when(imageRepositoryMock.existsByEpisodeEntityId(episodeEntity.getId())).thenReturn(true);
         when(nodeServiceMock.getOrCreateNodeEntityForThisNode()).thenReturn(nodeEntity);
         when(directoryRepositoryMock.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity)).thenReturn(List.of(cacheDirectory));
         when(mediaFileFoundExtractSubtitlesMock.extractSubtitles(any(), any(), any(), any())).thenReturn(List.of());
@@ -164,6 +168,7 @@ class HandleMediaFileFoundTest {
         when(movieRepositoryMock.findById(movieId)).thenReturn(Optional.of(movieEntity));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directoryEntity, filePath)).thenReturn(Optional.of(mediaFileEntity));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(eq(mediaFileEntity), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 5000L));
+        when(imageRepositoryMock.existsByMovieEntityId(movieId)).thenReturn(true);
         when(nodeServiceMock.getOrCreateNodeEntityForThisNode()).thenReturn(nodeEntity);
         when(directoryRepositoryMock.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity)).thenReturn(List.of(cacheDirectory));
         when(mediaFileFoundExtractSubtitlesMock.extractSubtitles(any(), any(), any(), any())).thenReturn(List.of());
@@ -295,6 +300,7 @@ class HandleMediaFileFoundTest {
         when(nodeServiceMock.getOrCreateNodeEntityForThisNode()).thenReturn(nodeEntity);
         when(directoryRepositoryMock.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity)).thenReturn(List.of(cacheDirectory));
         when(mediaFileFoundExtractSubtitlesMock.extractSubtitles(any(), any(), any(), any())).thenReturn(List.of());
+        when(imageRepositoryMock.existsByEpisodeEntityId(episodeEntity.getId())).thenReturn(true);
 
         assertDoesNotThrow(() -> subject.listener(data));
     }

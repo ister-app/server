@@ -30,6 +30,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     private final EpisodeRepository episodeRepository;
     private final MovieRepository movieRepository;
     private final MediaFileStreamRepository mediaFileStreamRepository;
+    private final ImageRepository imageRepository;
 
     private final MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams;
     private final MediaFileFoundCreateBackground mediaFileFoundCreateBackground;
@@ -46,6 +47,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
                                 EpisodeRepository episodeRepository,
                                 MovieRepository movieRepository,
                                 MediaFileStreamRepository mediaFileStreamRepository,
+                                ImageRepository imageRepository,
                                 MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams,
                                 MediaFileFoundCreateBackground mediaFileFoundCreateBackground,
                                 MediaFileFoundGetDuration mediaFileFoundGetDuration,
@@ -57,6 +59,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
         this.mediaFileStreamRepository = mediaFileStreamRepository;
+        this.imageRepository = imageRepository;
         this.mediaFileFoundCheckForStreams = mediaFileFoundCheckForStreams;
         this.mediaFileFoundCreateBackground = mediaFileFoundCreateBackground;
         this.mediaFileFoundGetDuration = mediaFileFoundGetDuration;
@@ -134,8 +137,12 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
      * Create background image for media file and save a reference to it in the database.
      */
     private void createBackgroundImage(Optional<EpisodeEntity> episodeEntity, Optional<MovieEntity> movieEntity, String mediaFilePath, long durationInMilliseconds) {
-        if ((episodeEntity.isPresent() && episodeEntity.get().getImagesEntities().isEmpty()) ||
-                (movieEntity.isPresent() && movieEntity.get().getImagesEntities().isEmpty())) {
+        // Query the image repository directly instead of navigating the entities' LAZY
+        // imagesEntities collection: this handler runs on a RabbitMQ listener thread with no
+        // open-session-in-view, so lazy navigation would throw LazyInitializationException.
+        boolean episodeNeedsBackground = episodeEntity.isPresent() && !imageRepository.existsByEpisodeEntityId(episodeEntity.get().getId());
+        boolean movieNeedsBackground = movieEntity.isPresent() && !imageRepository.existsByMovieEntityId(movieEntity.get().getId());
+        if (episodeNeedsBackground || movieNeedsBackground) {
             NodeEntity nodeEntity = nodeService.getOrCreateNodeEntityForThisNode();
             DirectoryEntity cacheDisk = directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity).stream().findFirst().orElseThrow();
             String toPath = getPathString(cacheDisk, episodeEntity, movieEntity);
