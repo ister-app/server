@@ -50,6 +50,9 @@ public class HlsTranscodeService {
     private static final String ARG_SEGMENT_TIMES = "-segment_times";
     private static final String ARG_SEGMENT_TIME_DELTA = "-segment_time_delta";
     private static final String AUDIO_SAMPLE_RATE = "48000";
+    /** The codec the AAC transcode qualities re-encode to; a source already in this codec is copied instead. */
+    private static final String AAC_CODEC = "aac";
+    private static final long PASS_POLL_MS = 250;
 
     private static final Set<String> MPEGTS_NATIVE_AUDIO_CODECS = Set.of("aac", "mp3", "ac3", "eac3", "dts");
 
@@ -85,6 +88,15 @@ public class HlsTranscodeService {
 
     @Value("${app.ister.transcoder.hls.pass-timeout-min-seconds:1800}")
     private long passTimeoutMinSeconds;
+
+    /**
+     * A pass that has not written a single segment within this window is force-stopped as
+     * "stalled". This reaps an FFmpeg that hangs on a specific input (emitting zero bytes)
+     * long before the much larger {@link #passTimeoutMinSeconds}, so the waiting segment
+     * request fails fast instead of holding the connection open for the whole segment timeout.
+     */
+    @Value("${app.ister.transcoder.hls.pass-stall-timeout-seconds:60}")
+    private long passStallTimeoutSeconds;
 
     /** HLS cache directories untouched for this long are removed by the cleanup job. */
     @Value("${app.ister.transcoder.hls.cache-retention-hours:2}")
@@ -310,14 +322,22 @@ public class HlsTranscodeService {
                 .addOutput(output)
                 .setOverwriteOutput(true)
                 .setLogLevel(LogLevel.ERROR),
-                inputPath, "video pass " + quality.getLabel());
+                inputPath, "video pass " + quality.getLabel(),
+                cacheDir, "seg_video_" + quality.getLabel() + "_");
     }
 
     /**
      * Starts a background audio-only FFmpeg pass for the given stream index and quality.
      * The encoder runs continuously across all segments, so PTS is never reset.
+     * <p>
+     * When the source stream is already AAC (the codec the transcode qualities target) and
+     * therefore MPEG-TS-native, the audio is stream-copied instead of re-encoded. This both
+     * saves CPU and avoids re-encoding an audio track through the AAC encoder — a path that
+     * can hang indefinitely on some inputs (e.g. an audio file carrying an embedded cover-art
+     * picture), whereas the copy path handles the same source without issue.
      */
-    public void startAudioPass(String inputPath, Path cacheDir, int streamIdx, AudioQuality audioQuality) {
+    public void startAudioPass(String inputPath, Path cacheDir, int streamIdx, AudioQuality audioQuality,
+                               String sourceCodecName) {
         try {
             Files.createDirectories(cacheDir);
         } catch (IOException e) {
@@ -328,20 +348,33 @@ public class HlsTranscodeService {
         Path outputPattern = cacheDir.resolve(
                 String.format("seg_audio_%d_%s_%%05d.ts", streamIdx, audioQuality.getLabel()));
 
-        log.debug("Starting audio pass: streamIdx={} quality={}", streamIdx, audioQuality.getLabel());
+        boolean copySource = AAC_CODEC.equalsIgnoreCase(sourceCodecName);
+        log.debug("Starting audio pass: streamIdx={} quality={} sourceCodec={} copy={}",
+                streamIdx, audioQuality.getLabel(), sourceCodecName, copySource);
 
+        // -vn guarantees an attached cover-art picture can never pull FFmpeg into a video
+        // encode/mux path; only the explicitly mapped audio stream is written.
         var output = UrlOutput.toUrl(outputPattern.toString())
                 .setFormat("segment")
                 .addArguments("-segment_format", FORMAT_MPEGTS)
                 .addArguments("-map", "0:" + streamIdx)
-                .addArgument("-vn")
-                .addArguments("-c:a", "aac")
-                .addArguments("-ar", AUDIO_SAMPLE_RATE)
-                .addArguments("-b:a", audioQuality.getBitrate())
-                .addArguments("-ac", "2");
+                .addArgument("-vn");
+
+        if (copySource) {
+            output.addArguments("-c:a", "copy");
+        } else {
+            output.addArguments("-c:a", AAC_CODEC)
+                    .addArguments("-ar", AUDIO_SAMPLE_RATE)
+                    .addArguments("-b:a", audioQuality.getBitrate())
+                    .addArguments("-ac", "2");
+        }
 
         if (!segmentTimes.isEmpty()) {
-            output.addArguments("-force_key_frames", segmentTimes);
+            if (!copySource) {
+                // -force_key_frames drives the AAC encoder to align frames with the cut points;
+                // it is meaningless (and rejected) with -c:a copy.
+                output.addArguments("-force_key_frames", segmentTimes);
+            }
             output.addArguments(ARG_SEGMENT_TIMES, segmentTimes);
             output.addArguments(ARG_SEGMENT_TIME_DELTA, "0.05");
         } else {
@@ -353,16 +386,66 @@ public class HlsTranscodeService {
                 .addOutput(output)
                 .setOverwriteOutput(true)
                 .setLogLevel(LogLevel.ERROR),
-                inputPath, "audio pass " + streamIdx + "/" + audioQuality.getLabel());
+                inputPath, "audio pass " + streamIdx + "/" + audioQuality.getLabel(),
+                cacheDir, String.format("seg_audio_%d_%s_", streamIdx, audioQuality.getLabel()));
     }
 
     /**
-     * Runs a whole-file FFmpeg pass with an upper time bound derived from the media duration.
-     * A hung FFmpeg is force-stopped instead of holding its pool thread (and OS process) forever.
+     * Runs a whole-file FFmpeg pass with two time bounds: an overall bound derived from the media
+     * duration, and a much shorter stall bound. A pass that never writes a segment is force-stopped
+     * after {@link #passStallTimeoutSeconds} so a hung FFmpeg (emitting zero bytes for a specific
+     * input) is reaped promptly instead of holding its pool thread and slot for the full duration
+     * bound. The pass future then completes exceptionally, so the waiting segment request fails fast.
      */
-    private void executePassWithTimeout(com.github.kokorin.jaffree.ffmpeg.FFmpeg ffmpeg, String inputPath, String what) {
+    private void executePassWithTimeout(com.github.kokorin.jaffree.ffmpeg.FFmpeg ffmpeg, String inputPath,
+                                        String what, Path cacheDir, String segmentPrefix) {
         long timeoutSeconds = Math.max((long) (getTotalDuration(inputPath) * passTimeoutMultiplier), passTimeoutMinSeconds);
-        executeWithTimeout(ffmpeg, timeoutSeconds, what);
+        var future = ffmpeg.executeAsync();
+        long overallDeadline = System.currentTimeMillis() + timeoutSeconds * 1000;
+        long stallDeadline = System.currentTimeMillis() + passStallTimeoutSeconds * 1000;
+        try {
+            while (true) {
+                try {
+                    future.get(PASS_POLL_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+                    return; // pass completed normally
+                } catch (java.util.concurrent.TimeoutException _) {
+                    long now = System.currentTimeMillis();
+                    if (now >= overallDeadline) {
+                        future.forceStop();
+                        throw new IllegalStateException("FFmpeg timed out after " + timeoutSeconds + "s: " + what);
+                    }
+                    if (now >= stallDeadline && !hasProducedSegment(cacheDir, segmentPrefix)) {
+                        future.forceStop();
+                        throw new IllegalStateException(
+                                "FFmpeg produced no output within " + passStallTimeoutSeconds + "s (stalled): " + what);
+                    }
+                }
+            }
+        } catch (java.util.concurrent.ExecutionException e) {
+            throw new IllegalStateException("FFmpeg failed: " + what, e.getCause());
+        } catch (InterruptedException e) {
+            future.forceStop();
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted during FFmpeg run: " + what, e);
+        }
+    }
+
+    /** True if the pass has already written at least one non-empty segment (so it is not stalled). */
+    private boolean hasProducedSegment(Path cacheDir, String segmentPrefix) {
+        if (cacheDir == null || segmentPrefix == null) return true; // no info to judge by — never false-trip
+        try (var files = Files.list(cacheDir)) {
+            return files.anyMatch(p -> {
+                String name = p.getFileName().toString();
+                if (!name.startsWith(segmentPrefix) || !name.endsWith(".ts")) return false;
+                try {
+                    return Files.size(p) > 0;
+                } catch (IOException _) {
+                    return false;
+                }
+            });
+        } catch (IOException _) {
+            return true; // cannot list the dir — don't kill a possibly-healthy pass
+        }
     }
 
     private void executeWithTimeout(com.github.kokorin.jaffree.ffmpeg.FFmpeg ffmpeg, long timeoutSeconds, String what) {

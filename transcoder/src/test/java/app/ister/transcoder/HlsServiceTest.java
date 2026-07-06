@@ -498,7 +498,7 @@ class HlsServiceTest {
         transcodeService.ensurePassStarted(id + "_video_720p",
                 () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
         transcodeService.ensurePassStarted(id + "_audio_1_192k",
-                () -> transcodeService.startAudioPass("/test/video.mkv", cacheDir, 1, AudioQuality.Q192K));
+                () -> transcodeService.startAudioPass("/test/video.mkv", cacheDir, 1, AudioQuality.Q192K, "aac"));
 
         Path videoResult = hlsService.getVideoSegment(id, "seg_video_720p_00000.ts");
         Path audioResult = hlsService.getAudioSegment(id, "seg_audio_1_192k_00000.ts");
@@ -722,7 +722,7 @@ class HlsServiceTest {
         }).when(ffmpegMock).executeAsync();
 
         transcodeService.ensurePassStarted(id + "_audio_1_192k",
-                () -> transcodeService.startAudioPass("/test/video.mkv", cacheDir, 1, AudioQuality.Q192K));
+                () -> transcodeService.startAudioPass("/test/video.mkv", cacheDir, 1, AudioQuality.Q192K, "aac"));
         Path result = hlsService.getAudioSegment(id, "seg_audio_1_192k_00000.ts");
 
         assertNotNull(result);
@@ -755,7 +755,7 @@ class HlsServiceTest {
         transcodeService.ensurePassStarted(id + "_video_720p",
                 () -> transcodeService.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
         transcodeService.ensurePassStarted(id + "_audio_1_192k",
-                () -> transcodeService.startAudioPass("/test/video.mkv", cacheDir, 1, AudioQuality.Q192K));
+                () -> transcodeService.startAudioPass("/test/video.mkv", cacheDir, 1, AudioQuality.Q192K, "aac"));
 
         Path video = hlsService.getVideoSegment(id, "seg_video_720p_00000.ts");
         Path audio = hlsService.getAudioSegment(id, "seg_audio_1_192k_00000.ts");

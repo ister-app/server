@@ -53,6 +53,7 @@ class HlsTranscodeServiceTest {
         ReflectionTestUtils.setField(service, "segmentStabilityMs", 200L);
         ReflectionTestUtils.setField(service, "passTimeoutMultiplier", 4.0);
         ReflectionTestUtils.setField(service, "passTimeoutMinSeconds", 1800L);
+        ReflectionTestUtils.setField(service, "passStallTimeoutSeconds", 60L);
         ReflectionTestUtils.setField(service, "cacheRetentionHours", 2L);
         service.init();
     }
@@ -425,9 +426,44 @@ class HlsTranscodeServiceTest {
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
         when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
 
-        service.startAudioPass("/test/audio.mkv", tempDir, 0, AudioQuality.Q192K);
+        // Non-AAC source (e.g. Opus) must be re-encoded to AAC
+        service.startAudioPass("/test/audio.mkv", tempDir, 0, AudioQuality.Q192K, "opus");
 
         verify(ffmpegMock).executeAsync();
+    }
+
+    @Test
+    void startAudioPassCopiesWhenSourceIsAac() {
+        when(ffprobeService.getKeyframes("/test/audio.m4a")).thenReturn(List.of());
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
+
+        // AAC source targeting the AAC 192k quality → stream copy instead of a re-encode,
+        // so the AAC encoder (which can hang on some inputs) is never invoked.
+        service.startAudioPass("/test/audio.m4a", tempDir, 0, AudioQuality.Q192K, "aac");
+
+        verify(ffmpegMock).executeAsync();
+    }
+
+    @Test
+    void startAudioPassForceStopsStalledPassThatProducesNoOutput() {
+        ReflectionTestUtils.setField(service, "passStallTimeoutSeconds", 0L);
+        when(ffprobeService.getKeyframes("/test/audio.mkv")).thenReturn(List.of());
+        when(ffprobeService.getTotalDuration("/test/audio.mkv")).thenReturn(30.0);
+
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        // A pass that never completes and never writes a segment → must be reaped as stalled.
+        FFmpegResultFuture neverCompletes = new FFmpegResultFuture(new CompletableFuture<>(), new Stopper() {
+            @Override public void graceStop() { /* no-op */ }
+            @Override public void forceStop() { /* no-op */ }
+            @Override public void setProcess(Process process) { /* no-op */ }
+        });
+        when(ffmpegMock.executeAsync()).thenReturn(neverCompletes);
+
+        assertThrows(IllegalStateException.class,
+                () -> service.startAudioPass("/test/audio.mkv", tempDir, 0, AudioQuality.Q192K, "opus"));
     }
 
     // ========== generateVideoSegment ==========

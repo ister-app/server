@@ -205,9 +205,15 @@ public class HlsService {
             passStarter = () -> transcodeService.startVideoPass(mediaFilePath, cacheDirPath, vq);
         } else {
             AudioQuality aq = AudioQuality.fromLabel(data.getQualityLabel());
-            segmentPrefix = "seg_audio_" + data.getAudioStreamIndex() + "_" + data.getQualityLabel() + "_";
+            int audioStreamIndex = data.getAudioStreamIndex();
+            segmentPrefix = "seg_audio_" + audioStreamIndex + "_" + data.getQualityLabel() + "_";
+            String sourceCodec = mediaFile.getMediaFileStreamEntity().stream()
+                    .filter(s -> s.getStreamIndex() == audioStreamIndex)
+                    .map(MediaFileStreamEntity::getCodecName)
+                    .findFirst()
+                    .orElse("");
             passStarter = () -> transcodeService.startAudioPass(mediaFilePath, cacheDirPath,
-                    data.getAudioStreamIndex(), aq);
+                    audioStreamIndex, aq, sourceCodec);
         }
 
         transcodeService.ensurePassStarted(data.getPassKey(), passStarter);
