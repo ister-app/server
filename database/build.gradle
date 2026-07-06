@@ -34,7 +34,12 @@ dependencies {
 
 hibernate {
     enhancement {
-        enableAssociationManagement = true
+        // Keep bidirectional-association management OFF: the enhanced ManyToOne setter would
+        // otherwise touch the inverse LAZY collection (e.g. building a MediaFileStreamEntity
+        // reads MediaFileEntity.mediaFileStreamEntity), throwing LazyInitializationException
+        // when no session is active. This matches hibernate.auto_manage_bidirectional_associations=false
+        // in core.properties. Does not affect cascade/persist/FK behaviour.
+        enableAssociationManagement = false
     }
 }
 
