@@ -18,6 +18,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -77,6 +78,17 @@ class EpisodeMetadataTest {
     void returnsEmptyWhenNullResponseBody() throws FeignException {
         when(tmdbClientMock._searchTv("Showname", null, null, null, null, 2024)).thenReturn(ResponseEntity.ok(null));
         Optional<TMDBResult> result = subject.getMetadata("Showname", 2024, 1, 1, "en");
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void returnsEmptyWhenEpisodeNotFoundOnTmdb() throws FeignException {
+        when(tmdbClientMock._searchTv("Showname", null, null, null, null, 2024)).thenReturn(ResponseEntity.ok(searchTv200ResponseMock));
+        when(searchTv200ResponseMock.getResults()).thenReturn(List.of(searchTv200ResponseResultsInnerMock));
+        when(searchTv200ResponseResultsInnerMock.getId()).thenReturn(1);
+        when(tmdbClientMock._tvEpisodeDetails(1, 5, 10, "", "en")).thenThrow(mock(FeignException.NotFound.class));
+
+        Optional<TMDBResult> result = subject.getMetadata("Showname", 2024, 5, 10, "en");
         assertTrue(result.isEmpty());
     }
 
