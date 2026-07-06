@@ -74,8 +74,17 @@ public class PersonLookupService {
             return person;
         } catch (DataIntegrityViolationException e) {
             // A concurrent handler created this person first (unique tmdb_id index): use the winner.
+            // The winner is committed by the time the constraint fires, so under READ_COMMITTED a
+            // fresh read finds it. Re-query in its own transaction to guarantee a current snapshot
+            // (the caller's outer transaction may hold an older one under stricter isolation) so a
+            // transient miss never dead-letters the whole credits fetch.
             log.debug("Concurrent person creation for tmdbId={}, re-querying", tmdbPersonId);
-            return personRepository.findByTmdbId(tmdbPersonId).orElseThrow(() -> e);
+            PersonEntity winner = newTransaction.execute(status ->
+                    personRepository.findByTmdbId(tmdbPersonId).orElse(null));
+            if (winner == null) {
+                throw e;
+            }
+            return winner;
         }
     }
 
