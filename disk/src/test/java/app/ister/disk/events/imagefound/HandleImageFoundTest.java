@@ -16,11 +16,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.mockito.ArgumentCaptor;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -96,6 +100,31 @@ class HandleImageFoundTest {
         subject.handle(data);
 
         verify(imageRepository).save(any(ImageEntity.class));
+    }
+
+    @Test
+    void handleSavesImageEntityWithoutBlurHashWhenImageUnreadable() throws IOException {
+        // File exists but is not a decodable image: the row must still be created (with a null
+        // blur-hash) so the image shows up, instead of dead-lettering the message.
+        Path imageFile = tempDir.resolve("broken.jpg");
+        Files.writeString(imageFile, "this is not a valid image");
+
+        UUID directoryId = UUID.randomUUID();
+        ImageFoundData data = ImageFoundData.builder()
+                .eventType(EventType.IMAGE_FOUND)
+                .path(imageFile.toString())
+                .directoryEntityId(directoryId)
+                .imageType(ImageType.COVER)
+                .build();
+
+        when(imageRepository.findByDirectoryEntityIdAndPath(directoryId, imageFile.toString()))
+                .thenReturn(Optional.empty());
+
+        subject.handle(data);
+
+        ArgumentCaptor<ImageEntity> captor = ArgumentCaptor.forClass(ImageEntity.class);
+        verify(imageRepository).save(captor.capture());
+        assertNull(captor.getValue().getBlurHash());
     }
 
     @Test
