@@ -1,5 +1,8 @@
 [
   {
-    "name": "java.awt.color.CMMException"
+    "name": "java.awt.color.CMMException",
+    "methods": [
+      { "name": "<init>", "parameterTypes": ["java.lang.String"] }
+    ]
   }
 ]

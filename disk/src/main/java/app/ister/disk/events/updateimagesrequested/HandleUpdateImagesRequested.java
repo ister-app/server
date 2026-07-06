@@ -68,7 +68,9 @@ public class HandleUpdateImagesRequested implements Handle<UpdateImagesRequested
 
             log.debug("Updated blur-hash for {}", imageEntity.getPath());
             return true;
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException | LinkageError e) {
+            // Best-effort per image: a corrupt file or a native-image image-decoding issue
+            // (e.g. AWT/CMM LinkageError) must not fail the whole update-images sweep.
             log.error("Unable to process imageEntity {}: {}", imageEntity.getPath(), e.getMessage());
             return false;
         }
