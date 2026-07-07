@@ -1,5 +1,6 @@
 package app.ister.search;
 
+import app.ister.core.config.LanguageProperties;
 import app.ister.search.config.TypesenseProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,16 +32,21 @@ class TypesenseClientTest {
         properties.setApiKey("test-key");
         properties.setCollection("media");
 
+        LanguageProperties languageProperties = new LanguageProperties();
+        languageProperties.setLanguages(List.of("en", "nl"));
+
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        subject = new TypesenseClient(properties, builder);
+        subject = new TypesenseClient(properties, languageProperties, builder);
     }
 
     @Test
     void searchSendsQueryParametersAndApiKey() {
         server.expect(requestTo(org.hamcrest.Matchers.containsString("/collections/media/documents/search?q=matrix")))
                 .andExpect(header("X-TYPESENSE-API-KEY", "test-key"))
-                .andExpect(queryParam("query_by", "title,context,description,genre"))
+                .andExpect(queryParam("query_by",
+                        "title,context,title_en,description_en,genre_en,title_nl,description_nl,genre_nl"))
+                .andExpect(queryParam("query_by_weights", "8,4,5,1,1,5,1,1"))
                 .andExpect(queryParam("per_page", "5"))
                 .andRespond(withSuccess("""
                         {"hits": [{"document": {"id": "abc", "type": "MOVIE"}}]}
@@ -49,6 +55,23 @@ class TypesenseClientTest {
         JsonNode response = subject.search("media", "matrix", 5, null);
 
         assertEquals("abc", response.path("hits").get(0).path("document").path("id").asString());
+        server.verify();
+    }
+
+    @Test
+    void createCollectionBuildsPerLanguageLocaleFields() {
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("/collections")))
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("\"name\": \"media_v1\""),
+                        org.hamcrest.Matchers.containsString("\"description_en\""),
+                        org.hamcrest.Matchers.containsString("\"description_nl\""),
+                        org.hamcrest.Matchers.containsString("\"title_en\""),
+                        org.hamcrest.Matchers.containsString("\"genre_nl\""),
+                        org.hamcrest.Matchers.containsString("\"locale\": \"nl\""))))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        subject.createCollection("media_v1");
+
         server.verify();
     }
 

@@ -1,5 +1,6 @@
 package app.ister.search;
 
+import app.ister.core.config.LanguageProperties;
 import app.ister.search.config.TypesenseProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.aot.hint.annotation.RegisterReflectionForBinding;
@@ -27,26 +28,24 @@ import java.util.stream.Collectors;
 @RegisterReflectionForBinding(SearchDocument.class) // Jackson binding in the GraalVM native image
 public class TypesenseClient {
 
-    private static final String SCHEMA_TEMPLATE = """
-            {
-              "name": "%s",
-              "fields": [
-                {"name": "type",         "type": "string", "facet": true},
-                {"name": "title",        "type": "string", "sort": true},
-                {"name": "context",      "type": "string", "optional": true},
-                {"name": "description",  "type": "string", "optional": true},
-                {"name": "genre",        "type": "string", "optional": true},
-                {"name": "year",         "type": "int32",  "optional": true},
-                {"name": "number",       "type": "int32",  "optional": true},
-                {"name": "seasonNumber", "type": "int32",  "optional": true},
-                {"name": "libraryId",    "type": "string", "optional": true, "facet": true}
-              ]
-            }""";
+    /** Language-independent fields, shared across all documents. */
+    private static final String BASE_FIELDS = """
+            {"name": "type",         "type": "string", "facet": true},
+            {"name": "title",        "type": "string", "sort": true},
+            {"name": "context",      "type": "string", "optional": true},
+            {"name": "year",         "type": "int32",  "optional": true},
+            {"name": "number",       "type": "int32",  "optional": true},
+            {"name": "seasonNumber", "type": "int32",  "optional": true},
+            {"name": "libraryId",    "type": "string", "optional": true, "facet": true}""";
 
     private final RestClient restClient;
+    private final LanguageProperties languageProperties;
     private final JsonMapper jsonMapper = JsonMapper.builder().build();
 
-    public TypesenseClient(TypesenseProperties properties, RestClient.Builder restClientBuilder) {
+    public TypesenseClient(TypesenseProperties properties,
+                           LanguageProperties languageProperties,
+                           RestClient.Builder restClientBuilder) {
+        this.languageProperties = languageProperties;
         this.restClient = restClientBuilder
                 .baseUrl(properties.baseUrl())
                 .defaultHeader("X-TYPESENSE-API-KEY", properties.getApiKey())
@@ -57,9 +56,26 @@ public class TypesenseClient {
         restClient.post()
                 .uri("/collections")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(SCHEMA_TEMPLATE.formatted(name))
+                .body(buildSchema(name))
                 .retrieve()
                 .toBodilessEntity();
+    }
+
+    /**
+     * Builds the collection schema: the language-independent {@link #BASE_FIELDS} plus, for each
+     * configured language, {@code title_<tag>}/{@code description_<tag>}/{@code genre_<tag>} string
+     * fields carrying the matching Typesense {@code locale} so tokenization is language-aware.
+     */
+    private String buildSchema(String name) {
+        List<String> fields = new ArrayList<>();
+        fields.add(BASE_FIELDS);
+        for (String tag : languageProperties.tags()) {
+            for (String base : List.of("title", "description", "genre")) {
+                fields.add("{\"name\": \"%s_%s\", \"type\": \"string\", \"optional\": true, \"locale\": \"%s\"}"
+                        .formatted(base, tag, tag));
+            }
+        }
+        return "{\"name\": \"%s\", \"fields\": [%s]}".formatted(name, String.join(",\n", fields));
     }
 
     public Optional<String> getAliasTarget(String alias) {
@@ -139,12 +155,14 @@ public class TypesenseClient {
     }
 
     public JsonNode search(String collection, String term, int perPage, UUID libraryId) {
+        String queryBy = queryByFields();
+        String queryByWeights = queryByWeights();
         return restClient.get()
                 .uri(uriBuilder -> {
                     uriBuilder.path("/collections/{collection}/documents/search")
                             .queryParam("q", term)
-                            .queryParam("query_by", "title,context,description,genre")
-                            .queryParam("query_by_weights", "8,4,1,1")
+                            .queryParam("query_by", queryBy)
+                            .queryParam("query_by_weights", queryByWeights)
                             .queryParam("per_page", perPage);
                     if (libraryId != null) {
                         uriBuilder.queryParam("filter_by", "libraryId:=" + libraryId);
@@ -153,5 +171,27 @@ public class TypesenseClient {
                 })
                 .retrieve()
                 .body(JsonNode.class);
+    }
+
+    /** {@code title,context} plus every configured language's title/description/genre field. */
+    private String queryByFields() {
+        List<String> fields = new ArrayList<>(List.of("title", "context"));
+        for (String tag : languageProperties.tags()) {
+            fields.add("title_" + tag);
+            fields.add("description_" + tag);
+            fields.add("genre_" + tag);
+        }
+        return String.join(",", fields);
+    }
+
+    /** Weights aligned with {@link #queryByFields()}: titles rank highest, descriptions/genres lowest. */
+    private String queryByWeights() {
+        List<String> weights = new ArrayList<>(List.of("8", "4"));
+        for (int i = 0; i < languageProperties.tags().size(); i++) {
+            weights.add("5"); // title_<tag>
+            weights.add("1"); // description_<tag>
+            weights.add("1"); // genre_<tag>
+        }
+        return String.join(",", weights);
     }
 }

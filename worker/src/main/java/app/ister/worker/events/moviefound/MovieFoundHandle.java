@@ -1,5 +1,6 @@
 package app.ister.worker.events.moviefound;
 
+import app.ister.core.config.LanguageProperties;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.eventdata.MovieFoundData;
@@ -15,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Optional;
 
 import static app.ister.core.MessageQueue.APP_ISTER_SERVER_MOVIE_FOUND;
@@ -25,14 +25,12 @@ import static app.ister.core.MessageQueue.APP_ISTER_SERVER_MOVIE_FOUND;
 @Slf4j
 @RequiredArgsConstructor
 public class MovieFoundHandle implements Handle<MovieFoundData> {
-    // List of languages in https://en.wikipedia.org/wiki/ISO_639-1.
-    private static final List<String> supportLanguages = List.of("en", "nl");
-
     private final MovieRepository movieRepository;
     private final MovieMetadata movieMetadata;
     private final MetadataSave metaDataSave;
     private final ImageDownloadService imageDownloadService;
     private final CreditsService creditsService;
+    private final LanguageProperties languageProperties;
 
     @Value("${app.ister.server.TMDB.apikey:}")
     private String apikey;
@@ -58,7 +56,7 @@ public class MovieFoundHandle implements Handle<MovieFoundData> {
         try {
             var movieEntity = movieRepository.findById(movieFoundData.getMovieId()).orElseThrow();
             Integer tmdbMovieId = null;
-            for (String language : supportLanguages) {
+            for (String language : languageProperties.tags()) {
                 Optional<TMDBResult> tmdbResult = movieMetadata.getMetadata(movieEntity.getName(), movieEntity.getReleaseYear(), language);
                 if (tmdbResult.isPresent()) {
                     metaDataSave.save(tmdbResult.get(), movieEntity, null, null);

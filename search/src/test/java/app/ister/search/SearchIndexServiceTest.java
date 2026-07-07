@@ -1,5 +1,6 @@
 package app.ister.search;
 
+import app.ister.core.config.LanguageProperties;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.enums.SearchEntityType;
@@ -75,7 +76,7 @@ class SearchIndexServiceTest {
         properties.setCollection("media");
         lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         subject = new SearchIndexService(movieRepository, showRepository, episodeRepository, personRepository,
-                albumRepository, trackRepository, new SearchDocumentMapper(), typesenseClient, properties,
+                albumRepository, trackRepository, new SearchDocumentMapper(new LanguageProperties()), typesenseClient, properties,
                 transactionManager);
     }
 
@@ -86,7 +87,8 @@ class SearchIndexServiceTest {
         subject.upsert(SearchEntityType.MOVIE, movie.getId());
 
         verify(typesenseClient).upsertDocument(eq("media"),
-                argThat(document -> document.id().equals(movie.getId().toString()) && document.type().equals("MOVIE")));
+                argThat(document -> document.fields().get("id").equals(movie.getId().toString())
+                        && document.fields().get("type").equals("MOVIE")));
     }
 
     @Test

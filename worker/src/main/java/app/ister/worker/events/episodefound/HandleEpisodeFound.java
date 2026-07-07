@@ -1,6 +1,7 @@
 package app.ister.worker.events.episodefound;
 
 import app.ister.core.MessageQueue;
+import app.ister.core.config.LanguageProperties;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.eventdata.EpisodeFoundData;
@@ -16,7 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -24,14 +24,12 @@ import java.util.Optional;
 @Transactional
 @RequiredArgsConstructor
 public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
-    // List of languages in https://en.wikipedia.org/wiki/ISO_639-1.
-    private static final List<String> supportLanguages = List.of("en", "nl");
-
     private final EpisodeRepository episodeRepository;
     private final EpisodeMetadata episodeMetadata;
     private final MetadataSave metaDataSave;
     private final ImageDownloadService imageDownloadService;
     private final CreditsService creditsService;
+    private final LanguageProperties languageProperties;
 
     @Value("${app.ister.server.TMDB.apikey:}")
     private String apikey;
@@ -57,7 +55,7 @@ public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
         try {
             var episodeEntity = episodeRepository.findById(episodeFoundData.getEpisodeId()).orElseThrow();
             Integer tmdbSeriesId = null;
-            for (String language : supportLanguages) {
+            for (String language : languageProperties.tags()) {
                 var showEntity = episodeEntity.getShowEntity();
                 Optional<TMDBResult> tmdbResult = episodeMetadata.getMetadata(showEntity.getName(), showEntity.getReleaseYear(), episodeEntity.getSeasonEntity().getNumber(), episodeEntity.getNumber(), language);
                 if (tmdbResult.isPresent()) {

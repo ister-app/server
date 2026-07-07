@@ -52,6 +52,7 @@ Everything is env-overridable; the most important settings:
 | RabbitMQ | `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD` | |
 | OIDC issuer | `OIDC_URL` | Keycloak-compatible; JWT resource server |
 | TMDB | `app.ister.server.TMDB.apikey` | API read access token; metadata is skipped without it |
+| Languages | `ISTER_LANGUAGES` (`app.ister.languages`) | app-wide list of ISO-639-1 tags (default `en,nl`); drives both which languages TMDB metadata is fetched in and which languages search indexes — see [Languages](#languages) |
 | Typesense | `TYPESENSE_ENABLED`, `TYPESENSE_HOST`, `TYPESENSE_PORT`, `TYPESENSE_API_KEY` | optional full-text search (GraphQL `search` query); run the `reindexSearch` mutation once after enabling to build the initial index |
 | FFmpeg | `FFMPEG_DIR`, `MKVEXTRACT`, `SUBTILE_OCR` | binary locations |
 | Cache/tmp | `CACHE_DIR`, `TMP_DIR` | HLS segments and image cache |
@@ -67,6 +68,42 @@ owns. Transcode queues are directory-scoped (`app.ister.server.transcode_request
 so transcode work is picked up by the node that holds the source file; produced segments are
 pushed to the requesting node via `POST /transcode/upload/{id}/{fileName}`, authenticated with
 short-lived node tokens.
+
+## Languages
+
+A single app-wide list of supported languages drives everything multilingual. It is configured as
+comma-separated **ISO-639-1 / BCP-47 tags** and defaults to `en,nl`:
+
+```properties
+app.ister.languages=${ISTER_LANGUAGES:en,nl}   # in core.properties
+```
+
+The list is exposed as `LanguageProperties` (`core/.../config/LanguageProperties.java`) and consumed
+by two subsystems:
+
+- **Metadata fetching (worker).** For every configured tag, TMDB details are fetched in that
+  language, producing one `MetadataEntity` row per language per media item (title, description,
+  genre, release date). The first tag is the primary/fallback language.
+- **Search (Typesense).** The collection schema and the search query are generated from the same
+  list: each language gets its own `title_<tag>` / `description_<tag>` / `genre_<tag>` fields, each
+  carrying the matching Typesense `locale` so tokenization is language-aware. A search queries across
+  all language fields at once.
+
+Two code systems are in play and bridged automatically: TMDB and the Typesense `locale`/field suffix
+use the ISO-639-1 tag (`en`), while `MetadataEntity.language` is stored as ISO-639-3 (`eng`, via
+`Locale.forLanguageTag(tag).getISO3Language()`).
+
+### Adding or changing a language
+
+1. Update the list, e.g. `ISTER_LANGUAGES=en,nl,de`, and restart.
+2. **Re-scan / re-fetch metadata** so the new language's `MetadataEntity` rows are created from TMDB
+   (the index can only surface metadata that exists in PostgreSQL).
+3. Run the `reindexSearch` GraphQL mutation once. The Typesense collection schema is fixed at
+   creation time, so a new language needs a fresh collection; `reindexSearch` builds one and swaps
+   the alias, keeping search live during the rebuild.
+
+Removing a language and reindexing simply drops its fields from the new collection; the stored
+`MetadataEntity` rows are left untouched.
 
 ## API
 

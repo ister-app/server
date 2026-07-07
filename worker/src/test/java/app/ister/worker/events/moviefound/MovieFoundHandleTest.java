@@ -1,6 +1,7 @@
 package app.ister.worker.events.moviefound;
 
 import app.ister.core.EventHandlingException;
+import app.ister.core.config.LanguageProperties;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -47,6 +49,9 @@ class MovieFoundHandleTest {
 
     @Mock
     private ImageDownloadService imageDownloadService;
+
+    @Spy
+    private LanguageProperties languageProperties = new LanguageProperties();
 
     @Test
     void handles() {

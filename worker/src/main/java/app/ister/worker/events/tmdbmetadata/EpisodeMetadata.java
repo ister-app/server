@@ -60,7 +60,7 @@ public class EpisodeMetadata {
         if (episode != null && episode.getAirDate() != null && episode.getOverview() != null) {
             return Optional.of(TMDBResult.builder()
                     .language(Locale.forLanguageTag(language).getISO3Language())
-                    .title(String.format(noTitleSetMap.get(language), episode.getEpisodeNumber()).equals(episode.getName()) ? null : episode.getName())
+                    .title(episodeTitle(episode.getName(), episode.getEpisodeNumber(), language))
                     .released(LocalDate.parse(episode.getAirDate()))
                     .sourceUri("TMDB://" + episode.getId())
                     .tmdbId(episode.getId())
@@ -72,5 +72,18 @@ public class EpisodeMetadata {
             log.debug("Couldn't find Episode {} {} {}", seasonNumber, episodeNumber, language);
             return Optional.empty();
         }
+    }
+
+    /**
+     * Nulls out TMDB's placeholder episode names (e.g. "Episode 5", "Aflevering 5") so they are not
+     * stored as real titles. For languages whose placeholder pattern we don't know the name is kept
+     * as-is rather than failing.
+     */
+    private String episodeTitle(String name, int episodeNumber, String language) {
+        String placeholderPattern = noTitleSetMap.get(language);
+        if (placeholderPattern != null && String.format(placeholderPattern, episodeNumber).equals(name)) {
+            return null;
+        }
+        return name;
     }
 }
