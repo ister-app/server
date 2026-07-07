@@ -37,13 +37,6 @@ public class ShowMetadata {
 
     private Optional<TMDBResult> getInfoForShow(@Valid SearchTv200ResponseResultsInner tvSeriesResultsPage, String language) throws FeignException {
         TvSeriesDetails200Response tvSeries1 = tmdbClient._tvSeriesDetails(tvSeriesResultsPage.getId(), "", language).getBody();
-        // TEMP DIAGNOSTIC: is poster/backdrop path actually deserialized in the native image?
-        if (tvSeries1 != null) {
-            log.info("TMDB details id={} name={} overviewLen={} firstAirDate={} posterPath={} backdropPath={}",
-                    tvSeriesResultsPage.getId(), tvSeries1.getName(),
-                    tvSeries1.getOverview() == null ? -1 : tvSeries1.getOverview().length(),
-                    tvSeries1.getFirstAirDate(), tvSeries1.getPosterPath(), tvSeries1.getBackdropPath());
-        }
         if (tvSeries1 != null && tvSeries1.getFirstAirDate() != null && tvSeries1.getOverview() != null) {
             return Optional.of(TMDBResult.builder()
                     .language(Locale.forLanguageTag(language).getISO3Language())

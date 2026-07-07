@@ -43,6 +43,10 @@ public class ImageSave {
                 .episodeEntityId(mediaEntityRef.episode() == null ? null : mediaEntityRef.episode().getId())
                 .personEntityId(mediaEntityRef.person() == null ? null : mediaEntityRef.person().getId())
                 .albumEntityId(mediaEntityRef.album() == null ? null : mediaEntityRef.album().getId())
-                .build(), cacheDisk.getNodeEntity().getName());
+                // Route by the cache DIRECTORY name (matches HandleImageFound's queue), not the
+                // node name — the IMAGE_FOUND queues are named per directory, so using the node
+                // name sent every downloaded TMDB image to a queue with no consumer (silently
+                // dropped), which is why no artwork was ever created.
+                .build(), cacheDisk.getName());
     }
 }

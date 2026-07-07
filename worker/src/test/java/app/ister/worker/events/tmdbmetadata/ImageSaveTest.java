@@ -48,7 +48,8 @@ class ImageSaveTest {
         subject.save(cacheDisk, "/cache/img.jpg", ImageType.BACKGROUND, "en", "TMDB://img.jpg", new ImageSave.MediaEntityRef(movie, null, null, null, null));
 
         ArgumentCaptor<ImageFoundData> captor = ArgumentCaptor.forClass(ImageFoundData.class);
-        verify(messageSender).sendImageFound(captor.capture(), org.mockito.ArgumentMatchers.eq("node1"));
+        // IMAGE_FOUND must be routed by the cache DIRECTORY name (queue name), not the node name.
+        verify(messageSender).sendImageFound(captor.capture(), org.mockito.ArgumentMatchers.eq("cache"));
 
         ImageFoundData sent = captor.getValue();
         assertEquals(cacheDisk.getId(), sent.getDirectoryEntityId());
@@ -69,7 +70,8 @@ class ImageSaveTest {
         subject.save(cacheDisk, "/cache/img.jpg", ImageType.COVER, "nl", "TMDB://img.jpg", new ImageSave.MediaEntityRef(null, show, null, null, null));
 
         ArgumentCaptor<ImageFoundData> captor = ArgumentCaptor.forClass(ImageFoundData.class);
-        verify(messageSender).sendImageFound(captor.capture(), org.mockito.ArgumentMatchers.eq("node1"));
+        // IMAGE_FOUND must be routed by the cache DIRECTORY name (queue name), not the node name.
+        verify(messageSender).sendImageFound(captor.capture(), org.mockito.ArgumentMatchers.eq("cache"));
 
         ImageFoundData sent = captor.getValue();
         assertEquals(show.getId(), sent.getShowEntityId());
@@ -85,7 +87,8 @@ class ImageSaveTest {
         subject.save(cacheDisk, "/cache/img.jpg", ImageType.BACKGROUND, "en", "TMDB://img.jpg", new ImageSave.MediaEntityRef(null, null, episode, null, null));
 
         ArgumentCaptor<ImageFoundData> captor = ArgumentCaptor.forClass(ImageFoundData.class);
-        verify(messageSender).sendImageFound(captor.capture(), org.mockito.ArgumentMatchers.eq("node1"));
+        // IMAGE_FOUND must be routed by the cache DIRECTORY name (queue name), not the node name.
+        verify(messageSender).sendImageFound(captor.capture(), org.mockito.ArgumentMatchers.eq("cache"));
 
         ImageFoundData sent = captor.getValue();
         assertEquals(episode.getId(), sent.getEpisodeEntityId());
