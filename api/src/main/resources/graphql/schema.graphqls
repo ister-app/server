@@ -97,7 +97,7 @@ type Node {
 
 type Episode {
     id: ID!
-    number: Int
+    number: Int!
     show: Show
     images: [Image!]
     season: Season
