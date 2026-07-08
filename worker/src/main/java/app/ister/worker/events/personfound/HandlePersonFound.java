@@ -1,6 +1,7 @@
 package app.ister.worker.events.personfound;
 
 import app.ister.core.Handle;
+import app.ister.core.config.LanguageProperties;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
@@ -35,6 +36,7 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
     private final MusicBrainzService musicBrainzService;
     private final ImageDownloadService imageDownloadService;
     private final ServerEventService serverEventService;
+    private final LanguageProperties languageProperties;
 
     @Override
     public EventType handles() {
@@ -57,7 +59,7 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
             // that year is what links a music artist to the same person as a TMDB actor.
             if (hasMetadata && hasImage && !needsBirthYear) return;
 
-            musicBrainzService.getArtistInfo(artist.getName()).ifPresent(info -> {
+            musicBrainzService.getArtistInfo(artist.getName(), languageProperties.tags()).ifPresent(info -> {
                 // Only individual persons get a birth year; groups keep NULL so a TMDB
                 // actor with the same name can still claim/enrich the record.
                 if (artist.getBirthYear() == null && "Person".equals(info.type())
@@ -69,13 +71,8 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
                         log.debug("Unparsable life-span begin '{}' for artist={}", info.lifeSpanBegin(), artist.getName());
                     }
                 }
-                if (!hasMetadata && info.bio() != null) {
-                    metadataRepository.save(MetadataEntity.builder()
-                            .description(info.bio())
-                            .genre(info.genre())
-                            .personEntity(artist)
-                            .sourceUri("musicbrainz://artist/" + artist.getName())
-                            .build());
+                if (!hasMetadata && !info.bios().isEmpty()) {
+                    saveBiosPerLanguage(artist, info);
                 }
                 if (!hasImage && info.imageUrl() != null) {
                     try {
@@ -89,5 +86,18 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
                 serverEventService.createSearchIndexEvent(SearchEntityType.PERSON, artist.getId());
             });
         });
+    }
+
+    /** One MetadataEntity per configured language (ISO-639-3), replacing any existing rows so a
+     * re-fetch overwrites instead of duplicating. */
+    private void saveBiosPerLanguage(app.ister.core.entity.PersonEntity artist, MusicBrainzService.ArtistInfo info) {
+        metadataRepository.deleteAll(metadataRepository.findByPersonEntityId(artist.getId()));
+        info.bios().forEach((tag, bio) -> metadataRepository.save(MetadataEntity.builder()
+                .description(bio)
+                .genre(info.genre())
+                .language(languageProperties.iso3(tag))
+                .personEntity(artist)
+                .sourceUri("musicbrainz://artist/" + artist.getName())
+                .build()));
     }
 }

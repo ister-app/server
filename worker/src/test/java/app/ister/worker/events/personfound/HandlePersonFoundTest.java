@@ -1,5 +1,6 @@
 package app.ister.worker.events.personfound;
 
+import app.ister.core.config.LanguageProperties;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.MetadataEntity;
@@ -18,10 +19,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -30,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -61,6 +65,9 @@ class HandlePersonFoundTest {
 
     @Mock
     private ImageDownloadService imageDownloadService;
+
+    @Spy
+    private LanguageProperties languageProperties = new LanguageProperties();
 
     private final UUID personId = UUID.randomUUID();
     private final PersonEntity artist = PersonEntity.builder()
@@ -105,16 +112,19 @@ class HandlePersonFoundTest {
         when(personRepository.findById(personId)).thenReturn(Optional.of(artist));
         when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
-        when(musicBrainzService.getArtistInfo("Artist"))
-                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo("A bio", "rock", IMAGE_URL, null, null)));
+        when(musicBrainzService.getArtistInfo(eq("Artist"), any()))
+                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), "rock", IMAGE_URL, null, null)));
 
         subject.handle(data);
 
+        // delete-then-insert; one row per configured language (en tag → ISO-639-3 "eng")
+        verify(metadataRepository).deleteAll(any());
         ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
         verify(metadataRepository).save(captor.capture());
         MetadataEntity saved = captor.getValue();
         assertEquals("A bio", saved.getDescription());
         assertEquals("rock", saved.getGenre());
+        assertEquals("eng", saved.getLanguage());
         assertEquals(artist, saved.getPersonEntity());
         assertEquals("musicbrainz://artist/Artist", saved.getSourceUri());
         verify(imageDownloadService).downloadAndSave(
@@ -129,8 +139,8 @@ class HandlePersonFoundTest {
         when(personRepository.findById(personId)).thenReturn(Optional.of(soloArtist));
         when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
-        when(musicBrainzService.getArtistInfo("Artist"))
-                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo("A bio", "rock", null, "Person", "1946-05-31")));
+        when(musicBrainzService.getArtistInfo(eq("Artist"), any()))
+                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), "rock", null, "Person", "1946-05-31")));
 
         subject.handle(data);
 
@@ -144,8 +154,8 @@ class HandlePersonFoundTest {
         when(personRepository.findById(personId)).thenReturn(Optional.of(band));
         when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
-        when(musicBrainzService.getArtistInfo("Artist"))
-                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo("A bio", "rock", null, "Group", "1985")));
+        when(musicBrainzService.getArtistInfo(eq("Artist"), any()))
+                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), "rock", null, "Group", "1985")));
 
         subject.handle(data);
 
@@ -176,8 +186,8 @@ class HandlePersonFoundTest {
                 .thenReturn(List.of(MetadataEntity.builder().build()));
         when(imageRepository.findByPersonEntityId(personId))
                 .thenReturn(List.of(ImageEntity.builder().build()));
-        when(musicBrainzService.getArtistInfo("Artist"))
-                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(null, null, null, "Person", "1993-06-26")));
+        when(musicBrainzService.getArtistInfo(eq("Artist"), any()))
+                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of(), null, null, "Person", "1993-06-26")));
 
         subject.handle(data);
 
@@ -193,8 +203,8 @@ class HandlePersonFoundTest {
         when(personRepository.findById(personId)).thenReturn(Optional.of(artist));
         when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
-        when(musicBrainzService.getArtistInfo("Artist"))
-                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo("A bio", "rock", IMAGE_URL, null, null)));
+        when(musicBrainzService.getArtistInfo(eq("Artist"), any()))
+                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), "rock", IMAGE_URL, null, null)));
         doThrow(new IOException("download failed"))
                 .when(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), anyString(), any());
 
@@ -208,8 +218,8 @@ class HandlePersonFoundTest {
         when(personRepository.findById(personId)).thenReturn(Optional.of(artist));
         when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
-        when(musicBrainzService.getArtistInfo("Artist"))
-                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo("A bio", "rock", null, null, null)));
+        when(musicBrainzService.getArtistInfo(eq("Artist"), any()))
+                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), "rock", null, null, null)));
 
         subject.handle(data);
 
@@ -223,8 +233,8 @@ class HandlePersonFoundTest {
         when(metadataRepository.findByPersonEntityId(personId))
                 .thenReturn(List.of(MetadataEntity.builder().build()));
         when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
-        when(musicBrainzService.getArtistInfo("Artist"))
-                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo("A bio", "rock", IMAGE_URL, null, null)));
+        when(musicBrainzService.getArtistInfo(eq("Artist"), any()))
+                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), "rock", IMAGE_URL, null, null)));
 
         subject.handle(data);
 
@@ -240,8 +250,8 @@ class HandlePersonFoundTest {
         when(personRepository.findById(personId)).thenReturn(Optional.of(artist));
         when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
-        when(musicBrainzService.getArtistInfo("Artist"))
-                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(null, "rock", IMAGE_URL, null, null)));
+        when(musicBrainzService.getArtistInfo(eq("Artist"), any()))
+                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of(), "rock", IMAGE_URL, null, null)));
 
         subject.handle(data);
 
@@ -254,7 +264,7 @@ class HandlePersonFoundTest {
         when(personRepository.findById(personId)).thenReturn(Optional.of(artist));
         when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
-        when(musicBrainzService.getArtistInfo("Artist")).thenReturn(Optional.empty());
+        when(musicBrainzService.getArtistInfo(eq("Artist"), any())).thenReturn(Optional.empty());
 
         subject.handle(data);
 

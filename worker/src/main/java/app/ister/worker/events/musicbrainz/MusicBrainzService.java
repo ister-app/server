@@ -6,6 +6,7 @@ import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -18,7 +19,9 @@ public class MusicBrainzService {
     private static final String MUSICBRAINZ_BASE = "https://musicbrainz.org/ws/2";
     private static final String COVER_ART_BASE = "https://coverartarchive.org/release";
     private static final String COVER_ART_RELEASE_GROUP_BASE = "https://coverartarchive.org/release-group";
-    private static final String WIKIPEDIA_API_BASE = "https://en.wikipedia.org/api/rest_v1/page/summary";
+    private static final String WIKIDATA_ENTITY_BASE = "https://www.wikidata.org/wiki/Special:EntityData/";
+    private static final String COMMONS_FILEPATH_BASE = "https://commons.wikimedia.org/wiki/Special:FilePath/";
+    private static final int IMAGE_WIDTH = 1000;
     private static final String USER_AGENT = "IsterServer/1.0 (info@ister.app)";
     private static final String ARTIST_QUERY_PREFIX = "artist:";
     private static final int MAX_ATTEMPTS = 3;
@@ -35,9 +38,12 @@ public class MusicBrainzService {
     /**
      * type is MusicBrainz's artist type ("Person", "Group", ...); lifeSpanBegin is the
      * begin date of the artist's life-span (birth date for persons, founding date for
-     * groups), possibly just a year ("1946") or year-month.
+     * groups), possibly just a year ("1946") or year-month. {@code bios} holds a biography per
+     * requested language tag (from Wikipedia via Wikidata); it may be empty.
      */
-    public record ArtistInfo(String bio, String genre, String imageUrl, String type, String lifeSpanBegin) {}
+    public record ArtistInfo(Map<String, String> bios, String genre, String imageUrl, String type, String lifeSpanBegin) {}
+
+    private record WikiSummary(String extract, String thumbnail) {}
 
     public record AlbumInfo(String description) {}
 
@@ -146,7 +152,7 @@ public class MusicBrainzService {
         return normalized.isEmpty() ? name.strip() : normalized;
     }
 
-    public Optional<ArtistInfo> getArtistInfo(String artistName) {
+    public Optional<ArtistInfo> getArtistInfo(String artistName, List<String> languageTags) {
         Map<String, Object> artist = searchTopArtist(artistName);
         if (artist == null) {
             return Optional.empty();
@@ -163,25 +169,56 @@ public class MusicBrainzService {
         String lifeSpanBegin = extractLifeSpanBegin(artist);
         String genre = extractTopTag(artist);
 
-        // The /artist search endpoint ignores inc=annotation+url-rels, so bio and the Wikipedia image
-        // only come from an MBID lookup. Do that follow-up call when we have an id.
-        String bio = null;
+        // The /artist search endpoint ignores inc=annotation+url-rels, so the image/wikidata links
+        // only come from an MBID lookup.
         String imageUrl = null;
+        String wikidataId = null;
+        String annotationBio = null;
         String mbid = artist.get("id") instanceof String s ? s : null;
         if (mbid != null) {
             Map<String, Object> details = lookupArtist(mbid);
             if (details != null) {
-                bio = extractAnnotation(details);
+                annotationBio = extractAnnotation(details);
                 if (genre == null) {
                     genre = extractTopTag(details);
                 }
-                imageUrl = extractWikipediaImageUrl(details);
+                imageUrl = extractImageRelationUrl(details);
+                wikidataId = extractWikidataId(details);
             }
+        }
+
+        // Bio per language + a thumbnail image fallback come from Wikidata → Wikipedia. MusicBrainz
+        // annotations are rare, and artists link via wikidata (not a direct wikipedia relation).
+        Map<String, String> bios = new LinkedHashMap<>();
+        if (wikidataId != null && languageTags != null && !languageTags.isEmpty()) {
+            Map<String, Object> wikidata = fetchWikidataEntity(wikidataId);
+            if (wikidata != null) {
+                for (String tag : languageTags) {
+                    String title = sitelinkTitle(wikidata, wikidataId, tag);
+                    if (title == null) {
+                        continue;
+                    }
+                    WikiSummary summary = fetchWikipediaSummary(tag, title);
+                    if (summary == null) {
+                        continue;
+                    }
+                    if (summary.extract() != null && !summary.extract().isBlank()) {
+                        bios.put(tag, summary.extract());
+                    }
+                    if (imageUrl == null && summary.thumbnail() != null) {
+                        imageUrl = summary.thumbnail();
+                    }
+                }
+            }
+        }
+        // Fall back to the (rare) MusicBrainz annotation for the primary language if Wikipedia gave nothing.
+        if (bios.isEmpty() && annotationBio != null && languageTags != null && !languageTags.isEmpty()) {
+            bios.put(languageTags.getFirst(), annotationBio);
         }
 
         // Return whenever the artist was found, so the birth year (life-span) flows through even for
         // artists that have no bio/genre/image — that year is what links them to TMDB actors.
-        return Optional.of(new ArtistInfo(bio, genre, imageUrl, type, lifeSpanBegin));
+        return Optional.of(new ArtistInfo(bios, genre, imageUrl, type, lifeSpanBegin));
     }
 
     private Map<String, Object> searchTopArtist(String artistName) {
@@ -296,52 +333,108 @@ public class MusicBrainzService {
         return null;
     }
 
+    /** URL of the MusicBrainz "image" relation (a Wikimedia Commons file page), rewritten to a
+     * downloadable, width-capped Special:FilePath URL. */
     @SuppressWarnings("unchecked")
-    private String extractWikipediaImageUrl(Map<String, Object> entity) {
+    private String extractImageRelationUrl(Map<String, Object> entity) {
+        String resource = relationResource(entity, "image");
+        if (resource == null) {
+            return null;
+        }
+        // resource looks like https://commons.wikimedia.org/wiki/File:Name.jpg
+        int marker = resource.indexOf("/wiki/File:");
+        if (marker < 0) {
+            return null;
+        }
+        String fileName = resource.substring(marker + "/wiki/File:".length());
+        return COMMONS_FILEPATH_BASE + fileName + "?width=" + IMAGE_WIDTH;
+    }
+
+    /** Wikidata entity id (e.g. "Q151892") from the MusicBrainz "wikidata" relation. */
+    private String extractWikidataId(Map<String, Object> entity) {
+        String resource = relationResource(entity, "wikidata");
+        if (resource == null) {
+            return null;
+        }
+        String id = resource.substring(resource.lastIndexOf('/') + 1);
+        return id.startsWith("Q") ? id : null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String relationResource(Map<String, Object> entity, String relationType) {
         Object relations = entity.get("relations");
-        if (!(relations instanceof List<?> relList)) return null;
-
+        if (!(relations instanceof List<?> relList)) {
+            return null;
+        }
         for (Object rel : relList) {
-            String resource = wikipediaResource(rel);
-            if (resource == null) continue;
-
-            // Extract the page title from the Wikipedia URL
-            String title = resource.substring(resource.lastIndexOf('/') + 1);
-            return fetchWikipediaThumbnail(title);
+            if (!(rel instanceof Map<?, ?> relMap) || !relationType.equals(relMap.get("type"))) {
+                continue;
+            }
+            if (((Map<String, Object>) relMap).get("url") instanceof Map<?, ?> urlMap
+                    && ((Map<String, Object>) urlMap).get("resource") instanceof String resource) {
+                return resource;
+            }
         }
         return null;
     }
 
-    @SuppressWarnings("unchecked")
-    private String wikipediaResource(Object rel) {
-        if (!(rel instanceof Map<?, ?> relMap)) return null;
-        Map<String, Object> relation = (Map<String, Object>) relMap;
-        if (!"wikipedia".equals(relation.get("type"))) return null;
-        Object urlObj = relation.get("url");
-        if (!(urlObj instanceof Map<?, ?> urlMap)) return null;
-        return (String) ((Map<String, Object>) urlMap).get("resource");
-    }
-
-    private String fetchWikipediaThumbnail(String pageTitle) {
+    private Map<String, Object> fetchWikidataEntity(String wikidataId) {
         try {
             Thread.sleep(500);
             @SuppressWarnings("unchecked")
-            Map<String, Object> summary = restClient.get()
-                    .uri(WIKIPEDIA_API_BASE + "/{title}", pageTitle)
+            Map<String, Object> body = restClient.get()
+                    .uri(WIKIDATA_ENTITY_BASE + "{id}.json", wikidataId)
                     .retrieve()
                     .body(Map.class);
-
-            if (summary == null) return null;
-            Object thumbnail = summary.get("thumbnail");
-            if (!(thumbnail instanceof Map<?, ?> thumb)) return null;
-            @SuppressWarnings("unchecked")
-            Object source = ((Map<String, Object>) thumb).get("source");
-            return source instanceof String s ? s : null;
+            return body;
         } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return null;
         } catch (RestClientException e) {
-            log.debug("Wikipedia thumbnail fetch failed for {}: {}", pageTitle, e.getMessage());
+            log.debug("Wikidata fetch failed for {}: {}", wikidataId, e.getMessage());
+            return null;
+        }
+    }
+
+    /** Title of the {@code <tag>wiki} sitelink (e.g. "enwiki", "nlwiki") for a Wikidata entity. */
+    @SuppressWarnings("unchecked")
+    private String sitelinkTitle(Map<String, Object> wikidata, String wikidataId, String languageTag) {
+        if (!(wikidata.get("entities") instanceof Map<?, ?> entities)
+                || !(((Map<String, Object>) entities).get(wikidataId) instanceof Map<?, ?> entity)
+                || !(((Map<String, Object>) entity).get("sitelinks") instanceof Map<?, ?> sitelinks)) {
+            return null;
+        }
+        Object link = ((Map<String, Object>) sitelinks).get(languageTag + "wiki");
+        if (link instanceof Map<?, ?> linkMap && ((Map<String, Object>) linkMap).get("title") instanceof String title) {
+            return title;
+        }
+        return null;
+    }
+
+    private WikiSummary fetchWikipediaSummary(String languageTag, String pageTitle) {
+        try {
+            Thread.sleep(500);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> summary = restClient.get()
+                    .uri("https://{lang}.wikipedia.org/api/rest_v1/page/summary/{title}", languageTag, pageTitle)
+                    .retrieve()
+                    .body(Map.class);
+            if (summary == null) {
+                return null;
+            }
+            Object extract = summary.get("extract");
+            String extractText = extract instanceof String s && !s.isBlank() ? s : null;
+            String thumbnail = null;
+            if (summary.get("thumbnail") instanceof Map<?, ?> thumb
+                    && ((Map<String, Object>) thumb).get("source") instanceof String src) {
+                thumbnail = src;
+            }
+            return new WikiSummary(extractText, thumbnail);
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (RestClientException e) {
+            log.debug("Wikipedia summary fetch failed for {}/{}: {}", languageTag, pageTitle, e.getMessage());
             return null;
         }
     }

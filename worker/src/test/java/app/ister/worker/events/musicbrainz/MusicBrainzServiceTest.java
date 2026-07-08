@@ -7,6 +7,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.containsString;
@@ -27,6 +28,10 @@ class MusicBrainzServiceTest {
     private static final String ARTIST_LOOKUP_ENDPOINT = "https://musicbrainz.org/ws/2/artist/";
     private static final String RELEASE_GROUP_ENDPOINT = "https://musicbrainz.org/ws/2/release-group?query=";
     private static final String WIKIPEDIA_SUMMARY_ENDPOINT = "https://en.wikipedia.org/api/rest_v1/page/summary/";
+    private static final String WIKIPEDIA_NL_SUMMARY_ENDPOINT = "https://nl.wikipedia.org/api/rest_v1/page/summary/";
+    private static final String WIKIDATA_ENDPOINT = "https://www.wikidata.org/wiki/Special:EntityData/";
+    private static final List<String> EN = List.of("en");
+    private static final List<String> EN_NL = List.of("en", "nl");
 
     private MusicBrainzService subject;
     private MockRestServiceServer server;
@@ -159,45 +164,62 @@ class MusicBrainzServiceTest {
     }
 
     // ========== getArtistInfo ==========
-    // Flow: search /artist?query= for the MBID + type/life-span/tags, then look up
-    // /artist/{mbid} for annotation (bio) + url-rels (Wikipedia image).
+    // Flow: search /artist?query= (MBID + type/life-span/tags) → lookup /artist/{mbid} (annotation +
+    // image/wikidata relations) → Wikidata entity (sitelinks) → per-language Wikipedia summary
+    // (bio extract + thumbnail fallback).
 
     @Test
-    void getArtistInfoReturnsBioGenreAndImageUrl() {
+    void getArtistInfoUsesImageRelationAndWikipediaBio() {
         server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
-                .andRespond(withSuccess("{\"artists\":[{\"id\":\"mbid-1\",\"name\":\"Radiohead\",\"tags\":[{\"name\":\"rock\"},{\"name\":\"alternative\"}]}]}",
+                .andRespond(withSuccess("{\"artists\":[{\"id\":\"mbid-1\",\"name\":\"Radiohead\",\"type\":\"Group\",\"tags\":[{\"name\":\"rock\"}]}]}",
                         MediaType.APPLICATION_JSON));
         server.expect(requestTo(startsWith(ARTIST_LOOKUP_ENDPOINT)))
                 .andRespond(withSuccess("""
-                        {"annotation":{"text":"An English rock band."},
-                         "relations":[{"type":"wikipedia","url":{"resource":"https://en.wikipedia.org/wiki/Radiohead"}}]}
+                        {"relations":[
+                          {"type":"image","url":{"resource":"https://commons.wikimedia.org/wiki/File:Radiohead.jpg"}},
+                          {"type":"wikidata","url":{"resource":"https://www.wikidata.org/wiki/Q1"}}]}
                         """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(WIKIDATA_ENDPOINT)))
+                .andRespond(withSuccess("{\"entities\":{\"Q1\":{\"sitelinks\":{\"enwiki\":{\"title\":\"Radiohead\"}}}}}",
+                        MediaType.APPLICATION_JSON));
         server.expect(requestTo(WIKIPEDIA_SUMMARY_ENDPOINT + "Radiohead"))
-                .andRespond(withSuccess("{\"thumbnail\":{\"source\":\"https://img.example/radiohead.jpg\"}}",
+                .andRespond(withSuccess("{\"extract\":\"An English rock band.\",\"thumbnail\":{\"source\":\"https://img.example/thumb.jpg\"}}",
                         MediaType.APPLICATION_JSON));
 
-        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Radiohead");
+        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Radiohead", EN);
 
         assertTrue(result.isPresent());
-        assertEquals("An English rock band.", result.get().bio());
         assertEquals("rock", result.get().genre());
-        assertEquals("https://img.example/radiohead.jpg", result.get().imageUrl());
+        assertEquals("An English rock band.", result.get().bios().get("en"));
+        // The MusicBrainz image relation wins over the Wikipedia thumbnail.
+        assertEquals("https://commons.wikimedia.org/wiki/Special:FilePath/Radiohead.jpg?width=1000",
+                result.get().imageUrl());
         server.verify();
     }
 
     @Test
-    void getArtistInfoExtractsTypeAndLifeSpanBeginFromSearch() {
+    void getArtistInfoFetchesBioPerConfiguredLanguageAndFallsBackToThumbnail() {
         server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
-                .andRespond(withSuccess("{\"artists\":[{\"id\":\"mbid-cher\",\"name\":\"Cher\",\"type\":\"Person\",\"life-span\":{\"begin\":\"1946-05-31\"}}]}",
-                        MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"artists\":[{\"id\":\"mbid-1\",\"name\":\"Radiohead\"}]}", MediaType.APPLICATION_JSON));
         server.expect(requestTo(startsWith(ARTIST_LOOKUP_ENDPOINT)))
-                .andRespond(withSuccess("{\"annotation\":{\"text\":\"A singer.\"}}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"relations\":[{\"type\":\"wikidata\",\"url\":{\"resource\":\"https://www.wikidata.org/wiki/Q1\"}}]}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(WIKIDATA_ENDPOINT)))
+                .andRespond(withSuccess("{\"entities\":{\"Q1\":{\"sitelinks\":{\"enwiki\":{\"title\":\"Radiohead\"},\"nlwiki\":{\"title\":\"Radiohead (band)\"}}}}}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(WIKIPEDIA_SUMMARY_ENDPOINT + "Radiohead"))
+                .andRespond(withSuccess("{\"extract\":\"English bio\",\"thumbnail\":{\"source\":\"https://img.example/thumb.jpg\"}}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(WIKIPEDIA_NL_SUMMARY_ENDPOINT)))
+                .andRespond(withSuccess("{\"extract\":\"Nederlandse bio\"}", MediaType.APPLICATION_JSON));
 
-        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Cher");
+        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Radiohead", EN_NL);
 
         assertTrue(result.isPresent());
-        assertEquals("Person", result.get().type());
-        assertEquals("1946-05-31", result.get().lifeSpanBegin());
+        assertEquals("English bio", result.get().bios().get("en"));
+        assertEquals("Nederlandse bio", result.get().bios().get("nl"));
+        // No image relation, so the first summary's thumbnail is used.
+        assertEquals("https://img.example/thumb.jpg", result.get().imageUrl());
         server.verify();
     }
 
@@ -210,7 +232,7 @@ class MusicBrainzServiceTest {
         server.expect(requestTo(startsWith(ARTIST_LOOKUP_ENDPOINT)))
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
-        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Ariana Grande");
+        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Ariana Grande", EN);
 
         assertTrue(result.isPresent());
         assertEquals("Person", result.get().type());
@@ -220,21 +242,57 @@ class MusicBrainzServiceTest {
 
     @Test
     void getArtistInfoReturnsPresentEvenWithNoBioGenreOrImage() {
-        // New behaviour: an artist that is found but has no bio/genre/image is still returned, so its
-        // birth year (life-span) can be stored — that year links it to a TMDB actor.
+        // Found but bare: still returned so the life-span birth year can be stored (it links to a TMDB actor).
         server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
                 .andRespond(withSuccess("{\"artists\":[{\"id\":\"mbid-1\",\"name\":\"Some Person\",\"type\":\"Person\",\"life-span\":{\"begin\":\"1980\"}}]}",
                         MediaType.APPLICATION_JSON));
         server.expect(requestTo(startsWith(ARTIST_LOOKUP_ENDPOINT)))
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
-        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Some Person");
+        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Some Person", EN);
 
         assertTrue(result.isPresent());
-        assertNull(result.get().bio());
+        assertTrue(result.get().bios().isEmpty());
         assertNull(result.get().genre());
         assertNull(result.get().imageUrl());
         assertEquals("1980", result.get().lifeSpanBegin());
+    }
+
+    @Test
+    void getArtistInfoFallsBackToAnnotationWhenNoWikidata() {
+        server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
+                .andRespond(withSuccess("{\"artists\":[{\"id\":\"m\",\"name\":\"Radiohead\",\"tags\":[{\"name\":\"rock\"}]}]}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(ARTIST_LOOKUP_ENDPOINT)))
+                .andRespond(withSuccess("{\"annotation\":{\"text\":\"MB annotation bio\"}}", MediaType.APPLICATION_JSON));
+
+        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Radiohead", EN);
+
+        assertTrue(result.isPresent());
+        assertEquals("MB annotation bio", result.get().bios().get("en"));
+        assertNull(result.get().imageUrl());
+        // No wikidata relation, so no Wikidata/Wikipedia calls were made.
+        server.verify();
+    }
+
+    @Test
+    void getArtistInfoContinuesWhenWikipediaFails() {
+        server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
+                .andRespond(withSuccess("{\"artists\":[{\"id\":\"m\",\"name\":\"Radiohead\"}]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(ARTIST_LOOKUP_ENDPOINT)))
+                .andRespond(withSuccess("{\"relations\":[{\"type\":\"wikidata\",\"url\":{\"resource\":\"https://www.wikidata.org/wiki/Q1\"}}]}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(WIKIDATA_ENDPOINT)))
+                .andRespond(withSuccess("{\"entities\":{\"Q1\":{\"sitelinks\":{\"enwiki\":{\"title\":\"Radiohead\"}}}}}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(WIKIPEDIA_SUMMARY_ENDPOINT + "Radiohead"))
+                .andRespond(withServerError());
+
+        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Radiohead", EN);
+
+        assertTrue(result.isPresent());
+        assertTrue(result.get().bios().isEmpty());
+        assertNull(result.get().imageUrl());
     }
 
     @Test
@@ -243,7 +301,7 @@ class MusicBrainzServiceTest {
                 .andRespond(withSuccess("{\"artists\":[{\"id\":\"mbid-x\",\"name\":\"A Completely Different Band\"}]}",
                         MediaType.APPLICATION_JSON));
 
-        assertEquals(Optional.empty(), subject.getArtistInfo("Radiohead"));
+        assertEquals(Optional.empty(), subject.getArtistInfo("Radiohead", EN));
         server.verify();
     }
 
@@ -252,47 +310,7 @@ class MusicBrainzServiceTest {
         server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
                 .andRespond(withSuccess("{\"artists\":[]}", MediaType.APPLICATION_JSON));
 
-        assertEquals(Optional.empty(), subject.getArtistInfo("Nobody"));
-    }
-
-    @Test
-    void getArtistInfoReturnsPartialInfoWhenWikipediaFetchFails() {
-        server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
-                .andRespond(withSuccess("{\"artists\":[{\"id\":\"m\",\"name\":\"Radiohead\",\"tags\":[{\"name\":\"rock\"}]}]}",
-                        MediaType.APPLICATION_JSON));
-        server.expect(requestTo(startsWith(ARTIST_LOOKUP_ENDPOINT)))
-                .andRespond(withSuccess("""
-                        {"annotation":{"text":"Bio text"},
-                         "relations":[{"type":"wikipedia","url":{"resource":"https://en.wikipedia.org/wiki/Radiohead"}}]}
-                        """, MediaType.APPLICATION_JSON));
-        server.expect(requestTo(WIKIPEDIA_SUMMARY_ENDPOINT + "Radiohead"))
-                .andRespond(withServerError());
-
-        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Radiohead");
-
-        assertTrue(result.isPresent());
-        assertEquals("Bio text", result.get().bio());
-        assertEquals("rock", result.get().genre());
-        assertNull(result.get().imageUrl());
-    }
-
-    @Test
-    void getArtistInfoIgnoresNonWikipediaRelations() {
-        server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
-                .andRespond(withSuccess("{\"artists\":[{\"id\":\"m\",\"name\":\"Radiohead\"}]}", MediaType.APPLICATION_JSON));
-        server.expect(requestTo(startsWith(ARTIST_LOOKUP_ENDPOINT)))
-                .andRespond(withSuccess("""
-                        {"annotation":{"text":"Bio text"},
-                         "relations":[{"type":"discogs","url":{"resource":"https://www.discogs.com/artist/1"}}]}
-                        """, MediaType.APPLICATION_JSON));
-
-        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Radiohead");
-
-        assertTrue(result.isPresent());
-        assertEquals("Bio text", result.get().bio());
-        assertNull(result.get().imageUrl());
-        // No request to Wikipedia was made
-        server.verify();
+        assertEquals(Optional.empty(), subject.getArtistInfo("Nobody", EN));
     }
 
     @Test
@@ -300,7 +318,7 @@ class MusicBrainzServiceTest {
         server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
                 .andRespond(withServerError());
 
-        assertEquals(Optional.empty(), subject.getArtistInfo("Radiohead"));
+        assertEquals(Optional.empty(), subject.getArtistInfo("Radiohead", EN));
     }
 
     // ========== getAlbumInfo ==========
