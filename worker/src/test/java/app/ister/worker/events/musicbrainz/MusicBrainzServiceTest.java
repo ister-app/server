@@ -46,7 +46,7 @@ class MusicBrainzServiceTest {
     void getCoverArtUrlReturnsReleaseGroupFrontWhenReleaseGroupFound() {
         server.expect(requestTo(startsWith(RELEASE_GROUP_ENDPOINT)))
                 .andExpect(method(GET))
-                .andRespond(withSuccess("{\"release-groups\":[{\"id\":\"rg-1\"}]}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"release-groups\":[{\"id\":\"rg-1\",\"title\":\"OK Computer\"}]}", MediaType.APPLICATION_JSON));
 
         Optional<String> result = subject.getCoverArtUrl("Radiohead", "OK Computer");
 
@@ -55,11 +55,48 @@ class MusicBrainzServiceTest {
     }
 
     @Test
+    void getCoverArtUrlMatchesStylizedCanonicalTitle() {
+        // Local tag "Emotion" must still match MusicBrainz's stylized "E•MO•TION".
+        server.expect(requestTo(startsWith(RELEASE_GROUP_ENDPOINT)))
+                .andRespond(withSuccess("{\"release-groups\":[{\"id\":\"rg-emo\",\"title\":\"E\\u2022MO\\u2022TION\"}]}", MediaType.APPLICATION_JSON));
+
+        Optional<String> result = subject.getCoverArtUrl("Carly Rae Jepsen", "Emotion");
+
+        assertEquals(Optional.of("https://coverartarchive.org/release-group/rg-emo/front"), result);
+        server.verify();
+    }
+
+    @Test
+    void getCoverArtUrlSkipsResultsWhoseTitleDoesNotMatch() {
+        // A loosely-scored unrelated result must not be accepted; falls through to an empty release query.
+        server.expect(requestTo(startsWith(RELEASE_GROUP_ENDPOINT)))
+                .andRespond(withSuccess("{\"release-groups\":[{\"id\":\"rg-x\",\"title\":\"Something Completely Different\"}]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(RELEASE_ENDPOINT)))
+                .andRespond(withSuccess("{\"releases\":[]}", MediaType.APPLICATION_JSON));
+
+        assertEquals(Optional.empty(), subject.getCoverArtUrl("Radiohead", "OK Computer"));
+        server.verify();
+    }
+
+    @Test
+    void getCoverArtUrlPicksTheTitleMatchAmongSeveralResults() {
+        server.expect(requestTo(startsWith(RELEASE_GROUP_ENDPOINT)))
+                .andRespond(withSuccess("{\"release-groups\":[" +
+                        "{\"id\":\"rg-wrong\",\"title\":\"21st Century Digital Girl\"}," +
+                        "{\"id\":\"rg-right\",\"title\":\"21st Century\"}]}", MediaType.APPLICATION_JSON));
+
+        Optional<String> result = subject.getCoverArtUrl("Groove Coverage", "21st Century");
+
+        assertEquals(Optional.of("https://coverartarchive.org/release-group/rg-right/front"), result);
+        server.verify();
+    }
+
+    @Test
     void getCoverArtUrlFallsBackToReleaseWhenNoReleaseGroup() {
         server.expect(requestTo(startsWith(RELEASE_GROUP_ENDPOINT)))
                 .andRespond(withSuccess("{\"release-groups\":[]}", MediaType.APPLICATION_JSON));
         server.expect(requestTo(startsWith(RELEASE_ENDPOINT)))
-                .andRespond(withSuccess("{\"releases\":[{\"id\":\"abc-123\"}]}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"releases\":[{\"id\":\"abc-123\",\"title\":\"OK Computer\"}]}", MediaType.APPLICATION_JSON));
 
         Optional<String> result = subject.getCoverArtUrl("Radiohead", "OK Computer");
 
@@ -71,7 +108,7 @@ class MusicBrainzServiceTest {
     void getCoverArtUrlQuotesAndEscapesSearchTerms() {
         // Quotes in the artist name must be escaped inside the quoted query term
         server.expect(requestTo(containsString("%5C%22Best%5C%22")))
-                .andRespond(withSuccess("{\"release-groups\":[{\"id\":\"rg-1\"}]}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"release-groups\":[{\"id\":\"rg-1\",\"title\":\"Album\"}]}", MediaType.APPLICATION_JSON));
 
         Optional<String> result = subject.getCoverArtUrl("The \"Best\" Band", "Album");
 
@@ -105,6 +142,13 @@ class MusicBrainzServiceTest {
         assertEquals("Back to Bedlam", MusicBrainzService.normalizeAlbumName("Back to Bedlam (RE 2005)"));
         assertEquals("As I Am", MusicBrainzService.normalizeAlbumName("As I Am [Bonus Track]"));
         assertEquals("Whispers of the Forest", MusicBrainzService.normalizeAlbumName("Whispers of the Forest FLAC"));
+    }
+
+    @Test
+    void normalizeTitleCollapsesStylizationAndPunctuation() {
+        assertEquals(MusicBrainzService.normalizeTitle("Emotion"), MusicBrainzService.normalizeTitle("E•MO•TION"));
+        assertEquals("21stcentury", MusicBrainzService.normalizeTitle("21st Century"));
+        assertEquals("", MusicBrainzService.normalizeTitle(null));
     }
 
     @Test

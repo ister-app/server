@@ -8,6 +8,7 @@ import org.springframework.web.client.RestClientException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -42,29 +43,37 @@ public class MusicBrainzService {
 
     public Optional<String> getCoverArtUrl(String artistName, String albumName) {
         String normalizedAlbum = normalizeAlbumName(albumName);
+        // The album is queried as a quoted phrase but NOT field-scoped (release:/releasegroup:). A
+        // field-scoped exact match fails on stylized canonical titles — e.g. our "Emotion" vs
+        // MusicBrainz's "E•MO•TION", where the interpunct splits tokens so "emotion" matches nothing.
+        // The general phrase query lets MusicBrainz's analyzer normalise punctuation and rank it #1;
+        // a normalised-title check on the results then guards against loose false positives.
+        String query = ARTIST_QUERY_PREFIX + encode(artistName) + " AND " + encode(normalizedAlbum);
+
         // Prefer the release-group front: coverartarchive returns art if ANY release in the group has
-        // a cover, instead of gambling on one specific release (limit=1) that often has none uploaded.
-        Optional<String> releaseGroupId = findId(
-                "/release-group?query={query}&fmt=json&limit=1", "release-groups",
-                ARTIST_QUERY_PREFIX + encode(artistName) + " AND releasegroup:" + encode(normalizedAlbum),
-                artistName, albumName);
+        // a cover, instead of gambling on one specific release that often has none uploaded.
+        Optional<String> releaseGroupId = findMatchingId(
+                "/release-group?query={query}&fmt=json&limit=5", "release-groups",
+                query, artistName, normalizedAlbum);
         if (releaseGroupId.isPresent()) {
             return releaseGroupId.map(id -> COVER_ART_RELEASE_GROUP_BASE + "/" + id + "/front");
         }
         // Fall back to a specific release match.
-        return findId(
-                "/release?query={query}&fmt=json&limit=1", "releases",
-                ARTIST_QUERY_PREFIX + encode(artistName) + " AND release:" + encode(normalizedAlbum),
-                artistName, albumName)
+        return findMatchingId(
+                "/release?query={query}&fmt=json&limit=5", "releases",
+                query, artistName, normalizedAlbum)
                 .map(id -> COVER_ART_BASE + "/" + id + "/front");
     }
 
     /**
-     * Runs a MusicBrainz search and returns the id of the first result under {@code resultsKey}.
-     * Retries a couple of times on transient errors (MusicBrainz rate-limits with HTTP 503) instead
-     * of silently giving up on the first hiccup.
+     * Runs a MusicBrainz search and returns the id of the first result whose title matches
+     * {@code expectedTitle} after normalisation (case, punctuation and stylisation removed), so a
+     * loose phrase query can surface stylized titles without accepting an unrelated near-match.
+     * Retries on HTTP 503 (MusicBrainz rate limiting) instead of giving up on the first hiccup.
      */
-    private Optional<String> findId(String uriTemplate, String resultsKey, String query, String artistName, String albumName) {
+    private Optional<String> findMatchingId(String uriTemplate, String resultsKey, String query,
+                                            String artistName, String expectedTitle) {
+        String wanted = normalizeTitle(expectedTitle);
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
                 Thread.sleep(1000);
@@ -79,26 +88,44 @@ public class MusicBrainzService {
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> results = (List<Map<String, Object>>) response.get(resultsKey);
                 if (results == null || results.isEmpty()) {
-                    log.debug("No MusicBrainz {} found for artist={} album={}", resultsKey, artistName, albumName);
+                    log.debug("No MusicBrainz {} found for artist={} album={}", resultsKey, artistName, expectedTitle);
                     return Optional.empty();
                 }
-                return Optional.ofNullable((String) results.getFirst().get("id"));
+                Optional<String> match = results.stream()
+                        .filter(r -> wanted.equals(normalizeTitle((String) r.get("title"))))
+                        .map(r -> (String) r.get("id"))
+                        .filter(Objects::nonNull)
+                        .findFirst();
+                if (match.isEmpty()) {
+                    log.debug("MusicBrainz {} results for artist={} album={} did not match on title",
+                            resultsKey, artistName, expectedTitle);
+                }
+                return match;
             } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 return Optional.empty();
             } catch (HttpServerErrorException.ServiceUnavailable e) {
                 // MusicBrainz throttles with HTTP 503; the 1s sleep at the top of the loop backs off.
                 log.warn("MusicBrainz {} rate-limited (attempt {}/{}) for artist={} album={}",
-                        resultsKey, attempt, MAX_ATTEMPTS, artistName, albumName);
+                        resultsKey, attempt, MAX_ATTEMPTS, artistName, expectedTitle);
                 if (attempt == MAX_ATTEMPTS) {
                     return Optional.empty();
                 }
             } catch (RestClientException e) {
-                log.warn("MusicBrainz {} error for artist={} album={}: {}", resultsKey, artistName, albumName, e.getMessage());
+                log.warn("MusicBrainz {} error for artist={} album={}: {}", resultsKey, artistName, expectedTitle, e.getMessage());
                 return Optional.empty();
             }
         }
         return Optional.empty();
+    }
+
+    /** Lowercases and removes everything that is not a letter or digit, collapsing stylisation
+     * (interpunct, accents-as-punctuation, spacing) so "E•MO•TION" and "Emotion" compare equal. */
+    static String normalizeTitle(String title) {
+        if (title == null) {
+            return "";
+        }
+        return title.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]", "");
     }
 
     /**
