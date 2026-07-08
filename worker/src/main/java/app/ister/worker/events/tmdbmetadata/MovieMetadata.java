@@ -25,12 +25,14 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class MovieMetadata {
     private final TmdbClient tmdbClient;
+    private final TmdbResultSelector resultSelector;
 
     public Optional<TMDBResult> getMetadata(String name, int releaseYear, String language) {
         log.debug("Starting task executing.");
         SearchMovie200Response tvSeriesResultsPage = tmdbClient._searchMovie(name, null, null, String.valueOf(releaseYear), null, null, null).getBody();
-        if (tvSeriesResultsPage != null && !tvSeriesResultsPage.getResults().isEmpty()) {
-            return getInfoForShow(tvSeriesResultsPage.getResults().getFirst(), language);
+        if (tvSeriesResultsPage != null) {
+            return resultSelector.selectMovie(tvSeriesResultsPage.getResults(), name)
+                    .flatMap(result -> getInfoForShow(result, language));
         }
         return Optional.empty();
     }

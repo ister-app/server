@@ -33,7 +33,7 @@ class MovieMetadataTest {
 
     @BeforeEach
     void setUp() {
-        subject = new MovieMetadata(tmdbClientMock);
+        subject = new MovieMetadata(tmdbClientMock, new TmdbResultSelector());
     }
 
     @Test

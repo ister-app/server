@@ -159,6 +159,23 @@ class ImageScannerTest {
     }
 
     @Test
+    void analyzeMusicImageDoesNotCreateOrphanShowOrMovie() {
+        LibraryEntity musicLib = LibraryEntity.builder().libraryType(LibraryType.MUSIC).build();
+        DirectoryEntity musicDir = DirectoryEntity.builder()
+                .path("/music")
+                .libraryEntity(musicLib)
+                .nodeEntity(NodeEntity.builder().name("disk1").build())
+                .build();
+
+        // A compilation folder whose name the video path parser would classify as a show.
+        subject.analyze(musicDir, Path.of("/music/Various Artists/Qmusic Top 500 (2017)/cover.jpg"), false, 0);
+
+        verify(scannerHelperService, never()).getOrCreateShow(any(), any(), anyInt());
+        verify(scannerHelperService, never()).getOrCreateMovie(any(), any(), anyInt());
+        verify(scannerHelperService, never()).getOrCreateEpisode(any(), any(), anyInt(), anyInt(), anyInt());
+    }
+
+    @Test
     void analyzeMusicAlbumImageLinksToAlbum() {
         LibraryEntity musicLib = LibraryEntity.builder().libraryType(LibraryType.MUSIC).build();
         DirectoryEntity musicDir = DirectoryEntity.builder()

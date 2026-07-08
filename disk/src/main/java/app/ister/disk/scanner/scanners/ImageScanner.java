@@ -71,8 +71,14 @@ public class ImageScanner implements Scanner {
                 .path(path.toString())
                 .type(imageType);
 
-        linkToVideoLibraryEntity(imageEntity, new PathObject(path.toString()), directoryEntity);
-        linkToMusicLibraryEntity(imageEntity, directoryEntity, path);
+        // Only run the video-path linker for non-music libraries. Otherwise the video PathObject
+        // parser classifies music folder names (e.g. "Qmusic Top 500 ...") as a SHOW/MOVIE and
+        // getOrCreateShow spawns an orphan show entity inside the MUSIC library.
+        if (isMusicLibrary(directoryEntity)) {
+            linkToMusicLibraryEntity(imageEntity, directoryEntity, path);
+        } else {
+            linkToVideoLibraryEntity(imageEntity, new PathObject(path.toString()), directoryEntity);
+        }
 
         ImageEntity build = imageEntity.build();
         imageRepository.save(build);
@@ -93,12 +99,13 @@ public class ImageScanner implements Scanner {
         }
     }
 
+    private boolean isMusicLibrary(DirectoryEntity directoryEntity) {
+        return directoryEntity.getLibraryEntity() != null
+                && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.MUSIC;
+    }
+
     private void linkToMusicLibraryEntity(ImageEntity.ImageEntityBuilder<?, ?> imageEntity,
                                            DirectoryEntity directoryEntity, Path path) {
-        if (directoryEntity.getLibraryEntity() == null
-                || directoryEntity.getLibraryEntity().getLibraryType() != LibraryType.MUSIC) {
-            return;
-        }
         MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), path.toString());
         if (musicPath.getDirType() == DirType.ARTIST && musicPath.isFlatAlbumStructure()) {
             String artistName = readAlbumArtistFromDirectory(path.getParent(), musicPath.getArtistName());

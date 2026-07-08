@@ -43,9 +43,22 @@ class MusicBrainzServiceTest {
     // ========== getCoverArtUrl ==========
 
     @Test
-    void getCoverArtUrlReturnsCoverArtArchiveUrlWhenReleaseFound() {
-        server.expect(requestTo(startsWith(RELEASE_ENDPOINT)))
+    void getCoverArtUrlReturnsReleaseGroupFrontWhenReleaseGroupFound() {
+        server.expect(requestTo(startsWith(RELEASE_GROUP_ENDPOINT)))
                 .andExpect(method(GET))
+                .andRespond(withSuccess("{\"release-groups\":[{\"id\":\"rg-1\"}]}", MediaType.APPLICATION_JSON));
+
+        Optional<String> result = subject.getCoverArtUrl("Radiohead", "OK Computer");
+
+        assertEquals(Optional.of("https://coverartarchive.org/release-group/rg-1/front"), result);
+        server.verify();
+    }
+
+    @Test
+    void getCoverArtUrlFallsBackToReleaseWhenNoReleaseGroup() {
+        server.expect(requestTo(startsWith(RELEASE_GROUP_ENDPOINT)))
+                .andRespond(withSuccess("{\"release-groups\":[]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(RELEASE_ENDPOINT)))
                 .andRespond(withSuccess("{\"releases\":[{\"id\":\"abc-123\"}]}", MediaType.APPLICATION_JSON));
 
         Optional<String> result = subject.getCoverArtUrl("Radiohead", "OK Computer");
@@ -58,7 +71,7 @@ class MusicBrainzServiceTest {
     void getCoverArtUrlQuotesAndEscapesSearchTerms() {
         // Quotes in the artist name must be escaped inside the quoted query term
         server.expect(requestTo(containsString("%5C%22Best%5C%22")))
-                .andRespond(withSuccess("{\"releases\":[{\"id\":\"abc-123\"}]}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"release-groups\":[{\"id\":\"rg-1\"}]}", MediaType.APPLICATION_JSON));
 
         Optional<String> result = subject.getCoverArtUrl("The \"Best\" Band", "Album");
 
@@ -67,7 +80,9 @@ class MusicBrainzServiceTest {
     }
 
     @Test
-    void getCoverArtUrlReturnsEmptyWhenNoReleases() {
+    void getCoverArtUrlReturnsEmptyWhenNoReleaseGroupOrRelease() {
+        server.expect(requestTo(startsWith(RELEASE_GROUP_ENDPOINT)))
+                .andRespond(withSuccess("{\"release-groups\":[]}", MediaType.APPLICATION_JSON));
         server.expect(requestTo(startsWith(RELEASE_ENDPOINT)))
                 .andRespond(withSuccess("{\"releases\":[]}", MediaType.APPLICATION_JSON));
 
@@ -75,19 +90,27 @@ class MusicBrainzServiceTest {
     }
 
     @Test
-    void getCoverArtUrlReturnsEmptyWhenReleaseHasNoId() {
+    void getCoverArtUrlReturnsEmptyOnServerError() {
+        server.expect(requestTo(startsWith(RELEASE_GROUP_ENDPOINT)))
+                .andRespond(withServerError());
         server.expect(requestTo(startsWith(RELEASE_ENDPOINT)))
-                .andRespond(withSuccess("{\"releases\":[{\"title\":\"no id here\"}]}", MediaType.APPLICATION_JSON));
+                .andRespond(withServerError());
 
         assertEquals(Optional.empty(), subject.getCoverArtUrl("Radiohead", "OK Computer"));
     }
 
     @Test
-    void getCoverArtUrlReturnsEmptyOnServerError() {
-        server.expect(requestTo(startsWith(RELEASE_ENDPOINT)))
-                .andRespond(withServerError());
+    void normalizeAlbumNameStripsEditionAndFormatNoise() {
+        assertEquals("Delta", MusicBrainzService.normalizeAlbumName("Delta (Deluxe Edition)"));
+        assertEquals("Back to Bedlam", MusicBrainzService.normalizeAlbumName("Back to Bedlam (RE 2005)"));
+        assertEquals("As I Am", MusicBrainzService.normalizeAlbumName("As I Am [Bonus Track]"));
+        assertEquals("Whispers of the Forest", MusicBrainzService.normalizeAlbumName("Whispers of the Forest FLAC"));
+    }
 
-        assertEquals(Optional.empty(), subject.getCoverArtUrl("Radiohead", "OK Computer"));
+    @Test
+    void normalizeAlbumNameKeepsOriginalWhenStrippingEmptiesIt() {
+        assertEquals("(Deluxe)", MusicBrainzService.normalizeAlbumName("(Deluxe)"));
+        assertEquals("", MusicBrainzService.normalizeAlbumName(null));
     }
 
     // ========== getArtistInfo ==========
