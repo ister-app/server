@@ -83,15 +83,38 @@ public class ScannerHelperService {
      * - Else create and return it.
      */
     public PersonEntity getOrCreatePerson(LibraryEntity libraryEntity, String artistName) {
+        return getOrCreatePerson(libraryEntity, artistName, 0);
+    }
+
+    /**
+     * Like {@link #getOrCreatePerson(LibraryEntity, String)} but seeds the birth year from a value
+     * parsed out of the folder structure (a trailing "(YYYY)" on the artist directory). A value
+     * {@code <= 0} means "unknown"; MusicBrainz then fills it in during PERSON_FOUND enrichment. The
+     * birth year is what links a music artist to the same person as a TMDB actor.
+     */
+    public PersonEntity getOrCreatePerson(LibraryEntity libraryEntity, String artistName, int birthYear) {
+        Integer year = birthYear > 0 ? birthYear : null;
         return personRepository.findByLibraryEntityAndName(libraryEntity, artistName)
+                .map(existing -> fillBirthYearIfMissing(existing, year))
                 .orElseGet(() -> {
                     PersonEntity personEntity = personRepository.findFirstByNameAndLibraryEntityIsNull(artistName)
                             .orElseGet(() -> PersonEntity.builder().name(artistName).build());
                     personEntity.setLibraryEntity(libraryEntity);
+                    if (year != null && personEntity.getBirthYear() == null) {
+                        personEntity.setBirthYear(year);
+                    }
                     personRepository.save(personEntity);
                     serverEventService.createPersonFoundEvent(personEntity.getId());
                     return personEntity;
                 });
+    }
+
+    private PersonEntity fillBirthYearIfMissing(PersonEntity person, Integer year) {
+        if (year != null && person.getBirthYear() == null) {
+            person.setBirthYear(year);
+            personRepository.save(person);
+        }
+        return person;
     }
 
     /**

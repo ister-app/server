@@ -52,7 +52,10 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
         personRepository.findById(data.getPersonId()).ifPresent(artist -> {
             boolean hasMetadata = !metadataRepository.findByPersonEntityId(artist.getId()).isEmpty();
             boolean hasImage = !imageRepository.findByPersonEntityId(artist.getId()).isEmpty();
-            if (hasMetadata && hasImage) return;
+            boolean needsBirthYear = artist.getBirthYear() == null;
+            // Still call MusicBrainz when the birth year is missing even if metadata+image exist:
+            // that year is what links a music artist to the same person as a TMDB actor.
+            if (hasMetadata && hasImage && !needsBirthYear) return;
 
             musicBrainzService.getArtistInfo(artist.getName()).ifPresent(info -> {
                 // Only individual persons get a birth year; groups keep NULL so a TMDB

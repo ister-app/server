@@ -147,40 +147,89 @@ public class MusicBrainzService {
     }
 
     public Optional<ArtistInfo> getArtistInfo(String artistName) {
-        try {
-            Thread.sleep(1000);
-            String query = ARTIST_QUERY_PREFIX + encode(artistName);
-            @SuppressWarnings("unchecked")
-            Map<String, Object> response = restClient.get()
-                    .uri(MUSICBRAINZ_BASE + "/artist?query={query}&fmt=json&limit=1&inc=annotation+url-rels+tags", query)
-                    .retrieve()
-                    .body(Map.class);
-
-            if (response == null) return Optional.empty();
-
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> artists = (List<Map<String, Object>>) response.get("artists");
-            if (artists == null || artists.isEmpty()) {
-                log.debug("No MusicBrainz artist found for name={}", artistName);
-                return Optional.empty();
-            }
-
-            Map<String, Object> artist = artists.getFirst();
-            String bio = extractAnnotation(artist);
-            String genre = extractTopTag(artist);
-            String imageUrl = extractWikipediaImageUrl(artist);
-            String type = artist.get("type") instanceof String s ? s : null;
-            String lifeSpanBegin = extractLifeSpanBegin(artist);
-
-            if (bio == null && genre == null && imageUrl == null) return Optional.empty();
-            return Optional.of(new ArtistInfo(bio, genre, imageUrl, type, lifeSpanBegin));
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            return Optional.empty();
-        } catch (RestClientException e) {
-            log.warn("MusicBrainz API error for artist={}: {}", artistName, e.getMessage());
+        Map<String, Object> artist = searchTopArtist(artistName);
+        if (artist == null) {
             return Optional.empty();
         }
+        // Guard against a wrong artist: if MusicBrainz returned a name, require it to match ours
+        // after normalisation (case/punctuation/stylisation removed).
+        String foundName = artist.get("name") instanceof String s ? s : null;
+        if (foundName != null && !normalizeTitle(artistName).equals(normalizeTitle(foundName))) {
+            log.debug("MusicBrainz top artist for name={} did not match (got {})", artistName, foundName);
+            return Optional.empty();
+        }
+
+        String type = artist.get("type") instanceof String s ? s : null;
+        String lifeSpanBegin = extractLifeSpanBegin(artist);
+        String genre = extractTopTag(artist);
+
+        // The /artist search endpoint ignores inc=annotation+url-rels, so bio and the Wikipedia image
+        // only come from an MBID lookup. Do that follow-up call when we have an id.
+        String bio = null;
+        String imageUrl = null;
+        String mbid = artist.get("id") instanceof String s ? s : null;
+        if (mbid != null) {
+            Map<String, Object> details = lookupArtist(mbid);
+            if (details != null) {
+                bio = extractAnnotation(details);
+                if (genre == null) {
+                    genre = extractTopTag(details);
+                }
+                imageUrl = extractWikipediaImageUrl(details);
+            }
+        }
+
+        // Return whenever the artist was found, so the birth year (life-span) flows through even for
+        // artists that have no bio/genre/image — that year is what links them to TMDB actors.
+        return Optional.of(new ArtistInfo(bio, genre, imageUrl, type, lifeSpanBegin));
+    }
+
+    private Map<String, Object> searchTopArtist(String artistName) {
+        Map<String, Object> response = musicBrainzGet(
+                "/artist?query={query}&fmt=json&limit=1&inc=tags", ARTIST_QUERY_PREFIX + encode(artistName),
+                "artist search", artistName);
+        if (response == null) {
+            return null;
+        }
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> artists = (List<Map<String, Object>>) response.get("artists");
+        if (artists == null || artists.isEmpty()) {
+            log.debug("No MusicBrainz artist found for name={}", artistName);
+            return null;
+        }
+        return artists.getFirst();
+    }
+
+    private Map<String, Object> lookupArtist(String mbid) {
+        return musicBrainzGet("/artist/{mbid}?fmt=json&inc=annotation+url-rels+tags", mbid, "artist lookup", mbid);
+    }
+
+    /** GETs a MusicBrainz JSON document, retrying on HTTP 503 (rate limiting). Returns null on
+     * repeated rate limiting, other client/server errors, or a null body. */
+    private Map<String, Object> musicBrainzGet(String uriTemplate, String pathArg, String what, String context) {
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                Thread.sleep(1000);
+                @SuppressWarnings("unchecked")
+                Map<String, Object> response = restClient.get()
+                        .uri(MUSICBRAINZ_BASE + uriTemplate, pathArg)
+                        .retrieve()
+                        .body(Map.class);
+                return response;
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+                return null;
+            } catch (HttpServerErrorException.ServiceUnavailable e) {
+                log.warn("MusicBrainz {} rate-limited (attempt {}/{}) for {}", what, attempt, MAX_ATTEMPTS, context);
+                if (attempt == MAX_ATTEMPTS) {
+                    return null;
+                }
+            } catch (RestClientException e) {
+                log.warn("MusicBrainz {} error for {}: {}", what, context, e.getMessage());
+                return null;
+            }
+        }
+        return null;
     }
 
     public Optional<AlbumInfo> getAlbumInfo(String artistName, String albumName) {

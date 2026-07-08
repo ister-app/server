@@ -81,7 +81,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
     }
 
     private void analyzeArtistNfo(DirectoryEntity directoryEntity, String path, MusicPathObject musicPath) {
-        var artist = scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), musicPath.getArtistName());
+        var artist = scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), musicPath.getArtistName(), musicPath.getArtistYear());
         try {
             Parser.parseArtist(path).ifPresent(parsed -> {
                 String title = parsed.getName() != null ? parsed.getName() : musicPath.getArtistName();
@@ -100,7 +100,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
     }
 
     private void analyzeAlbumNfo(DirectoryEntity directoryEntity, String path, MusicPathObject musicPath) {
-        var artist = scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), musicPath.getArtistName());
+        var artist = scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), musicPath.getArtistName(), musicPath.getArtistYear());
         var album = scannerHelperService.getOrCreateAlbum(directoryEntity.getLibraryEntity(), artist, musicPath.getAlbumName(), musicPath.getAlbumYear());
         try {
             Parser.parseAlbum(path).ifPresent(parsed -> {

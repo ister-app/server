@@ -39,6 +39,7 @@ public class MusicPathObject {
             " (FLAC)", " (MP3)", " (AAC)", " (WAV)", " [FLAC]", " [MP3]", " [AAC]", " [WAV]");
 
     private String artistName;
+    private int artistYear;
     private String albumName;
     private int albumYear;
     private int trackNumber;
@@ -68,15 +69,18 @@ public class MusicPathObject {
 
     private void parseOneLevel(String[] parts) {
         if (!hasExtension(parts[0])) {
-            artistName = parts[0];
+            artistName = parseArtistName(parts[0]);
+            artistYear = parseAlbumYear(parts[0]);
             dirType = DirType.ARTIST;
         }
     }
 
     private void parseTwoLevels(String[] parts) {
-        artistName = parts[0];
+        artistName = parseArtistName(parts[0]);
         String item = parts[1];
         if (!hasExtension(item)) {
+            // parts[0] is a genuine artist directory here, so a trailing (YYYY) is the artist's year.
+            artistYear = parseAlbumYear(parts[0]);
             albumName = parseAlbumName(item, artistName);
             albumYear = parseAlbumYear(item);
             dirType = DirType.ALBUM;
@@ -95,7 +99,8 @@ public class MusicPathObject {
     }
 
     private void parseThreePlusLevels(String[] parts) {
-        artistName = parts[0];
+        artistName = parseArtistName(parts[0]);
+        artistYear = parseAlbumYear(parts[0]);
         String albumPart = parts[1];
         albumName = parseAlbumName(albumPart, artistName);
         albumYear = parseAlbumYear(albumPart);
@@ -186,6 +191,12 @@ public class MusicPathObject {
     private int parseAlbumYear(String dirName) {
         Optional<MatchResult> match = regex(REGEX_ALBUM_YEAR, dirName);
         return match.map(m -> Integer.parseInt(m.group(2))).orElse(0);
+    }
+
+    /** Strips an optional trailing "(YYYY)" from an artist directory name (e.g. "Ariana Grande (1993)"),
+     * keeping the plain name so name-based matching and dedup are unaffected. */
+    private String parseArtistName(String dirName) {
+        return regex(REGEX_ALBUM_YEAR, dirName).map(m -> m.group(1).strip()).orElse(dirName);
     }
 
     private boolean hasExtension(String name) {

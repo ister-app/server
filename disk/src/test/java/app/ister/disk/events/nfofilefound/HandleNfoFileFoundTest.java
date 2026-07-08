@@ -234,10 +234,10 @@ class HandleNfoFileFoundTest {
                 .build();
 
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
-        when(scannerHelperService.getOrCreatePerson(library, "The Beatles")).thenReturn(artist);
+        when(scannerHelperService.getOrCreatePerson(library, "The Beatles", 0)).thenReturn(artist);
 
         subject.handle(data);
-        verify(scannerHelperService).getOrCreatePerson(library, "The Beatles");
+        verify(scannerHelperService).getOrCreatePerson(library, "The Beatles", 0);
     }
 
     @Test
@@ -259,7 +259,7 @@ class HandleNfoFileFoundTest {
                 .build();
 
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
-        when(scannerHelperService.getOrCreatePerson(library, "The Beatles")).thenReturn(artist);
+        when(scannerHelperService.getOrCreatePerson(library, "The Beatles", 0)).thenReturn(artist);
 
         subject.handle(data);
         verify(metadataRepository).save(any(MetadataEntity.class));
@@ -278,7 +278,7 @@ class HandleNfoFileFoundTest {
                 .build();
 
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
-        when(scannerHelperService.getOrCreatePerson(library, "The Beatles")).thenReturn(artist);
+        when(scannerHelperService.getOrCreatePerson(library, "The Beatles", 0)).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Abbey Road", 1969)).thenReturn(album);
 
         subject.handle(data);
@@ -305,7 +305,7 @@ class HandleNfoFileFoundTest {
                 .build();
 
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
-        when(scannerHelperService.getOrCreatePerson(library, "The Beatles")).thenReturn(artist);
+        when(scannerHelperService.getOrCreatePerson(library, "The Beatles", 0)).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Abbey Road", 1969)).thenReturn(album);
 
         subject.handle(data);

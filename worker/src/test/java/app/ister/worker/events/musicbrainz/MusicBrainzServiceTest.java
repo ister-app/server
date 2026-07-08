@@ -24,6 +24,7 @@ class MusicBrainzServiceTest {
 
     private static final String RELEASE_ENDPOINT = "https://musicbrainz.org/ws/2/release?query=";
     private static final String ARTIST_ENDPOINT = "https://musicbrainz.org/ws/2/artist?query=";
+    private static final String ARTIST_LOOKUP_ENDPOINT = "https://musicbrainz.org/ws/2/artist/";
     private static final String RELEASE_GROUP_ENDPOINT = "https://musicbrainz.org/ws/2/release-group?query=";
     private static final String WIKIPEDIA_SUMMARY_ENDPOINT = "https://en.wikipedia.org/api/rest_v1/page/summary/";
 
@@ -158,16 +159,18 @@ class MusicBrainzServiceTest {
     }
 
     // ========== getArtistInfo ==========
+    // Flow: search /artist?query= for the MBID + type/life-span/tags, then look up
+    // /artist/{mbid} for annotation (bio) + url-rels (Wikipedia image).
 
     @Test
     void getArtistInfoReturnsBioGenreAndImageUrl() {
         server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
+                .andRespond(withSuccess("{\"artists\":[{\"id\":\"mbid-1\",\"name\":\"Radiohead\",\"tags\":[{\"name\":\"rock\"},{\"name\":\"alternative\"}]}]}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(ARTIST_LOOKUP_ENDPOINT)))
                 .andRespond(withSuccess("""
-                        {"artists":[{
-                            "annotation":{"text":"An English rock band."},
-                            "tags":[{"name":"rock"},{"name":"alternative"}],
-                            "relations":[{"type":"wikipedia","url":{"resource":"https://en.wikipedia.org/wiki/Radiohead"}}]
-                        }]}
+                        {"annotation":{"text":"An English rock band."},
+                         "relations":[{"type":"wikipedia","url":{"resource":"https://en.wikipedia.org/wiki/Radiohead"}}]}
                         """, MediaType.APPLICATION_JSON));
         server.expect(requestTo(WIKIPEDIA_SUMMARY_ENDPOINT + "Radiohead"))
                 .andRespond(withSuccess("{\"thumbnail\":{\"source\":\"https://img.example/radiohead.jpg\"}}",
@@ -183,35 +186,65 @@ class MusicBrainzServiceTest {
     }
 
     @Test
-    void getArtistInfoExtractsTypeAndLifeSpanBegin() {
+    void getArtistInfoExtractsTypeAndLifeSpanBeginFromSearch() {
         server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
-                .andRespond(withSuccess("""
-                        {"artists":[{
-                            "type":"Person",
-                            "life-span":{"begin":"1946-05-31"},
-                            "annotation":{"text":"A singer."}
-                        }]}
-                        """, MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"artists\":[{\"id\":\"mbid-cher\",\"name\":\"Cher\",\"type\":\"Person\",\"life-span\":{\"begin\":\"1946-05-31\"}}]}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(ARTIST_LOOKUP_ENDPOINT)))
+                .andRespond(withSuccess("{\"annotation\":{\"text\":\"A singer.\"}}", MediaType.APPLICATION_JSON));
 
         Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Cher");
 
         assertTrue(result.isPresent());
         assertEquals("Person", result.get().type());
         assertEquals("1946-05-31", result.get().lifeSpanBegin());
+        server.verify();
     }
 
     @Test
-    void getArtistInfoReturnsNullTypeAndLifeSpanWhenAbsent() {
+    void getArtistInfoMatchesStylizedNameAndKeepsLifeSpan() {
+        // Reproduces the Ariana Grande case: our "Ariana Grande" must match and yield birth year 1993.
         server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
-                .andRespond(withSuccess("""
-                        {"artists":[{"annotation":{"text":"A band."}}]}
-                        """, MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"artists\":[{\"id\":\"mbid-ag\",\"name\":\"Ariana Grande\",\"type\":\"Person\",\"life-span\":{\"begin\":\"1993-06-26\"},\"tags\":[{\"name\":\"pop\"}]}]}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(ARTIST_LOOKUP_ENDPOINT)))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
-        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Some Band");
+        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Ariana Grande");
 
         assertTrue(result.isPresent());
-        assertNull(result.get().type());
-        assertNull(result.get().lifeSpanBegin());
+        assertEquals("Person", result.get().type());
+        assertEquals("1993-06-26", result.get().lifeSpanBegin());
+        assertEquals("pop", result.get().genre());
+    }
+
+    @Test
+    void getArtistInfoReturnsPresentEvenWithNoBioGenreOrImage() {
+        // New behaviour: an artist that is found but has no bio/genre/image is still returned, so its
+        // birth year (life-span) can be stored — that year links it to a TMDB actor.
+        server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
+                .andRespond(withSuccess("{\"artists\":[{\"id\":\"mbid-1\",\"name\":\"Some Person\",\"type\":\"Person\",\"life-span\":{\"begin\":\"1980\"}}]}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(ARTIST_LOOKUP_ENDPOINT)))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Some Person");
+
+        assertTrue(result.isPresent());
+        assertNull(result.get().bio());
+        assertNull(result.get().genre());
+        assertNull(result.get().imageUrl());
+        assertEquals("1980", result.get().lifeSpanBegin());
+    }
+
+    @Test
+    void getArtistInfoReturnsEmptyWhenNameDoesNotMatch() {
+        server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
+                .andRespond(withSuccess("{\"artists\":[{\"id\":\"mbid-x\",\"name\":\"A Completely Different Band\"}]}",
+                        MediaType.APPLICATION_JSON));
+
+        assertEquals(Optional.empty(), subject.getArtistInfo("Radiohead"));
+        server.verify();
     }
 
     @Test
@@ -223,22 +256,14 @@ class MusicBrainzServiceTest {
     }
 
     @Test
-    void getArtistInfoReturnsEmptyWhenArtistHasNoUsableFields() {
-        server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
-                .andRespond(withSuccess("{\"artists\":[{\"name\":\"Radiohead\"}]}", MediaType.APPLICATION_JSON));
-
-        assertEquals(Optional.empty(), subject.getArtistInfo("Radiohead"));
-    }
-
-    @Test
     void getArtistInfoReturnsPartialInfoWhenWikipediaFetchFails() {
         server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
+                .andRespond(withSuccess("{\"artists\":[{\"id\":\"m\",\"name\":\"Radiohead\",\"tags\":[{\"name\":\"rock\"}]}]}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(ARTIST_LOOKUP_ENDPOINT)))
                 .andRespond(withSuccess("""
-                        {"artists":[{
-                            "annotation":{"text":"Bio text"},
-                            "tags":[{"name":"rock"}],
-                            "relations":[{"type":"wikipedia","url":{"resource":"https://en.wikipedia.org/wiki/Radiohead"}}]
-                        }]}
+                        {"annotation":{"text":"Bio text"},
+                         "relations":[{"type":"wikipedia","url":{"resource":"https://en.wikipedia.org/wiki/Radiohead"}}]}
                         """, MediaType.APPLICATION_JSON));
         server.expect(requestTo(WIKIPEDIA_SUMMARY_ENDPOINT + "Radiohead"))
                 .andRespond(withServerError());
@@ -254,11 +279,11 @@ class MusicBrainzServiceTest {
     @Test
     void getArtistInfoIgnoresNonWikipediaRelations() {
         server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
+                .andRespond(withSuccess("{\"artists\":[{\"id\":\"m\",\"name\":\"Radiohead\"}]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(ARTIST_LOOKUP_ENDPOINT)))
                 .andRespond(withSuccess("""
-                        {"artists":[{
-                            "annotation":{"text":"Bio text"},
-                            "relations":[{"type":"discogs","url":{"resource":"https://www.discogs.com/artist/1"}}]
-                        }]}
+                        {"annotation":{"text":"Bio text"},
+                         "relations":[{"type":"discogs","url":{"resource":"https://www.discogs.com/artist/1"}}]}
                         """, MediaType.APPLICATION_JSON));
 
         Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Radiohead");

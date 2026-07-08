@@ -188,6 +188,44 @@ class ScannerHelperServiceTest {
     }
 
     @Test
+    void getOrCreatePersonSeedsBirthYearFromFolderOnNewArtist() {
+        when(personRepository.findByLibraryEntityAndName(library, "Ariana Grande"))
+                .thenReturn(Optional.empty());
+        when(personRepository.findFirstByNameAndLibraryEntityIsNull("Ariana Grande"))
+                .thenReturn(Optional.empty());
+
+        PersonEntity result = subject.getOrCreatePerson(library, "Ariana Grande", 1993);
+
+        assertEquals(1993, result.getBirthYear());
+        verify(personRepository).save(result);
+        verify(serverEventService).createPersonFoundEvent(result.getId());
+    }
+
+    @Test
+    void getOrCreatePersonFillsMissingBirthYearOnExistingArtist() {
+        PersonEntity existing = PersonEntity.builder().name("Ariana Grande").build();
+        when(personRepository.findByLibraryEntityAndName(library, "Ariana Grande"))
+                .thenReturn(Optional.of(existing));
+
+        PersonEntity result = subject.getOrCreatePerson(library, "Ariana Grande", 1993);
+
+        assertEquals(1993, result.getBirthYear());
+        verify(personRepository).save(existing);
+    }
+
+    @Test
+    void getOrCreatePersonDoesNotOverrideExistingBirthYear() {
+        PersonEntity existing = PersonEntity.builder().name("Ariana Grande").birthYear(1990).build();
+        when(personRepository.findByLibraryEntityAndName(library, "Ariana Grande"))
+                .thenReturn(Optional.of(existing));
+
+        PersonEntity result = subject.getOrCreatePerson(library, "Ariana Grande", 1993);
+
+        assertEquals(1990, result.getBirthYear());
+        verify(personRepository, never()).save(any());
+    }
+
+    @Test
     void getOrCreateAlbumReturnsExistingAlbum() {
         PersonEntity artist = PersonEntity.builder().name("The Beatles").build();
         AlbumEntity existing = AlbumEntity.builder().name("Abbey Road").releaseYear(1969).build();

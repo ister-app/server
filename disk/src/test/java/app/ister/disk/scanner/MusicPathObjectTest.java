@@ -20,6 +20,25 @@ class MusicPathObjectTest {
         assertEquals(DirType.ARTIST, subject.getDirType());
         assertEquals(FileType.NONE, subject.getFileType());
         assertEquals("The Beatles", subject.getArtistName());
+        assertEquals(0, subject.getArtistYear());
+    }
+
+    @Test
+    void artistDirectoryWithYear() {
+        var subject = new MusicPathObject(ROOT, "/music/Ariana Grande (1993)");
+        assertEquals(DirType.ARTIST, subject.getDirType());
+        assertEquals("Ariana Grande", subject.getArtistName());
+        assertEquals(1993, subject.getArtistYear());
+    }
+
+    @Test
+    void albumDirectoryUnderArtistWithYearStripsBothYears() {
+        var subject = new MusicPathObject(ROOT, "/music/Ariana Grande (1993)/Sweetener (2018)");
+        assertEquals(DirType.ALBUM, subject.getDirType());
+        assertEquals("Ariana Grande", subject.getArtistName());
+        assertEquals(1993, subject.getArtistYear());
+        assertEquals("Sweetener", subject.getAlbumName());
+        assertEquals(2018, subject.getAlbumYear());
     }
 
     @Test

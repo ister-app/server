@@ -120,7 +120,7 @@ class AudioScannerTest {
         AlbumEntity album = buildAlbum(library, artist);
         TrackEntity track = buildTrack(album);
 
-        when(scannerHelperService.getOrCreatePerson(library, "Artist")).thenReturn(artist);
+        when(scannerHelperService.getOrCreatePerson(library, "Artist", 0)).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Album", 2024)).thenReturn(album);
         when(scannerHelperService.getOrCreateTrack(artist, album, 1, 1)).thenReturn(track);
         when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath.toString()))
@@ -160,7 +160,7 @@ class AudioScannerTest {
                 .trackEntity(track)
                 .build();
 
-        when(scannerHelperService.getOrCreatePerson(library, "Artist")).thenReturn(artist);
+        when(scannerHelperService.getOrCreatePerson(library, "Artist", 0)).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Album", 2024)).thenReturn(album);
         when(scannerHelperService.getOrCreateTrack(artist, album, 1, 1)).thenReturn(track);
         when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath.toString()))
@@ -193,7 +193,7 @@ class AudioScannerTest {
                 .trackEntity(wrongTrack)
                 .build();
 
-        when(scannerHelperService.getOrCreatePerson(library, "Artist")).thenReturn(artist);
+        when(scannerHelperService.getOrCreatePerson(library, "Artist", 0)).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Album", 2024)).thenReturn(album);
         when(scannerHelperService.getOrCreateTrack(artist, album, 1, 1)).thenReturn(correctTrack);
         when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath.toString()))
@@ -222,7 +222,7 @@ class AudioScannerTest {
                 .trackEntity(null)
                 .build();
 
-        when(scannerHelperService.getOrCreatePerson(library, "Artist")).thenReturn(artist);
+        when(scannerHelperService.getOrCreatePerson(library, "Artist", 0)).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Album", 2024)).thenReturn(album);
         when(scannerHelperService.getOrCreateTrack(artist, album, 1, 1)).thenReturn(track);
         when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath.toString()))

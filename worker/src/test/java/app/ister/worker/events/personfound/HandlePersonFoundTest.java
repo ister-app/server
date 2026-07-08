@@ -154,8 +154,9 @@ class HandlePersonFoundTest {
     }
 
     @Test
-    void handleSkipsWhenMetadataAndImageAlreadyExist() {
-        when(personRepository.findById(personId)).thenReturn(Optional.of(artist));
+    void handleSkipsWhenMetadataImageAndBirthYearAllExist() {
+        PersonEntity complete = PersonEntity.builder().id(personId).name("Artist").birthYear(1980).build();
+        when(personRepository.findById(personId)).thenReturn(Optional.of(complete));
         when(metadataRepository.findByPersonEntityId(personId))
                 .thenReturn(List.of(MetadataEntity.builder().build()));
         when(imageRepository.findByPersonEntityId(personId))
@@ -165,6 +166,26 @@ class HandlePersonFoundTest {
 
         verifyNoInteractions(musicBrainzService, imageDownloadService);
         verify(metadataRepository, never()).save(any());
+    }
+
+    @Test
+    void handleStillFetchesBirthYearWhenMetadataAndImageExistButYearMissing() throws IOException {
+        PersonEntity yearless = PersonEntity.builder().id(personId).name("Artist").build();
+        when(personRepository.findById(personId)).thenReturn(Optional.of(yearless));
+        when(metadataRepository.findByPersonEntityId(personId))
+                .thenReturn(List.of(MetadataEntity.builder().build()));
+        when(imageRepository.findByPersonEntityId(personId))
+                .thenReturn(List.of(ImageEntity.builder().build()));
+        when(musicBrainzService.getArtistInfo("Artist"))
+                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(null, null, null, "Person", "1993-06-26")));
+
+        subject.handle(data);
+
+        assertEquals(1993, yearless.getBirthYear());
+        verify(personRepository).save(yearless);
+        // metadata + image already present: not re-saved / re-downloaded
+        verify(metadataRepository, never()).save(any());
+        verify(imageDownloadService, never()).downloadAndSave(anyString(), any(), anyString(), anyString(), any());
     }
 
     @Test

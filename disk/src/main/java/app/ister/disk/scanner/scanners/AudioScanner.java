@@ -62,7 +62,7 @@ public class AudioScanner implements Scanner {
         String artistName = musicPath.isFlatAlbumStructure()
                 ? readAlbumArtistTag(path.toString(), musicPath.getArtistName())
                 : musicPath.getArtistName();
-        PersonEntity artist = scannerHelperService.getOrCreatePerson(library, artistName);
+        PersonEntity artist = scannerHelperService.getOrCreatePerson(library, artistName, musicPath.getArtistYear());
         AlbumEntity album = scannerHelperService.getOrCreateAlbum(library, artist, musicPath.getAlbumName(), musicPath.getAlbumYear());
         TrackEntity track = scannerHelperService.getOrCreateTrack(artist, album, musicPath.getTrackNumber(), musicPath.getDiscNumber());
 

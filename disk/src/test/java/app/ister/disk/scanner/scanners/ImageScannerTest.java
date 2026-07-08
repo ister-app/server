@@ -155,7 +155,7 @@ class ImageScannerTest {
 
         subject.analyze(musicDir, Path.of("/music/The Beatles/background.jpg"), false, 0);
 
-        verify(scannerHelperService).getOrCreatePerson(any(), eq("The Beatles"));
+        verify(scannerHelperService).getOrCreatePerson(any(), eq("The Beatles"), anyInt());
     }
 
     @Test
@@ -244,7 +244,7 @@ class ImageScannerTest {
 
         subject.analyze(musicDir, albumDir.resolve("cover.jpg"), false, 0);
 
-        verify(scannerHelperService).getOrCreatePerson(any(), eq("Various Artists"));
+        verify(scannerHelperService).getOrCreatePerson(any(), eq("Various Artists"), anyInt());
     }
 
     @Test
