@@ -1,6 +1,7 @@
 package app.ister.core.entity;
 
 import app.ister.core.enums.PlayQueueSourceType;
+import app.ister.core.enums.SubtitleFormat;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -46,6 +47,15 @@ public class PlayQueueEntity extends BaseEntity {
 
     // Start item that was materialized up-front for a shuffled queue; excluded from chunk queries.
     private UUID sourceStartId;
+
+    // Last-known stream settings the client reported via updatePlayQueue; used to prefetch
+    // the next queue item in the same format. Null until a client reports them.
+    private Boolean streamDirect;
+
+    private Boolean streamTranscode;
+
+    @Enumerated(EnumType.STRING)
+    private SubtitleFormat streamSubtitleFormat;
 
     @OneToMany(cascade = {CascadeType.ALL}, mappedBy = "playQueueEntity", orphanRemoval = true)
     @OrderBy("position ASC")

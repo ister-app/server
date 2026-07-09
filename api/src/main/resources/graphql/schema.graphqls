@@ -23,7 +23,8 @@ type Mutation {
     scanLibrary: Boolean!
     analyzeLibrary: Boolean!
     createPlayQueue(input: CreatePlayQueueInput!): PlayQueue!
-    updatePlayQueue(id: ID!, progressInMilliseconds: Int!, playQueueItemId: ID!): PlayQueue
+    "streamSettings: what the client is currently playing with; enables prefetching the next queue item in the same format."
+    updatePlayQueue(id: ID!, progressInMilliseconds: Int!, playQueueItemId: ID!, streamSettings: StreamSettingsInput): PlayQueue
     movePlayQueueItem(playQueueId: ID!, playQueueItemId: ID!, afterPlayQueueItemId: ID): PlayQueue!
     removePlayQueueItem(playQueueId: ID!, playQueueItemId: ID!): PlayQueue!
     addPlayQueueItem(playQueueId: ID!, mediaType: MediaType!, mediaId: ID!, afterPlayQueueItemId: ID): PlayQueue!
@@ -65,6 +66,20 @@ enum PlayQueueSourceType {
     SHOW
     ALBUM
     LIBRARY
+}
+
+enum SubtitleFormat {
+    WEBVTT
+    SRT
+}
+
+"Stream settings the client is playing the current item with, as passed to the HLS master playlist request."
+input StreamSettingsInput {
+    "Include the stream-copy (direct) quality variant."
+    direct: Boolean!
+    "Include the re-encoded (720p/480p) quality variants."
+    transcode: Boolean!
+    subtitleFormat: SubtitleFormat
 }
 
 input CreatePlayQueueInput {

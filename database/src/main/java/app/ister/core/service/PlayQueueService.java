@@ -9,6 +9,7 @@ import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayQueueSourceType;
+import app.ister.core.enums.SubtitleFormat;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.MovieRepository;
@@ -48,6 +49,10 @@ public class PlayQueueService {
     private final WatchStatusRepository watchStatusRepository;
 
     private final WatchStatusService watchStatusService;
+
+    /** Stream settings a client reports via updatePlayQueue; used to prefetch the next item in the same format. */
+    public record StreamSettings(Boolean direct, Boolean transcode, SubtitleFormat subtitleFormat) {
+    }
 
     private static final BigDecimal GAP = new BigDecimal("1000");
     private static final BigDecimal TWO = new BigDecimal("2");
@@ -130,17 +135,36 @@ public class PlayQueueService {
 
     /**
      * Find the PlayQueue and then update it.
+     *
+     * @param streamSettings what the client is currently playing with; stored on the queue
+     *                       and used to prefetch the next item in the same format (may be null)
      */
     @Transactional
-    public Optional<PlayQueueEntity> updatePlayQueue(UUID id, long progressInMilliseconds, UUID playQueueItemId, Authentication authentication) {
+    public Optional<PlayQueueEntity> updatePlayQueue(UUID id, long progressInMilliseconds, UUID playQueueItemId, StreamSettings streamSettings, Authentication authentication) {
         log.debug("Updating play queue for user: {}", authentication.getName());
         // Update the current playing episode
         Optional<PlayQueueEntity> playQueueEntityOptional = playQueueRepository.findById(id);
         playQueueEntityOptional.ifPresent(playQueueEntity -> {
             checkOwnership(playQueueEntity, authentication);
+            applyStreamSettings(playQueueEntity, streamSettings);
             updatePlayQueueItemWithProgress(progressInMilliseconds, playQueueItemId, authentication, playQueueEntity);
         });
         return playQueueEntityOptional;
+    }
+
+    private void applyStreamSettings(PlayQueueEntity queue, StreamSettings streamSettings) {
+        if (streamSettings == null) {
+            return;
+        }
+        if (streamSettings.direct() != null) {
+            queue.setStreamDirect(streamSettings.direct());
+        }
+        if (streamSettings.transcode() != null) {
+            queue.setStreamTranscode(streamSettings.transcode());
+        }
+        if (streamSettings.subtitleFormat() != null) {
+            queue.setStreamSubtitleFormat(streamSettings.subtitleFormat());
+        }
     }
 
     /**

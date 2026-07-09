@@ -7,8 +7,11 @@ import app.ister.core.entity.PlayQueueEntity;
 import app.ister.core.entity.PlayQueueItemEntity;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayQueueSourceType;
+import app.ister.api.dto.StreamSettingsInput;
+import app.ister.core.enums.SubtitleFormat;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
+import app.ister.core.service.PlayQueuePrefetchService;
 import app.ister.core.service.PlayQueueService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,6 +44,9 @@ class PlayQueueControllerTest {
 
     @Mock
     private MovieRepository movieRepository;
+
+    @Mock
+    private PlayQueuePrefetchService playQueuePrefetchService;
 
     @Mock
     private Authentication authentication;
@@ -133,11 +139,39 @@ class PlayQueueControllerTest {
         UUID id = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
         PlayQueueEntity queue = PlayQueueEntity.builder().build();
-        when(playQueueService.updatePlayQueue(id, 5000L, itemId, authentication)).thenReturn(Optional.of(queue));
+        when(playQueueService.updatePlayQueue(id, 5000L, itemId, null, authentication)).thenReturn(Optional.of(queue));
 
-        Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, itemId, authentication);
+        Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, itemId, null, authentication);
 
         assertTrue(result.isPresent());
+        verify(playQueuePrefetchService).maybePrefetchNext(queue, itemId, 5000L);
+    }
+
+    @Test
+    void updatePlayQueueMapsStreamSettings() {
+        UUID id = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        PlayQueueEntity queue = PlayQueueEntity.builder().build();
+        StreamSettingsInput input = new StreamSettingsInput(true, false, SubtitleFormat.SRT);
+        when(playQueueService.updatePlayQueue(id, 5000L, itemId,
+                new PlayQueueService.StreamSettings(true, false, SubtitleFormat.SRT), authentication))
+                .thenReturn(Optional.of(queue));
+
+        Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, itemId, input, authentication);
+
+        assertTrue(result.isPresent());
+    }
+
+    @Test
+    void updatePlayQueueSkipsPrefetchWhenQueueNotFound() {
+        UUID id = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        when(playQueueService.updatePlayQueue(id, 5000L, itemId, null, authentication)).thenReturn(Optional.empty());
+
+        Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, itemId, null, authentication);
+
+        assertTrue(result.isEmpty());
+        verifyNoInteractions(playQueuePrefetchService);
     }
 
     @Test

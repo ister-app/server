@@ -1,6 +1,7 @@
 package app.ister.api.controller;
 
 import app.ister.api.dto.CreatePlayQueueInput;
+import app.ister.api.dto.StreamSettingsInput;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PlayQueueEntity;
@@ -10,6 +11,7 @@ import app.ister.core.enums.MediaType;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.TrackRepository;
+import app.ister.core.service.PlayQueuePrefetchService;
 import app.ister.core.service.PlayQueueService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -35,11 +37,14 @@ public class PlayQueueController {
 
     private final TrackRepository trackRepository;
 
-    public PlayQueueController(PlayQueueService playQueueService, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository) {
+    private final PlayQueuePrefetchService playQueuePrefetchService;
+
+    public PlayQueueController(PlayQueueService playQueueService, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, PlayQueuePrefetchService playQueuePrefetchService) {
         this.playQueueService = playQueueService;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
         this.trackRepository = trackRepository;
+        this.playQueuePrefetchService = playQueuePrefetchService;
     }
 
     @PreAuthorize("hasRole('user')")
@@ -57,8 +62,13 @@ public class PlayQueueController {
 
     @PreAuthorize("hasRole('user')")
     @MutationMapping
-    public Optional<PlayQueueEntity> updatePlayQueue(@Argument UUID id, @Argument long progressInMilliseconds, @Argument UUID playQueueItemId, Authentication authentication) {
-        return playQueueService.updatePlayQueue(id, progressInMilliseconds, playQueueItemId, authentication);
+    public Optional<PlayQueueEntity> updatePlayQueue(@Argument UUID id, @Argument long progressInMilliseconds, @Argument UUID playQueueItemId,
+                                                     @Argument StreamSettingsInput streamSettings, Authentication authentication) {
+        PlayQueueService.StreamSettings settings = streamSettings == null ? null
+                : new PlayQueueService.StreamSettings(streamSettings.direct(), streamSettings.transcode(), streamSettings.subtitleFormat());
+        Optional<PlayQueueEntity> playQueue = playQueueService.updatePlayQueue(id, progressInMilliseconds, playQueueItemId, settings, authentication);
+        playQueue.ifPresent(queue -> playQueuePrefetchService.maybePrefetchNext(queue, playQueueItemId, progressInMilliseconds));
+        return playQueue;
     }
 
     @PreAuthorize("hasRole('user')")

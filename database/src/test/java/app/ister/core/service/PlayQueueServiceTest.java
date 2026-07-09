@@ -345,7 +345,7 @@ class PlayQueueServiceTest {
         UUID id = UUID.randomUUID();
         when(playQueueRepository.findById(id)).thenReturn(Optional.empty());
 
-        Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, UUID.randomUUID(), authentication);
+        Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, UUID.randomUUID(), null, authentication);
 
         assertTrue(result.isEmpty());
     }
@@ -357,7 +357,7 @@ class PlayQueueServiceTest {
         PlayQueueEntity queue = ownedQueue(List.of(item));
         when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
 
-        Optional<PlayQueueEntity> result = subject.updatePlayQueue(queue.getId(), 5000L, item.getId(), authentication);
+        Optional<PlayQueueEntity> result = subject.updatePlayQueue(queue.getId(), 5000L, item.getId(), null, authentication);
 
         assertTrue(result.isPresent());
         assertEquals(5000L, result.get().getProgressInMilliseconds());
@@ -383,7 +383,7 @@ class PlayQueueServiceTest {
         List<UUID> nextChunk = IntStream.range(0, 50).mapToObj(i -> UUID.randomUUID()).toList();
         when(episodeRepository.findEpisodeIdsForShowOrdered(showId, 50, 50)).thenReturn(nextChunk);
 
-        subject.updatePlayQueue(queue.getId(), 5000L, item.getId(), authentication);
+        subject.updatePlayQueue(queue.getId(), 5000L, item.getId(), null, authentication);
 
         assertEquals(51, queue.getItems().size());
         assertEquals(100, queue.getSourceOffset());
@@ -406,7 +406,7 @@ class PlayQueueServiceTest {
                 .build();
         when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
 
-        subject.updatePlayQueue(queue.getId(), 5000L, item.getId(), authentication);
+        subject.updatePlayQueue(queue.getId(), 5000L, item.getId(), null, authentication);
 
         assertEquals(1, queue.getItems().size());
         verifyNoInteractions(episodeRepository);
@@ -423,7 +423,7 @@ class PlayQueueServiceTest {
                 .build();
         when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
 
-        subject.updatePlayQueue(queue.getId(), 5000L, item.getId(), authentication);
+        subject.updatePlayQueue(queue.getId(), 5000L, item.getId(), null, authentication);
 
         assertEquals(1, queue.getItems().size());
         verifyNoInteractions(episodeRepository);
@@ -447,7 +447,7 @@ class PlayQueueServiceTest {
         when(episodeRepository.findById(epId)).thenReturn(Optional.of(episode));
         when(watchStatusService.getOrCreate(authentication, item.getId(), episode, null)).thenReturn(watchStatus);
 
-        subject.updatePlayQueue(queue.getId(), 90000L, item.getId(), authentication);
+        subject.updatePlayQueue(queue.getId(), 90000L, item.getId(), null, authentication);
 
         verify(watchStatusRepository).save(watchStatus);
         assertEquals(90000L, watchStatus.getProgressInMilliseconds());
@@ -471,7 +471,7 @@ class PlayQueueServiceTest {
         when(movieRepository.findById(movieId)).thenReturn(Optional.of(movie));
         when(watchStatusService.getOrCreate(authentication, item.getId(), null, movie)).thenReturn(watchStatus);
 
-        subject.updatePlayQueue(queue.getId(), 90000L, item.getId(), authentication);
+        subject.updatePlayQueue(queue.getId(), 90000L, item.getId(), null, authentication);
 
         verify(watchStatusRepository).save(watchStatus);
     }
