@@ -1,7 +1,6 @@
 package app.ister.disk.events.audiofilefound;
 
 import app.ister.core.entity.AlbumEntity;
-import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
@@ -13,7 +12,6 @@ import app.ister.core.enums.SearchEntityType;
 import app.ister.core.eventdata.AudioFileFoundData;
 import app.ister.core.eventdata.ImageFoundData;
 import app.ister.core.repository.AlbumRepository;
-import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
@@ -57,7 +55,6 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final MetadataRepository metadataRepository;
     private final TrackRepository trackRepository;
-    private final PersonRepository personRepository;
     private final AlbumRepository albumRepository;
     private final ImageRepository imageRepository;
     private final ScannerHelperService scannerHelperService;
@@ -79,7 +76,6 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                                 MediaFileStreamRepository mediaFileStreamRepository,
                                 MetadataRepository metadataRepository,
                                 TrackRepository trackRepository,
-                                PersonRepository personRepository,
                                 AlbumRepository albumRepository,
                                 ImageRepository imageRepository,
                                 ScannerHelperService scannerHelperService,
@@ -94,7 +90,6 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         this.mediaFileStreamRepository = mediaFileStreamRepository;
         this.metadataRepository = metadataRepository;
         this.trackRepository = trackRepository;
-        this.personRepository = personRepository;
         this.albumRepository = albumRepository;
         this.imageRepository = imageRepository;
         this.scannerHelperService = scannerHelperService;
@@ -164,9 +159,6 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
             track = trackRepository.findById(correctedTrackId).orElse(track);
         }
 
-        correctArtistNameFromTags(track, format);
-        correctAlbumFromTags(track, format);
-
         String title = extractTitle(format, mediaFile.getPath());
         if (title != null) {
             metadataRepository.deleteAll(metadataRepository.findByTrackEntityId(track.getId()));
@@ -184,9 +176,18 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         saveAlbumMetadataFromTags(track, mediaFile, format);
     }
 
+    /**
+     * Album name and release year identify the album ({@code AlbumEntity}'s unique key) and are derived
+     * from the path by every scanner. Tag-derived values therefore land here, in metadata, and never on
+     * the entity itself — correcting the entity would strand the cover and NFO scanners, which look the
+     * album up by its path-derived name and year.
+     */
     private void saveAlbumMetadataFromTags(TrackEntity track, MediaFileEntity mediaFile, Format format) {
         AlbumEntity album = track.getAlbumEntity();
         if (album == null) return;
+        // Tracks of one album are consumed concurrently; without the lock two of them both see no
+        // metadata and both insert a row.
+        if (albumRepository.findByIdForUpdate(album.getId()).isEmpty()) return;
         if (!metadataRepository.findByAlbumEntityId(album.getId()).isEmpty()) return;
 
         String albumTitle = extractAlbumTitle(format);
@@ -278,58 +279,6 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         } catch (NumberFormatException _) {
             return 0;
         }
-    }
-
-    private void correctArtistNameFromTags(TrackEntity track, Format format) {
-        if (format == null) return;
-        String albumArtist = format.getTag("album_artist");
-        if (albumArtist == null) albumArtist = format.getTag("ALBUM_ARTIST");
-        if (albumArtist == null || albumArtist.isBlank()) return;
-        PersonEntity artist = track.getPersonEntity();
-        if (albumArtist.equals(artist.getName())) return;
-        boolean exists = personRepository
-                .findByLibraryEntityAndName(track.getAlbumEntity().getLibraryEntity(), albumArtist)
-                .isPresent();
-        if (!exists) {
-            artist.setName(albumArtist);
-            serverEventService.createSearchIndexEvent(SearchEntityType.PERSON, artist.getId());
-        }
-    }
-
-    private void correctAlbumFromTags(TrackEntity track, Format format) {
-        if (format == null) return;
-        AlbumEntity album = track.getAlbumEntity();
-        if (album == null) return;
-
-        String tagAlbumTitle = extractAlbumTitle(format);
-        LocalDate tagReleased = extractReleaseDate(format);
-        int tagYear = tagReleased != null ? tagReleased.getYear() : 0;
-
-        boolean nameNeedsCorrection = tagAlbumTitle != null && !tagAlbumTitle.equals(album.getName());
-        boolean yearNeedsCorrection = tagYear > 0 && album.getReleaseYear() == 0;
-
-        if (!nameNeedsCorrection && !yearNeedsCorrection) return;
-
-        String newName = nameNeedsCorrection ? tagAlbumTitle : album.getName();
-        int newYear = yearNeedsCorrection ? tagYear : album.getReleaseYear();
-
-        // Only update if the target (name, year) doesn't conflict with another album
-        boolean conflict = albumRepository
-                .findByPersonEntityAndNameAndReleaseYear(album.getPersonEntity(), newName, newYear)
-                .filter(other -> !other.getId().equals(album.getId()))
-                .isPresent();
-        if (conflict) return;
-
-        if (nameNeedsCorrection) {
-            log.info("Correcting album name: '{}' → '{}'", album.getName(), newName);
-            album.setName(newName);
-        }
-        if (yearNeedsCorrection) {
-            log.info("Correcting album year for '{}': 0 → {}", album.getName(), newYear);
-            album.setReleaseYear(newYear);
-        }
-        albumRepository.save(album);
-        serverEventService.createSearchIndexEvent(SearchEntityType.ALBUM, album.getId());
     }
 
     private String extractTitle(Format format, String path) {

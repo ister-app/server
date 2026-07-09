@@ -11,7 +11,6 @@ import app.ister.core.enums.EventType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.AudioFileFoundData;
 import app.ister.core.repository.AlbumRepository;
-import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
@@ -49,6 +48,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -67,8 +67,6 @@ class HandleAudioFileFoundTest {
     private MetadataRepository metadataRepositoryMock;
     @Mock
     private TrackRepository trackRepositoryMock;
-    @Mock
-    private PersonRepository personRepositoryMock;
     @Mock
     private AlbumRepository albumRepositoryMock;
     @Mock
@@ -105,7 +103,6 @@ class HandleAudioFileFoundTest {
                 mediaFileStreamRepositoryMock,
                 metadataRepositoryMock,
                 trackRepositoryMock,
-                personRepositoryMock,
                 albumRepositoryMock,
                 imageRepositoryMock,
                 scannerHelperServiceMock,
@@ -210,11 +207,9 @@ class HandleAudioFileFoundTest {
         when(format.getTag("tracknumber")).thenReturn(null);
         when(format.getTag("TRACKNUMBER")).thenReturn(null);
         when(format.getTag("title")).thenReturn("My Track");
-        when(format.getTag("album_artist")).thenReturn(null);
-        when(format.getTag("ALBUM_ARTIST")).thenReturn(null);
         when(format.getTag("comment")).thenReturn("Nice song");
-        when(format.getTag("album")).thenReturn(null);
-        when(format.getTag("ALBUM")).thenReturn(null);
+        when(format.getTag("genre")).thenReturn(null);
+        when(format.getTag("GENRE")).thenReturn(null);
         when(format.getTag("date")).thenReturn(null);
         when(format.getTag("DATE")).thenReturn(null);
         when(format.getTag("year")).thenReturn(null);
@@ -296,11 +291,9 @@ class HandleAudioFileFoundTest {
         when(format.getTag("TRACKNUMBER")).thenReturn(null);
         when(format.getTag("title")).thenReturn(null);
         when(format.getTag("TITLE")).thenReturn(null);
-        when(format.getTag("album_artist")).thenReturn(null);
-        when(format.getTag("ALBUM_ARTIST")).thenReturn(null);
         when(format.getTag("comment")).thenReturn(null);
-        when(format.getTag("album")).thenReturn(null);
-        when(format.getTag("ALBUM")).thenReturn(null);
+        when(format.getTag("genre")).thenReturn(null);
+        when(format.getTag("GENRE")).thenReturn(null);
         when(format.getTag("date")).thenReturn(null);
         when(format.getTag("DATE")).thenReturn(null);
         when(format.getTag("year")).thenReturn(null);
@@ -326,7 +319,7 @@ class HandleAudioFileFoundTest {
     }
 
     @Test
-    void handleCorrectArtistNameFromTagWhenDifferentAndNotExists() {
+    void handleDoesNotChangeAlbumOrArtistIdentityFromTags() {
         DirectoryEntity directory = DirectoryEntity.builder().build();
         ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
 
@@ -336,9 +329,11 @@ class HandleAudioFileFoundTest {
                 .size(1000L).build();
         ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
 
+        UUID albumId = UUID.randomUUID();
         LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
-        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("OldArtistName").build();
-        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Album").releaseYear(2024).build();
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("FolderArtist").build();
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("FolderAlbum").releaseYear(0).build();
+        ReflectionTestUtils.setField(album, "id", albumId);
         TrackEntity track = TrackEntity.builder().personEntity(artist).albumEntity(album).number(1).discNumber(1)
                 .metadataEntities(new ArrayList<>()).build();
 
@@ -353,23 +348,21 @@ class HandleAudioFileFoundTest {
         when(format.getTag("TRACK")).thenReturn(null);
         when(format.getTag("tracknumber")).thenReturn(null);
         when(format.getTag("TRACKNUMBER")).thenReturn(null);
-        when(format.getTag("album_artist")).thenReturn("NewArtistName");
         when(format.getTag("title")).thenReturn("Track Title");
         when(format.getTag("comment")).thenReturn(null);
         when(format.getTag("COMMENT")).thenReturn(null);
-        when(format.getTag("album")).thenReturn(null);
-        when(format.getTag("ALBUM")).thenReturn(null);
-        when(format.getTag("date")).thenReturn(null);
-        when(format.getTag("DATE")).thenReturn(null);
-        when(format.getTag("year")).thenReturn(null);
-        when(format.getTag("YEAR")).thenReturn(null);
-        when(personRepositoryMock.findByLibraryEntityAndName(library, "NewArtistName")).thenReturn(Optional.empty());
+        when(format.getTag("album")).thenReturn("Tag Album (2010)");
+        when(format.getTag("date")).thenReturn("2010");
+        when(format.getTag("genre")).thenReturn(null);
+        when(format.getTag("GENRE")).thenReturn(null);
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
         when(trackRepositoryMock.findById(TRACK_ID)).thenReturn(Optional.of(track));
+        when(albumRepositoryMock.findByIdForUpdate(albumId)).thenReturn(Optional.of(album));
+        when(metadataRepositoryMock.findByAlbumEntityId(albumId)).thenReturn(List.of());
 
         var data = AudioFileFoundData.builder()
                 .eventType(EventType.AUDIO_FILE_FOUND)
@@ -379,23 +372,27 @@ class HandleAudioFileFoundTest {
 
         subject.handle(data);
 
-        org.junit.jupiter.api.Assertions.assertEquals("NewArtistName", artist.getName());
+        // The scanners identify an album by its path-derived name and year; tags must not move it.
+        org.junit.jupiter.api.Assertions.assertEquals("FolderArtist", artist.getName());
+        org.junit.jupiter.api.Assertions.assertEquals("FolderAlbum", album.getName());
+        org.junit.jupiter.api.Assertions.assertEquals(0, album.getReleaseYear());
+        verify(albumRepositoryMock, never()).save(any(AlbumEntity.class));
     }
 
     @Test
-    void handleDoesNotChangeArtistNameWhenAlreadyMatchesTag() {
+    void handleSkipsAlbumMetadataWhenAlbumAlreadyHasMetadata() {
         DirectoryEntity directory = DirectoryEntity.builder().build();
         ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
 
         UUID mediaFileId = UUID.randomUUID();
-        MediaFileEntity mediaFile = MediaFileEntity.builder()
-                .path(PATH)
-                .size(1000L).build();
+        MediaFileEntity mediaFile = MediaFileEntity.builder().path(PATH).size(1000L).build();
         ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
 
+        UUID albumId = UUID.randomUUID();
         LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
-        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("SameArtist").build();
-        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Album").releaseYear(2024).build();
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("Artist").build();
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Album").releaseYear(0).build();
+        ReflectionTestUtils.setField(album, "id", albumId);
         TrackEntity track = TrackEntity.builder().personEntity(artist).albumEntity(album).number(1).discNumber(1)
                 .metadataEntities(new ArrayList<>()).build();
 
@@ -406,26 +403,23 @@ class HandleAudioFileFoundTest {
         when(jaffreeMock.getFFPROBE()).thenReturn(ffprobe);
         when(ffprobe.execute()).thenReturn(result);
         when(result.getFormat()).thenReturn(format);
-        when(format.getTag("track")).thenReturn(null);
-        when(format.getTag("TRACK")).thenReturn(null);
-        when(format.getTag("tracknumber")).thenReturn(null);
-        when(format.getTag("TRACKNUMBER")).thenReturn(null);
-        when(format.getTag("album_artist")).thenReturn("SameArtist");
+        when(format.getTag("track")).thenReturn("1");
+        when(format.getTag("disc")).thenReturn("1");
         when(format.getTag("title")).thenReturn("Track Title");
         when(format.getTag("comment")).thenReturn(null);
         when(format.getTag("COMMENT")).thenReturn(null);
-        when(format.getTag("album")).thenReturn(null);
-        when(format.getTag("ALBUM")).thenReturn(null);
-        when(format.getTag("date")).thenReturn(null);
-        when(format.getTag("DATE")).thenReturn(null);
-        when(format.getTag("year")).thenReturn(null);
-        when(format.getTag("YEAR")).thenReturn(null);
+        when(format.getTag("date")).thenReturn("2010");
+        when(format.getTag("genre")).thenReturn(null);
+        when(format.getTag("GENRE")).thenReturn(null);
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
         when(trackRepositoryMock.findById(TRACK_ID)).thenReturn(Optional.of(track));
+        when(albumRepositoryMock.findByIdForUpdate(albumId)).thenReturn(Optional.of(album));
+        when(metadataRepositoryMock.findByAlbumEntityId(albumId))
+                .thenReturn(List.of(MetadataEntity.builder().albumEntity(album).title("Album").build()));
 
         var data = AudioFileFoundData.builder()
                 .eventType(EventType.AUDIO_FILE_FOUND)
@@ -435,8 +429,8 @@ class HandleAudioFileFoundTest {
 
         subject.handle(data);
 
-        verify(personRepositoryMock, never()).findByLibraryEntityAndName(any(), any());
-        org.junit.jupiter.api.Assertions.assertEquals("SameArtist", artist.getName());
+        // Only the track's own metadata row is written; the album already has one.
+        verify(metadataRepositoryMock, times(1)).save(any(MetadataEntity.class));
     }
 
     @Test
@@ -476,13 +470,11 @@ class HandleAudioFileFoundTest {
         when(format.getTag("DISC")).thenReturn(null);
         when(format.getTag("discnumber")).thenReturn(null);
         when(format.getTag("DISCNUMBER")).thenReturn(null);
-        when(format.getTag("album_artist")).thenReturn(null);
-        when(format.getTag("ALBUM_ARTIST")).thenReturn(null);
         when(format.getTag("title")).thenReturn("Bring out Your Dead");
         when(format.getTag("comment")).thenReturn(null);
         when(format.getTag("COMMENT")).thenReturn(null);
-        when(format.getTag("album")).thenReturn(null);
-        when(format.getTag("ALBUM")).thenReturn(null);
+        when(format.getTag("genre")).thenReturn(null);
+        when(format.getTag("GENRE")).thenReturn(null);
         when(format.getTag("date")).thenReturn(null);
         when(format.getTag("DATE")).thenReturn(null);
         when(format.getTag("year")).thenReturn(null);

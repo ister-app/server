@@ -21,8 +21,10 @@ import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -66,6 +68,23 @@ public class AlbumController {
     @SchemaMapping(typeName = "Album", field = "artist")
     public PersonEntity artist(AlbumEntity albumEntity) {
         return albumEntity.getPersonEntity();
+    }
+
+    /**
+     * The album's own release year is only set when the directory name carries a "(YYYY)" suffix;
+     * for everything else the year lives in the metadata parsed from the audio tags or MusicBrainz.
+     */
+    @SchemaMapping(typeName = "Album", field = "releaseYear")
+    public int releaseYear(AlbumEntity albumEntity) {
+        if (albumEntity.getReleaseYear() > 0) {
+            return albumEntity.getReleaseYear();
+        }
+        return albumEntity.getMetadataEntities().stream()
+                .map(MetadataEntity::getReleased)
+                .filter(Objects::nonNull)
+                .mapToInt(LocalDate::getYear)
+                .min()
+                .orElse(0);
     }
 
     @SchemaMapping(typeName = "Album", field = "tracks")

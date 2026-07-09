@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -235,6 +236,41 @@ class ScannerHelperServiceTest {
         assertEquals(existing, subject.getOrCreateAlbum(library, artist, "Abbey Road", 1969));
         verify(albumRepository, never()).save(any());
         verify(serverEventService, never()).createAlbumFoundEvent(any());
+    }
+
+    /**
+     * The cover scanner reaches this method with the year the directory name carries, which is 0 for
+     * almost every directory. Matching on that 0 against an album whose year came from the audio tags
+     * is what used to spawn a second, empty album per cover.
+     */
+    @Test
+    void getOrCreateAlbumMatchesOnNameAloneWhenDirectoryHasNoYear() {
+        PersonEntity artist = PersonEntity.builder().name("Adele").build();
+        AlbumEntity existing = AlbumEntity.builder().name("19").releaseYear(2008).build();
+        when(albumRepository.findFirstByPersonEntityAndNameOrderByDateCreatedAsc(artist, "19"))
+                .thenReturn(Optional.of(existing));
+
+        assertEquals(existing, subject.getOrCreateAlbum(library, artist, "19", 0));
+        verify(albumRepository, never()).findByPersonEntityAndNameAndReleaseYear(any(), any(), anyInt());
+        verify(albumRepository, never()).save(any());
+        verify(serverEventService, never()).createAlbumFoundEvent(any());
+    }
+
+    @Test
+    void getOrCreateAlbumSeparatesSameNamedAlbumsWhenDirectoriesCarryAYear() {
+        PersonEntity artist = PersonEntity.builder().name("The Great Park").build();
+        AlbumEntity from2010 = AlbumEntity.builder().name("Simple Folk Recording").releaseYear(2010).build();
+        when(albumRepository.findByPersonEntityAndNameAndReleaseYear(artist, "Simple Folk Recording", 2010))
+                .thenReturn(Optional.of(from2010));
+        when(albumRepository.findByPersonEntityAndNameAndReleaseYear(artist, "Simple Folk Recording", 2013))
+                .thenReturn(Optional.empty());
+
+        assertEquals(from2010, subject.getOrCreateAlbum(library, artist, "Simple Folk Recording", 2010));
+        AlbumEntity from2013 = subject.getOrCreateAlbum(library, artist, "Simple Folk Recording", 2013);
+
+        assertEquals(2013, from2013.getReleaseYear());
+        verify(albumRepository).save(from2013);
+        verify(serverEventService).createAlbumFoundEvent(from2013.getId());
     }
 
     @Test

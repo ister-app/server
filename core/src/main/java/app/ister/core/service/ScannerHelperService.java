@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -121,9 +123,19 @@ public class ScannerHelperService {
      * Check if the database contains an album with the given parameters.
      * - If it exists return it.
      * - Else create and return it.
+     *
+     * <p>Both the name and the release year come from the album directory, and the audio, image and
+     * NFO scanners all derive them the same way — that is what lets a cover.jpg find the album its
+     * sibling tracks created. A directory only carries a year when it ends in "(YYYY)"; when it does
+     * not, {@code releaseYear} is 0 and the year cannot identify the album, so the name alone has to.
+     * Two same-named albums by one artist in year-less directories therefore merge; only a year in
+     * the directory name can tell them apart.
      */
     public AlbumEntity getOrCreateAlbum(LibraryEntity libraryEntity, PersonEntity personEntity, String albumName, int releaseYear) {
-        return albumRepository.findByPersonEntityAndNameAndReleaseYear(personEntity, albumName, releaseYear)
+        Optional<AlbumEntity> existing = releaseYear > 0
+                ? albumRepository.findByPersonEntityAndNameAndReleaseYear(personEntity, albumName, releaseYear)
+                : albumRepository.findFirstByPersonEntityAndNameOrderByDateCreatedAsc(personEntity, albumName);
+        return existing
                 .orElseGet(() -> {
                     AlbumEntity albumEntity = AlbumEntity.builder()
                             .libraryEntity(libraryEntity)
