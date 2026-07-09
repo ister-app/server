@@ -1,7 +1,6 @@
 package app.ister.worker.events.analyzelibraryrequested;
 
 import app.ister.core.Handle;
-import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.AlbumFoundData;
@@ -64,10 +63,15 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
     @Override
     public void handle(AnalyzeLibraryRequestedData data) {
         var nodeEntity = nodeService.getOrCreateNodeEntityForThisNode();
-        directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, nodeEntity).forEach(dir ->
+        // Every directory of this node, CACHE included: downloaded artwork lives there and makes up
+        // the bulk of the images. The sweep is scoped per directory, so a directory left out here
+        // never gets its blur-hashes computed at all.
+        directoryRepository.findByNodeEntity(nodeEntity).forEach(dir ->
                 messageSender.sendUpdateImagesRequested(
                         UpdateImagesRequestedData.builder()
                                 .eventType(EventType.UPDATE_IMAGES_REQUESTED)
+                                .directoryEntityId(dir.getId())
+                                .directoryName(dir.getName())
                                 .build(),
                         dir.getName()));
         dispatchMissingMetadataEvents(nodeEntity.getName());

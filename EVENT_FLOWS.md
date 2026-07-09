@@ -75,7 +75,7 @@ flowchart TD
     A["ANALYZE_LIBRARY_REQUESTED\n.{nodeName}"]
     A --> B["AnalyzeLibraryRequestedHandle\n📦 worker"]
 
-    B -->|"per directory"| C["UPDATE_IMAGES_REQUESTED\n.{dirName}"]
+    B -->|"per directory (incl. cache)"| C["UPDATE_IMAGES_REQUESTED\n.{dirName}"]
     B -->|"series zonder metadata"| D["SHOW_FOUND"]
     B -->|"afleveringen zonder metadata"| E["EPISODE_FOUND"]
     B -->|"films zonder metadata"| F["MOVIE_FOUND"]
@@ -83,7 +83,8 @@ flowchart TD
     B -->|"albums zonder afbeelding"| H["ALBUM_FOUND"]
     B -->|"tracks zonder metadata"| I["AUDIO_FILE_FOUND\n.{dirName}"]
 
-    C --> C1["HandleUpdateImagesRequested\n📦 disk\nBlurHash voor afbeeldingen zonder hash"]
+    C --> C1["HandleUpdateImagesRequested\n📦 disk\nBlurHash voor één chunk afbeeldingen"]
+    C1 -->|"chunk vol: nog werk te doen\nafterId = laatste id"| C
 
     D --> D1["HandleShowFound\n📦 worker"]
     D1 -->|"TMDB: titel, beschrijving\nposter + achtergrond downloaden"| IMG1["IMAGE_FOUND\n.{dirName}"]
@@ -108,9 +109,31 @@ flowchart TD
 
     I --> I1["HandleAudioFileFound\n📦 disk\n(zelfde als Flow 1)"]
 
-    IMG1 & IMG2 & IMG3 & IMG4 --> FIN["HandleImageFound\n📦 disk\nBlurHash + opslaan"]
+    IMG1 & IMG2 & IMG3 & IMG4 --> FIN["HandleImageFound\n📦 disk\nrij opslaan, géén BlurHash"]
     NFO1 & NFO2 --> FIN2["HandleNfoFileFound\n📦 disk\nXML parsen + opslaan"]
 ```
+
+### BlurHash-sweep
+
+`HandleImageFound` slaat een afbeelding snel op zonder BlurHash: dat coderen is CPU-duur en maakte
+die handler de bottleneck bij grote scans. De hashes worden achteraf gevuld door de
+`UPDATE_IMAGES_REQUESTED`-sweep, per directory — de **cache-directory inbegrepen**, want daar staat
+de gedownloade artwork en dus de overgrote meerderheid van de afbeeldingen.
+
+Die sweep verwerkt per bericht hoogstens `app.ister.server.blur-hash.chunk-size` afbeeldingen en
+publiceert daarna een opvolger met een keyset-cursor (`afterId`). Eén sweep over de hele bibliotheek
+in één bericht duurde langer dan RabbitMQ's `consumer_timeout` (30 min), waarna het bericht
+teruggezet werd en de sweep eindeloos opnieuw begon zonder ooit te committen.
+
+Twee subtiliteiten:
+
+- De cursor is een **keyset op `id`**, geen offset en geen "eerstvolgende zonder hash". Een
+  afbeelding die nooit te hashen is (een CMYK-JPEG die `ImageIO` niet leest) houdt `blur_hash NULL`;
+  met een simpele `LIMIT` zou de sweep zulke rijen elke ronde opnieuw pakken en nooit eindigen.
+  PostgreSQL sorteert `uuid` unsigned terwijl `java.util.UUID.compareTo` signed vergelijkt, dus zowel
+  de `ORDER BY` als de `id >` moeten in de database gebeuren.
+- De opvolger wordt pas gepubliceerd **nadat** de chunk gecommit is (zie `BlurHashChunkProcessor`).
+  Andersom zou een mislukte commit een cursor achterlaten die voorbij nooit-opgeslagen werk staat.
 
 ---
 
@@ -292,7 +315,7 @@ graph LR
 | `HandleSubtitleFileFound` | disk | `SUBTITLE_FILE_FOUND` | — |
 | `HandleImageFound` | disk | `IMAGE_FOUND` | — |
 | `HandleNfoFileFound` | disk | `NFO_FILE_FOUND` | — |
-| `HandleUpdateImagesRequested` | disk | `UPDATE_IMAGES_REQUESTED` | — |
+| `HandleUpdateImagesRequested` | disk | `UPDATE_IMAGES_REQUESTED` | `UPDATE_IMAGES_REQUESTED` (volgende chunk) |
 | `HandleAnalyzeDataDisk` | disk | `ANALYZE_DATA` | `MEDIA_FILE_FOUND` / `AUDIO_FILE_FOUND` / `NFO_FILE_FOUND` / `SUBTITLE_FILE_FOUND` |
 | `HandlePreTranscodeRecentlyWatched` | disk | `PRE_TRANSCODE_RECENTLY_WATCHED` | `TRANSCODE_REQUESTED`, `MEDIA_FILE_FOUND` (voor bestanden zonder geanalyseerde streams) |
 | `HandlePersonFound` | disk | `PERSON_FOUND` | `NFO_FILE_FOUND` |

@@ -15,6 +15,8 @@ public interface DirectoryRepository extends CrudRepository<DirectoryEntity, UUI
 
     List<DirectoryEntity> findByDirectoryTypeAndNodeEntity(DirectoryType directoryType, NodeEntity nodeEntity);
 
+    List<DirectoryEntity> findByNodeEntity(NodeEntity nodeEntity);
+
     List<DirectoryEntity> findByDirectoryType(DirectoryType directoryType);
 
     List<DirectoryEntity> findByLibraryEntityAndDirectoryType(LibraryEntity libraryEntity, DirectoryType directoryType);

@@ -4,6 +4,7 @@ import app.ister.core.entity.AlbumEntity;
 import app.ister.core.entity.CreditEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MovieEntity;
@@ -16,10 +17,12 @@ import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.CreditType;
 import app.ister.core.enums.DirectoryType;
+import app.ister.core.enums.ImageType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.StreamCodecType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Limit;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
@@ -38,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Runs the Flyway migrations against a real PostgreSQL and exercises the repository
@@ -78,6 +82,84 @@ class PostgresRepositoryIntegrationTest {
 
     @Autowired
     private EpisodeRepository episodeRepository;
+
+    @Autowired
+    private ImageRepository imageRepository;
+
+    /**
+     * The blur-hash sweep walks a directory in chunks, resuming from the last id of the previous
+     * chunk. Note that PostgreSQL orders {@code uuid} as unsigned bytes while
+     * {@link UUID#compareTo} compares signed longs, so the two disagree: both the {@code ORDER BY}
+     * and the {@code id >} of the cursor must be evaluated by the database. Never compare the
+     * cursor in Java.
+     */
+    @Test
+    void blurHashSweepChunksResumeAfterCursorAndSkipUnhashableImages() {
+        DirectoryEntity directory = persistDirectory("blur-sweep");
+        DirectoryEntity otherDirectory = persistDirectory("blur-sweep-other");
+
+        // Six images without a blur-hash, one with. Ids are random UUIDs, so the id ordering
+        // the sweep relies on is not the insertion order -- exactly as in production.
+        IntStream.range(0, 6).forEach(i -> persistImage(directory, "/cache/no-hash-" + i + ".jpg", null));
+        persistImage(directory, "/cache/hashed.jpg", "LEHV6nWB2yk8pyo0adR*");
+        persistImage(otherDirectory, "/cache/other-directory.jpg", null);
+        em.flush();
+
+        List<ImageEntity> first = imageRepository
+                .findByDirectoryEntityIdAndBlurHashIsNullOrderById(directory.getId(), Limit.of(4));
+        assertEquals(4, first.size());
+        assertTrue(first.stream().allMatch(i -> i.getDirectoryEntityId().equals(directory.getId())),
+                "sweep must not leak images from another directory");
+        assertEquals(first, imageRepository.findByDirectoryEntityIdAndBlurHashIsNullOrderById(
+                directory.getId(), Limit.of(4)), "chunk order must be deterministic across calls");
+
+        // Resuming after the last id of the previous chunk yields the remainder, without overlap.
+        List<ImageEntity> second = imageRepository.findByDirectoryEntityIdAndBlurHashIsNullAndIdGreaterThanOrderById(
+                directory.getId(), first.getLast().getId(), Limit.of(4));
+        assertEquals(2, second.size());
+        assertTrue(second.stream().noneMatch(first::contains), "chunks must not overlap");
+
+        // Together the chunks cover every unhashed image in the directory exactly once, and the
+        // already-hashed one is never revisited.
+        assertEquals(6, new HashSet<>(concat(first, second)).size());
+        assertTrue(concat(first, second).stream().noneMatch(i -> i.getPath().equals("/cache/hashed.jpg")));
+
+        // Cursor past the final id terminates the sweep, even though the images it skipped are
+        // still blur-hash-less (the CMYK case): an empty chunk is what stops the chain.
+        assertTrue(imageRepository.findByDirectoryEntityIdAndBlurHashIsNullAndIdGreaterThanOrderById(
+                directory.getId(), second.getLast().getId(), Limit.of(4)).isEmpty());
+    }
+
+    /**
+     * A message published before the sweep became chunked carries no directory, so it deserialises
+     * with a null id. Such a message must consume itself into an empty chunk rather than blow up or
+     * sweep every directory at once.
+     */
+    @Test
+    void chunkForAnUnknownDirectoryIsEmpty() {
+        persistImage(persistDirectory("blur-sweep-legacy"), "/cache/legacy.jpg", null);
+        em.flush();
+
+        assertTrue(imageRepository.findByDirectoryEntityIdAndBlurHashIsNullOrderById(null, Limit.of(500)).isEmpty());
+    }
+
+    private static List<ImageEntity> concat(List<ImageEntity> a, List<ImageEntity> b) {
+        List<ImageEntity> all = new ArrayList<>(a);
+        all.addAll(b);
+        return all;
+    }
+
+    private DirectoryEntity persistDirectory(String name) {
+        NodeEntity node = em.persist(NodeEntity.builder().name("node-" + name).url("http://localhost").build());
+        return em.persist(DirectoryEntity.builder()
+                .nodeEntity(node).name(name).path("/data/" + name).directoryType(DirectoryType.CACHE).build());
+    }
+
+    private void persistImage(DirectoryEntity directory, String path, String blurHash) {
+        ImageEntity image = ImageEntity.builder().type(ImageType.COVER).path(path).blurHash(blurHash).build();
+        image.setDirectoryEntity(directory);
+        em.persist(image);
+    }
 
     @Test
     void flywayMigrationsMatchEntityMappings() {

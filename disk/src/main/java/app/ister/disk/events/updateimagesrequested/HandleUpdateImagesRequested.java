@@ -1,34 +1,32 @@
 package app.ister.disk.events.updateimagesrequested;
 
 import app.ister.core.Handle;
-import app.ister.core.entity.ImageEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.UpdateImagesRequestedData;
-import app.ister.core.repository.ImageRepository;
-import io.trbl.blurhash.BlurHash;
+import app.ister.core.service.MessageSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
-import java.util.List;
-
+/**
+ * Fills in missing blur-hashes for one directory, one chunk per message.
+ *
+ * <p>When a chunk comes back full there is more work, so a successor message is published carrying a
+ * cursor past the chunk just handled. An empty (or short) chunk ends the chain. Not annotated
+ * {@code @Transactional}: see {@link BlurHashChunkProcessor}.
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor
-@Transactional
 public class HandleUpdateImagesRequested implements Handle<UpdateImagesRequestedData> {
 
-    private final ImageRepository imageRepository;
+    private final BlurHashChunkProcessor chunkProcessor;
+    private final MessageSender messageSender;
+
+    @Value("${app.ister.server.blur-hash.chunk-size:500}")
+    private int chunkSize;
 
     @RabbitListener(queues = "#{@diskQueueNamingConfig.getUpdateImagesRequestedQueues()}")
     @Override
@@ -43,36 +41,23 @@ public class HandleUpdateImagesRequested implements Handle<UpdateImagesRequested
 
     @Override
     public void handle(UpdateImagesRequestedData data) {
-        List<ImageEntity> toUpdate = new ArrayList<>();
-        imageRepository.findAll().forEach(imageEntity -> {
-            if (imageEntity.getBlurHash() == null && applyBlurHash(imageEntity)) {
-                toUpdate.add(imageEntity);
-            }
-        });
-        if (!toUpdate.isEmpty()) {
-            imageRepository.saveAll(toUpdate);
+        BlurHashChunkProcessor.Chunk chunk =
+                chunkProcessor.process(data.getDirectoryEntityId(), data.getAfterId(), chunkSize);
+
+        if (chunk.size() < chunkSize) {
+            log.info("Blur-hash sweep finished for directory {}", data.getDirectoryName());
+            return;
         }
-    }
 
-    private boolean applyBlurHash(ImageEntity imageEntity) {
-        try {
-            BufferedImage bi = ImageIO.read(new File(imageEntity.getPath()));
-            String blurHash = BlurHash.encode(bi);
-
-            BasicFileAttributes attrs = Files.readAttributes(
-                    Path.of(imageEntity.getPath()), BasicFileAttributes.class);
-
-            imageEntity.setBlurHash(blurHash);
-            imageEntity.setFileLastModifiedTime(attrs.lastModifiedTime().toInstant());
-            imageEntity.setFileCreationTime(attrs.creationTime().toInstant());
-
-            log.debug("Updated blur-hash for {}", imageEntity.getPath());
-            return true;
-        } catch (IOException | RuntimeException | LinkageError e) {
-            // Best-effort per image: a corrupt file or a native-image image-decoding issue
-            // (e.g. AWT/CMM LinkageError) must not fail the whole update-images sweep.
-            log.error("Unable to process imageEntity {}: {}", imageEntity.getPath(), e.getMessage());
-            return false;
-        }
+        log.debug("Blur-hash chunk of {} done for directory {}, continuing after {}",
+                chunk.size(), data.getDirectoryName(), chunk.lastId());
+        messageSender.sendUpdateImagesRequested(
+                UpdateImagesRequestedData.builder()
+                        .eventType(EventType.UPDATE_IMAGES_REQUESTED)
+                        .directoryEntityId(data.getDirectoryEntityId())
+                        .directoryName(data.getDirectoryName())
+                        .afterId(chunk.lastId())
+                        .build(),
+                data.getDirectoryName());
     }
 }
