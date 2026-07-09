@@ -55,10 +55,10 @@ public class PreTranscodeService {
     /**
      * Collects the media files to pre-transcode for the given disk, across all users.
      * <p>
-     * Episodes: the recently-watched episode itself is always included; if it was watched
-     * within the last {@code nextEpisodeRecentDays} days, the next episode in show order is
-     * also included.
-     * Movies: every recently-watched movie is included.
+     * Episodes: a recently-watched episode is included only while it is not fully watched
+     * (resuming a half-watched episode stays instant); if it was watched within the last
+     * {@code nextEpisodeRecentDays} days, the next episode in show order is also included.
+     * Movies: only recently-watched movies that are not fully watched are included.
      * Media files without analyzed streams cannot be transcoded and are returned separately
      * so the caller can trigger (re-)analysis.
      * All DB access is performed within this transaction to avoid LazyInitializationException.
@@ -89,9 +89,14 @@ public class PreTranscodeService {
             UUID episodeId = UUID.fromString(row[0].toString());
             UUID showId = UUID.fromString(row[1].toString());
             Instant lastWatched = (Instant) row[2];
+            boolean watched = Boolean.TRUE.equals(row[3]);
             episodeRepository.findById(episodeId).ifPresent(lastWatchedEpisode -> {
-                addMediaFiles(lastWatchedEpisode.getMediaFileEntities(), diskName, result,
-                        lastWatchedEpisode.getId(), null);
+                if (!watched) {
+                    // Only a half-watched episode itself is kept warm; a finished episode
+                    // needs no cache anymore, just its successor below.
+                    addMediaFiles(lastWatchedEpisode.getMediaFileEntities(), diskName, result,
+                            lastWatchedEpisode.getId(), null);
+                }
                 if (lastWatched.isAfter(recentCutoff)) {
                     addNextEpisodeMediaFiles(showId, lastWatchedEpisode, diskName, episodesByShow, result);
                 }
@@ -115,7 +120,7 @@ public class PreTranscodeService {
     }
 
     private void collectMovieMediaFiles(UUID userId, String diskName, PreTranscodeCollection result) {
-        watchStatusRepository.findRecentMovieIdsByUserId(userId).forEach(movieIdStr -> {
+        watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(userId).forEach(movieIdStr -> {
             UUID movieId = UUID.fromString(movieIdStr);
             movieRepository.findById(movieId).ifPresent(movie ->
                     addMediaFiles(movie.getMediaFileEntities(), diskName, result, null, movieId));

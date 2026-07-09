@@ -61,7 +61,7 @@ class PreTranscodeServiceTest {
         when(userRepository.findAll()).thenReturn(List.of(user(userId)));
         when(watchStatusRepository.findRecentEpisodesWithDateByUserId(userId))
                 .thenReturn(rows(episodeId, UUID.randomUUID(), daysAgo(30)));
-        when(watchStatusRepository.findRecentMovieIdsByUserId(userId)).thenReturn(List.of());
+        when(watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(userId)).thenReturn(List.of());
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
 
         Set<UUID> result = subject.collectMediaFilesToPreTranscode("disk1").mediaFileIds();
@@ -83,7 +83,7 @@ class PreTranscodeServiceTest {
         when(userRepository.findAll()).thenReturn(List.of(user(userId)));
         when(watchStatusRepository.findRecentEpisodesWithDateByUserId(userId))
                 .thenReturn(rows(ep1Id, showId, daysAgo(20)));
-        when(watchStatusRepository.findRecentMovieIdsByUserId(userId)).thenReturn(List.of());
+        when(watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(userId)).thenReturn(List.of());
         when(episodeRepository.findById(ep1Id)).thenReturn(Optional.of(ep1));
         when(episodeRepository.findByShowEntityId(eq(showId), any(Sort.class)))
                 .thenReturn(List.of(ep1, ep2));
@@ -110,7 +110,7 @@ class PreTranscodeServiceTest {
         when(userRepository.findAll()).thenReturn(List.of(user(userId)));
         when(watchStatusRepository.findRecentEpisodesWithDateByUserId(userId))
                 .thenReturn(rows(ep1Id, showId, daysAgo(NEXT_EPISODE_RECENT_DAYS + 1)));
-        when(watchStatusRepository.findRecentMovieIdsByUserId(userId)).thenReturn(List.of());
+        when(watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(userId)).thenReturn(List.of());
         when(episodeRepository.findById(ep1Id)).thenReturn(Optional.of(ep1));
 
         Set<UUID> result = subject.collectMediaFilesToPreTranscode("disk1").mediaFileIds();
@@ -136,7 +136,7 @@ class PreTranscodeServiceTest {
         when(userRepository.findAll()).thenReturn(List.of(user(userId)));
         when(watchStatusRepository.findRecentEpisodesWithDateByUserId(userId))
                 .thenReturn(rows(ep1Id, showId, daysAgo(8)));
-        when(watchStatusRepository.findRecentMovieIdsByUserId(userId)).thenReturn(List.of());
+        when(watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(userId)).thenReturn(List.of());
         when(episodeRepository.findById(ep1Id)).thenReturn(Optional.of(ep1));
 
         Set<UUID> result = subject.collectMediaFilesToPreTranscode("disk1").mediaFileIds();
@@ -155,7 +155,7 @@ class PreTranscodeServiceTest {
         when(userRepository.findAll()).thenReturn(List.of(user(userId)));
         when(watchStatusRepository.findRecentEpisodesWithDateByUserId(userId))
                 .thenReturn(rows(epId, showId, daysAgo(1)));
-        when(watchStatusRepository.findRecentMovieIdsByUserId(userId)).thenReturn(List.of());
+        when(watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(userId)).thenReturn(List.of());
         when(episodeRepository.findById(epId)).thenReturn(Optional.of(ep));
         when(episodeRepository.findByShowEntityId(eq(showId), any(Sort.class)))
                 .thenReturn(List.of(ep));
@@ -163,6 +163,31 @@ class PreTranscodeServiceTest {
         Set<UUID> result = subject.collectMediaFilesToPreTranscode("disk1").mediaFileIds();
 
         assertEquals(Set.of(mfId), result);
+    }
+
+    @Test
+    void fullyWatchedEpisodeIsExcludedButNextEpisodeIsIncluded() {
+        UUID userId = UUID.randomUUID();
+        UUID showId = UUID.randomUUID();
+        UUID ep1Id = UUID.randomUUID();
+        UUID ep2Id = UUID.randomUUID();
+        UUID mf1Id = UUID.randomUUID();
+        UUID mf2Id = UUID.randomUUID();
+        EpisodeEntity ep1 = episode(ep1Id, mediaFile(mf1Id, "disk1"));
+        EpisodeEntity ep2 = episode(ep2Id, mediaFile(mf2Id, "disk1"));
+
+        when(userRepository.findAll()).thenReturn(List.of(user(userId)));
+        when(watchStatusRepository.findRecentEpisodesWithDateByUserId(userId))
+                .thenReturn(rows(ep1Id, showId, daysAgo(1), true));
+        when(watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(userId)).thenReturn(List.of());
+        when(episodeRepository.findById(ep1Id)).thenReturn(Optional.of(ep1));
+        when(episodeRepository.findByShowEntityId(eq(showId), any(Sort.class)))
+                .thenReturn(List.of(ep1, ep2));
+
+        Set<UUID> result = subject.collectMediaFilesToPreTranscode("disk1").mediaFileIds();
+
+        assertFalse(result.contains(mf1Id), "fully watched episode should not be pre-transcoded");
+        assertTrue(result.contains(mf2Id), "next episode should be included");
     }
 
     // ===== Movies =====
@@ -176,7 +201,7 @@ class PreTranscodeServiceTest {
 
         when(userRepository.findAll()).thenReturn(List.of(user(userId)));
         when(watchStatusRepository.findRecentEpisodesWithDateByUserId(userId)).thenReturn(List.of());
-        when(watchStatusRepository.findRecentMovieIdsByUserId(userId))
+        when(watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(userId))
                 .thenReturn(List.of(movieId.toString()));
         when(movieRepository.findById(movieId)).thenReturn(Optional.of(movie));
 
@@ -194,7 +219,7 @@ class PreTranscodeServiceTest {
 
         when(userRepository.findAll()).thenReturn(List.of(user(userId)));
         when(watchStatusRepository.findRecentEpisodesWithDateByUserId(userId)).thenReturn(List.of());
-        when(watchStatusRepository.findRecentMovieIdsByUserId(userId))
+        when(watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(userId))
                 .thenReturn(List.of(movieId.toString()));
         when(movieRepository.findById(movieId)).thenReturn(Optional.of(movie));
 
@@ -216,7 +241,7 @@ class PreTranscodeServiceTest {
         when(userRepository.findAll()).thenReturn(List.of(user(userId)));
         when(watchStatusRepository.findRecentEpisodesWithDateByUserId(userId))
                 .thenReturn(rows(episodeId, UUID.randomUUID(), daysAgo(30)));
-        when(watchStatusRepository.findRecentMovieIdsByUserId(userId)).thenReturn(List.of());
+        when(watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(userId)).thenReturn(List.of());
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
 
         PreTranscodeService.PreTranscodeCollection result = subject.collectMediaFilesToPreTranscode("disk1");
@@ -243,7 +268,7 @@ class PreTranscodeServiceTest {
         when(userRepository.findAll()).thenReturn(List.of(user(userId)));
         when(watchStatusRepository.findRecentEpisodesWithDateByUserId(userId))
                 .thenReturn(rows(episodeId, UUID.randomUUID(), daysAgo(30)));
-        when(watchStatusRepository.findRecentMovieIdsByUserId(userId)).thenReturn(List.of());
+        when(watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(userId)).thenReturn(List.of());
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(ep));
 
         Set<UUID> result = subject.collectMediaFilesToPreTranscode("disk1").mediaFileIds();
@@ -265,7 +290,7 @@ class PreTranscodeServiceTest {
                 .thenReturn(rows(episodeId, UUID.randomUUID(), daysAgo(30)));
         when(watchStatusRepository.findRecentEpisodesWithDateByUserId(userId2))
                 .thenReturn(rows(episodeId, UUID.randomUUID(), daysAgo(30)));
-        when(watchStatusRepository.findRecentMovieIdsByUserId(any())).thenReturn(List.of());
+        when(watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(any())).thenReturn(List.of());
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(ep));
 
         Set<UUID> result = subject.collectMediaFilesToPreTranscode("disk1").mediaFileIds();
@@ -288,7 +313,7 @@ class PreTranscodeServiceTest {
                 .thenReturn(rows(ep1Id, showId, daysAgo(1)));
         when(watchStatusRepository.findRecentEpisodesWithDateByUserId(userId2))
                 .thenReturn(rows(ep1Id, showId, daysAgo(1)));
-        when(watchStatusRepository.findRecentMovieIdsByUserId(any())).thenReturn(List.of());
+        when(watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(any())).thenReturn(List.of());
         when(episodeRepository.findById(ep1Id)).thenReturn(Optional.of(ep1));
         when(episodeRepository.findByShowEntityId(eq(showId), any(Sort.class)))
                 .thenReturn(List.of(ep1, ep2));
@@ -344,7 +369,11 @@ class PreTranscodeServiceTest {
     }
 
     private List<Object[]> rows(UUID episodeId, UUID showId, Instant lastWatched) {
-        Object[] row = new Object[]{episodeId, showId, lastWatched};
+        return rows(episodeId, showId, lastWatched, false);
+    }
+
+    private List<Object[]> rows(UUID episodeId, UUID showId, Instant lastWatched, boolean watched) {
+        Object[] row = new Object[]{episodeId, showId, lastWatched, watched};
         List<Object[]> list = new java.util.ArrayList<>();
         list.add(row);
         return list;

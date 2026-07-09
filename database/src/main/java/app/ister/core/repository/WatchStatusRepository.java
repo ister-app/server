@@ -58,9 +58,10 @@ public interface WatchStatusRepository extends CrudRepository<WatchStatusEntity,
 
     /**
      * Like {@link #findRecentEpisodesAndShowIdsByUserId} but also returns the date_updated
-     * column so callers can determine how recently the episode was watched.
+     * and watched columns so callers can determine how recently the episode was watched and
+     * whether it was finished.
      *
-     * @return list of Object[] rows: [episode_entity_id (String), show_entity_id (String), date_updated (Timestamp)]
+     * @return list of Object[] rows: [episode_entity_id (String), show_entity_id (String), date_updated (Timestamp), watched (Boolean)]
      */
     @Query(
             value = """
@@ -69,6 +70,7 @@ public interface WatchStatusRepository extends CrudRepository<WatchStatusEntity,
                         wse.episode_entity_id,
                         ee.show_entity_id,
                         wse.date_updated AS wse_date_updated,
+                        wse.watched AS wse_watched,
                         ROW_NUMBER() OVER(PARTITION BY ee.show_entity_id ORDER BY wse.date_updated DESC) AS row_number
                       FROM watch_status_entity wse
                       LEFT JOIN episode_entity ee ON wse.episode_entity_id = ee.id
@@ -79,13 +81,32 @@ public interface WatchStatusRepository extends CrudRepository<WatchStatusEntity,
                     SELECT
                       episode_entity_id,
                       show_entity_id,
-                      wse_date_updated
+                      wse_date_updated,
+                      wse_watched
                     FROM added_row_number
                     WHERE row_number = 1;
                     """,
             nativeQuery = true
     )
     List<Object[]> findRecentEpisodesWithDateByUserId(@Param("userId") UUID userId);
+
+    /**
+     * Movies the user recently started but did not finish (latest watch status per movie has
+     * {@code watched = false}). Used by the pre-transcode scheduler: fully watched movies no
+     * longer need their HLS cache kept warm.
+     */
+    @Query(value = """
+            SELECT movie_entity_id FROM (
+              SELECT DISTINCT ON (wse.movie_entity_id) wse.movie_entity_id, wse.watched
+              FROM watch_status_entity wse
+              WHERE wse.user_entity_id = :userId
+                AND wse.movie_entity_id IS NOT NULL
+                AND wse.date_updated >= CURRENT_DATE - INTERVAL '150 days'
+              ORDER BY wse.movie_entity_id, wse.date_updated DESC
+            ) latest
+            WHERE latest.watched = FALSE
+            """, nativeQuery = true)
+    List<String> findRecentUnwatchedMovieIdsByUserId(@Param("userId") UUID userId);
 
     @Query(value = """
             SELECT DISTINCT ON (wse.movie_entity_id) wse.movie_entity_id

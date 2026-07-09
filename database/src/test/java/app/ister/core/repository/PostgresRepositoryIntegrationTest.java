@@ -203,6 +203,7 @@ class PostgresRepositoryIntegrationTest {
         assertEquals(1, result.size());
         assertEquals(episode.getId().toString(), String.valueOf(result.get(0)[0]));
         assertNotNull(result.get(0)[2], "date_updated column should be returned");
+        assertEquals(Boolean.TRUE, result.get(0)[3], "watched column should be returned");
     }
 
     @Test
@@ -215,6 +216,22 @@ class PostgresRepositoryIntegrationTest {
         List<String> result = watchStatusRepository.findRecentMovieIdsByUserId(user.getId());
 
         assertEquals(List.of(movie.getId().toString()), result);
+    }
+
+    @Test
+    void findRecentUnwatchedMovieIdsExcludesFullyWatchedMovies() {
+        UserEntity user = em.persist(UserEntity.builder().externalId("user-4").build());
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.MOVIE).name("Movies2").build());
+        MovieEntity watchedMovie = em.persist(MovieEntity.builder().libraryEntity(library).name("Watched").releaseYear(2020).build());
+        MovieEntity halfWatchedMovie = em.persist(MovieEntity.builder().libraryEntity(library).name("HalfWatched").releaseYear(2021).build());
+        em.persist(watchStatus(user, null, watchedMovie)); // helper sets watched = true
+        WatchStatusEntity halfWatched = watchStatus(user, null, halfWatchedMovie);
+        halfWatched.setWatched(false);
+        em.persistAndFlush(halfWatched);
+
+        List<String> result = watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(user.getId());
+
+        assertEquals(List.of(halfWatchedMovie.getId().toString()), result);
     }
 
     @Test

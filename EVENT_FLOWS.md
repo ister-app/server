@@ -172,26 +172,41 @@ flowchart TD
 
 **Trigger A:** Pre-transcode periodieke taak
 **Trigger B:** Playback-verzoek van client
+**Trigger C:** Playqueue-prefetch — `updatePlayQueue` (GraphQL) meldt voortgang; vlak voor het einde van het huidige item stuurt `PlayQueuePrefetchService` (📦 core) een `TRANSCODE_REQUESTED` (preTranscode=true) voor de volgende item(s), in de door de client gerapporteerde streamSettings.
 
 ```mermaid
 flowchart TD
     TrigA([Periodieke taak]) -->|"per disk"| A
     TrigB([Playback verzoek]) -->|direct| B
+    TrigC([updatePlayQueue voortgang]) -->|"einde nadert →\nvolgende item(s), keepUntil=+24h"| B
 
     A["PRE_TRANSCODE_RECENTLY_WATCHED\n.{diskName}"]
     A --> PA["HandlePreTranscodeRecentlyWatched\n📦 disk"]
-    PA -->|"verzamelt recent bekeken\nbijwerken keep-bestand"| B
+    PA -->|"half-bekeken + volgende episodes\nkeepUntil=+30min (schuift elke run op)"| B
     PA -->|"bestand zonder geanalyseerde\nstreams → her-analyse"| MFF["MEDIA_FILE_FOUND\n.{dirName}"]
 
-    B["TRANSCODE_REQUESTED\n.{dirName}  preTranscode=true/false"]
+    B["TRANSCODE_REQUESTED\n.{dirName}  preTranscode=true/false\nkeepUntilEpochMillis (optioneel)"]
     B --> PB["HandleTranscodeRequested\n📦 transcoder"]
-    PB -->|"HLS master playlist\nHLS variant playlists"| FS1[("HLS bestanden\nop schijf")]
-    PB -->|"per bitrate/pass"| C
+    PB -->|"HLS master playlist\nHLS variant playlists\nkeep_until in cache-dir"| FS1[("HLS bestanden\nop schijf")]
+    PB -->|"per bitrate/pass\nbackground=true bij pre-transcode"| C
 
     C["TRANSCODE_PASS_REQUESTED\n.{dirName}"]
     C --> PC["HandleTranscodePassRequested\n📦 transcoder"]
     PC -->|"FFmpeg via Jaffree\nHLS segmenten genereren"| FS2[("HLS segmenten\nop schijf")]
 ```
+
+**Prioriteit:** passes met `background=true` (pre-transcode/prefetch) draaien alleen op restcapaciteit
+(`max-background-files`, `max-background-passes`) en worden gepreëmpt (FFmpeg gestopt, event vervalt —
+de scheduler/prefetch stuurt later opnieuw) zodra interactieve playback een slot of thread nodig heeft.
+Daarnaast draait background-FFmpeg met OS-niceness (`background-nice`, default 10, 0 = uit) via een bij
+startup gegenereerd wrapper-script, zodat het ook op CPU-niveau alleen ongebruikte cycles krijgt;
+ontbreekt `nice`, dan valt het automatisch terug op normale prioriteit.
+Een succesvolle pass schrijft een `done_<segmentPrefix>`-marker; alleen die marker (niet de aanwezigheid
+van segmenten) laat een latere pre-transcode de pass overslaan.
+
+**Retentie:** de cleanup-taak verwijdert een cache-dir pas als hij ≥2 uur onaangeraakt is én de
+`keep_until`-deadline (hoogste ooit ontvangen `keepUntilEpochMillis`) verstreken is. Prefetch stuurt
++24 uur; de periodieke pre-transcode stuurt +30 min en ververst dat elke 15 min zolang de regel geldt.
 
 ---
 
