@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
@@ -23,6 +24,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -50,6 +52,8 @@ class HlsTranscodeServiceTest {
         ReflectionTestUtils.setField(service, "hwaccelDevice", "/dev/dri/renderD128");
         ReflectionTestUtils.setField(service, "maxConcurrentFiles", 2);
         ReflectionTestUtils.setField(service, "maxConcurrentPasses", 4);
+        ReflectionTestUtils.setField(service, "maxBackgroundFiles", 10);
+        ReflectionTestUtils.setField(service, "maxBackgroundPasses", 4);
         ReflectionTestUtils.setField(service, "segmentStabilityMs", 200L);
         ReflectionTestUtils.setField(service, "passTimeoutMultiplier", 4.0);
         ReflectionTestUtils.setField(service, "passTimeoutMinSeconds", 1800L);
@@ -350,20 +354,66 @@ class HlsTranscodeServiceTest {
     }
 
     @Test
-    void cleanupOldFilesSkipsDirListedInKeepFile() throws IOException {
-        String keepId = "keep-this-uuid";
-        Path keepDir = tempDir.resolve(keepId);
+    void cleanupOldFilesSkipsDirWithUnexpiredKeepUntil() throws IOException {
+        UUID mediaFileId = UUID.randomUUID();
+        Path keepDir = tempDir.resolve(mediaFileId.toString());
         Files.createDirectories(keepDir);
         Path staleFile = keepDir.resolve("seg.ts");
         Files.writeString(staleFile, "data");
         Files.setLastModifiedTime(staleFile, FileTime.from(Instant.now().minus(3, ChronoUnit.HOURS)));
 
-        Path keepFile = tempDir.resolve("pretranscode_keep_abc.txt");
-        Files.writeString(keepFile, keepId + "\n");
+        service.extendKeepUntil(mediaFileId, System.currentTimeMillis() + 60_000);
+        // Retention deadline is set, but the segment itself is stale
+        Files.setLastModifiedTime(staleFile, FileTime.from(Instant.now().minus(3, ChronoUnit.HOURS)));
 
         service.cleanupOldFiles();
 
         assertTrue(Files.exists(keepDir));
+    }
+
+    @Test
+    void cleanupOldFilesRemovesDirWithExpiredKeepUntil() throws IOException {
+        UUID mediaFileId = UUID.randomUUID();
+        Path keepDir = tempDir.resolve(mediaFileId.toString());
+        Files.createDirectories(keepDir);
+        service.extendKeepUntil(mediaFileId, System.currentTimeMillis() - 1_000);
+        Path staleFile = keepDir.resolve("seg.ts");
+        Files.writeString(staleFile, "data");
+        try (var files = Files.list(keepDir)) {
+            files.forEach(p -> {
+                try {
+                    Files.setLastModifiedTime(p, FileTime.from(Instant.now().minus(3, ChronoUnit.HOURS)));
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+        }
+
+        service.cleanupOldFiles();
+
+        assertFalse(Files.exists(keepDir));
+    }
+
+    @Test
+    void extendKeepUntilKeepsHighestDeadline() {
+        UUID mediaFileId = UUID.randomUUID();
+        long high = System.currentTimeMillis() + 3_600_000;
+        service.extendKeepUntil(mediaFileId, high);
+        service.extendKeepUntil(mediaFileId, System.currentTimeMillis() + 60_000);
+
+        Path keepUntilFile = tempDir.resolve(mediaFileId.toString()).resolve("keep_until");
+        assertTrue(Files.exists(keepUntilFile));
+        assertDoesNotThrow(() -> assertTrue(Long.parseLong(Files.readString(keepUntilFile).trim()) == high));
+    }
+
+    @Test
+    void cleanupOldFilesDeletesLegacyKeepFiles() throws IOException {
+        Path legacy = tempDir.resolve("pretranscode_keep_abc.txt");
+        Files.writeString(legacy, "some-id\n");
+
+        service.cleanupOldFiles();
+
+        assertFalse(Files.exists(legacy));
     }
 
     @Test
@@ -415,6 +465,111 @@ class HlsTranscodeServiceTest {
         service.ensurePassStarted(key, () -> { throw new AssertionError("Should not be called"); });
 
         assertSame(running, activeGenerations().get(key));
+    }
+
+    // ========== background niceness ==========
+
+    @Test
+    void createNiceWrapperReturnsNullWhenDisabled() {
+        ReflectionTestUtils.setField(service, "backgroundNice", 0);
+        assertNull(service.createNiceWrapper());
+    }
+
+    @Test
+    void createNiceWrapperWritesExecutableScript() throws IOException {
+        ReflectionTestUtils.setField(service, "backgroundNice", 10);
+        ReflectionTestUtils.setField(service, "ffmpegDir", "/usr/bin");
+
+        Path dir = service.createNiceWrapper();
+
+        assertNotNull(dir, "nice is available on Linux, wrapper should be created");
+        Path script = dir.resolve("ffmpeg");
+        assertTrue(Files.isExecutable(script));
+        String content = Files.readString(script);
+        assertTrue(content.contains("nice -n 10"));
+        assertTrue(content.contains("/usr/bin/ffmpeg"));
+    }
+
+    @Test
+    void backgroundPassUsesNiceWrapperWhenAvailable() throws IOException {
+        Path wrapperDir = Files.createDirectories(tempDir.resolve("nice-wrapper"));
+        ReflectionTestUtils.setField(service, "niceWrapperDir", wrapperDir);
+
+        assertNotNull(service.ffmpegFor(true));
+        verify(jaffree, never()).getFFMPEG();
+
+        service.ffmpegFor(false);
+        verify(jaffree).getFFMPEG();
+    }
+
+    @Test
+    void backgroundPassFallsBackToNormalFfmpegWithoutWrapper() {
+        ReflectionTestUtils.setField(service, "niceWrapperDir", null);
+
+        service.ffmpegFor(true);
+
+        verify(jaffree).getFFMPEG();
+    }
+
+    // ========== background priority & preemption ==========
+
+    @Test
+    void backgroundPassIsDroppedWhenNoBackgroundFileSlotAvailable() {
+        ReflectionTestUtils.setField(service, "backgroundFileBudget", new Semaphore(0));
+        java.util.concurrent.atomic.AtomicBoolean started = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+        service.ensurePassStarted("bg-file_video_720p", () -> started.set(true), true);
+
+        await().atMost(2, TimeUnit.SECONDS)
+                .until(() -> !activeGenerations().containsKey("bg-file_video_720p"));
+        assertFalse(started.get(), "dropped background pass must not start FFmpeg");
+    }
+
+    @Test
+    void backgroundPassIsDroppedWhenPassBudgetExhausted() {
+        ReflectionTestUtils.setField(service, "backgroundPassBudget", new Semaphore(0));
+        java.util.concurrent.atomic.AtomicBoolean started = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+        service.ensurePassStarted("bg-file_video_720p", () -> started.set(true), true);
+
+        await().atMost(2, TimeUnit.SECONDS)
+                .until(() -> !activeGenerations().containsKey("bg-file_video_720p"));
+        assertFalse(started.get(), "dropped background pass must not start FFmpeg");
+    }
+
+    @Test
+    void interactivePassPreemptsRunningBackgroundPassForFileSlot() throws Exception {
+        ReflectionTestUtils.setField(service, "concurrentFileSlots", new Semaphore(1));
+        CountDownLatch backgroundRunning = new CountDownLatch(1);
+        CountDownLatch interactiveRan = new CountDownLatch(1);
+
+        service.ensurePassStarted("bg-file_video_720p", () -> {
+            backgroundRunning.countDown();
+            try {
+                Thread.sleep(30_000); // simulates a long FFmpeg pass; interrupted by preemption
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("interrupted", e);
+            }
+        }, true);
+        assertTrue(backgroundRunning.await(2, TimeUnit.SECONDS));
+
+        service.ensurePassStarted("fg-file_video_copy", interactiveRan::countDown, false);
+
+        assertTrue(interactiveRan.await(5, TimeUnit.SECONDS), "interactive pass should run after preempting background");
+        // The preempted background pass is forgotten so a later event can restart it
+        await().atMost(2, TimeUnit.SECONDS)
+                .until(() -> !activeGenerations().containsKey("bg-file_video_720p"));
+    }
+
+    @Test
+    void backgroundRequestDoesNotRestartFailedPass() {
+        String key = "bg-file_video_720p";
+        activeGenerations().put(key, CompletableFuture.failedFuture(new IllegalStateException("boom")));
+
+        service.ensurePassStarted(key, () -> { throw new AssertionError("Should not restart"); }, true);
+
+        assertTrue(activeGenerations().get(key).isCompletedExceptionally());
     }
 
     // ========== startAudioPass ==========

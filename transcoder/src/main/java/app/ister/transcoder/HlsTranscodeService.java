@@ -56,6 +56,12 @@ public class HlsTranscodeService {
 
     private static final Set<String> MPEGTS_NATIVE_AUDIO_CODECS = Set.of("aac", "mp3", "ac3", "eac3", "dts");
 
+    /** Marker file written after a pass finished successfully: {@code done_<segmentPrefix>}. */
+    private static final String DONE_MARKER_PREFIX = "done_";
+
+    /** Per-cache-dir file holding the epoch-millis timestamp until which the dir must be kept. */
+    private static final String KEEP_UNTIL_FILE = "keep_until";
+
     private final Jaffree jaffree;
     private final FfprobeService ffprobeService;
 
@@ -77,6 +83,29 @@ public class HlsTranscodeService {
     /** Upper bound on concurrent FFmpeg passes across all files (one pass per quality level). */
     @Value("${app.ister.transcoder.hls.max-concurrent-passes:4}")
     private int maxConcurrentPasses;
+
+    /** Of the {@code max-concurrent-files} slots, background (pre-transcode/prefetch) work may hold at most this many. */
+    @Value("${app.ister.transcoder.hls.max-background-files:1}")
+    private int maxBackgroundFiles;
+
+    /** Of the {@code max-concurrent-passes} threads, background work may hold at most this many. */
+    @Value("${app.ister.transcoder.hls.max-background-passes:2}")
+    private int maxBackgroundPasses;
+
+    /**
+     * OS niceness for background FFmpeg processes (0 = run at normal priority). The kernel then
+     * only grants a background encode the CPU cycles interactive encodes leave unused, on top of
+     * the admission/preemption rules. Applied via a generated {@code nice}-wrapper script; when
+     * {@code nice} is unavailable the wrapper is disabled and background runs at normal priority.
+     */
+    @Value("${app.ister.transcoder.hls.background-nice:10}")
+    private int backgroundNice;
+
+    @Value("${app.ister.server.ffmpeg-dir}")
+    private String ffmpegDir;
+
+    /** Directory holding the nice-wrapper `ffmpeg` script; null when the wrapper is disabled. */
+    private Path niceWrapperDir;
 
     /** A segment is considered fully written when its size is unchanged for this long. */
     @Value("${app.ister.transcoder.hls.segment-stability-ms:200}")
@@ -135,10 +164,95 @@ public class HlsTranscodeService {
     /** Media file IDs that currently hold a semaphore slot. */
     private final Set<String> filesWithAcquiredSlot = ConcurrentHashMap.newKeySet();
 
+    /** Limits the file slots background work may hold. Initialised in {@link #init()}. */
+    Semaphore backgroundFileBudget;
+
+    /** Limits the executor threads background passes may hold. Initialised in {@link #init()}. */
+    Semaphore backgroundPassBudget;
+
+    /** Media file IDs whose slot was acquired under the background budget (preemptable). */
+    private final Set<String> filesWithBackgroundBudget = ConcurrentHashMap.newKeySet();
+
+    /** Media file IDs preempted in favour of interactive work; queued background passes for these skip FFmpeg. */
+    private final Set<String> preemptedFiles = ConcurrentHashMap.newKeySet();
+
+    /** Generation keys whose running pass was individually preempted (removed from activeGenerations on failure). */
+    private final Set<String> preemptedKeys = ConcurrentHashMap.newKeySet();
+
+    /** Bookkeeping for a pass that is currently executing on a pool thread. */
+    private static final class RunningPass {
+        final String generationKey;
+        final String mediaFileId;
+        final boolean background;
+        final long startedAtMillis;
+        final java.util.concurrent.atomic.AtomicReference<Thread> thread = new java.util.concurrent.atomic.AtomicReference<>();
+
+        RunningPass(String generationKey, String mediaFileId, boolean background, long startedAtMillis) {
+            this.generationKey = generationKey;
+            this.mediaFileId = mediaFileId;
+            this.background = background;
+            this.startedAtMillis = startedAtMillis;
+        }
+    }
+
+    /** Passes currently executing on a pool thread, by generation key. */
+    private final ConcurrentHashMap<String, RunningPass> runningPasses = new ConcurrentHashMap<>();
+
     @PostConstruct
     void init() {
         concurrentFileSlots = new Semaphore(maxConcurrentFiles);
         transcodeExecutor = Executors.newFixedThreadPool(maxConcurrentPasses);
+        backgroundFileBudget = new Semaphore(Math.min(maxBackgroundFiles, maxConcurrentFiles));
+        backgroundPassBudget = new Semaphore(Math.min(maxBackgroundPasses, maxConcurrentPasses));
+        niceWrapperDir = createNiceWrapper();
+    }
+
+    // ========== Background niceness ==========
+
+    /**
+     * Writes a wrapper script that starts FFmpeg under {@code nice -n <backgroundNice>}, in a
+     * fresh temp directory (Jaffree resolves {@code <dir>/ffmpeg}, so the script simply shadows
+     * the binary's name). Probes {@code nice} first; any failure disables the wrapper so
+     * background passes still run, just at normal priority.
+     *
+     * @return the wrapper directory, or null when disabled or unavailable
+     */
+    Path createNiceWrapper() {
+        if (backgroundNice <= 0) {
+            return null;
+        }
+        try {
+            Process probe = new ProcessBuilder("nice", "-n", String.valueOf(backgroundNice), "true")
+                    .redirectErrorStream(true)
+                    .start();
+            if (!probe.waitFor(5, java.util.concurrent.TimeUnit.SECONDS) || probe.exitValue() != 0) {
+                probe.destroyForcibly();
+                log.warn("'nice -n {}' probe failed; background FFmpeg passes will run at normal priority", backgroundNice);
+                return null;
+            }
+            Path dir = Files.createTempDirectory("ister-ffmpeg-nice");
+            Path script = dir.resolve("ffmpeg");
+            String realFfmpeg = Paths.get(ffmpegDir).resolve("ffmpeg").toString();
+            Files.writeString(script, "#!/bin/sh\nexec nice -n " + backgroundNice + " " + realFfmpeg + " \"$@\"\n");
+            Files.setPosixFilePermissions(script, java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"));
+            log.info("Background FFmpeg passes run with nice -n {} via {}", backgroundNice, script);
+            return dir;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Interrupted while probing 'nice'; background FFmpeg passes will run at normal priority");
+            return null;
+        } catch (IOException | RuntimeException e) {
+            log.warn("Could not set up nice wrapper; background FFmpeg passes will run at normal priority", e);
+            return null;
+        }
+    }
+
+    /** FFmpeg builder for a pass: background passes use the nice-wrapper when available. */
+    com.github.kokorin.jaffree.ffmpeg.FFmpeg ffmpegFor(boolean background) {
+        if (background && niceWrapperDir != null) {
+            return com.github.kokorin.jaffree.ffmpeg.FFmpeg.atPath(niceWrapperDir);
+        }
+        return jaffree.getFFMPEG();
     }
 
     // ========== Hardware acceleration ==========
@@ -196,6 +310,15 @@ public class HlsTranscodeService {
     }
 
     public void ensurePassStarted(String generationKey, Runnable passStarter) {
+        ensurePassStarted(generationKey, passStarter, false);
+    }
+
+    /**
+     * @param background pre-transcode/prefetch work: only runs on spare capacity (never blocks
+     *                   waiting for a slot) and may be preempted when interactive work needs
+     *                   its slot or thread.
+     */
+    public void ensurePassStarted(String generationKey, Runnable passStarter, boolean background) {
         String mediaFileId = generationKey.split("_", 2)[0];
         Object lock = generationLocks.computeIfAbsent(generationKey, k -> new Object());
         synchronized (lock) {
@@ -204,44 +327,179 @@ public class HlsTranscodeService {
                 return; // pass already running
             }
             if (existing != null && existing.isCompletedExceptionally()) {
+                if (background) {
+                    // Don't burn background budget retrying an input that already failed;
+                    // an interactive request may still force a restart below.
+                    log.debug("Skipping background restart of previously failed pass {}", generationKey);
+                    return;
+                }
                 log.warn("Previous FFmpeg pass for {} failed, restarting", generationKey);
+            }
+            // An interactive request for a file whose slot was acquired as background promotes
+            // the file: it keeps its slot but is no longer preemptable, and the budget frees up.
+            if (!background && filesWithBackgroundBudget.remove(mediaFileId)) {
+                preemptedFiles.remove(mediaFileId);
+                backgroundFileBudget.release();
             }
             boolean isFirstPassForFile = activePassesPerFile
                     .computeIfAbsent(mediaFileId, k -> new AtomicInteger(0))
                     .getAndIncrement() == 0;
-            // The file slot is acquired on a virtual thread, NOT inside the pass pool: if
-            // slot-waiters occupied pool threads, a full pool of waiting first-passes would
-            // starve the queued passes of the slot-holding files (deadlock until timeout).
             CompletableFuture<Void> future = new CompletableFuture<>();
-            Thread.startVirtualThread(() -> runPassWithSlot(mediaFileId, isFirstPassForFile, passStarter, future));
             activeGenerations.put(generationKey, future);
+            if (background) {
+                // Slot acquisition is non-blocking for background work, so it happens inline:
+                // by the time a sibling pass of the same file is registered, the file either
+                // holds its slot or this pass (and its counter increment) is already gone.
+                if (isFirstPassForFile && !tryAcquireBackgroundSlot(mediaFileId)) {
+                    dropBackgroundPass(generationKey, mediaFileId, future, "no background file slot available");
+                    return;
+                }
+                submitPass(generationKey, mediaFileId, true, passStarter, future);
+            } else {
+                // The file slot is acquired on a virtual thread, NOT inside the pass pool: if
+                // slot-waiters occupied pool threads, a full pool of waiting first-passes would
+                // starve the queued passes of the slot-holding files (deadlock until timeout).
+                Thread.startVirtualThread(() -> runPassWithSlot(generationKey, mediaFileId, isFirstPassForFile, passStarter, future));
+            }
         }
     }
 
-    private void runPassWithSlot(String mediaFileId, boolean isFirstPassForFile, Runnable passStarter,
-                                 CompletableFuture<Void> future) {
+    private void runPassWithSlot(String generationKey, String mediaFileId, boolean isFirstPassForFile,
+                                 Runnable passStarter, CompletableFuture<Void> future) {
         try {
             if (isFirstPassForFile) {
-                acquireTranscodeSlot(mediaFileId);
+                acquireTranscodeSlotPreempting(mediaFileId);
             }
         } catch (RuntimeException e) {
             future.completeExceptionally(e);
             return;
         }
+        preemptBackgroundPassForThreadIfNeeded();
+        submitPass(generationKey, mediaFileId, false, passStarter, future);
+    }
+
+    private void submitPass(String generationKey, String mediaFileId, boolean background,
+                            Runnable passStarter, CompletableFuture<Void> future) {
         try {
-            transcodeExecutor.submit(() -> {
-                try {
-                    passStarter.run();
-                    future.complete(null);
-                } catch (Exception t) {
-                    future.completeExceptionally(t);
-                } finally {
-                    releaseTranscodeSlotIfDone(mediaFileId);
-                }
-            });
+            transcodeExecutor.submit(() -> runPass(generationKey, mediaFileId, background, passStarter, future));
         } catch (RuntimeException e) { // executor shut down
             releaseTranscodeSlotIfDone(mediaFileId);
             future.completeExceptionally(e);
+        }
+    }
+
+    private void runPass(String generationKey, String mediaFileId, boolean background,
+                         Runnable passStarter, CompletableFuture<Void> future) {
+        if (background && preemptedFiles.contains(mediaFileId)) {
+            // Queued pass of a file that was preempted while this task waited for a thread:
+            // don't start FFmpeg, just drain the bookkeeping so the slot frees up quickly.
+            dropBackgroundPass(generationKey, mediaFileId, future, "file was preempted by interactive work");
+            return;
+        }
+        if (background && !backgroundPassBudget.tryAcquire()) {
+            dropBackgroundPass(generationKey, mediaFileId, future, "background pass budget exhausted");
+            return;
+        }
+        RunningPass runningPass = new RunningPass(generationKey, mediaFileId, background, System.currentTimeMillis());
+        runningPass.thread.set(Thread.currentThread());
+        runningPasses.put(generationKey, runningPass);
+        try {
+            passStarter.run();
+            future.complete(null);
+        } catch (Exception t) {
+            if (preemptedKeys.remove(generationKey)) {
+                // Preempted, not failed: forget the pass so a later event can restart it.
+                activeGenerations.remove(generationKey);
+                log.info("Background pass {} preempted by interactive work", generationKey);
+            }
+            future.completeExceptionally(t);
+        } finally {
+            synchronized (runningPass) {
+                runningPass.thread.set(null);
+            }
+            Thread.interrupted(); // clear a leaked preemption interrupt before the pool thread is reused
+            runningPasses.remove(generationKey);
+            if (background) {
+                backgroundPassBudget.release();
+            }
+            releaseTranscodeSlotIfDone(mediaFileId);
+        }
+    }
+
+    /**
+     * Drops a background pass that cannot (or should no longer) run. The generation key is
+     * removed so a later scheduler/prefetch event simply retries; nothing is queued.
+     */
+    private void dropBackgroundPass(String generationKey, String mediaFileId, CompletableFuture<Void> future, String reason) {
+        log.info("Dropping background pass {}: {}", generationKey, reason);
+        activeGenerations.remove(generationKey);
+        future.completeExceptionally(new IllegalStateException("Background pass dropped: " + reason));
+        releaseTranscodeSlotIfDone(mediaFileId);
+    }
+
+    private boolean tryAcquireBackgroundSlot(String mediaFileId) {
+        if (!backgroundFileBudget.tryAcquire()) {
+            return false;
+        }
+        if (!concurrentFileSlots.tryAcquire()) {
+            backgroundFileBudget.release();
+            return false;
+        }
+        filesWithBackgroundBudget.add(mediaFileId);
+        filesWithAcquiredSlot.add(mediaFileId);
+        log.debug("Acquired background transcode slot: {}", mediaFileId);
+        return true;
+    }
+
+    /**
+     * Interactive slot acquisition: when no slot is free, the youngest background file is
+     * preempted (its running passes are interrupted, which releases its slot) before falling
+     * back to the normal blocking acquire.
+     */
+    private void acquireTranscodeSlotPreempting(String mediaFileId) {
+        if (concurrentFileSlots.tryAcquire()) {
+            filesWithAcquiredSlot.add(mediaFileId);
+            log.debug("Acquired transcode slot: {}", mediaFileId);
+            return;
+        }
+        preemptYoungestBackgroundFile();
+        acquireTranscodeSlot(mediaFileId);
+    }
+
+    private void preemptYoungestBackgroundFile() {
+        runningPasses.values().stream()
+                .filter(pass -> pass.background && filesWithBackgroundBudget.contains(pass.mediaFileId))
+                .max(Comparator.comparingLong(pass -> pass.startedAtMillis))
+                .ifPresent(youngest -> {
+                    log.info("Preempting background transcode of {} for interactive playback", youngest.mediaFileId);
+                    preemptedFiles.add(youngest.mediaFileId);
+                    runningPasses.values().stream()
+                            .filter(pass -> pass.mediaFileId.equals(youngest.mediaFileId))
+                            .forEach(this::preemptPass);
+                });
+    }
+
+    /**
+     * When the pass pool is saturated and a background pass is running, interrupt the youngest
+     * background pass so the interactive pass that is about to be submitted gets its thread.
+     */
+    private void preemptBackgroundPassForThreadIfNeeded() {
+        if (runningPasses.size() < maxConcurrentPasses) {
+            return;
+        }
+        runningPasses.values().stream()
+                .filter(pass -> pass.background)
+                .max(Comparator.comparingLong(pass -> pass.startedAtMillis))
+                .ifPresent(this::preemptPass);
+    }
+
+    private void preemptPass(RunningPass pass) {
+        synchronized (pass) {
+            Thread thread = pass.thread.get();
+            if (thread != null) {
+                preemptedKeys.add(pass.generationKey);
+                thread.interrupt();
+            }
         }
     }
 
@@ -266,6 +524,10 @@ public class HlsTranscodeService {
                 concurrentFileSlots.release();
                 log.debug("Released transcode slot: {}", mediaFileId);
             }
+            if (filesWithBackgroundBudget.remove(mediaFileId)) {
+                backgroundFileBudget.release();
+            }
+            preemptedFiles.remove(mediaFileId);
             activePassesPerFile.remove(mediaFileId);
         }
     }
@@ -276,6 +538,10 @@ public class HlsTranscodeService {
      * eliminating the per-segment PTS reset that causes A/V drift.
      */
     public void startVideoPass(String inputPath, Path cacheDir, VideoQuality quality) {
+        startVideoPass(inputPath, cacheDir, quality, false);
+    }
+
+    public void startVideoPass(String inputPath, Path cacheDir, VideoQuality quality, boolean background) {
         try {
             Files.createDirectories(cacheDir);
         } catch (IOException e) {
@@ -317,13 +583,14 @@ public class HlsTranscodeService {
             }
         }
 
-        executePassWithTimeout(jaffree.getFFMPEG()
+        executePassWithTimeout(ffmpegFor(background)
                 .addInput(buildInput(inputPath))
                 .addOutput(output)
                 .setOverwriteOutput(true)
                 .setLogLevel(LogLevel.ERROR),
                 inputPath, "video pass " + quality.getLabel(),
                 cacheDir, "seg_video_" + quality.getLabel() + "_");
+        writeDoneMarker(cacheDir, "seg_video_" + quality.getLabel() + "_");
     }
 
     /**
@@ -338,6 +605,11 @@ public class HlsTranscodeService {
      */
     public void startAudioPass(String inputPath, Path cacheDir, int streamIdx, AudioQuality audioQuality,
                                String sourceCodecName) {
+        startAudioPass(inputPath, cacheDir, streamIdx, audioQuality, sourceCodecName, false);
+    }
+
+    public void startAudioPass(String inputPath, Path cacheDir, int streamIdx, AudioQuality audioQuality,
+                               String sourceCodecName, boolean background) {
         try {
             Files.createDirectories(cacheDir);
         } catch (IOException e) {
@@ -381,13 +653,64 @@ public class HlsTranscodeService {
             output.addArguments("-segment_time", "10");
         }
 
-        executePassWithTimeout(jaffree.getFFMPEG()
+        executePassWithTimeout(ffmpegFor(background)
                 .addInput(UrlInput.fromUrl(inputPath))
                 .addOutput(output)
                 .setOverwriteOutput(true)
                 .setLogLevel(LogLevel.ERROR),
                 inputPath, "audio pass " + streamIdx + "/" + audioQuality.getLabel(),
                 cacheDir, String.format("seg_audio_%d_%s_", streamIdx, audioQuality.getLabel()));
+        writeDoneMarker(cacheDir, String.format("seg_audio_%d_%s_", streamIdx, audioQuality.getLabel()));
+    }
+
+    /**
+     * Marks a pass as fully completed on disk. Presence of the marker (not the presence of
+     * segments) tells later pre-transcode runs to skip the pass: a preempted or crashed pass
+     * leaves segments behind but no marker, so it is correctly restarted.
+     */
+    private void writeDoneMarker(Path cacheDir, String segmentPrefix) {
+        try {
+            Files.writeString(cacheDir.resolve(DONE_MARKER_PREFIX + segmentPrefix), "");
+        } catch (IOException e) {
+            log.warn("Could not write done marker for {} in {}", segmentPrefix, cacheDir, e);
+        }
+    }
+
+    /** True if a pass with this segment prefix ran to completion (marker present on disk). */
+    public boolean hasDoneMarker(Path cacheDir, String segmentPrefix) {
+        return Files.exists(cacheDir.resolve(DONE_MARKER_PREFIX + segmentPrefix));
+    }
+
+    // ========== Cache retention ==========
+
+    /**
+     * Extends the retention deadline of a media file's cache dir; the highest deadline ever
+     * written wins. The cleanup job keeps the dir until the deadline has passed.
+     */
+    public void extendKeepUntil(UUID mediaFileId, long keepUntilEpochMillis) {
+        Path dir = Paths.get(tmpDir, mediaFileId.toString());
+        try {
+            Files.createDirectories(dir);
+            if (keepUntilEpochMillis > readKeepUntil(dir)) {
+                Files.writeString(dir.resolve(KEEP_UNTIL_FILE), Long.toString(keepUntilEpochMillis));
+            }
+        } catch (IOException e) {
+            log.warn("Could not write keep-until for {}", mediaFileId, e);
+        }
+    }
+
+    /** Retention deadline (epoch millis) of a cache dir; 0 when absent or unreadable. */
+    private long readKeepUntil(Path cacheDir) {
+        Path file = cacheDir.resolve(KEEP_UNTIL_FILE);
+        if (!Files.exists(file)) {
+            return 0;
+        }
+        try {
+            return Long.parseLong(Files.readString(file).trim());
+        } catch (IOException | NumberFormatException e) {
+            log.warn("Unreadable keep-until file {}", file, e);
+            return 0;
+        }
     }
 
     /**
@@ -645,13 +968,14 @@ public class HlsTranscodeService {
         Path root = Paths.get(tmpDir);
         if (!Files.exists(root)) return;
 
-        Set<String> keepIds = loadKeepFileIds(root);
+        deleteLegacyKeepFiles(root);
         Instant retentionThreshold = Instant.now().minus(cacheRetentionHours, ChronoUnit.HOURS);
+        long now = System.currentTimeMillis();
         try (var dirs = Files.list(root)) {
             dirs.filter(Files::isDirectory).forEach(dir -> {
                 String dirName = dir.getFileName().toString();
-                if (keepIds.contains(dirName)) {
-                    log.debug("Skipping pre-transcode kept dir: {}", dir);
+                if (readKeepUntil(dir) > now) {
+                    log.debug("Skipping dir kept by retention deadline: {}", dir);
                     return;
                 }
                 try (var entries = Files.list(dir)) {
@@ -675,6 +999,10 @@ public class HlsTranscodeService {
                             concurrentFileSlots.release();
                             log.warn("Released stale transcode slot during cleanup: {}", dirName);
                         }
+                        if (filesWithBackgroundBudget.remove(dirName)) {
+                            backgroundFileBudget.release();
+                        }
+                        preemptedFiles.remove(dirName);
                         activePassesPerFile.remove(dirName);
                     }
                 } catch (IOException e) {
@@ -686,25 +1014,22 @@ public class HlsTranscodeService {
         }
     }
 
-    private Set<String> loadKeepFileIds(Path root) {
+    /** Removes the keep files of the pre-retention-deadline era; superseded by {@link #KEEP_UNTIL_FILE}. */
+    private void deleteLegacyKeepFiles(Path root) {
         try (var files = Files.list(root)) {
-            return files
-                    .filter(p -> !Files.isDirectory(p))
+            files.filter(p -> !Files.isDirectory(p))
                     .filter(p -> p.getFileName().toString().startsWith("pretranscode_keep_")
                               && p.getFileName().toString().endsWith(".txt"))
-                    .flatMap(p -> {
+                    .forEach(p -> {
                         try {
-                            return Files.readAllLines(p).stream();
+                            Files.deleteIfExists(p);
+                            log.info("Deleted legacy pre-transcode keep file {}", p);
                         } catch (IOException e) {
-                            log.warn("Could not read keep file {}", p, e);
-                            return java.util.stream.Stream.empty();
+                            log.warn("Could not delete legacy keep file {}", p, e);
                         }
-                    })
-                    .filter(line -> !line.isBlank())
-                    .collect(Collectors.toSet());
+                    });
         } catch (IOException e) {
-            log.warn("Could not read pretranscode keep files", e);
-            return Set.of();
+            log.warn("Could not scan for legacy keep files", e);
         }
     }
 

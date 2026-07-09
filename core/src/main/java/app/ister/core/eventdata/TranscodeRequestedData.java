@@ -19,4 +19,6 @@ public class TranscodeRequestedData extends MessageData {
     private Boolean transcode;
     private SubtitleFormat subtitleFormat;
     private Boolean preTranscode;
+    /** Keep the HLS cache for this media file at least until this moment (epoch millis). */
+    private Long keepUntilEpochMillis;
 }

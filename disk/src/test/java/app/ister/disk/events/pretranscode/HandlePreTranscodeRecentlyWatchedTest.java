@@ -11,15 +11,11 @@ import app.ister.core.service.PreTranscodeService.UnanalyzedMediaFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -42,15 +38,12 @@ class HandlePreTranscodeRecentlyWatchedTest {
     @Mock
     private MessageSender messageSender;
 
-    @TempDir
-    Path tempDir;
-
     private HandlePreTranscodeRecentlyWatched subject;
 
     @BeforeEach
     void setUp() {
         subject = new HandlePreTranscodeRecentlyWatched(preTranscodeService, messageSender);
-        ReflectionTestUtils.setField(subject, "tmpDir", tempDir.toString());
+        ReflectionTestUtils.setField(subject, "keepMinutes", 30L);
     }
 
     private static PreTranscodeCollection collection(Set<UUID> ids) {
@@ -94,7 +87,7 @@ class HandlePreTranscodeRecentlyWatchedTest {
     }
 
     @Test
-    void handleWritesKeepFile() throws IOException {
+    void handleSendsSlidingRetentionDeadline() {
         UUID id1 = UUID.randomUUID();
 
         PreTranscodeRecentlyWatchedData data = PreTranscodeRecentlyWatchedData.builder()
@@ -104,28 +97,16 @@ class HandlePreTranscodeRecentlyWatchedTest {
 
         when(preTranscodeService.collectMediaFilesToPreTranscode("diskA")).thenReturn(collection(Set.of(id1)));
 
+        long before = System.currentTimeMillis();
         subject.handle(data);
+        long after = System.currentTimeMillis();
 
-        Path keepFile = tempDir.resolve("pretranscode_keep_diskA.txt");
-        assertTrue(Files.exists(keepFile));
-        String content = Files.readString(keepFile);
-        assertTrue(content.contains(id1.toString()));
-    }
-
-    @Test
-    void handleWithEmptySetWritesEmptyKeepFile() throws IOException {
-        PreTranscodeRecentlyWatchedData data = PreTranscodeRecentlyWatchedData.builder()
-                .eventType(EventType.PRE_TRANSCODE_RECENTLY_WATCHED)
-                .diskName("diskB")
-                .build();
-
-        when(preTranscodeService.collectMediaFilesToPreTranscode("diskB")).thenReturn(collection(Set.of()));
-
-        subject.handle(data);
-
-        Path keepFile = tempDir.resolve("pretranscode_keep_diskB.txt");
-        assertTrue(Files.exists(keepFile));
-        assertEquals("", Files.readString(keepFile));
+        ArgumentCaptor<TranscodeRequestedData> captor = ArgumentCaptor.forClass(TranscodeRequestedData.class);
+        verify(messageSender).sendTranscodeRequested(captor.capture(), eq("diskA"));
+        long keepUntil = captor.getValue().getKeepUntilEpochMillis();
+        long thirtyMinutes = 30 * 60 * 1000L;
+        assertTrue(keepUntil >= before + thirtyMinutes && keepUntil <= after + thirtyMinutes,
+                "keepUntil should be ~30 minutes from now");
     }
 
     @Test

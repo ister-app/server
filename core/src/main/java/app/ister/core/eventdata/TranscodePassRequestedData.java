@@ -19,4 +19,6 @@ public class TranscodePassRequestedData extends MessageData {
     private String passCategory;
     private String qualityLabel;
     private Integer audioStreamIndex;
+    /** True for pre-transcode/prefetch work; background passes never delay interactive playback. */
+    private Boolean background;
 }

@@ -193,6 +193,7 @@ public class HlsService {
 
     private void doStartPass(TranscodePassRequestedData data, MediaFileEntity mediaFile) {
         boolean remote = isRemote(mediaFile);
+        boolean background = Boolean.TRUE.equals(data.getBackground());
         String mediaFilePath = resolveInputPath(mediaFile);
 
         Path cacheDirPath = cacheDir(data.getMediaFileId());
@@ -202,7 +203,7 @@ public class HlsService {
         if (PASS_CATEGORY_VIDEO.equals(data.getPassCategory())) {
             VideoQuality vq = VideoQuality.fromLabel(data.getQualityLabel());
             segmentPrefix = "seg_video_" + data.getQualityLabel() + "_";
-            passStarter = () -> transcodeService.startVideoPass(mediaFilePath, cacheDirPath, vq);
+            passStarter = () -> transcodeService.startVideoPass(mediaFilePath, cacheDirPath, vq, background);
         } else {
             AudioQuality aq = AudioQuality.fromLabel(data.getQualityLabel());
             int audioStreamIndex = data.getAudioStreamIndex();
@@ -213,10 +214,10 @@ public class HlsService {
                     .findFirst()
                     .orElse("");
             passStarter = () -> transcodeService.startAudioPass(mediaFilePath, cacheDirPath,
-                    audioStreamIndex, aq, sourceCodec);
+                    audioStreamIndex, aq, sourceCodec, background);
         }
 
-        transcodeService.ensurePassStarted(data.getPassKey(), passStarter);
+        transcodeService.ensurePassStarted(data.getPassKey(), passStarter, background);
 
         if (remote) {
             String nodeUrl = mediaFile.getDirectoryEntity().getNodeEntity().getUrl();
@@ -267,8 +268,8 @@ public class HlsService {
         String qualityLabel = vq.getLabel();
         String passKey = mediaFileId + "_video_" + qualityLabel;
         if (transcodeService.isPassActive(passKey) || transcodeService.hasCompletedPass(passKey)) return;
-        if (hasSegmentsOnDisk(cacheDir(mediaFileId), "seg_video_" + qualityLabel + "_")) {
-            log.debug("Skipping video pass for {} quality={} — segments already on disk", mediaFileId, qualityLabel);
+        if (transcodeService.hasDoneMarker(cacheDir(mediaFileId), "seg_video_" + qualityLabel + "_")) {
+            log.debug("Skipping video pass for {} quality={} — pass already completed on disk", mediaFileId, qualityLabel);
             return;
         }
         doStartPass(TranscodePassRequestedData.builder()
@@ -278,6 +279,7 @@ public class HlsService {
                 .mediaFilePath(inputPath)
                 .passCategory(PASS_CATEGORY_VIDEO)
                 .qualityLabel(qualityLabel)
+                .background(true)
                 .build(), mediaFile);
     }
 
@@ -285,8 +287,8 @@ public class HlsService {
                                          int streamIdx, MediaFileEntity mediaFile) {
         String passKey = mediaFileId + "_audio_" + streamIdx + "_" + qualityLabel;
         if (transcodeService.isPassActive(passKey) || transcodeService.hasCompletedPass(passKey)) return;
-        if (hasSegmentsOnDisk(cacheDir(mediaFileId), "seg_audio_" + streamIdx + "_" + qualityLabel + "_")) {
-            log.debug("Skipping audio pass for {} streamIdx={} quality={} — segments already on disk", mediaFileId, streamIdx, qualityLabel);
+        if (transcodeService.hasDoneMarker(cacheDir(mediaFileId), "seg_audio_" + streamIdx + "_" + qualityLabel + "_")) {
+            log.debug("Skipping audio pass for {} streamIdx={} quality={} — pass already completed on disk", mediaFileId, streamIdx, qualityLabel);
             return;
         }
         doStartPass(TranscodePassRequestedData.builder()
@@ -297,19 +299,8 @@ public class HlsService {
                 .passCategory(PASS_CATEGORY_AUDIO)
                 .qualityLabel(qualityLabel)
                 .audioStreamIndex(streamIdx)
+                .background(true)
                 .build(), mediaFile);
-    }
-
-    private boolean hasSegmentsOnDisk(Path dir, String prefix) {
-        if (!Files.isDirectory(dir)) return false;
-        try (var stream = Files.list(dir)) {
-            return stream.anyMatch(p -> {
-                String name = p.getFileName().toString();
-                return name.startsWith(prefix) && name.endsWith(".ts");
-            });
-        } catch (IOException _) {
-            return false;
-        }
     }
 
     /**

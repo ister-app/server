@@ -39,6 +39,9 @@ public class HandleTranscodeRequested implements Handle<TranscodeRequestedData> 
         log.debug("Handling TRANSCODE_REQUESTED for mediaFileId={}", data.getMediaFileId());
         try {
             hlsService.generateAllPlaylists(data.getMediaFileId(), data.getDirect(), data.getTranscode(), data.getSubtitleFormat());
+            if (data.getKeepUntilEpochMillis() != null) {
+                transcodeService.extendKeepUntil(data.getMediaFileId(), data.getKeepUntilEpochMillis());
+            }
             if (Boolean.TRUE.equals(data.getPreTranscode())) {
                 if (transcodeService.hasAnyActiveOrCompletedPassForFile(data.getMediaFileId())) {
                     log.debug("Skipping pre-transcode passes for {} - already transcoding or recently completed", data.getMediaFileId());

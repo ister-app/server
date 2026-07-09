@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -136,6 +137,42 @@ class HandleTranscodeRequestedTest {
 
         verify(hlsService).generateAllPlaylists(id, false, true, SubtitleFormat.WEBVTT);
         verify(hlsService, never()).startAllPasses(any(), anyBoolean(), anyBoolean());
+    }
+
+    @Test
+    void keepUntilIsWrittenWhenPresent() throws Exception {
+        UUID id = UUID.randomUUID();
+        long keepUntil = System.currentTimeMillis() + 3_600_000;
+        TranscodeRequestedData data = TranscodeRequestedData.builder()
+                .eventType(EventType.TRANSCODE_REQUESTED)
+                .mediaFileId(id)
+                .direct(false)
+                .transcode(true)
+                .subtitleFormat(SubtitleFormat.WEBVTT)
+                .preTranscode(false)
+                .keepUntilEpochMillis(keepUntil)
+                .build();
+
+        handler.handle(data);
+
+        verify(transcodeService).extendKeepUntil(id, keepUntil);
+    }
+
+    @Test
+    void keepUntilIsNotWrittenWhenAbsent() throws Exception {
+        UUID id = UUID.randomUUID();
+        TranscodeRequestedData data = TranscodeRequestedData.builder()
+                .eventType(EventType.TRANSCODE_REQUESTED)
+                .mediaFileId(id)
+                .direct(false)
+                .transcode(true)
+                .subtitleFormat(SubtitleFormat.WEBVTT)
+                .preTranscode(false)
+                .build();
+
+        handler.handle(data);
+
+        verify(transcodeService, never()).extendKeepUntil(any(), anyLong());
     }
 
     @Test

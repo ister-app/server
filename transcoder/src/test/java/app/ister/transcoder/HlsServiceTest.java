@@ -71,6 +71,8 @@ class HlsServiceTest {
         ReflectionTestUtils.setField(transcodeService, "segmentTimeoutMs", 5000L);
         ReflectionTestUtils.setField(transcodeService, "maxConcurrentFiles", 10);
         ReflectionTestUtils.setField(transcodeService, "maxConcurrentPasses", 4);
+        ReflectionTestUtils.setField(transcodeService, "maxBackgroundFiles", 10);
+        ReflectionTestUtils.setField(transcodeService, "maxBackgroundPasses", 4);
         ReflectionTestUtils.setField(transcodeService, "segmentStabilityMs", 200L);
         ReflectionTestUtils.setField(transcodeService, "passTimeoutMultiplier", 4.0);
         ReflectionTestUtils.setField(transcodeService, "passTimeoutMinSeconds", 1800L);

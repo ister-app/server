@@ -15,14 +15,10 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -35,8 +31,13 @@ public class HandlePreTranscodeRecentlyWatched implements Handle<PreTranscodeRec
     /** Media files for which re-analysis was already requested; avoids re-sending every scheduler run. */
     private final Set<UUID> analyzeRequested = ConcurrentHashMap.newKeySet();
 
-    @Value("${app.ister.server.tmp-dir}")
-    private String tmpDir;
+    /**
+     * Retention window sent with each pre-transcode request. The scheduler runs every 15
+     * minutes, so as long as a media file keeps matching the recently-watched rules its
+     * deadline keeps sliding forward; once the rule stops matching the cache expires.
+     */
+    @Value("${app.ister.server.pretranscode.keep-minutes:30}")
+    private long keepMinutes;
 
     @Override
     public EventType handles() {
@@ -56,8 +57,7 @@ public class HandlePreTranscodeRecentlyWatched implements Handle<PreTranscodeRec
 
         PreTranscodeService.PreTranscodeCollection collection = preTranscodeService.collectMediaFilesToPreTranscode(diskName);
         Set<UUID> mediaFileIds = collection.mediaFileIds();
-
-        updateKeepFile(diskName, mediaFileIds);
+        long keepUntilEpochMillis = System.currentTimeMillis() + Duration.ofMinutes(keepMinutes).toMillis();
 
         mediaFileIds.forEach(mediaFileId ->
                 messageSender.sendTranscodeRequested(
@@ -68,6 +68,7 @@ public class HandlePreTranscodeRecentlyWatched implements Handle<PreTranscodeRec
                                 .transcode(true)
                                 .subtitleFormat(SubtitleFormat.WEBVTT)
                                 .preTranscode(true)
+                                .keepUntilEpochMillis(keepUntilEpochMillis)
                                 .build(),
                         diskName)
         );
@@ -100,17 +101,4 @@ public class HandlePreTranscodeRecentlyWatched implements Handle<PreTranscodeRec
         });
     }
 
-    private void updateKeepFile(String diskName, Set<UUID> mediaFileIds) {
-        Path keepFile = Path.of(tmpDir, "pretranscode_keep_" + diskName + ".txt");
-        try {
-            Files.createDirectories(keepFile.getParent());
-            String content = mediaFileIds.stream()
-                    .map(UUID::toString)
-                    .collect(Collectors.joining("\n"));
-            Files.writeString(keepFile, content, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            log.debug("Updated keep file {} with {} entries", keepFile, mediaFileIds.size());
-        } catch (IOException e) {
-            log.warn("Could not update keep file {}", keepFile, e);
-        }
-    }
 }
