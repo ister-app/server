@@ -917,7 +917,7 @@ class HlsServiceTest {
         Files.createDirectories(cacheDir);
 
         MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
-        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", audioStream);
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream(0, 1920, 1080), audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
@@ -945,7 +945,7 @@ class HlsServiceTest {
         Files.createDirectories(cacheDir);
 
         MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
-        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", audioStream);
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream(0, 1920, 1080), audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
@@ -974,7 +974,7 @@ class HlsServiceTest {
         Files.createDirectories(cacheDir);
 
         MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
-        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", audioStream);
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream(0, 1920, 1080), audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
@@ -1019,7 +1019,7 @@ class HlsServiceTest {
 
         MediaFileStreamEntity audio1 = audioStream(1, "eng", "English");
         MediaFileStreamEntity audio2 = audioStream(2, "nld", "Dutch");
-        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", audio1, audio2);
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream(0, 1920, 1080), audio1, audio2);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));

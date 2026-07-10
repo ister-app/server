@@ -356,6 +356,25 @@ class HlsPlaylistBuilderTest {
         return count;
     }
 
+    @Test
+    void buildMasterPlaylistTreatsEmbeddedCoverArtAsAudioOnly() {
+        // A FLAC/MP3 with embedded cover art has an mjpeg VIDEO stream; it must get the
+        // audio-only variants, not video variants (FFmpeg cannot transcode the artwork).
+        MediaFileStreamEntity coverArt = MediaFileStreamEntity.builder()
+                .streamIndex(1)
+                .codecType(StreamCodecType.VIDEO)
+                .codecName("mjpeg")
+                .width(500).height(500)
+                .path("")
+                .build();
+        MediaFileEntity mediaFile = mediaFile(audioStream(0, "eng", null), coverArt);
+
+        String result = builder.buildMasterPlaylist(mediaFile, true, true, SubtitleFormat.WEBVTT);
+
+        assertFalse(result.contains("stream_video_"), "cover art must not produce video variants");
+        assertTrue(result.contains("stream_audio_0_"), "audio-only variants expected");
+    }
+
     private MediaFileEntity mediaFile(MediaFileStreamEntity... streams) {
         return MediaFileEntity.builder()
                 .path("/test/video.mkv")

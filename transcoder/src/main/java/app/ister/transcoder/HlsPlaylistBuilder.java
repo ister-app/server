@@ -32,6 +32,21 @@ public class HlsPlaylistBuilder {
         return IMAGE_SUBTITLE_CODECS.contains(s.getCodecName());
     }
 
+    /** Codecs ffprobe reports for embedded cover art (attached pictures). */
+    private static final java.util.Set<String> ARTWORK_CODECS = java.util.Set.of("mjpeg", "png", "bmp", "gif", "webp");
+
+    /**
+     * Embedded cover art in music files is stored as a VIDEO stream by the analyzer;
+     * treating it as playable video makes a FLAC advertise (and FFmpeg attempt) video
+     * transcodes of its album cover. Every "does this file have video" decision must
+     * go through this filter.
+     */
+    static boolean isRealVideoStream(MediaFileStreamEntity s) {
+        return s.getCodecType() == StreamCodecType.VIDEO
+                && (s.getCodecName() == null
+                    || !ARTWORK_CODECS.contains(s.getCodecName().toLowerCase(java.util.Locale.ROOT)));
+    }
+
     /**
      * Builds the master.m3u8 content for the given media file.
      *
@@ -42,7 +57,7 @@ public class HlsPlaylistBuilder {
         List<MediaFileStreamEntity> streams = mediaFile.getMediaFileStreamEntity();
 
         MediaFileStreamEntity videoStream = streams.stream()
-                .filter(s -> s.getCodecType() == StreamCodecType.VIDEO)
+                .filter(HlsPlaylistBuilder::isRealVideoStream)
                 .findFirst()
                 .orElse(null);
         int srcWidth = videoStream != null ? videoStream.getWidth() : 1920;

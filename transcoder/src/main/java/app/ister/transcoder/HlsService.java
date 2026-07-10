@@ -295,7 +295,11 @@ public class HlsService {
                 .filter(s -> s.getCodecType() == StreamCodecType.AUDIO)
                 .toList();
 
-        for (int i = 0; i < videoQualities.length; i++) {
+        // Never start video passes for a file without a real video stream: FFmpeg's
+        // -map 0:v:0 would grab embedded cover art and fail (or transcode a JPEG).
+        boolean hasVideo = mediaFile.getMediaFileStreamEntity().stream()
+                .anyMatch(HlsPlaylistBuilder::isRealVideoStream);
+        for (int i = 0; hasVideo && i < videoQualities.length; i++) {
             if (includeQuality[i]) {
                 startVideoPassIfNeeded(mediaFileId, inputPath, videoQualities[i], mediaFile);
             }
@@ -573,7 +577,7 @@ public class HlsService {
         VideoQuality[] videoQualities = VideoQuality.values();
         AudioQuality[] audioQualities = AudioQuality.values();
 
-        boolean hasVideoStream = streams.stream().anyMatch(s -> s.getCodecType() == StreamCodecType.VIDEO);
+        boolean hasVideoStream = streams.stream().anyMatch(HlsPlaylistBuilder::isRealVideoStream);
         List<Double> effectiveKeyframes = rawKeyframes.isEmpty() ? buildSyntheticKeyframes(totalDuration) : rawKeyframes;
         if (rawKeyframes.isEmpty() && !audioOnly) {
             log.warn("No keyframes found for {}, falling back to synthetic keyframes", filePath);
@@ -666,7 +670,7 @@ public class HlsService {
     private static boolean isAudioOnly(MediaFileEntity mediaFile) {
         List<MediaFileStreamEntity> streams = mediaFile.getMediaFileStreamEntity();
         return streams != null && !streams.isEmpty()
-                && streams.stream().noneMatch(s -> s.getCodecType() == StreamCodecType.VIDEO);
+                && streams.stream().noneMatch(HlsPlaylistBuilder::isRealVideoStream);
     }
 
     /**
