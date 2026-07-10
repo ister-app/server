@@ -989,6 +989,20 @@ public class HlsTranscodeService {
         return durationCache.computeIfAbsent(filePath, ffprobeService::getTotalDuration);
     }
 
+    /**
+     * Records that a file has no video stream, so the keyframe probe — an ffprobe that scans
+     * the whole file over the mount only to find no video packets — is skipped everywhere the
+     * cache is consulted (playlist generation and the FFmpeg passes alike).
+     */
+    void seedAudioOnlyKeyframes(String filePath) {
+        keyframeCache.putIfAbsent(filePath, List.of());
+    }
+
+    /** Seeds the duration cache from an already-known value (the database), avoiding an ffprobe. */
+    void seedDuration(String filePath, double seconds) {
+        durationCache.putIfAbsent(filePath, seconds);
+    }
+
     private String buildSegmentTimes(List<Double> keyframes) {
         return keyframes.stream()
                 .skip(1) // skip 0.0; FFmpeg cuts at these positions
@@ -1024,7 +1038,18 @@ public class HlsTranscodeService {
             return;
         }
         try (var entries = Files.list(dir)) {
-            boolean allOld = entries.allMatch(f -> isOlderThan(f, retentionThreshold));
+            List<Path> files = entries.toList();
+            // Dirs holding nothing but playlists are a few KB of pre-generated playlists —
+            // the scan-time playlists for music. Keeping them permanently is what makes
+            // first play instant; re-analysis (deleteHlsCache) still replaces them. The
+            // exemption is deliberately this narrow: a dir with extracted subtitles or
+            // other leftovers (but no .ts) must still age out, or the cache disk fills.
+            boolean playlistsOnly = !files.isEmpty()
+                    && files.stream().allMatch(f -> f.getFileName().toString().endsWith(".m3u8"));
+            if (playlistsOnly) {
+                return;
+            }
+            boolean allOld = files.stream().allMatch(f -> isOlderThan(f, retentionThreshold));
             if (allOld) {
                 log.debug("Removing stale HLS cache: {}", dir);
                 deleteRecursively(dir);

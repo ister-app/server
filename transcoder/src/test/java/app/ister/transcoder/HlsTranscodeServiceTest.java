@@ -340,6 +340,38 @@ class HlsTranscodeServiceTest {
     }
 
     @Test
+    void cleanupOldFilesKeepsPlaylistOnlyDirForever() throws IOException {
+        // Pre-generated playlists (e.g. scan-time music playlists) have no .ts segments;
+        // they are kilobytes and keeping them is what makes first play instant.
+        Path playlistDir = tempDir.resolve("playlist-only-uuid");
+        Files.createDirectories(playlistDir);
+        Path master = playlistDir.resolve("master_d1_t1_sWEBVTT.m3u8");
+        Files.writeString(master, "#EXTM3U");
+        Files.setLastModifiedTime(master, FileTime.from(Instant.now().minus(30, ChronoUnit.DAYS)));
+
+        service.cleanupOldFiles();
+
+        assertTrue(Files.exists(playlistDir));
+    }
+
+    @Test
+    void cleanupOldFilesRemovesStaleSubtitleOnlyDir() throws IOException {
+        // A dir with extracted subtitles but no segments (direct play with subtitles)
+        // is not a pre-generated playlist dir and must still age out.
+        Path subDir = tempDir.resolve("subtitle-only-uuid");
+        Files.createDirectories(subDir);
+        for (String name : new String[]{"master_d1_t1_sWEBVTT.m3u8", "sub_abc.srt", "seg_sub_abc_00000.vtt"}) {
+            Path file = subDir.resolve(name);
+            Files.writeString(file, "old data");
+            Files.setLastModifiedTime(file, FileTime.from(Instant.now().minus(3, ChronoUnit.HOURS)));
+        }
+
+        service.cleanupOldFiles();
+
+        assertFalse(Files.exists(subDir));
+    }
+
+    @Test
     void cleanupOldFilesKeepsDirWithMixOfOldAndRecentFiles() throws IOException {
         Path dir = tempDir.resolve("mixed-dir-uuid");
         Files.createDirectories(dir);

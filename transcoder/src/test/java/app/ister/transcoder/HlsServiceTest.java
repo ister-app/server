@@ -53,6 +53,8 @@ class HlsServiceTest {
     @Mock private MessageSender messageSender;
     @Mock private RemoteNodeClient remoteNodeClient;
     @Mock private NodeTokenManager nodeTokenManager;
+    // With a mocked manager the TransactionTemplate executes its callback inline.
+    @Mock private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     @TempDir
     Path tempDir;
@@ -81,7 +83,7 @@ class HlsServiceTest {
         ReflectionTestUtils.setField(transcodeService, "concurrentFileSlots", new Semaphore(10));
         hlsService = new HlsService(playlistBuilder, subtitleService, transcodeService,
                 mediaFileRepository, mediaFileStreamRepository, messageSender,
-                remoteNodeClient, nodeTokenManager);
+                remoteNodeClient, nodeTokenManager, transactionManager);
         ReflectionTestUtils.setField(hlsService, "tmpDir", tempDir.toString());
         ReflectionTestUtils.setField(hlsService, "localNodeName", LOCAL_NODE_NAME);
         ReflectionTestUtils.setField(hlsService, "uploadDrainTimeoutMs", 5000L);
@@ -1570,16 +1572,50 @@ class HlsServiceTest {
     void generateAllPlaylistsAudioOnlyBuildsSyntheticKeyframes() throws IOException {
         UUID id = UUID.randomUUID();
         MediaFileStreamEntity audio = audioStream(0, "eng", "English");
-        // No video stream → buildSyntheticKeyframes is called
+        // No video stream → synthetic keyframes, and the keyframe probe is skipped entirely
         MediaFileEntity mediaFile = mediaFileEntity("/test/audio.flac", audio);
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        when(ffprobeService.getKeyframes("/test/audio.flac")).thenReturn(List.of(0.0, 5.0));
         when(ffprobeService.getTotalDuration("/test/audio.flac")).thenReturn(30.0);
 
         hlsService.generateAllPlaylists(id, false, true, SubtitleFormat.WEBVTT);
 
         Path cacheFile = tempDir.resolve(id.toString()).resolve("master_d0_t1_sWEBVTT.m3u8");
         assertTrue(Files.exists(cacheFile));
+        verify(ffprobeService, never()).getKeyframes(any());
+    }
+
+    @Test
+    void generateAllPlaylistsAudioOnlyWritesAllMasterVariants() throws IOException {
+        UUID id = UUID.randomUUID();
+        MediaFileEntity mediaFile = mediaFileEntity("/test/audio.flac", audioStream(0, "eng", "English"));
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+        when(ffprobeService.getTotalDuration("/test/audio.flac")).thenReturn(30.0);
+
+        hlsService.generateAllPlaylists(id, false, true, SubtitleFormat.WEBVTT);
+
+        // Every direct/transcode/subtitle-format combination is a cache hit for audio-only files.
+        for (String variant : List.of("d1_t0", "d0_t1", "d1_t1")) {
+            for (SubtitleFormat format : SubtitleFormat.values()) {
+                assertTrue(Files.exists(tempDir.resolve(id.toString())
+                                .resolve("master_" + variant + "_s" + format.name() + ".m3u8")),
+                        "expected master variant " + variant + "/" + format);
+            }
+        }
+    }
+
+    @Test
+    void generateAllPlaylistsAudioOnlySeedsDurationFromDatabase() throws IOException {
+        UUID id = UUID.randomUUID();
+        MediaFileEntity mediaFile = mediaFileEntity("/test/audio.flac", audioStream(0, "eng", "English"));
+        mediaFile.setDurationInMilliseconds(30_000);
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+
+        hlsService.generateAllPlaylists(id, false, true, SubtitleFormat.WEBVTT);
+
+        // Duration came from the entity, so no ffprobe at all ran for this file.
+        verify(ffprobeService, never()).getTotalDuration(any());
+        verify(ffprobeService, never()).getKeyframes(any());
+        assertTrue(Files.exists(tempDir.resolve(id.toString()).resolve("master_d0_t1_sWEBVTT.m3u8")));
     }
 
     // ========== generateAllPlaylists remote upload IOException ==========

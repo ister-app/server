@@ -10,11 +10,12 @@ import app.ister.core.eventdata.TranscodeRequestedData;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.service.MessageSender;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -46,7 +47,6 @@ import java.util.stream.Stream;
  */
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class HlsService {
 
     private static final String EXT_M3U8 = ".m3u8";
@@ -61,6 +61,33 @@ public class HlsService {
     private final MessageSender messageSender;
     private final RemoteNodeClient remoteNodeClient;
     private final NodeTokenManager nodeTokenManager;
+
+    /**
+     * Short read-only transactions for the HTTP request paths. The HLS endpoints poll for
+     * files for up to two minutes; an @Transactional spanning such a method pins a Hikari
+     * connection for the whole wait, which exhausted the pool under a handful of concurrent
+     * players. All entity reads happen inside this template and return plain values; the
+     * RabbitMQ sends, ffmpeg/ffprobe work and poll loops run without an active transaction.
+     */
+    private final TransactionTemplate readOnlyTransaction;
+
+    @SuppressWarnings("java:S107") // wiring, one collaborator per concern
+    public HlsService(HlsPlaylistBuilder playlistBuilder, HlsSubtitleService subtitleService,
+                      HlsTranscodeService transcodeService, MediaFileRepository mediaFileRepository,
+                      MediaFileStreamRepository mediaFileStreamRepository, MessageSender messageSender,
+                      RemoteNodeClient remoteNodeClient, NodeTokenManager nodeTokenManager,
+                      PlatformTransactionManager transactionManager) {
+        this.playlistBuilder = playlistBuilder;
+        this.subtitleService = subtitleService;
+        this.transcodeService = transcodeService;
+        this.mediaFileRepository = mediaFileRepository;
+        this.mediaFileStreamRepository = mediaFileStreamRepository;
+        this.messageSender = messageSender;
+        this.remoteNodeClient = remoteNodeClient;
+        this.nodeTokenManager = nodeTokenManager;
+        this.readOnlyTransaction = new TransactionTemplate(transactionManager);
+        this.readOnlyTransaction.setReadOnly(true);
+    }
 
     @Value("${app.ister.server.tmp-dir}")
     private String tmpDir;
@@ -95,11 +122,8 @@ public class HlsService {
      * @param direct    include the stream-copy (direct) video + audio-copy quality variant
      * @param transcode include the re-encoded (720p + 480p) video quality variants
      */
-    @Transactional(readOnly = true)
     public String getMasterPlaylist(UUID mediaFileId, boolean direct, boolean transcode, SubtitleFormat subtitleFormat) throws IOException {
-        String cacheFilename = String.format(Locale.ROOT, "master_d%d_t%d_s%s" + EXT_M3U8,
-                direct ? 1 : 0, transcode ? 1 : 0, subtitleFormat.name());
-        Path cacheFile = cacheDir(mediaFileId).resolve(cacheFilename);
+        Path cacheFile = cacheDir(mediaFileId).resolve(masterCacheFilename(direct, transcode, subtitleFormat));
 
         if (Files.exists(cacheFile)) {
             String cached = Files.readString(cacheFile);
@@ -111,11 +135,16 @@ public class HlsService {
             Files.delete(cacheFile);
         }
 
-        MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
-        if (mediaFile.getMediaFileStreamEntity() == null || mediaFile.getMediaFileStreamEntity().isEmpty()) {
+        String directoryName = readOnlyTransaction.execute(status -> {
+            MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
+            if (mediaFile.getMediaFileStreamEntity() == null || mediaFile.getMediaFileStreamEntity().isEmpty()) {
+                return null;
+            }
+            return mediaFile.getDirectoryEntity().getName();
+        });
+        if (directoryName == null) {
             throw new IOException("Media file not yet analyzed, no stream entries for: " + mediaFileId);
         }
-        String directoryName = mediaFile.getDirectoryEntity().getName();
         log.debug("Master playlist cache miss for {}, sending TRANSCODE_REQUESTED to directory queue {}", mediaFileId, directoryName);
 
         TranscodeRequestedData request = TranscodeRequestedData.builder()
@@ -141,18 +170,29 @@ public class HlsService {
      * Generates master.m3u8 and all stream playlists and writes them to cache.
      * Called by the {@code HandleTranscodeRequested} event handler.
      * If the media file is on a remote node, all generated playlists are uploaded to that node.
+     * <p>
+     * Deliberately NOT @Transactional: the keyframe ffprobe can scan a whole video over the
+     * mount for minutes, and a transaction spanning it pins a Hikari connection per busy
+     * listener thread. The entity (with its streams initialized) is loaded in a short
+     * transaction; everything after runs detached and only reads basic fields.
      */
-    @Transactional(readOnly = true)
     public void generateAllPlaylists(UUID mediaFileId, boolean direct, boolean transcode, SubtitleFormat subtitleFormat) throws IOException {
-        MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
-        String cacheFilename = String.format(Locale.ROOT, "master_d%d_t%d_s%s" + EXT_M3U8,
-                direct ? 1 : 0, transcode ? 1 : 0, subtitleFormat.name());
-        Path cacheFile = cacheDir(mediaFileId).resolve(cacheFilename);
+        Path cacheFile = cacheDir(mediaFileId).resolve(masterCacheFilename(direct, transcode, subtitleFormat));
 
+        // Duplicate TRANSCODE_REQUESTED events are common (poll-timeout re-sends,
+        // scan-time pre-generation); keep that path DB-free.
         if (Files.exists(cacheFile)) {
             log.debug("Playlists already cached for {}, skipping generation", mediaFileId);
             return;
         }
+
+        MediaFileEntity mediaFile = readOnlyTransaction.execute(status -> {
+            MediaFileEntity entity = mediaFileRepository.findById(mediaFileId).orElseThrow();
+            // Initialize the lazy streams collection while the session is open; the RabbitMQ
+            // listener thread has no OSIV, so a lazy load after this transaction would throw.
+            entity.getMediaFileStreamEntity().size();
+            return entity;
+        });
 
         Files.createDirectories(cacheFile.getParent());
         String masterContent = playlistBuilder.buildMasterPlaylist(mediaFile, direct, transcode, subtitleFormat);
@@ -163,6 +203,7 @@ public class HlsService {
         preGenerateStreamPlaylists(mediaFile, mediaFileId, direct, transcode, subtitleFormat);
         // Write master playlist last so that getMasterPlaylist's poll only fires after all stream playlists exist
         Files.writeString(cacheFile, masterContent);
+        writeAllMasterVariantsForAudioOnly(mediaFile, mediaFileId);
         log.debug("Generated all playlists for {}", mediaFileId);
 
         if (isRemote(mediaFile)) {
@@ -307,17 +348,27 @@ public class HlsService {
      * Returns (cached) stream playlist content.
      * Filename determines the type: stream_video_*, stream_audio_*, or stream_sub_*.
      */
-    @Transactional(readOnly = true)
     public String getStreamPlaylist(UUID mediaFileId, String streamFilename) throws IOException {
         Path cacheFile = cacheDir(mediaFileId).resolve(streamFilename);
         if (Files.exists(cacheFile)) {
             Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(System.currentTimeMillis()));
             return Files.readString(cacheFile);
         }
-        MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
-        String filePath = resolveInputPath(mediaFile);
-        List<Double> keyframes = transcodeService.getCachedKeyframes(filePath);
-        double totalDuration = transcodeService.getTotalDuration(filePath);
+        StreamPlaylistContext ctx = readOnlyTransaction.execute(status -> {
+            MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
+            return new StreamPlaylistContext(resolveInputPath(mediaFile), isAudioOnly(mediaFile),
+                    mediaFile.getDurationInMilliseconds());
+        });
+        seedProbeCachesForAudioOnly(ctx);
+        List<Double> keyframes = transcodeService.getCachedKeyframes(ctx.filePath());
+        double totalDuration = transcodeService.getTotalDuration(ctx.filePath());
+        if (keyframes.isEmpty() && ctx.audioOnly()) {
+            // Audio-only files are seeded with an empty keyframe list; mirror the synthetic
+            // 10s grid generateAllPlaylists uses (the audio pass falls back to
+            // -segment_time 10), or buildVodPlaylist throws. Video keeps throwing: its
+            // pass has no such fallback, so a synthetic playlist would not match.
+            keyframes = buildSyntheticKeyframes(totalDuration);
+        }
         Files.createDirectories(cacheFile.getParent());
         String content = playlistBuilder.buildStreamPlaylist(streamFilename, keyframes, totalDuration);
         Files.writeString(cacheFile, content);
@@ -330,7 +381,6 @@ public class HlsService {
      * On first request for a quality level, sends a {@code TRANSCODE_PASS_REQUESTED} event
      * to start the background FFmpeg pass, then polls until the segment appears.
      */
-    @Transactional(readOnly = true)
     public Path getVideoSegment(UUID mediaFileId, String segmentFilename) throws IOException {
         Path cacheFile = cacheDir(mediaFileId).resolve(segmentFilename);
 
@@ -351,24 +401,33 @@ public class HlsService {
      * Transcoded format: {@code seg_audio_{streamIdx}_{bitrate}_%05d.ts}           — produced by a background FFmpeg pass.
      * On first request for a transcoded quality, sends a {@code TRANSCODE_PASS_REQUESTED} event.
      */
-    @Transactional(readOnly = true)
     public Path getAudioSegment(UUID mediaFileId, String segmentFilename) throws IOException {
         String[] parts = segmentFilename.replace(".ts", "").split("_");
         Path cacheFile = cacheDir(mediaFileId).resolve(segmentFilename);
 
         if ("copy".equals(parts[parts.length - 1])) {
-            MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
-            String filePath = resolveInputPath(mediaFile);
-            return getCachedOrGenerateBinary(cacheFile, out -> {
-                double start = Double.parseDouble(parts[2]);
-                double duration = Double.parseDouble(parts[3]);
-                int audioIdx = Integer.parseInt(parts[4]);
+            if (Files.exists(cacheFile)) {
+                // Cache hits stay DB-free: repeat segment requests are the common case
+                // and must not compete for pool connections during playback.
+                Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(System.currentTimeMillis()));
+                return cacheFile;
+            }
+            int audioIdx = Integer.parseInt(parts[4]);
+            // Resolve everything from the DB up front: the generator below runs a synchronous
+            // FFmpeg invocation and must not hold entities or a connection while it does.
+            CopyAudioContext ctx = readOnlyTransaction.execute(status -> {
+                MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
                 String codecName = mediaFile.getMediaFileStreamEntity().stream()
                         .filter(s -> s.getStreamIndex() == audioIdx)
                         .map(MediaFileStreamEntity::getCodecName)
                         .findFirst()
                         .orElse("aac");
-                transcodeService.generateAudioSegment(filePath, out, start, duration, audioIdx, AudioQuality.COPY, codecName);
+                return new CopyAudioContext(resolveInputPath(mediaFile), codecName);
+            });
+            return getCachedOrGenerateBinary(cacheFile, out -> {
+                double start = Double.parseDouble(parts[2]);
+                double duration = Double.parseDouble(parts[3]);
+                transcodeService.generateAudioSegment(ctx.filePath(), out, start, duration, audioIdx, AudioQuality.COPY, ctx.codecName());
             });
         }
 
@@ -396,42 +455,49 @@ public class HlsService {
                 || transcodeService.hasFailedPass(passKey)) {
             return;
         }
-        MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
+        PassRequestContext ctx = readOnlyTransaction.execute(status -> {
+            MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
+            return new PassRequestContext(resolveInputPath(mediaFile), mediaFile.getDirectoryEntity().getName());
+        });
         messageSender.sendTranscodePassRequested(
                 TranscodePassRequestedData.builder()
                         .eventType(EventType.TRANSCODE_PASS_REQUESTED)
                         .mediaFileId(mediaFileId)
                         .passKey(passKey)
-                        .mediaFilePath(resolveInputPath(mediaFile))
+                        .mediaFilePath(ctx.inputPath())
                         .passCategory(passCategory)
                         .qualityLabel(qualityLabel)
                         .audioStreamIndex(audioStreamIndex)
                         .build(),
-                mediaFile.getDirectoryEntity().getName());
+                ctx.directoryName());
     }
 
     /**
      * Returns (cached) WebVTT subtitle segment content.
      * Filename format: {@code seg_sub_{subtitleStreamEntityId}_{%05d}.vtt}
      */
-    @Transactional(readOnly = true)
     public String getSubtitleSegment(UUID mediaFileId, String segmentFilename) throws IOException {
         // Parse: seg_sub_{uuid}_{%05d}.vtt
         String withoutExt = segmentFilename.replace(".vtt", "");
         int lastUnderscore = withoutExt.lastIndexOf('_');
         UUID subtitleId = UUID.fromString(withoutExt.substring("seg_sub_".length(), lastUnderscore));
 
-        MediaFileStreamEntity subtitleStream = mediaFileStreamRepository.findById(subtitleId).orElseThrow();
         Path cacheFile = cacheDir(mediaFileId).resolve(segmentFilename);
-
         if (Files.exists(cacheFile)) {
             Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(System.currentTimeMillis()));
             return Files.readString(cacheFile, StandardCharsets.UTF_8);
         }
         Files.createDirectories(cacheFile.getParent());
 
-        MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
-        String mediaFilePath = resolveInputPath(mediaFile);
+        // The subtitle stream entity is fully loaded here; generation below only reads its
+        // basic fields (id, codecType, path, streamIndex), never lazy associations.
+        SubtitleContext ctx = readOnlyTransaction.execute(status -> {
+            MediaFileStreamEntity subtitleStream = mediaFileStreamRepository.findById(subtitleId).orElseThrow();
+            MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
+            return new SubtitleContext(subtitleStream, resolveInputPath(mediaFile));
+        });
+        MediaFileStreamEntity subtitleStream = ctx.subtitleStream();
+        String mediaFilePath = ctx.mediaFilePath();
         String generationKey = mediaFileId + "_sub_" + subtitleId;
         Object lock = subtitleLocks.computeIfAbsent(generationKey, k -> new Object());
         synchronized (lock) {
@@ -449,19 +515,22 @@ public class HlsService {
      * For external subtitles the original file is returned directly.
      * For embedded subtitles the stream is extracted to SRT and cached.
      */
-    @Transactional(readOnly = true)
     public Path getSrtSubtitle(UUID mediaFileId, String filename) throws IOException {
         UUID subtitleId = UUID.fromString(filename.replace("sub_", "").replace(".srt", ""));
-        MediaFileStreamEntity stream = mediaFileStreamRepository.findById(subtitleId).orElseThrow();
+        SubtitleContext ctx = readOnlyTransaction.execute(status -> {
+            MediaFileStreamEntity stream = mediaFileStreamRepository.findById(subtitleId).orElseThrow();
+            String mediaFilePath = stream.getCodecType() == StreamCodecType.EXTERNAL_SUBTITLE ? null
+                    : resolveInputPath(mediaFileRepository.findById(mediaFileId).orElseThrow());
+            return new SubtitleContext(stream, mediaFilePath);
+        });
+        MediaFileStreamEntity stream = ctx.subtitleStream();
 
         String sourceSrtPath;
         if (stream.getCodecType() == StreamCodecType.EXTERNAL_SUBTITLE) {
             sourceSrtPath = stream.getPath();
         } else {
-            MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
-            String mediaFilePath = resolveInputPath(mediaFile);
             Files.createDirectories(cacheDir(mediaFileId));
-            sourceSrtPath = subtitleService.extractEmbeddedSubtitleToSrt(stream, mediaFilePath, cacheDir(mediaFileId));
+            sourceSrtPath = subtitleService.extractEmbeddedSubtitleToSrt(stream, ctx.mediaFilePath(), cacheDir(mediaFileId));
         }
 
         Path offsetPath = cacheDir(mediaFileId).resolve("sub_" + subtitleId + "_offset.srt");
@@ -475,6 +544,9 @@ public class HlsService {
                                              boolean direct, boolean transcode,
                                              SubtitleFormat subtitleFormat) throws IOException {
         String filePath = resolveInputPath(mediaFile);
+        boolean audioOnly = isAudioOnly(mediaFile);
+        seedProbeCachesForAudioOnly(new StreamPlaylistContext(filePath, audioOnly,
+                mediaFile.getDurationInMilliseconds()));
         List<Double> rawKeyframes = transcodeService.getCachedKeyframes(filePath);
         double totalDuration = transcodeService.getTotalDuration(filePath);
 
@@ -487,13 +559,18 @@ public class HlsService {
                         || s.getCodecType() == StreamCodecType.SUBTITLE)
                 .toList();
 
-        boolean[] includeVideo = {direct, transcode, transcode};
+        // Audio-only files get every stream playlist regardless of the requested stream
+        // settings: they are a few hundred bytes each, and it makes every master variant
+        // (see writeAllMasterVariantsForAudioOnly) a complete cache hit.
+        boolean[] includeVideo = audioOnly
+                ? new boolean[]{true, true, true}
+                : new boolean[]{direct, transcode, transcode};
         VideoQuality[] videoQualities = VideoQuality.values();
         AudioQuality[] audioQualities = AudioQuality.values();
 
         boolean hasVideoStream = streams.stream().anyMatch(s -> s.getCodecType() == StreamCodecType.VIDEO);
         List<Double> effectiveKeyframes = rawKeyframes.isEmpty() ? buildSyntheticKeyframes(totalDuration) : rawKeyframes;
-        if (rawKeyframes.isEmpty()) {
+        if (rawKeyframes.isEmpty() && !audioOnly) {
             log.warn("No keyframes found for {}, falling back to synthetic keyframes", filePath);
         }
 
@@ -548,6 +625,58 @@ public class HlsService {
                 writeStreamPlaylistIfAbsent(mediaFileId, filename, keyframes, totalDuration,
                         (start, dur, idx) -> String.format(Locale.ROOT, "seg_sub_%s_%05d.vtt", ssId, idx));
             }
+        }
+    }
+
+    /**
+     * For audio-only files, also writes the master playlists for every other stream-settings
+     * combination the client can request. All stream playlists exist for audio-only files
+     * (see preGenerateStreamPlaylists), so each variant is a handful of string writes and any
+     * later stream-settings choice is an instant cache hit instead of a queue round-trip.
+     */
+    private void writeAllMasterVariantsForAudioOnly(MediaFileEntity mediaFile, UUID mediaFileId) throws IOException {
+        if (!isAudioOnly(mediaFile)) {
+            return;
+        }
+        boolean[][] directTranscodeCombos = {{true, false}, {false, true}, {true, true}};
+        for (boolean[] combo : directTranscodeCombos) {
+            for (SubtitleFormat format : SubtitleFormat.values()) {
+                Path variantFile = cacheDir(mediaFileId).resolve(masterCacheFilename(combo[0], combo[1], format));
+                if (Files.exists(variantFile)) {
+                    continue;
+                }
+                String content = playlistBuilder.buildMasterPlaylist(mediaFile, combo[0], combo[1], format);
+                if (content.contains("#EXT-X-MEDIA") || content.contains("#EXT-X-STREAM-INF")) {
+                    Files.writeString(variantFile, content);
+                }
+            }
+        }
+    }
+
+    /**
+     * A file counts as audio-only when it has been analyzed (stream rows exist) and none of
+     * the streams is video. An un-analyzed file (no stream rows) is NOT audio-only: its
+     * probes must still run.
+     */
+    private static boolean isAudioOnly(MediaFileEntity mediaFile) {
+        List<MediaFileStreamEntity> streams = mediaFile.getMediaFileStreamEntity();
+        return streams != null && !streams.isEmpty()
+                && streams.stream().noneMatch(s -> s.getCodecType() == StreamCodecType.VIDEO);
+    }
+
+    /**
+     * Audio-only files need no ffprobe at all: the keyframe probe scans the whole file over
+     * the mount only to find no video packets, and the duration is already in the database
+     * from analysis. Seeding both caches here also keeps the later FFmpeg passes
+     * (startAudioPass reads the same caches) probe-free.
+     */
+    private void seedProbeCachesForAudioOnly(StreamPlaylistContext ctx) {
+        if (!ctx.audioOnly()) {
+            return;
+        }
+        transcodeService.seedAudioOnlyKeyframes(ctx.filePath());
+        if (ctx.durationInMilliseconds() > 0) {
+            transcodeService.seedDuration(ctx.filePath(), ctx.durationInMilliseconds() / 1000.0);
         }
     }
 
@@ -686,6 +815,13 @@ public class HlsService {
         return Paths.get(tmpDir, mediaFileId.toString());
     }
 
+    /** Single source of the master-playlist cache key: getMasterPlaylist polls for the
+     * exact filename generateAllPlaylists writes, so the format must never drift. */
+    private static String masterCacheFilename(boolean direct, boolean transcode, SubtitleFormat subtitleFormat) {
+        return String.format(Locale.ROOT, "master_d%d_t%d_s%s" + EXT_M3U8,
+                direct ? 1 : 0, transcode ? 1 : 0, subtitleFormat.name());
+    }
+
     private Path getCachedOrGenerateBinary(Path cacheFile, Consumer<Path> generator) throws IOException {
         if (Files.exists(cacheFile)) {
             Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(System.currentTimeMillis()));
@@ -694,5 +830,19 @@ public class HlsService {
         Files.createDirectories(cacheFile.getParent());
         generator.accept(cacheFile);
         return cacheFile;
+    }
+
+    // ========== Plain-value carriers for the short read-only transactions ==========
+
+    private record StreamPlaylistContext(String filePath, boolean audioOnly, long durationInMilliseconds) {
+    }
+
+    private record CopyAudioContext(String filePath, String codecName) {
+    }
+
+    private record PassRequestContext(String inputPath, String directoryName) {
+    }
+
+    private record SubtitleContext(MediaFileStreamEntity subtitleStream, String mediaFilePath) {
     }
 }
