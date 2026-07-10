@@ -1,0 +1,11 @@
+[
+  {
+    "name": "org.springframework.amqp.core.Queue",
+    "methods": [
+      {
+        "name": "getName",
+        "parameterTypes": []
+      }
+    ]
+  }
+]

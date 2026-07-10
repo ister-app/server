@@ -6,6 +6,7 @@ import app.ister.core.eventdata.PlaybackStatusData;
 import app.ister.core.eventdata.QueueStatsStatusData;
 import org.springframework.amqp.rabbit.annotation.RabbitHandler;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.aot.hint.annotation.RegisterReflectionForBinding;
 import org.springframework.stereotype.Component;
 
 /**
@@ -13,8 +14,13 @@ import org.springframework.stereotype.Component;
  * in-memory registries + websocket broadcaster. Every node — including the publisher
  * itself — runs this, so the cluster state converges on all nodes. Handlers stay
  * trivial: no database access (RabbitMQ listener threads have no Hibernate session).
+ * The queue name is resolved via SpEL; Queue.getName() is registered for native
+ * reflection in core's reflect-config.json.
  */
 @Component
+// Jackson binding of the @RabbitHandler payloads in the GraalVM native image.
+@RegisterReflectionForBinding({NodeActivityStatusData.class, QueueStatsStatusData.class,
+        EventFailureStatusData.class, PlaybackStatusData.class})
 @RabbitListener(queues = "#{statusQueue.name}")
 public class StatusEventListener {
 
