@@ -22,6 +22,7 @@ import app.ister.core.service.PlayQueuePrefetchService;
 import app.ister.core.service.PlayQueueService;
 import app.ister.core.status.PlaybackSessionRegistry;
 import app.ister.core.status.PlaybackStatusService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.TransactionException;
@@ -40,6 +41,7 @@ import java.util.UUID;
 
 @Controller
 @Slf4j
+@RequiredArgsConstructor
 public class PlayQueueController {
     private final PlayQueueService playQueueService;
 
@@ -58,18 +60,6 @@ public class PlayQueueController {
     private final PlaybackStatusService playbackStatusService;
 
     private final PlaybackSessionRegistry playbackSessionRegistry;
-
-    public PlayQueueController(PlayQueueService playQueueService, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, MediaFileRepository mediaFileRepository, ImageRepository imageRepository, PlayQueuePrefetchService playQueuePrefetchService, PlaybackStatusService playbackStatusService, PlaybackSessionRegistry playbackSessionRegistry) {
-        this.playQueueService = playQueueService;
-        this.episodeRepository = episodeRepository;
-        this.movieRepository = movieRepository;
-        this.trackRepository = trackRepository;
-        this.mediaFileRepository = mediaFileRepository;
-        this.imageRepository = imageRepository;
-        this.playQueuePrefetchService = playQueuePrefetchService;
-        this.playbackStatusService = playbackStatusService;
-        this.playbackSessionRegistry = playbackSessionRegistry;
-    }
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping

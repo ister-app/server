@@ -75,7 +75,7 @@ public class ServerStatusController {
             case NodeActivityStatusData data -> ServerActivityEvent.from(data);
             case QueueStatsStatusData data -> ServerActivityEvent.from(data);
             case EventFailureStatusData data -> ServerActivityEvent.from(data);
-            case PlaybackStatusData ignored -> null; // playback flows through nowPlaying
+            case PlaybackStatusData _ -> null; // playback flows through nowPlaying
             default -> null;
         };
     }

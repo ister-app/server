@@ -163,17 +163,24 @@ public class MusicBrainzService {
         if (name == null) {
             return "";
         }
-        String normalized = name
+        String normalized = stripTrailingSeparators(name
                 .replaceAll("[(\\[][^)\\]]*[)\\]]", " ")
                 .replaceAll("(?i)\\b(flac|deluxe(\\s+edition)?|special\\s+edition|remastered|remaster|bonus\\s+tracks?)\\b", " ")
-                // Possessive [-\s]++ is equivalent to [-\s]+ here — the class can never match a
-                // character of the literal "flac" that follows, so giving characters back could
-                // never produce a match — but it removes the super-linear backtracking on long
-                // whitespace/dash runs.
-                .replaceAll("(?i)[-\\s]++flac\\b", " ")
                 .replaceAll("\\s{2,}", " ")
-                .strip();
+                .strip());
         return normalized.isEmpty() ? name.strip() : normalized;
+    }
+
+    /**
+     * Drops the separator run a stripped suffix leaves behind ("Album - FLAC" → "Album -" → "Album").
+     * A char loop instead of a "[-\s]+$" regex, whose scan is super-linear on long separator runs.
+     */
+    private static String stripTrailingSeparators(String value) {
+        int end = value.length();
+        while (end > 0 && (value.charAt(end - 1) == '-' || Character.isWhitespace(value.charAt(end - 1)))) {
+            end--;
+        }
+        return value.substring(0, end);
     }
 
     public Optional<ArtistInfo> getArtistInfo(String artistName, List<String> languageTags) {

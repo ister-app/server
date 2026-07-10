@@ -1,6 +1,7 @@
 package app.ister.core.status;
 
 import app.ister.core.eventdata.PlaybackStatusData;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -26,6 +27,7 @@ public class PlaybackSessionRegistry {
     private final Map<java.util.UUID, Entry> sessions = new ConcurrentHashMap<>();
     private final Clock clock;
 
+    @Autowired
     public PlaybackSessionRegistry() {
         this(Clock.systemUTC());
     }

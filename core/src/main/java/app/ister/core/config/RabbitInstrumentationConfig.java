@@ -18,8 +18,12 @@ import java.util.Arrays;
  * in-flight work. Done as a BeanPostProcessor on the factory because the container's
  * own getAdviceChain() is protected.
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class RabbitInstrumentationConfig {
+
+    private RabbitInstrumentationConfig() {
+        // only a static @Bean factory method; never instantiated for behavior
+    }
 
     @Bean
     public static BeanPostProcessor processingActivityAdviceApplier(ObjectProvider<ProcessingActivityAdvice> advice) {

@@ -8,6 +8,7 @@ import app.ister.core.eventdata.ShowFoundData;
 import app.ister.core.service.MessageSender;
 import app.ister.core.status.PlaybackSessionRegistry;
 import app.ister.core.status.RecentFailuresBuffer;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -19,6 +20,7 @@ import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.Duration;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -125,17 +127,8 @@ class IsterServerIntegrationTest {
     }
 
     private static void awaitTrue(java.util.function.BooleanSupplier condition, String message) {
-        long deadline = System.currentTimeMillis() + 30_000;
-        while (!condition.getAsBoolean()) {
-            if (System.currentTimeMillis() > deadline) {
-                throw new AssertionError(message);
-            }
-            try {
-                Thread.sleep(200);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new AssertionError(message, e);
-            }
-        }
+        Awaitility.await()
+                .atMost(Duration.ofSeconds(30))
+                .untilAsserted(() -> assertTrue(condition.getAsBoolean(), message));
     }
 }

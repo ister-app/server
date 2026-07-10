@@ -11,6 +11,7 @@ import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.service.MessageSender;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -50,6 +51,8 @@ import java.util.stream.Stream;
 public class HlsService {
 
     private static final String EXT_M3U8 = ".m3u8";
+    private static final String EXT_X_MEDIA = "#EXT-X-MEDIA";
+    private static final String EXT_X_STREAM_INF = "#EXT-X-STREAM-INF";
     private static final String PASS_CATEGORY_VIDEO = "video";
     private static final String PASS_CATEGORY_AUDIO = "audio";
 
@@ -127,7 +130,7 @@ public class HlsService {
 
         if (Files.exists(cacheFile)) {
             String cached = Files.readString(cacheFile);
-            if (cached.contains("#EXT-X-MEDIA") || cached.contains("#EXT-X-STREAM-INF")) {
+            if (cached.contains(EXT_X_MEDIA) || cached.contains(EXT_X_STREAM_INF)) {
                 Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(System.currentTimeMillis()));
                 return cached;
             }
@@ -192,7 +195,7 @@ public class HlsService {
             // open; the RabbitMQ listener thread has no OSIV. Bytecode enhancement makes even
             // EAGER-annotated to-ones throw outside the session, so the directory→node chain
             // (isRemote/resolveInputPath) needs explicit touching just like the streams.
-            entity.getMediaFileStreamEntity().size();
+            Hibernate.initialize(entity.getMediaFileStreamEntity());
             if (entity.getDirectoryEntity() != null) {
                 entity.getDirectoryEntity().getNodeEntity().getUrl();
             }
@@ -201,7 +204,7 @@ public class HlsService {
 
         Files.createDirectories(cacheFile.getParent());
         String masterContent = playlistBuilder.buildMasterPlaylist(mediaFile, direct, transcode, subtitleFormat);
-        if (!masterContent.contains("#EXT-X-MEDIA") && !masterContent.contains("#EXT-X-STREAM-INF")) {
+        if (!masterContent.contains(EXT_X_MEDIA) && !masterContent.contains(EXT_X_STREAM_INF)) {
             log.warn("Master playlist for {} has no stream entries (streams not yet analyzed?), skipping cache write", mediaFileId);
             return;
         }
@@ -655,7 +658,7 @@ public class HlsService {
                     continue;
                 }
                 String content = playlistBuilder.buildMasterPlaylist(mediaFile, combo[0], combo[1], format);
-                if (content.contains("#EXT-X-MEDIA") || content.contains("#EXT-X-STREAM-INF")) {
+                if (content.contains(EXT_X_MEDIA) || content.contains(EXT_X_STREAM_INF)) {
                     Files.writeString(variantFile, content);
                 }
             }
