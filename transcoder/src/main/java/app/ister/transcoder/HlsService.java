@@ -188,9 +188,14 @@ public class HlsService {
 
         MediaFileEntity mediaFile = readOnlyTransaction.execute(status -> {
             MediaFileEntity entity = mediaFileRepository.findById(mediaFileId).orElseThrow();
-            // Initialize the lazy streams collection while the session is open; the RabbitMQ
-            // listener thread has no OSIV, so a lazy load after this transaction would throw.
+            // Initialize every association the detached path navigates while the session is
+            // open; the RabbitMQ listener thread has no OSIV. Bytecode enhancement makes even
+            // EAGER-annotated to-ones throw outside the session, so the directory→node chain
+            // (isRemote/resolveInputPath) needs explicit touching just like the streams.
             entity.getMediaFileStreamEntity().size();
+            if (entity.getDirectoryEntity() != null) {
+                entity.getDirectoryEntity().getNodeEntity().getUrl();
+            }
             return entity;
         });
 
