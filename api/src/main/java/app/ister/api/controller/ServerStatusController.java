@@ -17,7 +17,6 @@ import org.springframework.graphql.data.method.annotation.SubscriptionMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.util.List;
 
@@ -55,9 +54,9 @@ public class ServerStatusController {
     @PreAuthorize("hasRole('user')")
     @SubscriptionMapping
     public Flux<List<PlaybackSession>> nowPlaying() {
-        return Flux.concat(
-                        Mono.fromSupplier(playbackSessionRegistry::snapshot),
-                        broadcaster.nowPlayingFlux())
+        // The broadcaster replays the latest list, so the current state arrives
+        // immediately on subscribe; every registry change re-emits the full list.
+        return broadcaster.nowPlayingFlux()
                 .map(sessions -> sessions.stream().map(PlaybackSession::from).toList());
     }
 

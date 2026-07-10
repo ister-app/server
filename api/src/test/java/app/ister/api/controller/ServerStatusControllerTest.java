@@ -75,9 +75,12 @@ class ServerStatusControllerTest {
     }
 
     @Test
-    void nowPlayingStartsWithCurrentSnapshotThenUpdates() {
+    void nowPlayingStartsWithLatestStateThenUpdates() {
+        // In production every registry update is followed by an emit (StatusEventListener),
+        // so the replayed latest value always equals the current registry state.
         UUID first = UUID.randomUUID();
         playbackSessionRegistry.update(playback(first));
+        broadcaster.emitNowPlaying(playbackSessionRegistry.snapshot());
 
         List<List<PlaybackSession>> received = new CopyOnWriteArrayList<>();
         controller.nowPlaying().subscribe(received::add);
@@ -90,6 +93,28 @@ class ServerStatusControllerTest {
         assertEquals(1, received.get(0).size());
         assertEquals(first, received.get(0).getFirst().playQueueId());
         assertEquals(2, received.get(1).size());
+    }
+
+    @Test
+    void nowPlayingEmitsEmptyListToSubscriberOnFreshNode() {
+        List<List<PlaybackSession>> received = new CopyOnWriteArrayList<>();
+        controller.nowPlaying().subscribe(received::add);
+
+        assertEquals(1, received.size());
+        assertTrue(received.getFirst().isEmpty());
+    }
+
+    @Test
+    void serverActivityReplaysLatestEventToLateSubscriber() {
+        // The websocket transport may still be finishing the subscribe when an event is
+        // emitted; replay-latest guarantees the newest event is not lost.
+        broadcaster.emitActivity(new NodeActivityStatusData("node-a", Instant.now(), List.of(), 1, 0));
+
+        List<ServerActivityEvent> received = new CopyOnWriteArrayList<>();
+        controller.serverActivity().subscribe(received::add);
+
+        assertEquals(1, received.size());
+        assertEquals(ServerActivityEvent.ServerActivityEventType.NODE_ACTIVITY, received.getFirst().type());
     }
 
     @Test
