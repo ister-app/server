@@ -3,16 +3,19 @@ package app.ister.api.controller;
 import app.ister.api.dto.CreatePlayQueueInput;
 import app.ister.api.dto.StreamSettingsInput;
 import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PlayQueueEntity;
 import app.ister.core.entity.PlayQueueItemEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.MediaType;
+import app.ister.core.enums.PlayState;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.PlayQueuePrefetchService;
 import app.ister.core.service.PlayQueueService;
+import app.ister.core.status.PlaybackStatusService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
@@ -23,6 +26,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,12 +43,15 @@ public class PlayQueueController {
 
     private final PlayQueuePrefetchService playQueuePrefetchService;
 
-    public PlayQueueController(PlayQueueService playQueueService, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, PlayQueuePrefetchService playQueuePrefetchService) {
+    private final PlaybackStatusService playbackStatusService;
+
+    public PlayQueueController(PlayQueueService playQueueService, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, PlayQueuePrefetchService playQueuePrefetchService, PlaybackStatusService playbackStatusService) {
         this.playQueueService = playQueueService;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
         this.trackRepository = trackRepository;
         this.playQueuePrefetchService = playQueuePrefetchService;
+        this.playbackStatusService = playbackStatusService;
     }
 
     @PreAuthorize("hasRole('user')")
@@ -63,12 +70,62 @@ public class PlayQueueController {
     @PreAuthorize("hasRole('user')")
     @MutationMapping
     public Optional<PlayQueueEntity> updatePlayQueue(@Argument UUID id, @Argument long progressInMilliseconds, @Argument UUID playQueueItemId,
-                                                     @Argument StreamSettingsInput streamSettings, Authentication authentication) {
+                                                     @Argument StreamSettingsInput streamSettings, @Argument PlayState playState,
+                                                     Authentication authentication) {
         PlayQueueService.StreamSettings settings = streamSettings == null ? null
                 : new PlayQueueService.StreamSettings(streamSettings.direct(), streamSettings.transcode(), streamSettings.subtitleFormat());
         Optional<PlayQueueEntity> playQueue = playQueueService.updatePlayQueue(id, progressInMilliseconds, playQueueItemId, settings, authentication);
-        playQueue.ifPresent(queue -> playQueuePrefetchService.maybePrefetchNext(queue, playQueueItemId, progressInMilliseconds));
+        playQueue.ifPresent(queue -> {
+            playQueuePrefetchService.maybePrefetchNext(queue, playQueueItemId, progressInMilliseconds);
+            publishPlaybackHeartbeat(queue, playQueueItemId, progressInMilliseconds, playState);
+        });
         return playQueue;
+    }
+
+    /**
+     * Feeds the cluster-wide now-playing view. Runs on the request thread (open
+     * Hibernate session), so the lazy user/media associations may be navigated here;
+     * only plain values go into the heartbeat message.
+     */
+    private void publishPlaybackHeartbeat(PlayQueueEntity queue, UUID playQueueItemId, long progressInMilliseconds, PlayState playState) {
+        Optional<PlayQueueItemEntity> item = Optional.ofNullable(queue.getItems()).orElse(List.of()).stream()
+                .filter(candidate -> candidate.getId().equals(playQueueItemId))
+                .findFirst();
+        playbackStatusService.publishHeartbeat(
+                queue.getId(),
+                playQueueItemId,
+                queue.getUserEntity().getId(),
+                queue.getUserEntity().getName(),
+                item.map(PlayQueueItemEntity::getType).orElse(null),
+                item.map(PlayQueueController::mediaIdOf).orElse(null),
+                item.map(this::titleOf).orElse(null),
+                progressInMilliseconds,
+                playState);
+    }
+
+    private static UUID mediaIdOf(PlayQueueItemEntity item) {
+        return switch (item.getType()) {
+            case MOVIE -> item.getMovieEntityId();
+            case EPISODE -> item.getEpisodeEntityId();
+            case TRACK -> item.getTrackEntityId();
+        };
+    }
+
+    private String titleOf(PlayQueueItemEntity item) {
+        return switch (item.getType()) {
+            case MOVIE -> item.getMovieEntity() == null ? null : item.getMovieEntity().getName();
+            case EPISODE -> item.getEpisodeEntity() == null ? null
+                    : "%s S%02dE%02d".formatted(item.getEpisodeEntity().getShowEntity().getName(),
+                            item.getEpisodeEntity().getSeasonEntity().getNumber(), item.getEpisodeEntity().getNumber());
+            case TRACK -> item.getTrackEntityId() == null ? null
+                    : trackRepository.findById(item.getTrackEntityId())
+                            .map(track -> track.getMetadataEntities().stream()
+                                    .map(MetadataEntity::getTitle)
+                                    .filter(Objects::nonNull)
+                                    .findFirst()
+                                    .orElse(track.getAlbumEntity().getName() + " – track " + track.getNumber()))
+                            .orElse(null);
+        };
     }
 
     @PreAuthorize("hasRole('user')")

@@ -1,5 +1,7 @@
 type Query {
     getServerInfo: ServerInfo
+    "Initial state for the serverActivity/nowPlaying subscriptions: last known cluster-wide status."
+    serverActivitySnapshot: ServerActivitySnapshot!
     recentlyWatched: [RecentlyWatched!]
     episodeById(id: ID): Episode
     seasonById(id: ID): Season
@@ -23,8 +25,12 @@ type Mutation {
     scanLibrary: Boolean!
     analyzeLibrary: Boolean!
     createPlayQueue(input: CreatePlayQueueInput!): PlayQueue!
-    "streamSettings: what the client is currently playing with; enables prefetching the next queue item in the same format."
-    updatePlayQueue(id: ID!, progressInMilliseconds: Int!, playQueueItemId: ID!, streamSettings: StreamSettingsInput): PlayQueue
+    """
+    streamSettings: what the client is currently playing with; enables prefetching the next queue item in the same format.
+    playState: whether the client is playing or paused (defaults to PLAYING). This mutation doubles as the playback
+    heartbeat: keep calling it every few seconds — also while paused — or the session counts as stopped after 60s.
+    """
+    updatePlayQueue(id: ID!, progressInMilliseconds: Int!, playQueueItemId: ID!, streamSettings: StreamSettingsInput, playState: PlayState): PlayQueue
     movePlayQueueItem(playQueueId: ID!, playQueueItemId: ID!, afterPlayQueueItemId: ID): PlayQueue!
     removePlayQueueItem(playQueueId: ID!, playQueueItemId: ID!): PlayQueue!
     addPlayQueueItem(playQueueId: ID!, mediaType: MediaType!, mediaId: ID!, afterPlayQueueItemId: ID): PlayQueue!
@@ -37,6 +43,83 @@ type Mutation {
     analyzeDataForAlbum(albumId: ID!): Boolean!
     analyzeDataForTrack(trackId: ID!): Boolean!
     reindexSearch: Boolean!
+}
+
+type Subscription {
+    "Live server activity from all nodes: processing snapshots, queue depths and failures."
+    serverActivity: ServerActivityEvent!
+    "The full list of active playback sessions, re-emitted on every change."
+    nowPlaying: [PlaybackSession!]!
+}
+
+enum PlayState {
+    PLAYING
+    PAUSED
+}
+
+enum ServerActivityEventType {
+    NODE_ACTIVITY
+    QUEUE_STATS
+    FAILURE
+}
+
+"One status update from one node; exactly one of processing/queueStats/failure is set, matching `type`."
+type ServerActivityEvent {
+    type: ServerActivityEventType!
+    nodeName: String!
+    timestamp: String!
+    "What the node is processing right now (NODE_ACTIVITY)."
+    processing: [ProcessingItem!]
+    "Messages handled by the node since startup (NODE_ACTIVITY)."
+    processedCount: Int
+    "Messages that failed on the node since startup (NODE_ACTIVITY)."
+    failedCount: Int
+    queueStats: [QueueStat!]
+    failure: EventFailure
+}
+
+type ProcessingItem {
+    queue: String!
+    eventType: String!
+    startedAt: String!
+}
+
+type QueueStat {
+    queue: String!
+    depth: Int!
+    consumers: Int!
+}
+
+type EventFailure {
+    nodeName: String!
+    queue: String!
+    eventType: String
+    errorMessage: String
+    occurredAt: String!
+}
+
+type PlaybackSession {
+    playQueueId: ID!
+    playQueueItemId: ID
+    userId: ID!
+    userName: String
+    mediaType: MediaType
+    mediaId: ID
+    title: String
+    progressInMilliseconds: Int!
+    playState: PlayState!
+    "The node the client sends its updates to."
+    nodeName: String!
+    updatedAt: String!
+}
+
+type ServerActivitySnapshot {
+    "Last activity snapshot per node."
+    nodes: [ServerActivityEvent!]!
+    queueStats: [QueueStat!]!
+    "Recently dead-lettered events (newest first, max 100, in-memory)."
+    recentFailures: [EventFailure!]!
+    nowPlaying: [PlaybackSession!]!
 }
 
 enum SortingEnum {

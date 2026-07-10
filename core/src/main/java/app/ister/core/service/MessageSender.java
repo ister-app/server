@@ -1,5 +1,6 @@
 package app.ister.core.service;
 
+import app.ister.core.config.StatusExchangeConfig;
 import app.ister.core.eventdata.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -26,6 +27,11 @@ public class MessageSender {
     private void send(String queue, MessageData data) {
         log.debug("Sending message for queue: {} and data: {}", queue, data);
         rabbitTemplate.convertAndSend(queue, data);
+    }
+
+    /** Broadcasts a status message (node activity, queue stats, failure, playback) to all nodes. */
+    public void sendStatus(Object statusData) {
+        rabbitTemplate.convertAndSend(StatusExchangeConfig.STATUS_EXCHANGE, "", statusData);
     }
 
     // disk module

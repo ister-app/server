@@ -1,5 +1,7 @@
 package app.ister.core.config;
 
+import app.ister.core.eventdata.EventFailureStatusData;
+import app.ister.core.service.MessageSender;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
@@ -8,8 +10,11 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.retry.MessageRecoverer;
 import org.springframework.amqp.rabbit.retry.RepublishMessageRecoverer;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.time.Instant;
 
 /**
  * Failed event handling: listener retry is configured in core.properties
@@ -30,7 +35,9 @@ public class RabbitReliabilityConfig {
     }
 
     @Bean
-    public MessageRecoverer messageRecoverer(RabbitTemplate rabbitTemplate, ObjectProvider<MeterRegistry> meterRegistry) {
+    public MessageRecoverer messageRecoverer(RabbitTemplate rabbitTemplate, ObjectProvider<MeterRegistry> meterRegistry,
+                                             ObjectProvider<MessageSender> messageSender,
+                                             @Value("${app.ister.server.name}") String nodeName) {
         RepublishMessageRecoverer republish = new RepublishMessageRecoverer(rabbitTemplate, "", DEAD_LETTER_QUEUE);
         return (message, cause) -> {
             String queue = String.valueOf(message.getMessageProperties().getConsumerQueue());
@@ -44,7 +51,27 @@ public class RabbitReliabilityConfig {
                     .tag("queue", queue)
                     .register(registry)
                     .increment());
+            broadcastFailure(messageSender, nodeName, message, queue, cause);
             republish.recover(message, cause);
         };
+    }
+
+    /** Live visibility on the status exchange; must never prevent dead-lettering. */
+    private static void broadcastFailure(ObjectProvider<MessageSender> messageSender, String nodeName,
+                                         org.springframework.amqp.core.Message message, String queue, Throwable cause) {
+        try {
+            Object typeId = message.getMessageProperties().getHeader("__TypeId__");
+            // The listener wraps the handler exception in a ListenerExecutionFailedException.
+            Throwable rootCause = cause.getCause() != null ? cause.getCause() : cause;
+            messageSender.ifAvailable(sender -> sender.sendStatus(EventFailureStatusData.builder()
+                    .nodeName(nodeName)
+                    .timestamp(Instant.now())
+                    .queue(queue)
+                    .eventType(typeId == null ? "unknown" : typeId.toString().substring(typeId.toString().lastIndexOf('.') + 1))
+                    .errorMessage(rootCause.getMessage())
+                    .build()));
+        } catch (RuntimeException e) {
+            log.warn("Could not broadcast failure status for queue {}", queue, e);
+        }
     }
 }

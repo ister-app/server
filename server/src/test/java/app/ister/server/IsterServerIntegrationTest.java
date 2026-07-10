@@ -2,8 +2,12 @@ package app.ister.server;
 
 import app.ister.core.config.RabbitReliabilityConfig;
 import app.ister.core.enums.EventType;
+import app.ister.core.enums.PlayState;
+import app.ister.core.eventdata.PlaybackStatusData;
 import app.ister.core.eventdata.ShowFoundData;
 import app.ister.core.service.MessageSender;
+import app.ister.core.status.PlaybackSessionRegistry;
+import app.ister.core.status.RecentFailuresBuffer;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -60,6 +64,12 @@ class IsterServerIntegrationTest {
     @Autowired
     private RabbitTemplate rabbitTemplate;
 
+    @Autowired
+    private RecentFailuresBuffer recentFailuresBuffer;
+
+    @Autowired
+    private PlaybackSessionRegistry playbackSessionRegistry;
+
     @Test
     void contextLoadsWithRealDatabaseAndBroker() {
         // Full context: Flyway migrations applied, JPA mappings validated
@@ -87,5 +97,45 @@ class IsterServerIntegrationTest {
                 "original queue should be preserved for shoveling back");
         Object exceptionMessage = deadLetter.getMessageProperties().getHeader("x-exception-message");
         assertNotNull(exceptionMessage, "exception details should be preserved in the headers");
+
+        // The failure must also be broadcast on the status fan-out exchange and land in
+        // the in-memory recent-failures buffer that feeds the live activity view.
+        awaitTrue(() -> recentFailuresBuffer.snapshot().stream()
+                        .anyMatch(failure -> "app.ister.server.ShowFound".equals(failure.getQueue())),
+                "failure should be visible in the recent-failures buffer via the status exchange");
+    }
+
+    @Test
+    void playbackHeartbeatTravelsOverStatusExchangeIntoSessionRegistry() {
+        UUID playQueueId = UUID.randomUUID();
+        messageSender.sendStatus(PlaybackStatusData.builder()
+                .playQueueId(playQueueId)
+                .userId(UUID.randomUUID())
+                .userName("integration-user")
+                .progressInMilliseconds(1234)
+                .playState(PlayState.PAUSED)
+                .nodeName("some-other-node")
+                .timestamp(java.time.Instant.now())
+                .build());
+
+        awaitTrue(() -> playbackSessionRegistry.snapshot().stream()
+                        .anyMatch(session -> playQueueId.equals(session.getPlayQueueId())
+                                && session.getPlayState() == PlayState.PAUSED),
+                "heartbeat should arrive in the session registry via the status exchange");
+    }
+
+    private static void awaitTrue(java.util.function.BooleanSupplier condition, String message) {
+        long deadline = System.currentTimeMillis() + 30_000;
+        while (!condition.getAsBoolean()) {
+            if (System.currentTimeMillis() > deadline) {
+                throw new AssertionError(message);
+            }
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError(message, e);
+            }
+        }
     }
 }

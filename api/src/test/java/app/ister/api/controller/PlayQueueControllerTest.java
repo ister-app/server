@@ -5,14 +5,17 @@ import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PlayQueueEntity;
 import app.ister.core.entity.PlayQueueItemEntity;
+import app.ister.core.entity.UserEntity;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayQueueSourceType;
 import app.ister.api.dto.StreamSettingsInput;
+import app.ister.core.enums.PlayState;
 import app.ister.core.enums.SubtitleFormat;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.service.PlayQueuePrefetchService;
 import app.ister.core.service.PlayQueueService;
+import app.ister.core.status.PlaybackStatusService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -49,7 +52,16 @@ class PlayQueueControllerTest {
     private PlayQueuePrefetchService playQueuePrefetchService;
 
     @Mock
+    private PlaybackStatusService playbackStatusService;
+
+    @Mock
     private Authentication authentication;
+
+    private PlayQueueEntity buildQueueWithUser() {
+        UserEntity user = UserEntity.builder().name("test-user").build();
+        user.setId(UUID.randomUUID());
+        return PlayQueueEntity.builder().userEntity(user).build();
+    }
 
     private PlayQueueItemEntity buildItem(UUID id) {
         PlayQueueItemEntity item = PlayQueueItemEntity.builder()
@@ -138,10 +150,10 @@ class PlayQueueControllerTest {
     void updatePlayQueueDelegatesToService() {
         UUID id = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
-        PlayQueueEntity queue = PlayQueueEntity.builder().build();
+        PlayQueueEntity queue = buildQueueWithUser();
         when(playQueueService.updatePlayQueue(id, 5000L, itemId, null, authentication)).thenReturn(Optional.of(queue));
 
-        Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, itemId, null, authentication);
+        Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, itemId, null, null, authentication);
 
         assertTrue(result.isPresent());
         verify(playQueuePrefetchService).maybePrefetchNext(queue, itemId, 5000L);
@@ -151,15 +163,28 @@ class PlayQueueControllerTest {
     void updatePlayQueueMapsStreamSettings() {
         UUID id = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
-        PlayQueueEntity queue = PlayQueueEntity.builder().build();
+        PlayQueueEntity queue = buildQueueWithUser();
         StreamSettingsInput input = new StreamSettingsInput(true, false, SubtitleFormat.SRT);
         when(playQueueService.updatePlayQueue(id, 5000L, itemId,
                 new PlayQueueService.StreamSettings(true, false, SubtitleFormat.SRT), authentication))
                 .thenReturn(Optional.of(queue));
 
-        Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, itemId, input, authentication);
+        Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, itemId, input, null, authentication);
 
         assertTrue(result.isPresent());
+    }
+
+    @Test
+    void updatePlayQueuePublishesPlaybackHeartbeat() {
+        UUID id = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        PlayQueueEntity queue = buildQueueWithUser();
+        when(playQueueService.updatePlayQueue(id, 5000L, itemId, null, authentication)).thenReturn(Optional.of(queue));
+
+        subject.updatePlayQueue(id, 5000L, itemId, null, PlayState.PAUSED, authentication);
+
+        verify(playbackStatusService).publishHeartbeat(queue.getId(), itemId,
+                queue.getUserEntity().getId(), "test-user", null, null, null, 5000L, PlayState.PAUSED);
     }
 
     @Test
@@ -168,10 +193,10 @@ class PlayQueueControllerTest {
         UUID itemId = UUID.randomUUID();
         when(playQueueService.updatePlayQueue(id, 5000L, itemId, null, authentication)).thenReturn(Optional.empty());
 
-        Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, itemId, null, authentication);
+        Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, itemId, null, null, authentication);
 
         assertTrue(result.isEmpty());
-        verifyNoInteractions(playQueuePrefetchService);
+        verifyNoInteractions(playQueuePrefetchService, playbackStatusService);
     }
 
     @Test
