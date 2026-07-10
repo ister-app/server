@@ -55,10 +55,13 @@ class PlayQueueControllerTest {
     private PlaybackStatusService playbackStatusService;
 
     @Mock
+    private app.ister.core.status.PlaybackSessionRegistry playbackSessionRegistry;
+
+    @Mock
     private Authentication authentication;
 
     private PlayQueueEntity buildQueueWithUser() {
-        UserEntity user = UserEntity.builder().name("test-user").build();
+        UserEntity user = UserEntity.builder().name("test-user").externalId("sub-123").build();
         user.setId(UUID.randomUUID());
         return PlayQueueEntity.builder().userEntity(user).build();
     }
@@ -184,7 +187,69 @@ class PlayQueueControllerTest {
         subject.updatePlayQueue(id, 5000L, itemId, null, PlayState.PAUSED, authentication);
 
         verify(playbackStatusService).publishHeartbeat(queue.getId(), itemId,
-                queue.getUserEntity().getId(), "test-user", null, null, null, 5000L, PlayState.PAUSED);
+                queue.getUserEntity().getId(), "sub-123", "test-user", null, null, null, 5000L, PlayState.PAUSED);
+    }
+
+    @Test
+    void updatePlayQueueRepublishesLastKnownSessionWhenDatabaseIsUnavailable() {
+        UUID id = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        when(playQueueService.updatePlayQueue(id, 7000L, itemId, null, authentication))
+                .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("pool exhausted"));
+        when(authentication.getName()).thenReturn("sub-123");
+        when(playbackSessionRegistry.find(id)).thenReturn(Optional.of(
+                app.ister.core.eventdata.PlaybackStatusData.builder()
+                        .playQueueId(id).playQueueItemId(itemId).userId(userId)
+                        .userExternalId("sub-123").userName("test-user")
+                        .mediaType(MediaType.EPISODE).playState(PlayState.PLAYING).build()));
+
+        assertThrows(org.springframework.dao.DataAccessResourceFailureException.class,
+                () -> subject.updatePlayQueue(id, 7000L, itemId, null, PlayState.PAUSED, authentication));
+
+        // The now-playing feed still gets the fresh progress/state, from registry data.
+        verify(playbackStatusService).publishHeartbeat(id, itemId, userId, "sub-123", "test-user",
+                MediaType.EPISODE, null, null, 7000L, PlayState.PAUSED);
+        verifyNoInteractions(playQueuePrefetchService);
+    }
+
+    @Test
+    void updatePlayQueueSkipsDegradedHeartbeatWhenClientMovedToAnotherItem() {
+        UUID id = UUID.randomUUID();
+        UUID newItemId = UUID.randomUUID();
+        when(playQueueService.updatePlayQueue(id, 7000L, newItemId, null, authentication))
+                .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("pool exhausted"));
+        when(authentication.getName()).thenReturn("sub-123");
+        when(playbackSessionRegistry.find(id)).thenReturn(Optional.of(
+                app.ister.core.eventdata.PlaybackStatusData.builder()
+                        .playQueueId(id).playQueueItemId(UUID.randomUUID())
+                        .userExternalId("sub-123").userName("test-user")
+                        .playState(PlayState.PLAYING).build()));
+
+        assertThrows(org.springframework.dao.DataAccessResourceFailureException.class,
+                () -> subject.updatePlayQueue(id, 7000L, newItemId, null, PlayState.PLAYING, authentication));
+
+        // The registry's media fields describe the previous item; publishing them with the
+        // new item's progress would show the wrong track, so nothing is published.
+        verifyNoInteractions(playbackStatusService);
+    }
+
+    @Test
+    void updatePlayQueueSkipsDegradedHeartbeatForOtherUsersSession() {
+        UUID id = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        when(playQueueService.updatePlayQueue(id, 7000L, itemId, null, authentication))
+                .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("pool exhausted"));
+        when(authentication.getName()).thenReturn("sub-of-someone-else");
+        when(playbackSessionRegistry.find(id)).thenReturn(Optional.of(
+                app.ister.core.eventdata.PlaybackStatusData.builder()
+                        .playQueueId(id).userExternalId("sub-123").userName("test-user")
+                        .playState(PlayState.PLAYING).build()));
+
+        assertThrows(org.springframework.dao.DataAccessResourceFailureException.class,
+                () -> subject.updatePlayQueue(id, 7000L, itemId, null, PlayState.PAUSED, authentication));
+
+        verifyNoInteractions(playbackStatusService);
     }
 
     @Test

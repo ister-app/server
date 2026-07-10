@@ -15,8 +15,11 @@ import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.PlayQueuePrefetchService;
 import app.ister.core.service.PlayQueueService;
+import app.ister.core.status.PlaybackSessionRegistry;
 import app.ister.core.status.PlaybackStatusService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.TransactionException;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
@@ -45,13 +48,16 @@ public class PlayQueueController {
 
     private final PlaybackStatusService playbackStatusService;
 
-    public PlayQueueController(PlayQueueService playQueueService, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, PlayQueuePrefetchService playQueuePrefetchService, PlaybackStatusService playbackStatusService) {
+    private final PlaybackSessionRegistry playbackSessionRegistry;
+
+    public PlayQueueController(PlayQueueService playQueueService, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, PlayQueuePrefetchService playQueuePrefetchService, PlaybackStatusService playbackStatusService, PlaybackSessionRegistry playbackSessionRegistry) {
         this.playQueueService = playQueueService;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
         this.trackRepository = trackRepository;
         this.playQueuePrefetchService = playQueuePrefetchService;
         this.playbackStatusService = playbackStatusService;
+        this.playbackSessionRegistry = playbackSessionRegistry;
     }
 
     @PreAuthorize("hasRole('user')")
@@ -74,12 +80,42 @@ public class PlayQueueController {
                                                      Authentication authentication) {
         PlayQueueService.StreamSettings settings = streamSettings == null ? null
                 : new PlayQueueService.StreamSettings(streamSettings.direct(), streamSettings.transcode(), streamSettings.subtitleFormat());
-        Optional<PlayQueueEntity> playQueue = playQueueService.updatePlayQueue(id, progressInMilliseconds, playQueueItemId, settings, authentication);
+        Optional<PlayQueueEntity> playQueue;
+        try {
+            playQueue = playQueueService.updatePlayQueue(id, progressInMilliseconds, playQueueItemId, settings, authentication);
+        } catch (DataAccessException | TransactionException ex) {
+            // Transient DB trouble (e.g. an exhausted connection pool during a transcode
+            // burst) must not silence the now-playing feed: the registry is in-memory, so
+            // re-publish the last known session with the fresh progress/state, then
+            // surface the error so the client retries the persistent update.
+            republishLastKnownSession(id, playQueueItemId, progressInMilliseconds, playState, authentication);
+            throw ex;
+        }
         playQueue.ifPresent(queue -> {
             playQueuePrefetchService.maybePrefetchNext(queue, playQueueItemId, progressInMilliseconds);
             publishPlaybackHeartbeat(queue, playQueueItemId, progressInMilliseconds, playState);
         });
         return playQueue;
+    }
+
+    /**
+     * DB-free fallback heartbeat: reuses the session as last seen in the in-memory
+     * registry, bumping only progress/state. The registry entry originated from an
+     * ownership-checked update and carries that owner's OIDC subject, so ownership is
+     * re-verified against the JWT subject without the database (which is exactly what
+     * is unavailable here). Skipped when the client moved on to another queue item —
+     * the stale media fields would then describe the wrong track.
+     */
+    private void republishLastKnownSession(UUID playQueueId, UUID playQueueItemId, long progressInMilliseconds,
+                                           PlayState playState, Authentication authentication) {
+        playbackSessionRegistry.find(playQueueId)
+                .filter(last -> authentication.getName() != null
+                        && authentication.getName().equals(last.getUserExternalId()))
+                .filter(last -> playQueueItemId == null || playQueueItemId.equals(last.getPlayQueueItemId()))
+                .ifPresent(last -> playbackStatusService.publishHeartbeat(
+                        playQueueId, last.getPlayQueueItemId(), last.getUserId(), last.getUserExternalId(),
+                        last.getUserName(), last.getMediaType(), last.getMediaId(), last.getTitle(),
+                        progressInMilliseconds, playState));
     }
 
     /**
@@ -95,6 +131,7 @@ public class PlayQueueController {
                 queue.getId(),
                 playQueueItemId,
                 queue.getUserEntity().getId(),
+                queue.getUserEntity().getExternalId(),
                 queue.getUserEntity().getName(),
                 item.map(PlayQueueItemEntity::getType).orElse(null),
                 item.map(PlayQueueController::mediaIdOf).orElse(null),

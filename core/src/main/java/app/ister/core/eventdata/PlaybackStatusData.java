@@ -23,6 +23,9 @@ public class PlaybackStatusData {
     private UUID playQueueId;
     private UUID playQueueItemId;
     private UUID userId;
+    /** OIDC subject of the session owner; lets the degraded (DB-free) heartbeat
+     * path verify ownership against the JWT without a database lookup. */
+    private String userExternalId;
     private String userName;
     private MediaType mediaType;
     private UUID mediaId;

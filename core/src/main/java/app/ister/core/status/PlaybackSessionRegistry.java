@@ -53,6 +53,10 @@ public class PlaybackSessionRegistry {
         return sessions.values().removeIf(entry -> entry.receivedAt().isBefore(cutoff));
     }
 
+    public java.util.Optional<PlaybackStatusData> find(java.util.UUID playQueueId) {
+        return java.util.Optional.ofNullable(sessions.get(playQueueId)).map(Entry::data);
+    }
+
     public List<PlaybackStatusData> snapshot() {
         return sessions.values().stream()
                 .map(Entry::data)
