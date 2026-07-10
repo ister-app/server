@@ -3,14 +3,19 @@ package app.ister.api.controller;
 import app.ister.api.dto.CreatePlayQueueInput;
 import app.ister.api.dto.StreamSettingsInput;
 import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.ImageEntity;
+import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PlayQueueEntity;
 import app.ister.core.entity.PlayQueueItemEntity;
 import app.ister.core.entity.TrackEntity;
+import app.ister.core.enums.ImageType;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayState;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.ImageRepository;
+import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.PlayQueuePrefetchService;
@@ -44,17 +49,23 @@ public class PlayQueueController {
 
     private final TrackRepository trackRepository;
 
+    private final MediaFileRepository mediaFileRepository;
+
+    private final ImageRepository imageRepository;
+
     private final PlayQueuePrefetchService playQueuePrefetchService;
 
     private final PlaybackStatusService playbackStatusService;
 
     private final PlaybackSessionRegistry playbackSessionRegistry;
 
-    public PlayQueueController(PlayQueueService playQueueService, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, PlayQueuePrefetchService playQueuePrefetchService, PlaybackStatusService playbackStatusService, PlaybackSessionRegistry playbackSessionRegistry) {
+    public PlayQueueController(PlayQueueService playQueueService, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, MediaFileRepository mediaFileRepository, ImageRepository imageRepository, PlayQueuePrefetchService playQueuePrefetchService, PlaybackStatusService playbackStatusService, PlaybackSessionRegistry playbackSessionRegistry) {
         this.playQueueService = playQueueService;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
         this.trackRepository = trackRepository;
+        this.mediaFileRepository = mediaFileRepository;
+        this.imageRepository = imageRepository;
         this.playQueuePrefetchService = playQueuePrefetchService;
         this.playbackStatusService = playbackStatusService;
         this.playbackSessionRegistry = playbackSessionRegistry;
@@ -115,6 +126,7 @@ public class PlayQueueController {
                 .ifPresent(last -> playbackStatusService.publishHeartbeat(
                         playQueueId, last.getPlayQueueItemId(), last.getUserId(), last.getUserExternalId(),
                         last.getUserName(), last.getMediaType(), last.getMediaId(), last.getTitle(),
+                        last.getDurationInMilliseconds(), last.getArtworkImageId(),
                         progressInMilliseconds, playState));
     }
 
@@ -136,8 +148,62 @@ public class PlayQueueController {
                 item.map(PlayQueueItemEntity::getType).orElse(null),
                 item.map(PlayQueueController::mediaIdOf).orElse(null),
                 item.map(this::titleOf).orElse(null),
+                item.map(this::durationOf).orElse(null),
+                item.map(this::artworkOf).orElse(null),
                 progressInMilliseconds,
                 playState);
+    }
+
+    /** Duration of the playing item's media file; the longest one wins if there are several. */
+    private Long durationOf(PlayQueueItemEntity item) {
+        UUID mediaId = mediaIdOf(item);
+        if (mediaId == null) {
+            return null;
+        }
+        List<MediaFileEntity> files = switch (item.getType()) {
+            case MOVIE -> mediaFileRepository.findByMovieEntityId(mediaId);
+            case EPISODE -> mediaFileRepository.findByEpisodeEntityId(mediaId);
+            case TRACK -> mediaFileRepository.findByTrackEntityId(mediaId);
+        };
+        return files.stream()
+                .map(MediaFileEntity::getDurationInMilliseconds)
+                .filter(duration -> duration > 0)
+                .max(Long::compare)
+                .orElse(null);
+    }
+
+    /**
+     * Cover art for the now-playing card: the movie poster, the episode still (show
+     * poster when the episode has none), or the album cover for a track. Falls back to
+     * any image when there is no COVER. Clients fetch the bytes via GET /images/{id}/download.
+     */
+    private UUID artworkOf(PlayQueueItemEntity item) {
+        List<ImageEntity> images = switch (item.getType()) {
+            case MOVIE -> item.getMovieEntityId() == null ? List.of()
+                    : imageRepository.findByMovieEntityId(item.getMovieEntityId());
+            case EPISODE -> episodeArtwork(item);
+            case TRACK -> item.getTrackEntityId() == null ? List.<ImageEntity>of()
+                    : trackRepository.findById(item.getTrackEntityId())
+                            .map(track -> imageRepository.findByAlbumEntityId(track.getAlbumEntity().getId()))
+                            .orElse(List.of());
+        };
+        return images.stream().filter(image -> image.getType() == ImageType.COVER).findFirst()
+                .or(() -> images.stream().findFirst())
+                .map(ImageEntity::getId)
+                .orElse(null);
+    }
+
+    private List<ImageEntity> episodeArtwork(PlayQueueItemEntity item) {
+        if (item.getEpisodeEntityId() == null) {
+            return List.of();
+        }
+        List<ImageEntity> stills = imageRepository.findByEpisodeEntityId(item.getEpisodeEntityId());
+        if (!stills.isEmpty()) {
+            return stills;
+        }
+        return item.getEpisodeEntity() == null || item.getEpisodeEntity().getShowEntity() == null
+                ? List.of()
+                : imageRepository.findByShowEntityId(item.getEpisodeEntity().getShowEntity().getId());
     }
 
     private static UUID mediaIdOf(PlayQueueItemEntity item) {

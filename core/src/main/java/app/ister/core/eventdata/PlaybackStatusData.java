@@ -30,6 +30,10 @@ public class PlaybackStatusData {
     private MediaType mediaType;
     private UUID mediaId;
     private String title;
+    /** Total duration of the playing media file; null when no media file is known. */
+    private Long durationInMilliseconds;
+    /** Cover image of the playing media (movie poster / show poster / album cover). */
+    private UUID artworkImageId;
     private long progressInMilliseconds;
     private PlayState playState;
     private String nodeName;

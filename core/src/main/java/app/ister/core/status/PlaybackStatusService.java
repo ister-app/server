@@ -30,6 +30,7 @@ public class PlaybackStatusService {
     @SuppressWarnings("java:S107") // heartbeat carries exactly these fields
     public void publishHeartbeat(UUID playQueueId, UUID playQueueItemId, UUID userId, String userExternalId,
                                  String userName, MediaType mediaType, UUID mediaId, String title,
+                                 Long durationInMilliseconds, UUID artworkImageId,
                                  long progressInMilliseconds, PlayState playState) {
         messageSender.sendStatus(PlaybackStatusData.builder()
                 .playQueueId(playQueueId)
@@ -40,6 +41,8 @@ public class PlaybackStatusService {
                 .mediaType(mediaType)
                 .mediaId(mediaId)
                 .title(title)
+                .durationInMilliseconds(durationInMilliseconds)
+                .artworkImageId(artworkImageId)
                 .progressInMilliseconds(progressInMilliseconds)
                 .playState(playState == null ? PlayState.PLAYING : playState)
                 .nodeName(nodeName)

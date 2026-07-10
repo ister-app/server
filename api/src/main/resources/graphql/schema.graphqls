@@ -106,6 +106,10 @@ type PlaybackSession {
     mediaType: MediaType
     mediaId: ID
     title: String
+    "Total duration of the playing media file, when known."
+    durationInMilliseconds: Int
+    "Cover art (movie/show poster or album cover); fetch via GET /images/{id}/download."
+    artworkImageId: ID
     progressInMilliseconds: Int!
     playState: PlayState!
     "The node the client sends its updates to."

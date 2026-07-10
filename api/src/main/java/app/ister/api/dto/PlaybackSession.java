@@ -15,6 +15,8 @@ public record PlaybackSession(
         MediaType mediaType,
         UUID mediaId,
         String title,
+        Long durationInMilliseconds,
+        UUID artworkImageId,
         long progressInMilliseconds,
         PlayState playState,
         String nodeName,
@@ -23,6 +25,7 @@ public record PlaybackSession(
     public static PlaybackSession from(PlaybackStatusData data) {
         return new PlaybackSession(data.getPlayQueueId(), data.getPlayQueueItemId(), data.getUserId(),
                 data.getUserName(), data.getMediaType(), data.getMediaId(), data.getTitle(),
+                data.getDurationInMilliseconds(), data.getArtworkImageId(),
                 data.getProgressInMilliseconds(), data.getPlayState(), data.getNodeName(),
                 String.valueOf(data.getTimestamp()));
     }

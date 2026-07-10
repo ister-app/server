@@ -187,7 +187,7 @@ class PlayQueueControllerTest {
         subject.updatePlayQueue(id, 5000L, itemId, null, PlayState.PAUSED, authentication);
 
         verify(playbackStatusService).publishHeartbeat(queue.getId(), itemId,
-                queue.getUserEntity().getId(), "sub-123", "test-user", null, null, null, 5000L, PlayState.PAUSED);
+                queue.getUserEntity().getId(), "sub-123", "test-user", null, null, null, null, null, 5000L, PlayState.PAUSED);
     }
 
     @Test
@@ -209,7 +209,7 @@ class PlayQueueControllerTest {
 
         // The now-playing feed still gets the fresh progress/state, from registry data.
         verify(playbackStatusService).publishHeartbeat(id, itemId, userId, "sub-123", "test-user",
-                MediaType.EPISODE, null, null, 7000L, PlayState.PAUSED);
+                MediaType.EPISODE, null, null, null, null, 7000L, PlayState.PAUSED);
         verifyNoInteractions(playQueuePrefetchService);
     }
 
