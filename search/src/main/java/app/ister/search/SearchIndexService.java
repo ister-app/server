@@ -129,10 +129,10 @@ public class SearchIndexService {
                 Page<T> entities = repository.findAll(PageRequest.of(currentPage, PAGE_SIZE));
                 return new PageResult(entities.map(toDocument).toList(), entities.hasNext());
             });
-            if (result != null && !result.documents().isEmpty()) {
+            if (!result.documents().isEmpty()) {
                 typesenseClient.importDocuments(collection, result.documents());
             }
-            hasNext = result != null && result.hasNext();
+            hasNext = result.hasNext();
             page++;
         }
     }

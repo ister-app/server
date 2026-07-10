@@ -37,7 +37,6 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class PlayQueuePrefetchServiceTest {
@@ -82,7 +81,7 @@ class PlayQueuePrefetchServiceTest {
         verify(messageSender).sendTranscodeRequested(captor.capture(), eq("disk1"));
         TranscodeRequestedData sent = captor.getValue();
         assertEquals(nextMediaFileId, sent.getMediaFileId());
-        assertTrue(Boolean.TRUE.equals(sent.getPreTranscode()));
+        assertEquals(Boolean.TRUE, sent.getPreTranscode());
         assertTrue(sent.getKeepUntilEpochMillis() > System.currentTimeMillis() + 23 * 3_600_000L,
                 "prefetched item should be kept for ~24 hours");
         // Defaults when the client never reported stream settings

@@ -140,7 +140,7 @@ class HandleTranscodeRequestedTest {
     }
 
     @Test
-    void keepUntilIsWrittenWhenPresent() throws Exception {
+    void keepUntilIsWrittenWhenPresent() {
         UUID id = UUID.randomUUID();
         long keepUntil = System.currentTimeMillis() + 3_600_000;
         TranscodeRequestedData data = TranscodeRequestedData.builder()
@@ -159,7 +159,7 @@ class HandleTranscodeRequestedTest {
     }
 
     @Test
-    void keepUntilIsNotWrittenWhenAbsent() throws Exception {
+    void keepUntilIsNotWrittenWhenAbsent() {
         UUID id = UUID.randomUUID();
         TranscodeRequestedData data = TranscodeRequestedData.builder()
                 .eventType(EventType.TRANSCODE_REQUESTED)

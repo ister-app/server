@@ -60,12 +60,7 @@ public class MovieFoundHandle implements Handle<MovieFoundData> {
                 Optional<TMDBResult> tmdbResult = movieMetadata.getMetadata(movieEntity.getName(), movieEntity.getReleaseYear(), language);
                 if (tmdbResult.isPresent()) {
                     metaDataSave.save(tmdbResult.get(), movieEntity, null, null);
-                    if (tmdbResult.get().getBackgroundUrl() != null) {
-                        imageDownloadService.downloadAndSave(tmdbResult.get().getBackgroundUrl(), ImageType.BACKGROUND, tmdbResult.get().getLanguage(), "TMDB://" + tmdbResult.get().getBackgroundUrl(), new ImageSave.MediaEntityRef(movieEntity, null, null, null, null));
-                    }
-                    if (tmdbResult.get().getPosterUrl() != null) {
-                        imageDownloadService.downloadAndSave(tmdbResult.get().getPosterUrl(), ImageType.COVER, tmdbResult.get().getLanguage(), "TMDB://" + tmdbResult.get().getPosterUrl(), new ImageSave.MediaEntityRef(movieEntity, null, null, null, null));
-                    }
+                    saveImages(tmdbResult.get(), movieEntity);
                     if (tmdbMovieId == null) {
                         tmdbMovieId = tmdbResult.get().getTmdbId();
                     }
@@ -77,6 +72,16 @@ public class MovieFoundHandle implements Handle<MovieFoundData> {
             }
         } catch (IOException e) {
             throw new EventHandlingException("Download and saving image failed", e);
+        }
+    }
+
+    /** Downloads and saves the background and poster of one language-specific TMDB result. */
+    private void saveImages(TMDBResult tmdbResult, app.ister.core.entity.MovieEntity movieEntity) throws IOException {
+        if (tmdbResult.getBackgroundUrl() != null) {
+            imageDownloadService.downloadAndSave(tmdbResult.getBackgroundUrl(), ImageType.BACKGROUND, tmdbResult.getLanguage(), "TMDB://" + tmdbResult.getBackgroundUrl(), new ImageSave.MediaEntityRef(movieEntity, null, null, null, null));
+        }
+        if (tmdbResult.getPosterUrl() != null) {
+            imageDownloadService.downloadAndSave(tmdbResult.getPosterUrl(), ImageType.COVER, tmdbResult.getLanguage(), "TMDB://" + tmdbResult.getPosterUrl(), new ImageSave.MediaEntityRef(movieEntity, null, null, null, null));
         }
     }
 }

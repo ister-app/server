@@ -54,7 +54,7 @@ class BlurHashChunkProcessorTest {
     void processWithCursorResumesAfterIt() {
         UUID cursor = UUID.fromString("22222222-2222-2222-2222-222222222222");
         when(imageRepository.findByDirectoryEntityIdAndBlurHashIsNullAndIdGreaterThanOrderById(
-                eq(DIRECTORY_ID), eq(cursor), eq(Limit.of(500)))).thenReturn(List.of());
+                DIRECTORY_ID, cursor, Limit.of(500))).thenReturn(List.of());
 
         assertTrue(subject.process(DIRECTORY_ID, cursor, 500).isEmpty());
 

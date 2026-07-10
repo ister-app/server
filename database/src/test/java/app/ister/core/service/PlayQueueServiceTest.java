@@ -135,7 +135,8 @@ class PlayQueueServiceTest {
                 .build();
         when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
 
-        assertThrows(AccessDeniedException.class, () -> subject.getPlayQueue(queue.getId(), authentication));
+        UUID queueId = queue.getId();
+        assertThrows(AccessDeniedException.class, () -> subject.getPlayQueue(queueId, authentication));
     }
 
     @Test
@@ -227,8 +228,9 @@ class PlayQueueServiceTest {
         UUID showId = UUID.randomUUID();
         when(episodeRepository.findIdsOnlyByShowEntityId(eq(showId), any(Sort.class))).thenReturn(List.of());
 
+        UUID startId = UUID.randomUUID();
         assertThrows(IllegalArgumentException.class,
-                () -> subject.createPlayQueue(PlayQueueSourceType.SHOW, showId, UUID.randomUUID(), false, authentication));
+                () -> subject.createPlayQueue(PlayQueueSourceType.SHOW, showId, startId, false, authentication));
     }
 
     @Test

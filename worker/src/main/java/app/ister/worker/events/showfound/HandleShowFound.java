@@ -59,12 +59,7 @@ public class HandleShowFound implements Handle<app.ister.core.eventdata.ShowFoun
                 Optional<TMDBResult> tmdbResult = showMetadata.getMetadata(showEntity.getName(), showEntity.getReleaseYear(), language);
                 if (tmdbResult.isPresent()) {
                     metaDataSave.save(tmdbResult.get(), null, showEntity, null);
-                    if (tmdbResult.get().getBackgroundUrl() != null) {
-                        imageDownloadService.downloadAndSave(tmdbResult.get().getBackgroundUrl(), ImageType.BACKGROUND, tmdbResult.get().getLanguage(), "TMDB://" + tmdbResult.get().getBackgroundUrl(), new ImageSave.MediaEntityRef(null, showEntity, null, null, null));
-                    }
-                    if (tmdbResult.get().getPosterUrl() != null) {
-                        imageDownloadService.downloadAndSave(tmdbResult.get().getPosterUrl(), ImageType.COVER, tmdbResult.get().getLanguage(), "TMDB://" + tmdbResult.get().getPosterUrl(), new ImageSave.MediaEntityRef(null, showEntity, null, null, null));
-                    }
+                    saveImages(tmdbResult.get(), showEntity);
                     if (tmdbSeriesId == null) {
                         tmdbSeriesId = tmdbResult.get().getTmdbId();
                     }
@@ -76,6 +71,16 @@ public class HandleShowFound implements Handle<app.ister.core.eventdata.ShowFoun
             }
         } catch (IOException e) {
             throw new EventHandlingException("Download and saving image failed", e);
+        }
+    }
+
+    /** Downloads and saves the background and poster of one language-specific TMDB result. */
+    private void saveImages(TMDBResult tmdbResult, app.ister.core.entity.ShowEntity showEntity) throws IOException {
+        if (tmdbResult.getBackgroundUrl() != null) {
+            imageDownloadService.downloadAndSave(tmdbResult.getBackgroundUrl(), ImageType.BACKGROUND, tmdbResult.getLanguage(), "TMDB://" + tmdbResult.getBackgroundUrl(), new ImageSave.MediaEntityRef(null, showEntity, null, null, null));
+        }
+        if (tmdbResult.getPosterUrl() != null) {
+            imageDownloadService.downloadAndSave(tmdbResult.getPosterUrl(), ImageType.COVER, tmdbResult.getLanguage(), "TMDB://" + tmdbResult.getPosterUrl(), new ImageSave.MediaEntityRef(null, showEntity, null, null, null));
         }
     }
 }

@@ -403,7 +403,7 @@ class HlsTranscodeServiceTest {
 
         Path keepUntilFile = tempDir.resolve(mediaFileId.toString()).resolve("keep_until");
         assertTrue(Files.exists(keepUntilFile));
-        assertDoesNotThrow(() -> assertTrue(Long.parseLong(Files.readString(keepUntilFile).trim()) == high));
+        assertDoesNotThrow(() -> assertEquals(high, Long.parseLong(Files.readString(keepUntilFile).trim())));
     }
 
     @Test
@@ -478,6 +478,7 @@ class HlsTranscodeServiceTest {
     @Test
     void createNiceWrapperWritesExecutableScript() throws IOException {
         ReflectionTestUtils.setField(service, "backgroundNice", 10);
+        ReflectionTestUtils.setField(service, "nicePath", "/usr/bin/nice");
         ReflectionTestUtils.setField(service, "ffmpegDir", "/usr/bin");
 
         Path dir = service.createNiceWrapper();
@@ -546,7 +547,9 @@ class HlsTranscodeServiceTest {
         service.ensurePassStarted("bg-file_video_720p", () -> {
             backgroundRunning.countDown();
             try {
-                Thread.sleep(30_000); // simulates a long FFmpeg pass; interrupted by preemption
+                // Simulates a long FFmpeg pass; the await is interrupted by preemption
+                new CountDownLatch(1).await(30, TimeUnit.SECONDS);
+                throw new IllegalStateException("pass was not preempted");
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new IllegalStateException("interrupted", e);

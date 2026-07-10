@@ -85,7 +85,7 @@ public class TypesenseClient {
                     .retrieve()
                     .body(JsonNode.class);
             return Optional.ofNullable(response).map(node -> node.path("collection_name").asString());
-        } catch (HttpClientErrorException.NotFound e) {
+        } catch (HttpClientErrorException.NotFound _) {
             return Optional.empty();
         }
     }
@@ -149,7 +149,7 @@ public class TypesenseClient {
                     .uri("/collections/{collection}/documents/{id}", collection, documentId)
                     .retrieve()
                     .toBodilessEntity();
-        } catch (HttpClientErrorException.NotFound e) {
+        } catch (HttpClientErrorException.NotFound _) {
             log.debug("Document {} not present in collection {}; nothing to delete", documentId, collection);
         }
     }

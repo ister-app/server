@@ -54,7 +54,7 @@ public class EpisodeMetadata {
         TvEpisodeDetails200Response episode;
         try {
             episode = tmdbClient._tvEpisodeDetails(tvSeriesResultsPage.getId(), seasonNumber, episodeNumber, "", language).getBody();
-        } catch (FeignException.NotFound e) {
+        } catch (FeignException.NotFound _) {
             // TMDB simply does not have this episode (specials, mis-numbered episodes, ...). Treat it
             // like any other "no metadata" case instead of letting the 404 dead-letter the message.
             log.debug("TMDB has no episode s{}e{} for series {}", seasonNumber, episodeNumber, tvSeriesResultsPage.getId());

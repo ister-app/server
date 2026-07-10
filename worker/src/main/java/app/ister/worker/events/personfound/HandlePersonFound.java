@@ -3,6 +3,7 @@ package app.ister.worker.events.personfound;
 import app.ister.core.Handle;
 import app.ister.core.config.LanguageProperties;
 import app.ister.core.entity.MetadataEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.eventdata.PersonFoundData;
@@ -59,38 +60,51 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
             // that year is what links a music artist to the same person as a TMDB actor.
             if (hasMetadata && hasImage && !needsBirthYear) return;
 
-            musicBrainzService.getArtistInfo(artist.getName(), languageProperties.tags()).ifPresent(info -> {
-                // Only individual persons get a birth year; groups keep NULL so a TMDB
-                // actor with the same name can still claim/enrich the record.
-                if (artist.getBirthYear() == null && "Person".equals(info.type())
-                        && info.lifeSpanBegin() != null && info.lifeSpanBegin().length() >= 4) {
-                    try {
-                        artist.setBirthYear(Integer.parseInt(info.lifeSpanBegin().substring(0, 4)));
-                        personRepository.save(artist);
-                    } catch (NumberFormatException _) {
-                        log.debug("Unparsable life-span begin '{}' for artist={}", info.lifeSpanBegin(), artist.getName());
-                    }
-                }
-                if (!hasMetadata && !info.bios().isEmpty()) {
-                    saveBiosPerLanguage(artist, info);
-                }
-                if (!hasImage && info.imageUrl() != null) {
-                    try {
-                        imageDownloadService.downloadAndSave(info.imageUrl(), ImageType.COVER, "eng",
-                                "wikipedia://" + info.imageUrl(),
-                                new ImageSave.MediaEntityRef(null, null, null, artist, null));
-                    } catch (IOException e) {
-                        log.warn("Failed to download artist image for artist={}: {}", artist.getName(), e.getMessage());
-                    }
-                }
-                serverEventService.createSearchIndexEvent(SearchEntityType.PERSON, artist.getId());
-            });
+            musicBrainzService.getArtistInfo(artist.getName(), languageProperties.tags())
+                    .ifPresent(info -> enrichArtist(artist, info, hasMetadata, hasImage));
         });
+    }
+
+    private void enrichArtist(PersonEntity artist, MusicBrainzService.ArtistInfo info,
+                              boolean hasMetadata, boolean hasImage) {
+        saveBirthYear(artist, info);
+        if (!hasMetadata && !info.bios().isEmpty()) {
+            saveBiosPerLanguage(artist, info);
+        }
+        if (!hasImage && info.imageUrl() != null) {
+            saveArtistImage(artist, info.imageUrl());
+        }
+        serverEventService.createSearchIndexEvent(SearchEntityType.PERSON, artist.getId());
+    }
+
+    /** Only individual persons get a birth year; groups keep NULL so a TMDB actor with the same
+     * name can still claim/enrich the record. */
+    private void saveBirthYear(PersonEntity artist, MusicBrainzService.ArtistInfo info) {
+        if (artist.getBirthYear() != null || !"Person".equals(info.type())
+                || info.lifeSpanBegin() == null || info.lifeSpanBegin().length() < 4) {
+            return;
+        }
+        try {
+            artist.setBirthYear(Integer.parseInt(info.lifeSpanBegin().substring(0, 4)));
+            personRepository.save(artist);
+        } catch (NumberFormatException _) {
+            log.debug("Unparsable life-span begin '{}' for artist={}", info.lifeSpanBegin(), artist.getName());
+        }
+    }
+
+    private void saveArtistImage(PersonEntity artist, String imageUrl) {
+        try {
+            imageDownloadService.downloadAndSave(imageUrl, ImageType.COVER, "eng",
+                    "wikipedia://" + imageUrl,
+                    new ImageSave.MediaEntityRef(null, null, null, artist, null));
+        } catch (IOException e) {
+            log.warn("Failed to download artist image for artist={}: {}", artist.getName(), e.getMessage());
+        }
     }
 
     /** One MetadataEntity per configured language (ISO-639-3), replacing any existing rows so a
      * re-fetch overwrites instead of duplicating. */
-    private void saveBiosPerLanguage(app.ister.core.entity.PersonEntity artist, MusicBrainzService.ArtistInfo info) {
+    private void saveBiosPerLanguage(PersonEntity artist, MusicBrainzService.ArtistInfo info) {
         metadataRepository.deleteAll(metadataRepository.findByPersonEntityId(artist.getId()));
         info.bios().forEach((tag, bio) -> metadataRepository.save(MetadataEntity.builder()
                 .description(bio)

@@ -215,8 +215,14 @@ public class PlayQueueService {
         }
 
         if (playQueueItemId.equals(queue.getCurrentItem())) {
-            PlayQueueItemEntity newCurrent = index + 1 < items.size() ? items.get(index + 1)
-                    : (index > 0 ? items.get(index - 1) : null);
+            PlayQueueItemEntity newCurrent;
+            if (index + 1 < items.size()) {
+                newCurrent = items.get(index + 1);
+            } else if (index > 0) {
+                newCurrent = items.get(index - 1);
+            } else {
+                newCurrent = null;
+            }
             queue.setCurrentItem(newCurrent != null ? newCurrent.getId() : null);
             queue.setProgressInMilliseconds(0);
         }

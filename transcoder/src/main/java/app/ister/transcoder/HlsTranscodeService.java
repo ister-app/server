@@ -59,6 +59,8 @@ public class HlsTranscodeService {
     /** Marker file written after a pass finished successfully: {@code done_<segmentPrefix>}. */
     private static final String DONE_MARKER_PREFIX = "done_";
 
+    private static final String SEG_VIDEO_PREFIX = "seg_video_";
+
     /** Per-cache-dir file holding the epoch-millis timestamp until which the dir must be kept. */
     private static final String KEEP_UNTIL_FILE = "keep_until";
 
@@ -101,11 +103,18 @@ public class HlsTranscodeService {
     @Value("${app.ister.transcoder.hls.background-nice:10}")
     private int backgroundNice;
 
+    /** Absolute path of the {@code nice} binary; absolute so the wrapper never depends on PATH. */
+    @Value("${app.ister.transcoder.hls.nice-path:/usr/bin/nice}")
+    private String nicePath;
+
     @Value("${app.ister.server.ffmpeg-dir}")
     private String ffmpegDir;
 
     /** Directory holding the nice-wrapper `ffmpeg` script; null when the wrapper is disabled. */
     private Path niceWrapperDir;
+
+    /** Name of the wrapper directory inside {@link #tmpDir}; skipped by the cleanup job. */
+    private static final String NICE_WRAPPER_DIR_NAME = "ffmpeg-nice";
 
     /** A segment is considered fully written when its size is unchanged for this long. */
     @Value("${app.ister.transcoder.hls.segment-stability-ms:200}")
@@ -185,13 +194,31 @@ public class HlsTranscodeService {
         final String mediaFileId;
         final boolean background;
         final long startedAtMillis;
-        final java.util.concurrent.atomic.AtomicReference<Thread> thread = new java.util.concurrent.atomic.AtomicReference<>();
+        private Thread thread;
 
         RunningPass(String generationKey, String mediaFileId, boolean background, long startedAtMillis) {
             this.generationKey = generationKey;
             this.mediaFileId = mediaFileId;
             this.background = background;
             this.startedAtMillis = startedAtMillis;
+        }
+
+        synchronized void setThread(Thread thread) {
+            this.thread = thread;
+        }
+
+        /** Clears the thread so a preemptor can no longer interrupt it (the pass is finishing). */
+        synchronized void clearThread() {
+            this.thread = null;
+        }
+
+        /** Interrupts the pass thread if it is still running; false when the pass already finished. */
+        synchronized boolean interruptIfRunning() {
+            if (thread == null) {
+                return false;
+            }
+            thread.interrupt();
+            return true;
         }
     }
 
@@ -222,22 +249,26 @@ public class HlsTranscodeService {
             return null;
         }
         try {
-            Process probe = new ProcessBuilder("nice", "-n", String.valueOf(backgroundNice), "true")
+            Process probe = new ProcessBuilder(nicePath, "-n", String.valueOf(backgroundNice), "true")
                     .redirectErrorStream(true)
                     .start();
             if (!probe.waitFor(5, java.util.concurrent.TimeUnit.SECONDS) || probe.exitValue() != 0) {
                 probe.destroyForcibly();
-                log.warn("'nice -n {}' probe failed; background FFmpeg passes will run at normal priority", backgroundNice);
+                log.warn("'{} -n {}' probe failed; background FFmpeg passes will run at normal priority", nicePath, backgroundNice);
                 return null;
             }
-            Path dir = Files.createTempDirectory("ister-ffmpeg-nice");
+            // Lives in the app-owned cache dir (not the world-writable system temp dir);
+            // the cleanup job skips it by name. Script and dir are owner-only.
+            Path dir = Paths.get(tmpDir, NICE_WRAPPER_DIR_NAME);
+            Files.createDirectories(dir);
+            Files.setPosixFilePermissions(dir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
             Path script = dir.resolve("ffmpeg");
             String realFfmpeg = Paths.get(ffmpegDir).resolve("ffmpeg").toString();
-            Files.writeString(script, "#!/bin/sh\nexec nice -n " + backgroundNice + " " + realFfmpeg + " \"$@\"\n");
-            Files.setPosixFilePermissions(script, java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"));
+            Files.writeString(script, "#!/bin/sh\nexec " + nicePath + " -n " + backgroundNice + " " + realFfmpeg + " \"$@\"\n");
+            Files.setPosixFilePermissions(script, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
             log.info("Background FFmpeg passes run with nice -n {} via {}", backgroundNice, script);
             return dir;
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             log.warn("Interrupted while probing 'nice'; background FFmpeg passes will run at normal priority");
             return null;
@@ -401,7 +432,7 @@ public class HlsTranscodeService {
             return;
         }
         RunningPass runningPass = new RunningPass(generationKey, mediaFileId, background, System.currentTimeMillis());
-        runningPass.thread.set(Thread.currentThread());
+        runningPass.setThread(Thread.currentThread());
         runningPasses.put(generationKey, runningPass);
         try {
             passStarter.run();
@@ -414,9 +445,7 @@ public class HlsTranscodeService {
             }
             future.completeExceptionally(t);
         } finally {
-            synchronized (runningPass) {
-                runningPass.thread.set(null);
-            }
+            runningPass.clearThread();
             Thread.interrupted(); // clear a leaked preemption interrupt before the pool thread is reused
             runningPasses.remove(generationKey);
             if (background) {
@@ -494,12 +523,11 @@ public class HlsTranscodeService {
     }
 
     private void preemptPass(RunningPass pass) {
-        synchronized (pass) {
-            Thread thread = pass.thread.get();
-            if (thread != null) {
-                preemptedKeys.add(pass.generationKey);
-                thread.interrupt();
-            }
+        // Key is marked before the interrupt so the pass's failure handler always sees it;
+        // when the pass turns out to have finished already, the mark is rolled back.
+        preemptedKeys.add(pass.generationKey);
+        if (!pass.interruptIfRunning()) {
+            preemptedKeys.remove(pass.generationKey);
         }
     }
 
@@ -549,7 +577,7 @@ public class HlsTranscodeService {
         }
         List<Double> keyframes = getCachedKeyframes(inputPath);
         String segmentTimes = buildSegmentTimes(keyframes);
-        Path outputPattern = cacheDir.resolve("seg_video_" + quality.getLabel() + "_%05d.ts");
+        Path outputPattern = cacheDir.resolve(SEG_VIDEO_PREFIX + quality.getLabel() + "_%05d.ts");
 
         log.debug("Starting video pass: quality={} keyframes={} hwaccel={}", quality.getLabel(), keyframes.size(), hwaccelProperty);
 
@@ -589,8 +617,8 @@ public class HlsTranscodeService {
                 .setOverwriteOutput(true)
                 .setLogLevel(LogLevel.ERROR),
                 inputPath, "video pass " + quality.getLabel(),
-                cacheDir, "seg_video_" + quality.getLabel() + "_");
-        writeDoneMarker(cacheDir, "seg_video_" + quality.getLabel() + "_");
+                cacheDir, SEG_VIDEO_PREFIX + quality.getLabel() + "_");
+        writeDoneMarker(cacheDir, SEG_VIDEO_PREFIX + quality.getLabel() + "_");
     }
 
     /**
@@ -727,29 +755,36 @@ public class HlsTranscodeService {
         long overallDeadline = System.currentTimeMillis() + timeoutSeconds * 1000;
         long stallDeadline = System.currentTimeMillis() + passStallTimeoutSeconds * 1000;
         try {
-            while (true) {
-                try {
-                    future.get(PASS_POLL_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
-                    return; // pass completed normally
-                } catch (java.util.concurrent.TimeoutException _) {
-                    long now = System.currentTimeMillis();
-                    if (now >= overallDeadline) {
-                        future.forceStop();
-                        throw new IllegalStateException("FFmpeg timed out after " + timeoutSeconds + "s: " + what);
-                    }
-                    if (now >= stallDeadline && !hasProducedSegment(cacheDir, segmentPrefix)) {
-                        future.forceStop();
-                        throw new IllegalStateException(
-                                "FFmpeg produced no output within " + passStallTimeoutSeconds + "s (stalled): " + what);
-                    }
-                }
-            }
+            pollUntilPassCompletes(future, overallDeadline, stallDeadline, timeoutSeconds, what, cacheDir, segmentPrefix);
         } catch (java.util.concurrent.ExecutionException e) {
             throw new IllegalStateException("FFmpeg failed: " + what, e.getCause());
         } catch (InterruptedException e) {
             future.forceStop();
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted during FFmpeg run: " + what, e);
+        }
+    }
+
+    private void pollUntilPassCompletes(com.github.kokorin.jaffree.ffmpeg.FFmpegResultFuture future,
+                                        long overallDeadline, long stallDeadline, long timeoutSeconds,
+                                        String what, Path cacheDir, String segmentPrefix)
+            throws java.util.concurrent.ExecutionException, InterruptedException {
+        while (true) {
+            try {
+                future.get(PASS_POLL_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+                return; // pass completed normally
+            } catch (java.util.concurrent.TimeoutException _) {
+                long now = System.currentTimeMillis();
+                if (now >= overallDeadline) {
+                    future.forceStop();
+                    throw new IllegalStateException("FFmpeg timed out after " + timeoutSeconds + "s: " + what);
+                }
+                if (now >= stallDeadline && !hasProducedSegment(cacheDir, segmentPrefix)) {
+                    future.forceStop();
+                    throw new IllegalStateException(
+                            "FFmpeg produced no output within " + passStallTimeoutSeconds + "s (stalled): " + what);
+                }
+            }
         }
     }
 
@@ -972,46 +1007,61 @@ public class HlsTranscodeService {
         Instant retentionThreshold = Instant.now().minus(cacheRetentionHours, ChronoUnit.HOURS);
         long now = System.currentTimeMillis();
         try (var dirs = Files.list(root)) {
-            dirs.filter(Files::isDirectory).forEach(dir -> {
-                String dirName = dir.getFileName().toString();
-                if (readKeepUntil(dir) > now) {
-                    log.debug("Skipping dir kept by retention deadline: {}", dir);
-                    return;
-                }
-                try (var entries = Files.list(dir)) {
-                    boolean allOld = entries.allMatch(f -> isOlderThan(f, retentionThreshold));
-                    if (allOld) {
-                        log.debug("Removing stale HLS cache: {}", dir);
-                        try (var walk = Files.walk(dir)) {
-                            walk.sorted(Comparator.reverseOrder()).forEach(p -> {
-                                try {
-                                    Files.deleteIfExists(p);
-                                } catch (IOException e) {
-                                    log.warn("Could not delete {}", p, e);
-                                }
-                            });
-                        }
-                        activeGenerations.keySet().removeIf(k -> k.startsWith(dirName));
-                        generationLocks.keySet().removeIf(k -> k.startsWith(dirName));
-                        knownStableSegments.removeIf(k -> k.contains(dirName));
-                        segmentSizeSamples.keySet().removeIf(k -> k.contains(dirName));
-                        if (filesWithAcquiredSlot.remove(dirName)) {
-                            concurrentFileSlots.release();
-                            log.warn("Released stale transcode slot during cleanup: {}", dirName);
-                        }
-                        if (filesWithBackgroundBudget.remove(dirName)) {
-                            backgroundFileBudget.release();
-                        }
-                        preemptedFiles.remove(dirName);
-                        activePassesPerFile.remove(dirName);
-                    }
-                } catch (IOException e) {
-                    log.warn("Error scanning cache dir {}", dir, e);
-                }
-            });
+            dirs.filter(Files::isDirectory).forEach(dir -> cleanupCacheDir(dir, retentionThreshold, now));
         } catch (IOException e) {
             log.warn("Error during HLS cache cleanup", e);
         }
+    }
+
+    /** Removes a single HLS cache dir when it is stale and its retention deadline has passed. */
+    private void cleanupCacheDir(Path dir, Instant retentionThreshold, long now) {
+        String dirName = dir.getFileName().toString();
+        if (NICE_WRAPPER_DIR_NAME.equals(dirName)) {
+            return;
+        }
+        if (readKeepUntil(dir) > now) {
+            log.debug("Skipping dir kept by retention deadline: {}", dir);
+            return;
+        }
+        try (var entries = Files.list(dir)) {
+            boolean allOld = entries.allMatch(f -> isOlderThan(f, retentionThreshold));
+            if (allOld) {
+                log.debug("Removing stale HLS cache: {}", dir);
+                deleteRecursively(dir);
+                forgetCacheDirState(dirName);
+            }
+        } catch (IOException e) {
+            log.warn("Error scanning cache dir {}", dir, e);
+        }
+    }
+
+    private void deleteRecursively(Path dir) throws IOException {
+        try (var walk = Files.walk(dir)) {
+            walk.sorted(Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (IOException e) {
+                    log.warn("Could not delete {}", p, e);
+                }
+            });
+        }
+    }
+
+    /** Drops all in-memory pass bookkeeping of a removed cache dir and frees its slot/budget. */
+    private void forgetCacheDirState(String dirName) {
+        activeGenerations.keySet().removeIf(k -> k.startsWith(dirName));
+        generationLocks.keySet().removeIf(k -> k.startsWith(dirName));
+        knownStableSegments.removeIf(k -> k.contains(dirName));
+        segmentSizeSamples.keySet().removeIf(k -> k.contains(dirName));
+        if (filesWithAcquiredSlot.remove(dirName)) {
+            concurrentFileSlots.release();
+            log.warn("Released stale transcode slot during cleanup: {}", dirName);
+        }
+        if (filesWithBackgroundBudget.remove(dirName)) {
+            backgroundFileBudget.release();
+        }
+        preemptedFiles.remove(dirName);
+        activePassesPerFile.remove(dirName);
     }
 
     /** Removes the keep files of the pre-retention-deadline era; superseded by {@link #KEEP_UNTIL_FILE}. */

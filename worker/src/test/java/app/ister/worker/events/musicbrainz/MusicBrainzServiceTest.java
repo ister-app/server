@@ -38,7 +38,7 @@ class MusicBrainzServiceTest {
 
     @BeforeEach
     void setUp() {
-        subject = new MusicBrainzService();
+        subject = new MusicBrainzService("https://commons.wikimedia.org/wiki/Special:FilePath/");
         // The service builds its own RestClient in the constructor; rebind it to a mock server
         // so no real network calls are made.
         RestClient.Builder builder = RestClient.builder();

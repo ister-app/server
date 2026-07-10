@@ -1,6 +1,7 @@
 package app.ister.worker.events.musicbrainz;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
@@ -20,15 +21,19 @@ public class MusicBrainzService {
     private static final String COVER_ART_BASE = "https://coverartarchive.org/release";
     private static final String COVER_ART_RELEASE_GROUP_BASE = "https://coverartarchive.org/release-group";
     private static final String WIKIDATA_ENTITY_BASE = "https://www.wikidata.org/wiki/Special:EntityData/";
-    private static final String COMMONS_FILEPATH_BASE = "https://commons.wikimedia.org/wiki/Special:FilePath/";
     private static final int IMAGE_WIDTH = 1000;
     private static final String USER_AGENT = "IsterServer/1.0 (info@ister.app)";
     private static final String ARTIST_QUERY_PREFIX = "artist:";
     private static final int MAX_ATTEMPTS = 3;
 
+    /** Base URL for downloadable Wikimedia Commons files (Special:FilePath). */
+    private final String commonsFilepathBase;
     private final RestClient restClient;
 
-    public MusicBrainzService() {
+    public MusicBrainzService(
+            @Value("${app.ister.worker.musicbrainz.commons-filepath-base:https://commons.wikimedia.org/wiki/Special:FilePath/}")
+            String commonsFilepathBase) {
+        this.commonsFilepathBase = commonsFilepathBase;
         this.restClient = RestClient.builder()
                 .defaultHeader("User-Agent", USER_AGENT)
                 .defaultHeader("Accept", "application/json")
@@ -45,15 +50,23 @@ public class MusicBrainzService {
 
     private record WikiSummary(String extract, String thumbnail) {}
 
+    /** Extra artist data that only the MBID lookup (not the search endpoint) provides. */
+    private record ArtistDetails(String annotationBio, String genre, String imageUrl, String wikidataId) {
+        private static final ArtistDetails EMPTY = new ArtistDetails(null, null, null, null);
+    }
+
+    /** Per-language Wikipedia bios plus the first available thumbnail (image fallback). */
+    private record WikipediaContent(Map<String, String> bios, String thumbnail) {}
+
     public record AlbumInfo(String description) {}
 
     public Optional<String> getCoverArtUrl(String artistName, String albumName) {
         String normalizedAlbum = normalizeAlbumName(albumName);
-        // The album is queried as a quoted phrase but NOT field-scoped (release:/releasegroup:). A
+        // The album is queried as a quoted phrase but deliberately not field-scoped, because a
         // field-scoped exact match fails on stylized canonical titles — e.g. our "Emotion" vs
         // MusicBrainz's "E•MO•TION", where the interpunct splits tokens so "emotion" matches nothing.
-        // The general phrase query lets MusicBrainz's analyzer normalise punctuation and rank it #1;
-        // a normalised-title check on the results then guards against loose false positives.
+        // The general phrase query lets MusicBrainz's analyzer normalise punctuation and rank the
+        // album first, and a normalised-title check on the results guards against loose false positives.
         String query = ARTIST_QUERY_PREFIX + encode(artistName) + " AND " + encode(normalizedAlbum);
 
         // Prefer the release-group front: coverartarchive returns art if ANY release in the group has
@@ -79,7 +92,6 @@ public class MusicBrainzService {
      */
     private Optional<String> findMatchingId(String uriTemplate, String resultsKey, String query,
                                             String artistName, String expectedTitle) {
-        String wanted = normalizeTitle(expectedTitle);
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
                 Thread.sleep(1000);
@@ -91,26 +103,11 @@ public class MusicBrainzService {
                 if (response == null) {
                     return Optional.empty();
                 }
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> results = (List<Map<String, Object>>) response.get(resultsKey);
-                if (results == null || results.isEmpty()) {
-                    log.debug("No MusicBrainz {} found for artist={} album={}", resultsKey, artistName, expectedTitle);
-                    return Optional.empty();
-                }
-                Optional<String> match = results.stream()
-                        .filter(r -> wanted.equals(normalizeTitle((String) r.get("title"))))
-                        .map(r -> (String) r.get("id"))
-                        .filter(Objects::nonNull)
-                        .findFirst();
-                if (match.isEmpty()) {
-                    log.debug("MusicBrainz {} results for artist={} album={} did not match on title",
-                            resultsKey, artistName, expectedTitle);
-                }
-                return match;
+                return matchOnTitle(response, resultsKey, artistName, expectedTitle);
             } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 return Optional.empty();
-            } catch (HttpServerErrorException.ServiceUnavailable e) {
+            } catch (HttpServerErrorException.ServiceUnavailable _) {
                 // MusicBrainz throttles with HTTP 503; the 1s sleep at the top of the loop backs off.
                 log.warn("MusicBrainz {} rate-limited (attempt {}/{}) for artist={} album={}",
                         resultsKey, attempt, MAX_ATTEMPTS, artistName, expectedTitle);
@@ -123,6 +120,29 @@ public class MusicBrainzService {
             }
         }
         return Optional.empty();
+    }
+
+    /** Id of the first result in {@code response} whose title equals {@code expectedTitle} after
+     * normalisation, or empty when there are no results or none matches. */
+    private Optional<String> matchOnTitle(Map<String, Object> response, String resultsKey,
+                                          String artistName, String expectedTitle) {
+        String wanted = normalizeTitle(expectedTitle);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> results = (List<Map<String, Object>>) response.get(resultsKey);
+        if (results == null || results.isEmpty()) {
+            log.debug("No MusicBrainz {} found for artist={} album={}", resultsKey, artistName, expectedTitle);
+            return Optional.empty();
+        }
+        Optional<String> match = results.stream()
+                .filter(r -> wanted.equals(normalizeTitle((String) r.get("title"))))
+                .map(r -> (String) r.get("id"))
+                .filter(Objects::nonNull)
+                .findFirst();
+        if (match.isEmpty()) {
+            log.debug("MusicBrainz {} results for artist={} album={} did not match on title",
+                    resultsKey, artistName, expectedTitle);
+        }
+        return match;
     }
 
     /** Lowercases and removes everything that is not a letter or digit, collapsing stylisation
@@ -146,7 +166,11 @@ public class MusicBrainzService {
         String normalized = name
                 .replaceAll("[(\\[][^)\\]]*[)\\]]", " ")
                 .replaceAll("(?i)\\b(flac|deluxe(\\s+edition)?|special\\s+edition|remastered|remaster|bonus\\s+tracks?)\\b", " ")
-                .replaceAll("(?i)[-\\s]+flac\\b", " ")
+                // Possessive [-\s]++ is equivalent to [-\s]+ here — the class can never match a
+                // character of the literal "flac" that follows, so giving characters back could
+                // never produce a match — but it removes the super-linear backtracking on long
+                // whitespace/dash runs.
+                .replaceAll("(?i)[-\\s]++flac\\b", " ")
                 .replaceAll("\\s{2,}", " ")
                 .strip();
         return normalized.isEmpty() ? name.strip() : normalized;
@@ -154,7 +178,7 @@ public class MusicBrainzService {
 
     public Optional<ArtistInfo> getArtistInfo(String artistName, List<String> languageTags) {
         Map<String, Object> artist = searchTopArtist(artistName);
-        if (artist == null) {
+        if (artist.isEmpty()) {
             return Optional.empty();
         }
         // Guard against a wrong artist: if MusicBrainz returned a name, require it to match ours
@@ -167,53 +191,21 @@ public class MusicBrainzService {
 
         String type = artist.get("type") instanceof String s ? s : null;
         String lifeSpanBegin = extractLifeSpanBegin(artist);
+
+        ArtistDetails details = lookupArtistDetails(artist);
         String genre = extractTopTag(artist);
-
-        // The /artist search endpoint ignores inc=annotation+url-rels, so the image/wikidata links
-        // only come from an MBID lookup.
-        String imageUrl = null;
-        String wikidataId = null;
-        String annotationBio = null;
-        String mbid = artist.get("id") instanceof String s ? s : null;
-        if (mbid != null) {
-            Map<String, Object> details = lookupArtist(mbid);
-            if (details != null) {
-                annotationBio = extractAnnotation(details);
-                if (genre == null) {
-                    genre = extractTopTag(details);
-                }
-                imageUrl = extractImageRelationUrl(details);
-                wikidataId = extractWikidataId(details);
-            }
+        if (genre == null) {
+            genre = details.genre();
         }
 
-        // Bio per language + a thumbnail image fallback come from Wikidata → Wikipedia. MusicBrainz
-        // annotations are rare, and artists link via wikidata (not a direct wikipedia relation).
-        Map<String, String> bios = new LinkedHashMap<>();
-        if (wikidataId != null && languageTags != null && !languageTags.isEmpty()) {
-            Map<String, Object> wikidata = fetchWikidataEntity(wikidataId);
-            if (wikidata != null) {
-                for (String tag : languageTags) {
-                    String title = sitelinkTitle(wikidata, wikidataId, tag);
-                    if (title == null) {
-                        continue;
-                    }
-                    WikiSummary summary = fetchWikipediaSummary(tag, title);
-                    if (summary == null) {
-                        continue;
-                    }
-                    if (summary.extract() != null && !summary.extract().isBlank()) {
-                        bios.put(tag, summary.extract());
-                    }
-                    if (imageUrl == null && summary.thumbnail() != null) {
-                        imageUrl = summary.thumbnail();
-                    }
-                }
-            }
-        }
+        WikipediaContent wiki = fetchWikipediaContent(details.wikidataId(), languageTags);
+        // The MusicBrainz image relation wins over the Wikipedia thumbnail fallback.
+        String imageUrl = details.imageUrl() != null ? details.imageUrl() : wiki.thumbnail();
+
+        Map<String, String> bios = wiki.bios();
         // Fall back to the (rare) MusicBrainz annotation for the primary language if Wikipedia gave nothing.
-        if (bios.isEmpty() && annotationBio != null && languageTags != null && !languageTags.isEmpty()) {
-            bios.put(languageTags.getFirst(), annotationBio);
+        if (bios.isEmpty() && details.annotationBio() != null && languageTags != null && !languageTags.isEmpty()) {
+            bios.put(languageTags.getFirst(), details.annotationBio());
         }
 
         // Return whenever the artist was found, so the birth year (life-span) flows through even for
@@ -221,18 +213,58 @@ public class MusicBrainzService {
         return Optional.of(new ArtistInfo(bios, genre, imageUrl, type, lifeSpanBegin));
     }
 
+    /** The /artist search endpoint ignores inc=annotation+url-rels, so the annotation and the
+     * image/wikidata links only come from an MBID lookup. */
+    private ArtistDetails lookupArtistDetails(Map<String, Object> artist) {
+        if (!(artist.get("id") instanceof String mbid)) {
+            return ArtistDetails.EMPTY;
+        }
+        Map<String, Object> details = lookupArtist(mbid);
+        return new ArtistDetails(extractAnnotation(details), extractTopTag(details),
+                extractImageRelationUrl(details), extractWikidataId(details));
+    }
+
+    /** Bio per language + a thumbnail image fallback come from Wikidata → Wikipedia. MusicBrainz
+     * annotations are rare, and artists link via wikidata (not a direct wikipedia relation). */
+    private WikipediaContent fetchWikipediaContent(String wikidataId, List<String> languageTags) {
+        Map<String, String> bios = new LinkedHashMap<>();
+        if (wikidataId == null || languageTags == null || languageTags.isEmpty()) {
+            return new WikipediaContent(bios, null);
+        }
+        Map<String, Object> wikidata = fetchWikidataEntity(wikidataId);
+        String thumbnail = null;
+        for (String tag : languageTags) {
+            WikiSummary summary = fetchSummaryForLanguage(wikidata, wikidataId, tag);
+            if (summary == null) {
+                continue;
+            }
+            if (summary.extract() != null && !summary.extract().isBlank()) {
+                bios.put(tag, summary.extract());
+            }
+            if (thumbnail == null && summary.thumbnail() != null) {
+                thumbnail = summary.thumbnail();
+            }
+        }
+        return new WikipediaContent(bios, thumbnail);
+    }
+
+    /** Wikipedia summary for one language via the entity's sitelink, or null when the entity has
+     * no wiki in that language (or the summary fetch failed). */
+    private WikiSummary fetchSummaryForLanguage(Map<String, Object> wikidata, String wikidataId, String tag) {
+        String title = sitelinkTitle(wikidata, wikidataId, tag);
+        return title == null ? null : fetchWikipediaSummary(tag, title);
+    }
+
+    /** Top /artist search result, or an empty map when nothing was found. */
     private Map<String, Object> searchTopArtist(String artistName) {
         Map<String, Object> response = musicBrainzGet(
                 "/artist?query={query}&fmt=json&limit=1&inc=tags", ARTIST_QUERY_PREFIX + encode(artistName),
                 "artist search", artistName);
-        if (response == null) {
-            return null;
-        }
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> artists = (List<Map<String, Object>>) response.get("artists");
         if (artists == null || artists.isEmpty()) {
             log.debug("No MusicBrainz artist found for name={}", artistName);
-            return null;
+            return Map.of();
         }
         return artists.getFirst();
     }
@@ -241,8 +273,8 @@ public class MusicBrainzService {
         return musicBrainzGet("/artist/{mbid}?fmt=json&inc=annotation+url-rels+tags", mbid, "artist lookup", mbid);
     }
 
-    /** GETs a MusicBrainz JSON document, retrying on HTTP 503 (rate limiting). Returns null on
-     * repeated rate limiting, other client/server errors, or a null body. */
+    /** GETs a MusicBrainz JSON document, retrying on HTTP 503 (rate limiting). Returns an empty
+     * map on repeated rate limiting, other client/server errors, or a null body. */
     private Map<String, Object> musicBrainzGet(String uriTemplate, String pathArg, String what, String context) {
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
@@ -252,21 +284,21 @@ public class MusicBrainzService {
                         .uri(MUSICBRAINZ_BASE + uriTemplate, pathArg)
                         .retrieve()
                         .body(Map.class);
-                return response;
+                return response == null ? Map.of() : response;
             } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
-                return null;
-            } catch (HttpServerErrorException.ServiceUnavailable e) {
+                return Map.of();
+            } catch (HttpServerErrorException.ServiceUnavailable _) {
                 log.warn("MusicBrainz {} rate-limited (attempt {}/{}) for {}", what, attempt, MAX_ATTEMPTS, context);
                 if (attempt == MAX_ATTEMPTS) {
-                    return null;
+                    return Map.of();
                 }
             } catch (RestClientException e) {
                 log.warn("MusicBrainz {} error for {}: {}", what, context, e.getMessage());
-                return null;
+                return Map.of();
             }
         }
-        return null;
+        return Map.of();
     }
 
     public Optional<AlbumInfo> getAlbumInfo(String artistName, String albumName) {
@@ -347,7 +379,7 @@ public class MusicBrainzService {
             return null;
         }
         String fileName = resource.substring(marker + "/wiki/File:".length());
-        return COMMONS_FILEPATH_BASE + fileName + "?width=" + IMAGE_WIDTH;
+        return commonsFilepathBase + fileName + "?width=" + IMAGE_WIDTH;
     }
 
     /** Wikidata entity id (e.g. "Q151892") from the MusicBrainz "wikidata" relation. */
@@ -378,6 +410,7 @@ public class MusicBrainzService {
         return null;
     }
 
+    /** Wikidata entity document, or an empty map when the fetch failed or the body was null. */
     private Map<String, Object> fetchWikidataEntity(String wikidataId) {
         try {
             Thread.sleep(500);
@@ -386,13 +419,13 @@ public class MusicBrainzService {
                     .uri(WIKIDATA_ENTITY_BASE + "{id}.json", wikidataId)
                     .retrieve()
                     .body(Map.class);
-            return body;
+            return body == null ? Map.of() : body;
         } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
-            return null;
+            return Map.of();
         } catch (RestClientException e) {
             log.debug("Wikidata fetch failed for {}: {}", wikidataId, e.getMessage());
-            return null;
+            return Map.of();
         }
     }
 
