@@ -9,8 +9,10 @@ import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.SearchEntityType;
+import app.ister.core.enums.SubtitleFormat;
 import app.ister.core.eventdata.AudioFileFoundData;
 import app.ister.core.eventdata.ImageFoundData;
+import app.ister.core.eventdata.TranscodeRequestedData;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.ImageRepository;
@@ -31,6 +33,8 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -143,7 +147,37 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
             saveTrackMetadataFromTags(messageData.getTrackEntityUUID(), freshEntity);
             extractEmbeddedCoverArt(freshDirectory, freshEntity, checkResult.hasAttachedPic());
             deleteHlsCache(freshEntity.getId());
+            requestPlaylistPreGenerationAfterCommit(freshEntity.getId(), freshDirectory.getName());
         });
+    }
+
+    /**
+     * Pre-generates the HLS playlists for this track so the first play is a cache hit
+     * instead of a queue round-trip. preTranscode stays false: no FFmpeg passes are
+     * started, only playlists are written (cheap: audio-only files skip all ffprobes).
+     * Sent after commit so the transcoder sees the stream rows upserted above.
+     */
+    private void requestPlaylistPreGenerationAfterCommit(UUID mediaFileId, String directoryName) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    sendPlaylistPreGeneration(mediaFileId, directoryName);
+                }
+            });
+        } else {
+            sendPlaylistPreGeneration(mediaFileId, directoryName);
+        }
+    }
+
+    private void sendPlaylistPreGeneration(UUID mediaFileId, String directoryName) {
+        messageSender.sendTranscodeRequested(TranscodeRequestedData.builder()
+                .eventType(EventType.TRANSCODE_REQUESTED)
+                .mediaFileId(mediaFileId)
+                .direct(true)
+                .transcode(true)
+                .subtitleFormat(SubtitleFormat.WEBVTT)
+                .build(), directoryName);
     }
 
     private void saveTrackMetadataFromTags(UUID trackEntityUUID, MediaFileEntity mediaFile) {

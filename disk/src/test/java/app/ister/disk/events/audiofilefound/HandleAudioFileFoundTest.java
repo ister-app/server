@@ -533,4 +533,35 @@ class HandleAudioFileFoundTest {
         // HLS cache dir should be deleted
         org.junit.jupiter.api.Assertions.assertFalse(Files.exists(hlsDir));
     }
+
+    @Test
+    void handleRequestsPlaylistPreGeneration() {
+        DirectoryEntity directory = DirectoryEntity.builder().name("music-dir").build();
+        ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
+
+        UUID mediaFileId = UUID.randomUUID();
+        MediaFileEntity mediaFile = MediaFileEntity.builder()
+                .path(PATH)
+                .size(1000L).build();
+        ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
+
+        when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 1000L));
+
+        subject.handle(AudioFileFoundData.builder()
+                .eventType(EventType.AUDIO_FILE_FOUND)
+                .directoryEntityUUID(DIRECTORY_ID)
+                .trackEntityUUID(null)
+                .path(PATH).build());
+
+        // Playlists are pre-generated so the first play is a cache hit; no FFmpeg passes (preTranscode unset).
+        var captor = org.mockito.ArgumentCaptor.forClass(app.ister.core.eventdata.TranscodeRequestedData.class);
+        verify(messageSenderMock).sendTranscodeRequested(captor.capture(), org.mockito.ArgumentMatchers.eq("music-dir"));
+        org.junit.jupiter.api.Assertions.assertEquals(mediaFileId, captor.getValue().getMediaFileId());
+        org.junit.jupiter.api.Assertions.assertEquals(Boolean.TRUE, captor.getValue().getDirect());
+        org.junit.jupiter.api.Assertions.assertEquals(Boolean.TRUE, captor.getValue().getTranscode());
+        org.junit.jupiter.api.Assertions.assertNull(captor.getValue().getPreTranscode());
+    }
 }
