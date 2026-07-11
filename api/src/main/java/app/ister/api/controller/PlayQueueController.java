@@ -20,6 +20,7 @@ import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.PlayQueuePrefetchService;
 import app.ister.core.service.PlayQueueService;
+import app.ister.core.status.PlaybackCommandService;
 import app.ister.core.status.PlaybackSessionRegistry;
 import app.ister.core.status.PlaybackStatusService;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +61,8 @@ public class PlayQueueController {
     private final PlaybackStatusService playbackStatusService;
 
     private final PlaybackSessionRegistry playbackSessionRegistry;
+
+    private final PlaybackCommandService playbackCommandService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -224,19 +227,25 @@ public class PlayQueueController {
     @PreAuthorize("hasRole('user')")
     @MutationMapping
     public PlayQueueEntity movePlayQueueItem(@Argument UUID playQueueId, @Argument UUID playQueueItemId, @Argument UUID afterPlayQueueItemId, Authentication authentication) {
-        return playQueueService.movePlayQueueItem(playQueueId, playQueueItemId, afterPlayQueueItemId, authentication);
+        PlayQueueEntity queue = playQueueService.movePlayQueueItem(playQueueId, playQueueItemId, afterPlayQueueItemId, authentication);
+        playbackCommandService.publishQueueChanged(playQueueId);
+        return queue;
     }
 
     @PreAuthorize("hasRole('user')")
     @MutationMapping
     public PlayQueueEntity removePlayQueueItem(@Argument UUID playQueueId, @Argument UUID playQueueItemId, Authentication authentication) {
-        return playQueueService.removePlayQueueItem(playQueueId, playQueueItemId, authentication);
+        PlayQueueEntity queue = playQueueService.removePlayQueueItem(playQueueId, playQueueItemId, authentication);
+        playbackCommandService.publishQueueChanged(playQueueId);
+        return queue;
     }
 
     @PreAuthorize("hasRole('user')")
     @MutationMapping
     public PlayQueueEntity addPlayQueueItem(@Argument UUID playQueueId, @Argument MediaType mediaType, @Argument UUID mediaId, @Argument UUID afterPlayQueueItemId, Authentication authentication) {
-        return playQueueService.addPlayQueueItem(playQueueId, mediaType, mediaId, afterPlayQueueItemId, authentication);
+        PlayQueueEntity queue = playQueueService.addPlayQueueItem(playQueueId, mediaType, mediaId, afterPlayQueueItemId, authentication);
+        playbackCommandService.publishQueueChanged(playQueueId);
+        return queue;
     }
 
     @SchemaMapping(typeName = "PlayQueue", field = "currentItemId")

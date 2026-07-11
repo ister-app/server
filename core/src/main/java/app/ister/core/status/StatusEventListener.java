@@ -2,6 +2,7 @@ package app.ister.core.status;
 
 import app.ister.core.eventdata.EventFailureStatusData;
 import app.ister.core.eventdata.NodeActivityStatusData;
+import app.ister.core.eventdata.PlaybackCommandData;
 import app.ister.core.eventdata.PlaybackStatusData;
 import app.ister.core.eventdata.QueueStatsStatusData;
 import org.springframework.amqp.rabbit.annotation.RabbitHandler;
@@ -20,7 +21,7 @@ import org.springframework.stereotype.Component;
 @Component
 // Jackson binding of the @RabbitHandler payloads in the GraalVM native image.
 @RegisterReflectionForBinding({NodeActivityStatusData.class, QueueStatsStatusData.class,
-        EventFailureStatusData.class, PlaybackStatusData.class})
+        EventFailureStatusData.class, PlaybackStatusData.class, PlaybackCommandData.class})
 @RabbitListener(queues = "#{statusQueue.name}")
 public class StatusEventListener {
 
@@ -62,5 +63,10 @@ public class StatusEventListener {
     public void onPlayback(PlaybackStatusData data) {
         playbackSessionRegistry.update(data);
         broadcaster.emitNowPlaying(playbackSessionRegistry.snapshot());
+    }
+
+    @RabbitHandler
+    public void onPlaybackCommand(PlaybackCommandData data) {
+        broadcaster.emitCommand(data);
     }
 }

@@ -71,8 +71,12 @@ class PlayQueueServiceTest {
         user = UserEntity.builder().id(UUID.randomUUID()).build();
     }
 
+    /**
+     * Lenient: since queue reads/edits became party-mode (no ownership check), only the
+     * create/update/watch-status paths still resolve the user.
+     */
     private void mockUser() {
-        when(userService.getOrCreateUser(authentication)).thenReturn(user);
+        lenient().when(userService.getOrCreateUser(authentication)).thenReturn(user);
     }
 
     /**
@@ -126,17 +130,19 @@ class PlayQueueServiceTest {
     }
 
     @Test
-    void getPlayQueueThrowsForOtherUsersQueue() {
+    void getPlayQueueReturnsOtherUsersQueueForPartyMode() {
         mockUser();
         PlayQueueEntity queue = PlayQueueEntity.builder()
                 .id(UUID.randomUUID())
                 .userEntity(UserEntity.builder().id(UUID.randomUUID()).build())
+                .sourceExhausted(true)
                 .items(new ArrayList<>())
                 .build();
         when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
 
-        UUID queueId = queue.getId();
-        assertThrows(AccessDeniedException.class, () -> subject.getPlayQueue(queueId, authentication));
+        Optional<PlayQueueEntity> result = subject.getPlayQueue(queue.getId(), authentication);
+
+        assertTrue(result.isPresent());
     }
 
     @Test
@@ -353,6 +359,26 @@ class PlayQueueServiceTest {
     }
 
     @Test
+    void updatePlayQueueThrowsForOtherUsersQueue() {
+        // The heartbeat stays owner-only: it writes the caller's watch status and
+        // defines the session identity, unlike the party-mode queue reads/edits.
+        mockUser();
+        PlayQueueItemEntity item = buildItem(MediaType.TRACK, UUID.randomUUID(), "1000");
+        PlayQueueEntity queue = PlayQueueEntity.builder()
+                .id(UUID.randomUUID())
+                .userEntity(UserEntity.builder().id(UUID.randomUUID()).build())
+                .sourceExhausted(true)
+                .items(new ArrayList<>(List.of(item)))
+                .build();
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        UUID queueId = queue.getId();
+        UUID itemId = item.getId();
+
+        assertThrows(AccessDeniedException.class,
+                () -> subject.updatePlayQueue(queueId, 5000L, itemId, null, authentication));
+    }
+
+    @Test
     void updatePlayQueueUpdatesProgressAndSaves() {
         mockUser();
         PlayQueueItemEntity item = buildItem(MediaType.EPISODE, UUID.randomUUID(), "1000");
@@ -556,19 +582,21 @@ class PlayQueueServiceTest {
     }
 
     @Test
-    void movePlayQueueItemThrowsForOtherUsersQueue() {
+    void movePlayQueueItemAllowedOnOtherUsersQueueForPartyMode() {
         mockUser();
+        PlayQueueItemEntity first = buildItem(MediaType.TRACK, UUID.randomUUID(), "1000");
+        PlayQueueItemEntity second = buildItem(MediaType.TRACK, UUID.randomUUID(), "2000");
         PlayQueueEntity queue = PlayQueueEntity.builder()
                 .id(UUID.randomUUID())
                 .userEntity(UserEntity.builder().id(UUID.randomUUID()).build())
-                .items(new ArrayList<>())
+                .sourceExhausted(true)
+                .items(new ArrayList<>(List.of(first, second)))
                 .build();
         when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
-        UUID queueId = queue.getId();
-        UUID itemId = UUID.randomUUID();
 
-        assertThrows(AccessDeniedException.class,
-                () -> subject.movePlayQueueItem(queueId, itemId, null, authentication));
+        subject.movePlayQueueItem(queue.getId(), second.getId(), null, authentication);
+
+        assertEquals(List.of(second, first), queue.getItems());
     }
 
     // --- removePlayQueueItem ---

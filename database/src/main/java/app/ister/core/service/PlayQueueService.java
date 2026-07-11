@@ -77,13 +77,14 @@ public class PlayQueueService {
         this.watchStatusService = watchStatusService;
     }
 
+    /**
+     * Readable by any authenticated user (not just the owner): remote-control ("party
+     * mode") clients render another user's queue from this.
+     */
     @Transactional
     public Optional<PlayQueueEntity> getPlayQueue(UUID id, Authentication authentication) {
         Optional<PlayQueueEntity> playQueueEntityOptional = playQueueRepository.findById(id);
-        playQueueEntityOptional.ifPresent(playQueueEntity -> {
-            checkOwnership(playQueueEntity, authentication);
-            maybeExtend(playQueueEntity);
-        });
+        playQueueEntityOptional.ifPresent(this::maybeExtend);
         return playQueueEntityOptional;
     }
 
@@ -176,7 +177,7 @@ public class PlayQueueService {
     @Transactional
     public PlayQueueEntity movePlayQueueItem(UUID playQueueId, UUID playQueueItemId, UUID afterItemId, Authentication authentication) {
         log.debug("Moving play queue item {} in queue {}", playQueueItemId, playQueueId);
-        PlayQueueEntity queue = getOwnedQueue(playQueueId, authentication);
+        PlayQueueEntity queue = getEditableQueue(playQueueId);
         if (playQueueItemId.equals(afterItemId)) {
             throw new IllegalArgumentException("Cannot move an item after itself");
         }
@@ -201,7 +202,7 @@ public class PlayQueueService {
     @Transactional
     public PlayQueueEntity removePlayQueueItem(UUID playQueueId, UUID playQueueItemId, Authentication authentication) {
         log.debug("Removing play queue item {} from queue {}", playQueueItemId, playQueueId);
-        PlayQueueEntity queue = getOwnedQueue(playQueueId, authentication);
+        PlayQueueEntity queue = getEditableQueue(playQueueId);
         List<PlayQueueItemEntity> items = queue.getItems();
         int index = -1;
         for (int i = 0; i < items.size(); i++) {
@@ -240,7 +241,7 @@ public class PlayQueueService {
     @Transactional
     public PlayQueueEntity addPlayQueueItem(UUID playQueueId, MediaType mediaType, UUID mediaId, UUID afterItemId, Authentication authentication) {
         log.debug("Adding {} {} to queue {}", mediaType, mediaId, playQueueId);
-        PlayQueueEntity queue = getOwnedQueue(playQueueId, authentication);
+        PlayQueueEntity queue = getEditableQueue(playQueueId);
         validateMediaExists(mediaType, mediaId);
 
         BigDecimal position;
@@ -499,11 +500,15 @@ public class PlayQueueService {
         }
     }
 
-    private PlayQueueEntity getOwnedQueue(UUID playQueueId, Authentication authentication) {
-        PlayQueueEntity queue = playQueueRepository.findById(playQueueId)
+    /**
+     * Queue edits (add/move/remove) are deliberately not ownership-checked: remote
+     * control ("party mode") lets any authenticated user edit any queue. The heartbeat
+     * (updatePlayQueue) stays owner-only — it writes the caller's watch status and
+     * defines the session identity.
+     */
+    private PlayQueueEntity getEditableQueue(UUID playQueueId) {
+        return playQueueRepository.findById(playQueueId)
                 .orElseThrow(() -> new IllegalArgumentException("Play queue not found"));
-        checkOwnership(queue, authentication);
-        return queue;
     }
 
     private void checkOwnership(PlayQueueEntity queue, Authentication authentication) {

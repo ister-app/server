@@ -1,5 +1,6 @@
 package app.ister.core.status;
 
+import app.ister.core.eventdata.PlaybackCommandData;
 import app.ister.core.eventdata.PlaybackStatusData;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -23,6 +24,9 @@ public class ServerStatusBroadcaster {
 
     private final Sinks.Many<Object> activitySink = Sinks.many().replay().limit(1);
     private final Sinks.Many<List<PlaybackStatusData>> nowPlayingSink = Sinks.many().replay().limit(1);
+    // Commands must NOT replay: a (re)subscriber would re-execute the last command.
+    // Best-effort is correct here — with no live subscriber a command has no addressee.
+    private final Sinks.Many<PlaybackCommandData> commandSink = Sinks.many().multicast().directBestEffort();
 
     public ServerStatusBroadcaster() {
         // Seed so a subscriber on a fresh node immediately receives the (empty) list
@@ -38,6 +42,12 @@ public class ServerStatusBroadcaster {
 
     public void emitNowPlaying(List<PlaybackStatusData> sessions) {
         emitSerialized(nowPlayingSink, sessions);
+    }
+
+    public void emitCommand(PlaybackCommandData command) {
+        // Only emitted from the RabbitMQ listener thread, so no concurrent-emit spin
+        // needed; a dropped command (no subscribers) is intended behaviour.
+        commandSink.tryEmitNext(command);
     }
 
     /**
@@ -56,5 +66,9 @@ public class ServerStatusBroadcaster {
 
     public Flux<List<PlaybackStatusData>> nowPlayingFlux() {
         return nowPlayingSink.asFlux();
+    }
+
+    public Flux<PlaybackCommandData> commandFlux() {
+        return commandSink.asFlux();
     }
 }

@@ -58,6 +58,9 @@ class PlayQueueControllerTest {
     private app.ister.core.status.PlaybackSessionRegistry playbackSessionRegistry;
 
     @Mock
+    private app.ister.core.status.PlaybackCommandService playbackCommandService;
+
+    @Mock
     private Authentication authentication;
 
     private PlayQueueEntity buildQueueWithUser() {
@@ -123,6 +126,7 @@ class PlayQueueControllerTest {
         PlayQueueEntity result = subject.movePlayQueueItem(queueId, itemId, afterId, authentication);
 
         assertEquals(queue, result);
+        verify(playbackCommandService).publishQueueChanged(queueId);
     }
 
     @Test
@@ -135,6 +139,7 @@ class PlayQueueControllerTest {
         PlayQueueEntity result = subject.removePlayQueueItem(queueId, itemId, authentication);
 
         assertEquals(queue, result);
+        verify(playbackCommandService).publishQueueChanged(queueId);
     }
 
     @Test
@@ -147,6 +152,7 @@ class PlayQueueControllerTest {
         PlayQueueEntity result = subject.addPlayQueueItem(queueId, MediaType.TRACK, mediaId, null, authentication);
 
         assertEquals(queue, result);
+        verify(playbackCommandService).publishQueueChanged(queueId);
     }
 
     @Test
