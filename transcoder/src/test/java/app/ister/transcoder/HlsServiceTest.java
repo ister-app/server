@@ -13,6 +13,7 @@ import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.utils.Jaffree;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,8 +27,10 @@ import com.github.kokorin.jaffree.ffmpeg.FFmpegResultFuture;
 import com.github.kokorin.jaffree.process.Stopper;
 
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -89,6 +92,18 @@ class HlsServiceTest {
         ReflectionTestUtils.setField(hlsService, "uploadDrainTimeoutMs", 5000L);
     }
 
+    @AfterEach
+    void tearDown() throws InterruptedException {
+        // Pass threads must not outlive the test: a lingering pass writes segments/done markers
+        // into the @TempDir while JUnit deletes it, failing the cleanup of this or a later test.
+        transcodeService.transcodeExecutor.shutdown();
+        if (!transcodeService.transcodeExecutor.awaitTermination(10, TimeUnit.SECONDS)) {
+            transcodeService.transcodeExecutor.shutdownNow();
+            assertTrue(transcodeService.transcodeExecutor.awaitTermination(5, TimeUnit.SECONDS),
+                    "transcode pass threads did not terminate");
+        }
+    }
+
     private static final Stopper NOOP_STOPPER = new Stopper() {
         @Override public void graceStop() { /* no-op: test double never runs a real process */ }
         @Override public void forceStop() { /* no-op: test double never runs a real process */ }
@@ -97,6 +112,14 @@ class HlsServiceTest {
 
     private static FFmpegResultFuture completedFFmpegFuture() {
         return new FFmpegResultFuture(CompletableFuture.completedFuture(null), NOOP_STOPPER);
+    }
+
+    private static void writeIfAbsent(Path file, String content) throws IOException {
+        try {
+            Files.writeString(file, content, StandardOpenOption.CREATE_NEW);
+        } catch (FileAlreadyExistsException _) {
+            // another pass already wrote it — leave it untouched
+        }
     }
 
     private static FFmpegResultFuture failedFFmpegFuture(Throwable cause) {
@@ -750,9 +773,11 @@ class HlsServiceTest {
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
 
+        // Both passes run this answer concurrently; CREATE_NEW prevents the second pass from
+        // truncating a segment the first pass wrote while the test thread is reading its size.
         doAnswer(inv -> {
-            Files.writeString(cacheDir.resolve("seg_video_720p_00000.ts"), "video-data");
-            Files.writeString(cacheDir.resolve("seg_audio_1_192k_00000.ts"), "audio-data");
+            writeIfAbsent(cacheDir.resolve("seg_video_720p_00000.ts"), "video-data");
+            writeIfAbsent(cacheDir.resolve("seg_audio_1_192k_00000.ts"), "audio-data");
             return completedFFmpegFuture();
         }).when(ffmpegMock).executeAsync();
 

@@ -4,6 +4,7 @@ import app.ister.core.utils.Jaffree;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.FFmpegResultFuture;
 import com.github.kokorin.jaffree.process.Stopper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -60,6 +61,18 @@ class HlsTranscodeServiceTest {
         ReflectionTestUtils.setField(service, "passStallTimeoutSeconds", 60L);
         ReflectionTestUtils.setField(service, "cacheRetentionHours", 2L);
         service.init();
+    }
+
+    @AfterEach
+    void tearDown() throws InterruptedException {
+        // Pass threads must not outlive the test: a lingering pass writes segments/done markers
+        // into the @TempDir while JUnit deletes it, failing the cleanup of this or a later test.
+        service.transcodeExecutor.shutdown();
+        if (!service.transcodeExecutor.awaitTermination(10, TimeUnit.SECONDS)) {
+            service.transcodeExecutor.shutdownNow();
+            assertTrue(service.transcodeExecutor.awaitTermination(5, TimeUnit.SECONDS),
+                    "transcode pass threads did not terminate");
+        }
     }
 
     private static FFmpegResultFuture completedFFmpegFuture() {
