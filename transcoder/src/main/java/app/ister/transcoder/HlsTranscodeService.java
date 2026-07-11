@@ -330,6 +330,17 @@ public class HlsTranscodeService {
         return cf != null && cf.isCompletedExceptionally();
     }
 
+    /**
+     * True while at least one FFmpeg pass for this file is still encoding (not yet done). Used by
+     * the tmp-cleanup sweep to avoid deleting a transcode working directory that is in active use.
+     */
+    public boolean hasActivePassForFile(UUID mediaFileId) {
+        String prefix = mediaFileId.toString() + "_";
+        return activeGenerations.entrySet().stream()
+                .filter(e -> e.getKey().startsWith(prefix))
+                .anyMatch(e -> !e.getValue().isDone());
+    }
+
     public boolean hasAnyActiveOrCompletedPassForFile(UUID mediaFileId) {
         String prefix = mediaFileId.toString() + "_";
         return activeGenerations.entrySet().stream()

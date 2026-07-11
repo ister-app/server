@@ -5,7 +5,9 @@ import app.ister.core.entity.ImageEntity;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -18,6 +20,13 @@ public interface ImageRepository extends CrudRepository<ImageEntity, UUID> {
     Optional<ImageEntity> findByDirectoryEntityAndPath(DirectoryEntity directoryEntity, String path);
 
     Optional<ImageEntity> findByDirectoryEntityIdAndPath(UUID directoryEntityId, String path);
+
+    /**
+     * All image file paths referenced for a cache directory. Used by the cache-cleanup sweep to
+     * decide which files on disk are still referenced (everything else is a zombie).
+     */
+    @Query("select i.path from ImageEntity i where i.directoryEntityId = :directoryEntityId and i.path is not null")
+    List<String> findPathsByDirectoryEntityId(@Param("directoryEntityId") UUID directoryEntityId);
 
     List<ImageEntity> findByDirectoryEntity(DirectoryEntity directoryEntity);
 

@@ -14,5 +14,6 @@ dependencies {
 
     // Testing Dependencies
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation libs.jimfs
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

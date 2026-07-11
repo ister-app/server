@@ -20,6 +20,13 @@ public interface MediaFileStreamRepository extends JpaRepository<MediaFileStream
 
     List<MediaFileStreamEntity> findByMediaFileEntity_IdAndCodecType(UUID mediaFileId, StreamCodecType codecType);
 
+    /**
+     * All non-null stream file paths (e.g. extracted {@code .srt} subtitles cached on disk). Used
+     * by the cache-cleanup sweep to keep referenced subtitle files while removing zombies.
+     */
+    @Query("select s.path from MediaFileStreamEntity s where s.path is not null")
+    List<String> findAllNonNullPaths();
+
     @Modifying(clearAutomatically = true)
     @Query(value = "DELETE FROM media_file_stream_entity WHERE media_file_entity_id = :mediaFileEntityId", nativeQuery = true)
     void deleteAllByMediaFileEntityId(@Param("mediaFileEntityId") UUID mediaFileEntityId);
