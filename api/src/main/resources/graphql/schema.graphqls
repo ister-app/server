@@ -9,6 +9,12 @@ type Query {
     movies(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): MoviePage
     movieById(id: ID): Movie
     showById(id: ID): Show
+    """
+    Paged cast/credits for a single show, movie or episode.
+    Exactly one of showId/movieId/episodeId should be provided.
+    Ordered by castOrder (nulls last).
+    """
+    cast(showId: ID, movieId: ID, episodeId: ID, page: Int, size: Int): CreditPage
     getPlayQueue(id: ID!): PlayQueue
     libraries: [Library!]
     persons(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): PersonPage
@@ -378,6 +384,14 @@ type PersonPage {
 
 type AlbumPage {
     content: [Album!]!
+    totalPages: Int!
+    totalElements: Int!
+    number: Int!
+    size: Int!
+}
+
+type CreditPage {
+    content: [Credit!]!
     totalPages: Int!
     totalElements: Int!
     number: Int!

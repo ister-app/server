@@ -11,8 +11,15 @@ import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.ShowRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.BatchMapping;
+import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 
 import java.util.Comparator;
@@ -20,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -30,10 +38,35 @@ public class CreditController {
     private static final Comparator<CreditEntity> BY_CAST_ORDER =
             Comparator.comparing(CreditEntity::getCastOrder, Comparator.nullsLast(Comparator.naturalOrder()));
 
+    /** castOrder ascending, nulls last — mirrors {@link #BY_CAST_ORDER} for the paged query. */
+    private static final Sort BY_CAST_ORDER_SORT = Sort.by(Sort.Order.asc("castOrder").nullsLast());
+
+    private static final int DEFAULT_PAGE_SIZE = 20;
+
     private final CreditRepository creditRepository;
     private final MovieRepository movieRepository;
     private final ShowRepository showRepository;
     private final EpisodeRepository episodeRepository;
+
+    @PreAuthorize("hasRole('user')")
+    @QueryMapping
+    public Page<CreditEntity> cast(
+            @Argument Optional<UUID> showId,
+            @Argument Optional<UUID> movieId,
+            @Argument Optional<UUID> episodeId,
+            @Argument Optional<Integer> page,
+            @Argument Optional<Integer> size) {
+        long provided = List.of(showId, movieId, episodeId).stream().filter(Optional::isPresent).count();
+        if (provided != 1) {
+            throw new IllegalArgumentException("Exactly one of showId, movieId or episodeId must be provided.");
+        }
+        int pageSize = Math.clamp(size.orElse(DEFAULT_PAGE_SIZE), 1, Paging.MAX_PAGE_SIZE);
+        Pageable pageable = PageRequest.of(Math.max(page.orElse(0), 0), pageSize, BY_CAST_ORDER_SORT);
+        return showId.map(id -> creditRepository.findByShowEntityId(id, pageable))
+                .or(() -> movieId.map(id -> creditRepository.findByMovieEntityId(id, pageable)))
+                .or(() -> episodeId.map(id -> creditRepository.findByEpisodeEntityId(id, pageable)))
+                .orElseThrow();
+    }
 
     @BatchMapping(typeName = "Movie", field = "cast")
     public Map<MovieEntity, List<CreditEntity>> movieCast(List<MovieEntity> movies) {
