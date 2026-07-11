@@ -86,6 +86,9 @@ class PostgresRepositoryIntegrationTest {
     @Autowired
     private ImageRepository imageRepository;
 
+    @Autowired
+    private RatingRepository ratingRepository;
+
     /**
      * The blur-hash sweep walks a directory in chunks, resuming from the last id of the previous
      * chunk. Note that PostgreSQL orders {@code uuid} as unsigned bytes while
@@ -366,6 +369,20 @@ class PostgresRepositoryIntegrationTest {
         paged.addAll(episodeRepository.findEpisodeIdsForShowOrdered(show.getId(), 4, 4));
 
         assertEquals(expectedOrder, paged);
+    }
+
+    @Test
+    void ratingCanBeStoredAndReadBackPerUserAndItem() {
+        UserEntity user = em.persist(UserEntity.builder().externalId("rater-1").build());
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.MOVIE).name("Movies-rating").build());
+        MovieEntity movie = em.persist(MovieEntity.builder().libraryEntity(library).name("Rated").releaseYear(2020).build());
+        em.persistAndFlush(app.ister.core.entity.RatingEntity.builder().userEntity(user).movieEntity(movie).value(8).build());
+        em.clear();
+
+        assertEquals(8, ratingRepository.findByUserEntityAndMovieEntity(user, movie).orElseThrow().getValue());
+        var batch = ratingRepository.findByUserEntityExternalIdAndMovieEntityIn("rater-1", List.of(movie));
+        assertEquals(1, batch.size());
+        assertEquals(8, batch.get(0).getValue());
     }
 
     private MediaFileEntity persistMediaFile(String path) {
