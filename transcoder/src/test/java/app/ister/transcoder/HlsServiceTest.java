@@ -1427,6 +1427,68 @@ class HlsServiceTest {
         verify(messageSender).sendTranscodePassRequested(any(), any());
     }
 
+    // ========== Pre-transcoded cache-hit (done marker) ==========
+
+    @Test
+    void getVideoSegmentServesCompletedPassFromDiskWithoutRestartingPass() throws Exception {
+        // A file the pre-transcoder finished: done marker + segments on disk, but no in-memory
+        // pass record (e.g. after a restart). Playback must serve from cache, not re-encode.
+        UUID id = UUID.randomUUID();
+        Path cacheDir = tempDir.resolve(id.toString());
+        Files.createDirectories(cacheDir);
+        Path segFile = cacheDir.resolve("seg_video_720p_00000.ts");
+        Files.writeString(segFile, "video-segment-data");
+        Files.writeString(cacheDir.resolve("done_seg_video_720p_"), "");
+
+        Path result = hlsService.getVideoSegment(id, "seg_video_720p_00000.ts");
+
+        assertEquals(segFile, result);
+        verify(messageSender, never()).sendTranscodePassRequested(any(), any());
+        verify(mediaFileRepository, never()).findById(any());
+        verify(jaffree, never()).getFFMPEG();
+    }
+
+    @Test
+    void getAudioSegmentServesCompletedPassFromDiskWithoutRestartingPass() throws Exception {
+        UUID id = UUID.randomUUID();
+        Path cacheDir = tempDir.resolve(id.toString());
+        Files.createDirectories(cacheDir);
+        Path segFile = cacheDir.resolve("seg_audio_1_192k_00000.ts");
+        Files.writeString(segFile, "audio-segment-data");
+        Files.writeString(cacheDir.resolve("done_seg_audio_1_192k_"), "");
+
+        Path result = hlsService.getAudioSegment(id, "seg_audio_1_192k_00000.ts");
+
+        assertEquals(segFile, result);
+        verify(messageSender, never()).sendTranscodePassRequested(any(), any());
+        verify(mediaFileRepository, never()).findById(any());
+        verify(jaffree, never()).getFFMPEG();
+    }
+
+    @Test
+    void getVideoSegmentWithDoneMarkerButMissingSegmentStillRequestsPass() throws Exception {
+        // Done marker present but the requested segment is gone: not a cache-hit — the pass
+        // must be (re)requested so the missing segment is regenerated.
+        UUID id = UUID.randomUUID();
+        Path cacheDir = tempDir.resolve(id.toString());
+        Files.createDirectories(cacheDir);
+        Files.writeString(cacheDir.resolve("done_seg_video_720p_"), "");
+        Path segFile = cacheDir.resolve("seg_video_720p_00000.ts");
+
+        MediaFileStreamEntity video = videoStream(0, 1920, 1080);
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", video);
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+
+        CompletableFuture.delayedExecutor(200, TimeUnit.MILLISECONDS).execute(() -> {
+            try { Files.writeString(segFile, "video-segment-data"); } catch (IOException _) { /* surfaces as a missing segment below */ }
+        });
+
+        Path result = hlsService.getVideoSegment(id, "seg_video_720p_00000.ts");
+
+        assertNotNull(result);
+        verify(messageSender).sendTranscodePassRequested(any(), any());
+    }
+
     // ========== getSrtSubtitle embedded path ==========
 
     @Test

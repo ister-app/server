@@ -402,6 +402,8 @@ public class HlsService {
         String[] parts = segmentFilename.replace(".ts", "").split("_");
         String qualityLabel = parts[2];
         String passKey = mediaFileId + "_video_" + qualityLabel;
+        Path completed = completedSegmentOrNull(mediaFileId, cacheFile, "seg_video_" + qualityLabel + "_");
+        if (completed != null) return completed;
         requestPassIfNeeded(mediaFileId, passKey, PASS_CATEGORY_VIDEO, qualityLabel, null);
         return transcodeService.waitForSegment(cacheFile, passKey);
     }
@@ -450,8 +452,32 @@ public class HlsService {
         int streamIdx = Integer.parseInt(parts[2]);
         String bitrateLabel = parts[3];
         String passKey = mediaFileId + "_audio_" + streamIdx + "_" + bitrateLabel;
+        Path completed = completedSegmentOrNull(mediaFileId, cacheFile, "seg_audio_" + streamIdx + "_" + bitrateLabel + "_");
+        if (completed != null) return completed;
         requestPassIfNeeded(mediaFileId, passKey, PASS_CATEGORY_AUDIO, bitrateLabel, streamIdx);
         return transcodeService.waitForSegment(cacheFile, passKey);
+    }
+
+    /**
+     * Fast cache-hit for a fully pre-transcoded pass. When a pass wrote its done marker
+     * (see {@link HlsTranscodeService#writeDoneMarker}) every segment it produced is final, so
+     * the requested segment can be served straight from disk — without waiting on the
+     * size-stability window, and crucially without re-triggering a whole-file pass because the
+     * in-memory pass record is gone (e.g. after a restart, or once the completed future was
+     * evicted). Without this, playback ignores the done marker the pre-transcoder wrote and
+     * needlessly re-encodes a file that is already complete on disk.
+     *
+     * @return the segment path when its pass completed on disk and the file is present; else {@code null}
+     */
+    private Path completedSegmentOrNull(UUID mediaFileId, Path cacheFile, String segmentPrefix) throws IOException {
+        if (!transcodeService.hasDoneMarker(cacheDir(mediaFileId), segmentPrefix)) {
+            return null;
+        }
+        if (Files.exists(cacheFile) && Files.size(cacheFile) > 0) {
+            Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(System.currentTimeMillis()));
+            return cacheFile;
+        }
+        return null;
     }
 
     /**
