@@ -20,6 +20,8 @@ public class ScannerHelperService {
     private final PersonRepository personRepository;
     private final AlbumRepository albumRepository;
     private final TrackRepository trackRepository;
+    private final BookRepository bookRepository;
+    private final ChapterRepository chapterRepository;
     private final ServerEventService serverEventService;
 
     /**
@@ -164,6 +166,51 @@ public class ScannerHelperService {
                     trackRepository.save(trackEntity);
                     serverEventService.createTrackFoundEvent(trackEntity.getId());
                     return trackEntity;
+                });
+    }
+
+    /**
+     * Check if the database contains a book with the given parameters.
+     * - If it exists return it.
+     * - Else create and return it.
+     *
+     * <p>Same matching rules as {@link #getOrCreateAlbum}: the name comes from the epub filename or
+     * the book directory (with any "(karaoke)" suffix already stripped by the path parser), so the
+     * epub, the audiobook folder and a karaoke epub of the same book all converge on one row. A
+     * {@code releaseYear} of 0 means unknown and then the name alone identifies the book.
+     */
+    public BookEntity getOrCreateBook(LibraryEntity libraryEntity, PersonEntity personEntity, String bookName, int releaseYear) {
+        Optional<BookEntity> existing = releaseYear > 0
+                ? bookRepository.findByPersonEntityAndNameAndReleaseYear(personEntity, bookName, releaseYear)
+                : bookRepository.findFirstByPersonEntityAndNameOrderByDateCreatedAsc(personEntity, bookName);
+        return existing
+                .orElseGet(() -> {
+                    BookEntity bookEntity = BookEntity.builder()
+                            .libraryEntity(libraryEntity)
+                            .personEntity(personEntity)
+                            .name(bookName)
+                            .releaseYear(releaseYear).build();
+                    bookRepository.save(bookEntity);
+                    serverEventService.createBookFoundEvent(bookEntity.getId());
+                    return bookEntity;
+                });
+    }
+
+    /**
+     * Check if the database contains a chapter with the given parameters.
+     * - If it exists return it.
+     * - Else create and return it.
+     */
+    public ChapterEntity getOrCreateChapter(PersonEntity personEntity, BookEntity bookEntity, int chapterNumber) {
+        return chapterRepository.findByBookEntityAndNumber(bookEntity, chapterNumber)
+                .orElseGet(() -> {
+                    ChapterEntity chapterEntity = ChapterEntity.builder()
+                            .personEntity(personEntity)
+                            .bookEntity(bookEntity)
+                            .number(chapterNumber).build();
+                    chapterRepository.save(chapterEntity);
+                    serverEventService.createChapterFoundEvent(chapterEntity.getId());
+                    return chapterEntity;
                 });
     }
 

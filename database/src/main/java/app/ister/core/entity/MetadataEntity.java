@@ -44,6 +44,22 @@ public class MetadataEntity extends BaseEntity {
     @ManyToOne
     private TrackEntity trackEntity;
 
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne
+    private BookEntity bookEntity;
+
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne
+    private ChapterEntity chapterEntity;
+
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne
+    private PodcastEntity podcastEntity;
+
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne
+    private PodcastEpisodeEntity podcastEpisodeEntity;
+
     private String sourceUri;
 
     // https://en.wikipedia.org/wiki/ISO_639-3

@@ -29,12 +29,15 @@ public class DiskQueueConfig {
                 APP_ISTER_SERVER_UPDATE_IMAGES_REQUESTED,
                 APP_ISTER_SERVER_ANALYZE_DATA,
                 APP_ISTER_SERVER_PRE_TRANSCODE_RECENTLY_WATCHED,
-                APP_ISTER_SERVER_AUDIO_FILE_FOUND
+                APP_ISTER_SERVER_AUDIO_FILE_FOUND,
+                APP_ISTER_SERVER_EPUB_FILE_FOUND
         );
         String cacheDirName = nodeName + "-cache-directory";
         List<Queue> nodeQueues = List.of(
                 new Queue(APP_ISTER_SERVER_PERSON_FOUND + "." + nodeName),
-                new Queue(APP_ISTER_SERVER_ALBUM_FOUND + "." + nodeName)
+                new Queue(APP_ISTER_SERVER_ALBUM_FOUND + "." + nodeName),
+                // Podcast downloads are cache-directory-scoped: the audio lands on this node.
+                new Queue(APP_ISTER_SERVER_PODCAST_EPISODE_DOWNLOAD_REQUESTED + "." + cacheDirName)
         );
         return new Declarables(
                 Stream.concat(

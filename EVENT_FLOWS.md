@@ -40,6 +40,7 @@ flowchart TD
 
     D -->|video| E["MEDIA_FILE_FOUND\n.{dirName}"]
     D -->|audio| F["AUDIO_FILE_FOUND\n.{dirName}"]
+    D -->|".epub (BOOK-library)"| EP["EPUB_FILE_FOUND\n.{dirName}"]
     D -->|.srt| G["SUBTITLE_FILE_FOUND\n.{dirName}"]
     D -->|afbeelding| H["IMAGE_FOUND\n.{dirName}"]
     D -->|.nfo| I["NFO_FILE_FOUND\n.{dirName}"]
@@ -59,8 +60,32 @@ flowchart TD
     O -->|"BlurHash genereren\nImageEntity opslaan\nkoppelen aan Show/Movie/Episode/etc."| DB2[(Database)]
 
     I --> P["HandleNfoFileFound\n📦 disk"]
-    P -->|"Parseert XML NFO\ntitel, beschrijving, releasedatum\nbiografie/review voor muziek"| DB3[(Database)]
+    P -->|"Parseert XML NFO\ntitel, beschrijving, releasedatum\nbiografie/review voor muziek/boeken"| DB3[(Database)]
+
+    EP --> Q["HandleEpubFileFound\n📦 disk"]
+    Q -->|"leest OPF: titel, taal, beschrijving\nmedia overlays op inhoud (SMIL)\ncover uit de zip naar cache"| R["IMAGE_FOUND\n.{cacheDirName}"]
+    R --> O
 ```
+
+**Boeken (LibraryType BOOK):** de structuur is `Auteur/Boek.epub` en `Auteur/Boek/NNN_Hoofdstuk.mp3`.
+Epubs, audiobook-mp3's, karaoke-epubs met hetzelfde (genormaliseerde) boeknaam convergeren op één
+`BookEntity` (auteur = `PersonEntity`). Audiobook-mp3's volgen dezelfde `AUDIO_FILE_FOUND`-pijplijn
+als muziek — `HandleAudioFileFound` brancht op library-type en koppelt `ChapterEntity` i.p.v.
+`TrackEntity`. `getOrCreateBook`/`getOrCreateChapter` vuren `BOOK_FOUND`/`CHAPTER_FOUND`;
+`BOOK_FOUND` wordt in de worker opgepakt voor Open Library-verrijking. Of een epub media overlays
+heeft (voorleesaudio) wordt uitsluitend uit de inhoud gedetecteerd, nooit uit de bestandsnaam.
+
+**Podcasts (LibraryType PODCAST):** het eerste feed-gebaseerde librarytype — geen library-directory
+op disk. `subscribePodcast(feedUrl)` (of de uurlijkse `PodcastRefreshScheduler`, met
+`lastRefreshedAt`-guard tegen dubbele sweeps op meerdere nodes) stuurt `PODCAST_REFRESH_REQUESTED`
+(globale queue). De worker haalt de RSS-feed op (conditional GET met ETag/Last-Modified, cap 500
+items), synct kanaal-metadata/cover en maakt `PodcastEpisodeEntity`-rijen (dedup op guid). De
+nieuwste N (default 3) krijgen `PODCAST_EPISODE_DOWNLOAD_REQUESTED` op de cache-dir-queue van de
+node die de refresh deed; de disk-handler downloadt de enclosure (volgt redirects) naar
+`{cache}/podcasts/` en stuurt `AUDIO_FILE_FOUND`, waarna afspelen identiek is aan tracks. Oudere
+afleveringen downloaden on-demand via de `downloadPodcastEpisode`-mutation. Retentie: de dagelijkse
+cache-cleanup verwijdert downloads ouder dan `podcast-retention-days` (default 30), behalve als
+iemand middenin de aflevering zit — de afleverings-rij blijft en kan opnieuw downloaden.
 
 ---
 
@@ -314,8 +339,9 @@ graph LR
 | Scope | Events |
 |-------|--------|
 | **Node** `.{nodeName}` | `ANALYZE_LIBRARY_REQUESTED` |
-| **Directory** `.{dirName}` | `NEW_DIRECTORIES_SCAN_REQUESTED`, `FILE_SCAN_REQUESTED`, `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `SUBTITLE_FILE_FOUND`, `IMAGE_FOUND`, `NFO_FILE_FOUND`, `UPDATE_IMAGES_REQUESTED`, `ANALYZE_DATA` (disk), `PRE_TRANSCODE_RECENTLY_WATCHED`, `TRANSCODE_REQUESTED`, `TRANSCODE_PASS_REQUESTED` |
-| **Globaal** | `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND`, `ALBUM_FOUND`, `ANALYZE_DATA` (worker), `SEARCH_INDEX_REQUESTED`, `SEARCH_REINDEX_REQUESTED` |
+| **Directory** `.{dirName}` | `NEW_DIRECTORIES_SCAN_REQUESTED`, `FILE_SCAN_REQUESTED`, `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `EPUB_FILE_FOUND`, `SUBTITLE_FILE_FOUND`, `IMAGE_FOUND`, `NFO_FILE_FOUND`, `UPDATE_IMAGES_REQUESTED`, `ANALYZE_DATA` (disk), `PRE_TRANSCODE_RECENTLY_WATCHED`, `TRANSCODE_REQUESTED`, `TRANSCODE_PASS_REQUESTED` |
+| **Globaal** | `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND`, `ALBUM_FOUND`, `BOOK_FOUND`, `CHAPTER_FOUND` (geen consumer), `PODCAST_FOUND` (geen consumer), `PODCAST_EPISODE_FOUND` (geen consumer), `PODCAST_REFRESH_REQUESTED`, `ANALYZE_DATA` (worker), `SEARCH_INDEX_REQUESTED`, `SEARCH_REINDEX_REQUESTED` |
+| **Cache-directory** `.{nodeName}-cache-directory` | `PODCAST_EPISODE_DOWNLOAD_REQUESTED` (de download landt op de disk van die node) |
 
 ---
 
@@ -326,7 +352,8 @@ graph LR
 | `HandleNewDirectoriesScanRequested` | disk | `NEW_DIRECTORIES_SCAN_REQUESTED` | `FILE_SCAN_REQUESTED` |
 | `FileScanRequestedHandle` | disk | `FILE_SCAN_REQUESTED` | `MEDIA_FILE_FOUND` / `AUDIO_FILE_FOUND` / `IMAGE_FOUND` / `NFO_FILE_FOUND` / `SUBTITLE_FILE_FOUND` |
 | `HandleMediaFileFound` | disk | `MEDIA_FILE_FOUND` | `IMAGE_FOUND` |
-| `HandleAudioFileFound` | disk | `AUDIO_FILE_FOUND` | `IMAGE_FOUND` |
+| `HandleAudioFileFound` | disk | `AUDIO_FILE_FOUND` | `IMAGE_FOUND` (track- óf chapter-gebonden, per library-type) |
+| `HandleEpubFileFound` | disk | `EPUB_FILE_FOUND` | `IMAGE_FOUND` |
 | `HandleSubtitleFileFound` | disk | `SUBTITLE_FILE_FOUND` | — |
 | `HandleImageFound` | disk | `IMAGE_FOUND` | — |
 | `HandleNfoFileFound` | disk | `NFO_FILE_FOUND` | — |
@@ -342,6 +369,9 @@ graph LR
 | `MovieFoundHandle` | worker | `MOVIE_FOUND` | `IMAGE_FOUND` (+ cast credits direct in DB) |
 | `HandlePersonFound` | worker | `PERSON_FOUND` | — |
 | `HandleAlbumFound` | worker | `ALBUM_FOUND` | `IMAGE_FOUND` |
+| `HandleBookFound` | worker | `BOOK_FOUND` | `IMAGE_FOUND` (Open Library-cover, alleen als er nog geen is) |
+| `HandlePodcastRefreshRequested` | worker | `PODCAST_REFRESH_REQUESTED` | `IMAGE_FOUND` (feed-cover), `PODCAST_EPISODE_FOUND`, `PODCAST_EPISODE_DOWNLOAD_REQUESTED` (nieuwste N) |
+| `HandlePodcastEpisodeDownloadRequested` | disk | `PODCAST_EPISODE_DOWNLOAD_REQUESTED` | `AUDIO_FILE_FOUND` (op de cache-dir-queue → ffprobe + HLS-pregeneratie) |
 | `HandleTranscodeRequested` | transcoder | `TRANSCODE_REQUESTED` | `TRANSCODE_PASS_REQUESTED` |
 | `HandleTranscodePassRequested` | transcoder | `TRANSCODE_PASS_REQUESTED` | — |
 | `HandleSearchIndexRequested` | search | `SEARCH_INDEX_REQUESTED` | — (upsert/delete in Typesense) |

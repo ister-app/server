@@ -7,6 +7,7 @@ import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.FileScanRequestedData;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.disk.scanner.scanners.AudioScanner;
+import app.ister.disk.scanner.scanners.EpubScanner;
 import app.ister.disk.scanner.scanners.ImageScanner;
 import app.ister.disk.scanner.scanners.MediaFileScanner;
 import app.ister.disk.scanner.scanners.NfoScanner;
@@ -39,12 +40,14 @@ class FileScanRequestedHandleTest {
     private SubtitleScanner subtitleScanner;
     @Mock
     private AudioScanner audioScanner;
+    @Mock
+    private EpubScanner epubScanner;
 
     private FileScanRequestedHandle subject;
 
     @BeforeEach
     void setUp() {
-        subject = new FileScanRequestedHandle(directoryRepositoryMock, mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner);
+        subject = new FileScanRequestedHandle(directoryRepositoryMock, mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner);
     }
 
     @Test

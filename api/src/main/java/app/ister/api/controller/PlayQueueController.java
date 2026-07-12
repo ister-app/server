@@ -2,6 +2,7 @@ package app.ister.api.controller;
 
 import app.ister.api.dto.CreatePlayQueueInput;
 import app.ister.api.dto.StreamSettingsInput;
+import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.MediaFileEntity;
@@ -13,7 +14,10 @@ import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayState;
+import app.ister.core.entity.PodcastEpisodeEntity;
+import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MovieRepository;
@@ -51,6 +55,10 @@ public class PlayQueueController {
     private final MovieRepository movieRepository;
 
     private final TrackRepository trackRepository;
+
+    private final ChapterRepository chapterRepository;
+
+    private final PodcastEpisodeRepository podcastEpisodeRepository;
 
     private final MediaFileRepository mediaFileRepository;
 
@@ -157,6 +165,9 @@ public class PlayQueueController {
             case MOVIE -> mediaFileRepository.findByMovieEntityId(mediaId);
             case EPISODE -> mediaFileRepository.findByEpisodeEntityId(mediaId);
             case TRACK -> mediaFileRepository.findByTrackEntityId(mediaId);
+            case CHAPTER -> mediaFileRepository.findByChapterEntityId(mediaId);
+            case PODCAST_EPISODE -> mediaFileRepository.findByPodcastEpisodeEntityId(mediaId);
+            case BOOK -> List.of();
         };
         return files.stream()
                 .map(MediaFileEntity::getDurationInMilliseconds)
@@ -179,11 +190,29 @@ public class PlayQueueController {
                     : trackRepository.findById(item.getTrackEntityId())
                             .map(track -> imageRepository.findByAlbumEntityId(track.getAlbumEntity().getId()))
                             .orElse(List.of());
+            case CHAPTER -> item.getChapterEntityId() == null ? List.<ImageEntity>of()
+                    : chapterRepository.findById(item.getChapterEntityId())
+                            .map(chapter -> imageRepository.findByBookEntityId(chapter.getBookEntity().getId()))
+                            .orElse(List.of());
+            case PODCAST_EPISODE -> item.getPodcastEpisodeEntityId() == null ? List.<ImageEntity>of()
+                    : podcastEpisodeRepository.findById(item.getPodcastEpisodeEntityId())
+                            .map(this::podcastEpisodeArtwork)
+                            .orElse(List.of());
+            case BOOK -> List.of();
         };
         return images.stream().filter(image -> image.getType() == ImageType.COVER).findFirst()
                 .or(() -> images.stream().findFirst())
                 .map(ImageEntity::getId)
                 .orElse(null);
+    }
+
+    /** Episode image when the feed provided one, otherwise the podcast cover. */
+    private List<ImageEntity> podcastEpisodeArtwork(PodcastEpisodeEntity episode) {
+        List<ImageEntity> episodeImages = imageRepository.findByPodcastEpisodeEntityId(episode.getId());
+        if (!episodeImages.isEmpty()) {
+            return episodeImages;
+        }
+        return imageRepository.findByPodcastEntityId(episode.getPodcastEntity().getId());
     }
 
     private List<ImageEntity> episodeArtwork(PlayQueueItemEntity item) {
@@ -204,6 +233,9 @@ public class PlayQueueController {
             case MOVIE -> item.getMovieEntityId();
             case EPISODE -> item.getEpisodeEntityId();
             case TRACK -> item.getTrackEntityId();
+            case CHAPTER -> item.getChapterEntityId();
+            case PODCAST_EPISODE -> item.getPodcastEpisodeEntityId();
+            case BOOK -> null;
         };
     }
 
@@ -221,6 +253,23 @@ public class PlayQueueController {
                                     .findFirst()
                                     .orElse(track.getAlbumEntity().getName() + " – track " + track.getNumber()))
                             .orElse(null);
+            case CHAPTER -> item.getChapterEntityId() == null ? null
+                    : chapterRepository.findById(item.getChapterEntityId())
+                            .map(chapter -> chapter.getMetadataEntities().stream()
+                                    .map(MetadataEntity::getTitle)
+                                    .filter(Objects::nonNull)
+                                    .findFirst()
+                                    .orElse(chapter.getBookEntity().getName() + " – chapter " + chapter.getNumber()))
+                            .orElse(null);
+            case PODCAST_EPISODE -> item.getPodcastEpisodeEntityId() == null ? null
+                    : podcastEpisodeRepository.findById(item.getPodcastEpisodeEntityId())
+                            .map(episode -> episode.getMetadataEntities().stream()
+                                    .map(MetadataEntity::getTitle)
+                                    .filter(Objects::nonNull)
+                                    .findFirst()
+                                    .orElse(episode.getPodcastEntity().getTitle()))
+                            .orElse(null);
+            case BOOK -> null;
         };
     }
 
@@ -316,6 +365,20 @@ public class PlayQueueController {
     public Optional<TrackEntity> playQueueItemTrack(PlayQueueItemEntity playQueueItemEntity) {
         if (playQueueItemEntity.getTrackEntityId() != null) {
             return trackRepository.findById(playQueueItemEntity.getTrackEntityId());
+        } else return Optional.empty();
+    }
+
+    @SchemaMapping(typeName = "PlayQueueItem", field = "chapter")
+    public Optional<ChapterEntity> playQueueItemChapter(PlayQueueItemEntity playQueueItemEntity) {
+        if (playQueueItemEntity.getChapterEntityId() != null) {
+            return chapterRepository.findById(playQueueItemEntity.getChapterEntityId());
+        } else return Optional.empty();
+    }
+
+    @SchemaMapping(typeName = "PlayQueueItem", field = "podcastEpisode")
+    public Optional<PodcastEpisodeEntity> playQueueItemPodcastEpisode(PlayQueueItemEntity playQueueItemEntity) {
+        if (playQueueItemEntity.getPodcastEpisodeEntityId() != null) {
+            return podcastEpisodeRepository.findById(playQueueItemEntity.getPodcastEpisodeEntityId());
         } else return Optional.empty();
     }
 }

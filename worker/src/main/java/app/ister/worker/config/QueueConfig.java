@@ -59,4 +59,14 @@ public class QueueConfig {
         return new Queue(APP_ISTER_SERVER_ALBUM_FOUND);
     }
 
+    @Bean
+    public Queue queueBookFound() {
+        return new Queue(APP_ISTER_SERVER_BOOK_FOUND);
+    }
+
+    @Bean
+    public Queue queuePodcastRefreshRequested() {
+        return new Queue(APP_ISTER_SERVER_PODCAST_REFRESH_REQUESTED);
+    }
+
 }

@@ -6,5 +6,6 @@ public enum FileType {
     IMAGE,
     NFO,
     SUBTITLE,
-    AUDIO
+    AUDIO,
+    EPUB
 }

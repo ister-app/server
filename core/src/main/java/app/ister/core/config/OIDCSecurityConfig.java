@@ -47,6 +47,9 @@ public class OIDCSecurityConfig {
                         .requestMatchers("/graphql").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/.well-known/ister").permitAll()
+                        // The epub reader web app is a static shell; the data it loads (epub
+                        // resources, reading progress) authenticates via stream token or bearer.
+                        .requestMatchers("/reader/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

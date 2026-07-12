@@ -2,11 +2,13 @@ package app.ister.search;
 
 import app.ister.core.config.LanguageProperties;
 import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PersonEntity;
+import app.ister.core.entity.PodcastEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.SearchEntityType;
@@ -102,6 +104,31 @@ public class SearchDocumentMapper {
                 .number(track.getNumber())
                 .libraryId(libraryId(track.getAlbumEntity().getLibraryEntity()));
         addLocalized(builder, byLanguage(metadata));
+        return builder.build();
+    }
+
+    public SearchDocument toDocument(BookEntity book) {
+        Map<String, MetadataEntity> byLanguage = byLanguage(book.getMetadataEntities());
+        SearchDocument.Builder builder = SearchDocument.builder()
+                .id(book.getId().toString())
+                .type(SearchEntityType.BOOK.name())
+                .title(book.getName())
+                .context(book.getPersonEntity().getName())
+                .year(book.getReleaseYear())
+                .libraryId(libraryId(book.getLibraryEntity()));
+        addLocalized(builder, byLanguage);
+        return builder.build();
+    }
+
+    public SearchDocument toDocument(PodcastEntity podcast) {
+        Map<String, MetadataEntity> byLanguage = byLanguage(podcast.getMetadataEntities());
+        SearchDocument.Builder builder = SearchDocument.builder()
+                .id(podcast.getId().toString())
+                .type(SearchEntityType.PODCAST.name())
+                .title(podcast.getTitle())
+                .context(podcast.getAuthor())
+                .libraryId(libraryId(podcast.getLibraryEntity()));
+        addLocalized(builder, byLanguage);
         return builder.build();
     }
 

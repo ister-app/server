@@ -4,4 +4,6 @@ public enum LibraryType {
     MOVIE,
     SHOW,
     MUSIC,
+    BOOK,
+    PODCAST,
 }

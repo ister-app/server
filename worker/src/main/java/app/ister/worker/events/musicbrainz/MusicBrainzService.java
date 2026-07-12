@@ -146,8 +146,9 @@ public class MusicBrainzService {
     }
 
     /** Lowercases and removes everything that is not a letter or digit, collapsing stylisation
-     * (interpunct, accents-as-punctuation, spacing) so "E•MO•TION" and "Emotion" compare equal. */
-    static String normalizeTitle(String title) {
+     * (interpunct, accents-as-punctuation, spacing) so "E•MO•TION" and "Emotion" compare equal.
+     * Public: OpenLibraryService reuses the same match rule. */
+    public static String normalizeTitle(String title) {
         if (title == null) {
             return "";
         }

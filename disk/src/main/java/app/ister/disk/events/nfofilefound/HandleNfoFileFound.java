@@ -13,6 +13,7 @@ import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
 import app.ister.core.Handle;
 import app.ister.disk.nfo.Parser;
+import app.ister.disk.scanner.BookPathObject;
 import app.ister.disk.scanner.MusicPathObject;
 import app.ister.disk.scanner.PathObject;
 import app.ister.disk.scanner.enums.DirType;
@@ -59,6 +60,11 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
         if (directoryEntity.getLibraryEntity() != null
                 && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.MUSIC) {
             analyzeMusicNfo(directoryEntity, path);
+            return;
+        }
+        if (directoryEntity.getLibraryEntity() != null
+                && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.BOOK) {
+            analyzeBookLibraryNfo(directoryEntity, path);
             return;
         }
         PathObject pathObject = new PathObject(path);
@@ -122,6 +128,64 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
                         .sourceUri(FILE_URI_PREFIX + path).build());
                 setMetadataFk(directoryEntity, path, saved);
                 serverEventService.createSearchIndexEvent(SearchEntityType.ALBUM, album.getId());
+            });
+        } catch (java.io.FileNotFoundException _) {
+            log.error(NFO_PARSE_ERROR, path);
+        }
+    }
+
+    /** Book libraries reuse the music nfo formats: artist.nfo for the author, album.nfo for the book. */
+    private void analyzeBookLibraryNfo(DirectoryEntity directoryEntity, String path) {
+        BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), path);
+        if (bookPath.getDirType().equals(DirType.ARTIST)) {
+            analyzeAuthorNfo(directoryEntity, path, bookPath);
+        } else if (bookPath.getDirType().equals(DirType.ALBUM)) {
+            analyzeBookNfo(directoryEntity, path, bookPath);
+        }
+    }
+
+    private void analyzeAuthorNfo(DirectoryEntity directoryEntity, String path, BookPathObject bookPath) {
+        var author = scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), bookPath.getAuthorName(), bookPath.getAuthorYear());
+        try {
+            Parser.parseArtist(path).ifPresent(parsed -> {
+                String title = parsed.getName() != null ? parsed.getName() : bookPath.getAuthorName();
+                var saved = metadataRepository.save(MetadataEntity.builder()
+                        .title(title)
+                        .description(parsed.getBiography())
+                        .genre(parsed.getGenre())
+                        .personEntity(author)
+                        .sourceUri(FILE_URI_PREFIX + path).build());
+                setMetadataFk(directoryEntity, path, saved);
+                serverEventService.createSearchIndexEvent(SearchEntityType.PERSON, author.getId());
+            });
+        } catch (java.io.FileNotFoundException _) {
+            log.error(NFO_PARSE_ERROR, path);
+        }
+    }
+
+    private void analyzeBookNfo(DirectoryEntity directoryEntity, String path, BookPathObject bookPath) {
+        var author = scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), bookPath.getAuthorName(), bookPath.getAuthorYear());
+        var book = scannerHelperService.getOrCreateBook(directoryEntity.getLibraryEntity(), author, bookPath.getBookName(), bookPath.getBookYear());
+        try {
+            Parser.parseAlbum(path).ifPresent(parsed -> {
+                String title = parsed.getTitle() != null ? parsed.getTitle() : bookPath.getBookName();
+                java.time.LocalDate released;
+                if (parsed.getReleasedate() != null) {
+                    released = parsed.getReleasedate();
+                } else if (parsed.getYear() > 0) {
+                    released = java.time.LocalDate.of(parsed.getYear(), 1, 1);
+                } else {
+                    released = null;
+                }
+                var saved = metadataRepository.save(MetadataEntity.builder()
+                        .title(title)
+                        .description(parsed.getReview())
+                        .released(released)
+                        .genre(parsed.getGenre())
+                        .bookEntity(book)
+                        .sourceUri(FILE_URI_PREFIX + path).build());
+                setMetadataFk(directoryEntity, path, saved);
+                serverEventService.createSearchIndexEvent(SearchEntityType.BOOK, book.getId());
             });
         } catch (java.io.FileNotFoundException _) {
             log.error(NFO_PARSE_ERROR, path);

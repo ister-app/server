@@ -9,5 +9,7 @@ public enum RatingMediaType {
     SHOW,
     EPISODE,
     ALBUM,
-    TRACK
+    TRACK,
+    BOOK,
+    PODCAST
 }

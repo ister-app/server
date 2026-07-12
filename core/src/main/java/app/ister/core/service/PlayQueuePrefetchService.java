@@ -1,5 +1,6 @@
 package app.ister.core.service;
 
+import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MovieEntity;
@@ -10,7 +11,10 @@ import app.ister.core.enums.EventType;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.SubtitleFormat;
 import app.ister.core.eventdata.TranscodeRequestedData;
+import app.ister.core.entity.PodcastEpisodeEntity;
+import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.TrackRepository;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +43,8 @@ public class PlayQueuePrefetchService {
     private final MovieRepository movieRepository;
     private final EpisodeRepository episodeRepository;
     private final TrackRepository trackRepository;
+    private final ChapterRepository chapterRepository;
+    private final PodcastEpisodeRepository podcastEpisodeRepository;
     private final MessageSender messageSender;
 
     @Value("${app.ister.server.prefetch.enabled:true}")
@@ -89,13 +95,15 @@ public class PlayQueuePrefetchService {
             return;
         }
         long remainingMs = durationMs - progressInMilliseconds;
-        boolean nearEnd = current.getType() == MediaType.TRACK
+        boolean audioItem = current.getType() == MediaType.TRACK || current.getType() == MediaType.CHAPTER
+                || current.getType() == MediaType.PODCAST_EPISODE;
+        boolean nearEnd = audioItem
                 ? remainingMs <= trackThresholdSeconds * 1000 || progressInMilliseconds * 2 >= durationMs
                 : remainingMs <= videoThresholdSeconds * 1000;
         if (!nearEnd) {
             return;
         }
-        int depth = current.getType() == MediaType.TRACK ? trackDepth : 1;
+        int depth = audioItem ? trackDepth : 1;
         for (int i = currentIndex + 1; i <= currentIndex + depth && i < items.size(); i++) {
             PlayQueueItemEntity next = items.get(i);
             if (prefetchedItems.add(next.getId())) {
@@ -119,6 +127,11 @@ public class PlayQueuePrefetchService {
                     .map(EpisodeEntity::getMediaFileEntities).orElse(List.of());
             case TRACK -> trackRepository.findById(item.getTrackEntityId())
                     .map(TrackEntity::getMediaFileEntities).orElse(List.of());
+            case CHAPTER -> chapterRepository.findById(item.getChapterEntityId())
+                    .map(ChapterEntity::getMediaFileEntities).orElse(List.of());
+            case PODCAST_EPISODE -> podcastEpisodeRepository.findById(item.getPodcastEpisodeEntityId())
+                    .map(PodcastEpisodeEntity::getMediaFileEntities).orElse(List.of());
+            case BOOK -> List.of();
         };
     }
 

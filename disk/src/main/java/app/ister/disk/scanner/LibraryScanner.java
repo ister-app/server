@@ -6,6 +6,7 @@ import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.disk.scanner.scanners.AudioScanner;
+import app.ister.disk.scanner.scanners.EpubScanner;
 import app.ister.disk.scanner.scanners.ImageScanner;
 import app.ister.disk.scanner.scanners.MediaFileScanner;
 import app.ister.disk.scanner.scanners.NfoScanner;
@@ -30,6 +31,7 @@ public class LibraryScanner {
     private final NfoScanner nfoScanner;
     private final SubtitleScanner subtitleScanner;
     private final AudioScanner audioScanner;
+    private final EpubScanner epubScanner;
     private final ImageRepository imageRepository;
     private final MediaFileRepository mediaFileRepository;
     private final OtherPathFileRepository otherPathFileRepository;
@@ -41,7 +43,7 @@ public class LibraryScanner {
     public void scanDirectory(Path path, DirectoryEntity directoryEntity) throws IOException {
         log.debug("Log: {}", path);
         ScannedCache scannedCache = new ScannedCache(directoryEntity, imageRepository, mediaFileRepository, otherPathFileRepository);
-        Files.walkFileTree(path, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner)));
+        Files.walkFileTree(path, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner)));
         scannedCache.removeNotScannedFilesFromDatabase();
     }
 }

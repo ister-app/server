@@ -31,4 +31,22 @@ public interface MediaFileRepository extends CrudRepository<MediaFileEntity, UUI
     List<MediaFileEntity> findByMovieEntityId(UUID movieId);
 
     List<MediaFileEntity> findByTrackEntityId(UUID trackId);
+
+    List<MediaFileEntity> findByChapterEntityId(UUID chapterId);
+
+    /** Epub files attached directly to a book. */
+    List<MediaFileEntity> findByBookEntityId(UUID bookId);
+
+    List<MediaFileEntity> findByChapterEntity_BookEntityId(UUID bookId);
+
+    List<MediaFileEntity> findByPodcastEpisodeEntityId(UUID podcastEpisodeId);
+
+    boolean existsByPodcastEpisodeEntityId(UUID podcastEpisodeId);
+
+    /** All media-file paths in a directory (cache cleanup: downloaded podcast audio is referenced). */
+    @Query("SELECT m.path FROM MediaFileEntity m WHERE m.directoryEntityId = :directoryEntityId")
+    List<String> findPathsByDirectoryEntityId(@Param("directoryEntityId") UUID directoryEntityId);
+
+    /** Downloaded podcast episodes in a directory, oldest first (retention sweep). */
+    List<MediaFileEntity> findByDirectoryEntityIdAndPodcastEpisodeEntityIsNotNullOrderByDateCreatedAsc(UUID directoryEntityId);
 }

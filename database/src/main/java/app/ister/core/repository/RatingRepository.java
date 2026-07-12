@@ -1,6 +1,7 @@
 package app.ister.core.repository;
 
 import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.RatingEntity;
@@ -27,6 +28,10 @@ public interface RatingRepository extends CrudRepository<RatingEntity, UUID> {
 
     Optional<RatingEntity> findByUserEntityAndTrackEntity(UserEntity userEntity, TrackEntity trackEntity);
 
+    Optional<RatingEntity> findByUserEntityAndBookEntity(UserEntity userEntity, BookEntity bookEntity);
+
+    Optional<RatingEntity> findByUserEntityAndPodcastEntity(UserEntity userEntity, app.ister.core.entity.PodcastEntity podcastEntity);
+
     // Batch variants (used by GraphQL @BatchMapping to avoid N+1).
     List<RatingEntity> findByUserEntityExternalIdAndMovieEntityIn(String userEntityExternalId, Collection<MovieEntity> movieEntities);
 
@@ -37,4 +42,8 @@ public interface RatingRepository extends CrudRepository<RatingEntity, UUID> {
     List<RatingEntity> findByUserEntityExternalIdAndAlbumEntityIn(String userEntityExternalId, Collection<AlbumEntity> albumEntities);
 
     List<RatingEntity> findByUserEntityExternalIdAndTrackEntityIn(String userEntityExternalId, Collection<TrackEntity> trackEntities);
+
+    List<RatingEntity> findByUserEntityExternalIdAndBookEntityIn(String userEntityExternalId, Collection<BookEntity> bookEntities);
+
+    List<RatingEntity> findByUserEntityExternalIdAndPodcastEntityIn(String userEntityExternalId, Collection<app.ister.core.entity.PodcastEntity> podcastEntities);
 }

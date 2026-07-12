@@ -4,7 +4,9 @@ import app.ister.core.entity.RatingEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.enums.RatingMediaType;
 import app.ister.core.repository.AlbumRepository;
+import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.PodcastRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.RatingRepository;
 import app.ister.core.repository.ShowRepository;
@@ -34,6 +36,8 @@ public class RatingService {
     private final EpisodeRepository episodeRepository;
     private final AlbumRepository albumRepository;
     private final TrackRepository trackRepository;
+    private final BookRepository bookRepository;
+    private final PodcastRepository podcastRepository;
 
     /**
      * Sets or clears the calling user's rating for a single media item.
@@ -70,6 +74,8 @@ public class RatingService {
             case EPISODE -> ratingRepository.findByUserEntityAndEpisodeEntity(user, episode(mediaId));
             case ALBUM -> ratingRepository.findByUserEntityAndAlbumEntity(user, album(mediaId));
             case TRACK -> ratingRepository.findByUserEntityAndTrackEntity(user, track(mediaId));
+            case BOOK -> ratingRepository.findByUserEntityAndBookEntity(user, book(mediaId));
+            case PODCAST -> ratingRepository.findByUserEntityAndPodcastEntity(user, podcast(mediaId));
         };
     }
 
@@ -81,6 +87,8 @@ public class RatingService {
             case EPISODE -> builder.episodeEntity(episode(mediaId));
             case ALBUM -> builder.albumEntity(album(mediaId));
             case TRACK -> builder.trackEntity(track(mediaId));
+            case BOOK -> builder.bookEntity(book(mediaId));
+            case PODCAST -> builder.podcastEntity(podcast(mediaId));
         }
         return builder.build();
     }
@@ -103,6 +111,14 @@ public class RatingService {
 
     private app.ister.core.entity.TrackEntity track(UUID id) {
         return trackRepository.findById(id).orElseThrow(() -> notFound("Track", id));
+    }
+
+    private app.ister.core.entity.BookEntity book(UUID id) {
+        return bookRepository.findById(id).orElseThrow(() -> notFound("Book", id));
+    }
+
+    private app.ister.core.entity.PodcastEntity podcast(UUID id) {
+        return podcastRepository.findById(id).orElseThrow(() -> notFound("Podcast", id));
     }
 
     private static NoSuchElementException notFound(String type, UUID id) {

@@ -56,10 +56,22 @@ public interface ImageRepository extends CrudRepository<ImageEntity, UUID> {
 
     List<ImageEntity> findByAlbumEntityId(UUID albumEntityId);
 
+    List<ImageEntity> findByBookEntityId(UUID bookEntityId);
+
+    List<ImageEntity> findByPodcastEntityId(UUID podcastEntityId);
+
+    List<ImageEntity> findByPodcastEpisodeEntityId(UUID podcastEpisodeEntityId);
+
     // Batch variants (used by GraphQL @BatchMapping to avoid N+1)
     List<ImageEntity> findByShowEntityIdIn(Collection<UUID> showEntityIds);
 
     List<ImageEntity> findByPersonEntityIdIn(Collection<UUID> personEntityIds);
 
     List<ImageEntity> findByAlbumEntityIdIn(Collection<UUID> albumEntityIds);
+
+    List<ImageEntity> findByBookEntityIdIn(Collection<UUID> bookEntityIds);
+
+    List<ImageEntity> findByPodcastEntityIdIn(Collection<UUID> podcastEntityIds);
+
+    List<ImageEntity> findByPodcastEpisodeEntityIdIn(Collection<UUID> podcastEpisodeEntityIds);
 }

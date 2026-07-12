@@ -8,6 +8,7 @@ import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.utils.Jaffree;
+import app.ister.disk.scanner.BookPathObject;
 import app.ister.disk.scanner.MusicPathObject;
 import app.ister.disk.scanner.enums.FileType;
 import lombok.RequiredArgsConstructor;
@@ -37,22 +38,30 @@ public class AudioScanner implements Scanner {
     }
 
     /**
-     * Returns true if this path is an audio file in the given music library directory.
+     * Returns true if this path is an audio file in the given music or book library directory.
      */
     public boolean analyzable(Path path, boolean isRegularFile, DirectoryEntity directoryEntity) {
-        if (!isRegularFile) {
+        if (!isRegularFile || directoryEntity.getLibraryEntity() == null) {
             return false;
         }
-        if (directoryEntity.getLibraryEntity() == null
-                || directoryEntity.getLibraryEntity().getLibraryType() != LibraryType.MUSIC) {
-            return false;
+        LibraryType libraryType = directoryEntity.getLibraryEntity().getLibraryType();
+        if (libraryType == LibraryType.MUSIC) {
+            MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), path.toString());
+            return musicPath.getFileType().equals(FileType.AUDIO);
         }
-        MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), path.toString());
-        return musicPath.getFileType().equals(FileType.AUDIO);
+        if (libraryType == LibraryType.BOOK) {
+            BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), path.toString());
+            return bookPath.getFileType().equals(FileType.AUDIO);
+        }
+        return false;
     }
 
     @Override
     public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, boolean isRegularFile, long size) {
+        if (directoryEntity.getLibraryEntity() != null
+                && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.BOOK) {
+            return analyzeAudiobookChapter(directoryEntity, path, size);
+        }
         MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), path.toString());
         if (!musicPath.getFileType().equals(FileType.AUDIO)) {
             return Optional.empty();
@@ -94,6 +103,49 @@ public class AudioScanner implements Scanner {
             }
         }
         return Optional.of(track);
+    }
+
+    /**
+     * Book-library audio files are audiobook chapters: author and book come from the path, the
+     * chapter number from the leading digits of the filename (may be zero-based; only the ordering
+     * matters). The same AUDIO_FILE_FOUND event drives the downstream ffprobe/HLS pipeline.
+     */
+    private Optional<BaseEntity> analyzeAudiobookChapter(DirectoryEntity directoryEntity, Path path, long size) {
+        BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), path.toString());
+        if (!bookPath.getFileType().equals(FileType.AUDIO)) {
+            return Optional.empty();
+        }
+
+        LibraryEntity library = directoryEntity.getLibraryEntity();
+        PersonEntity author = scannerHelperService.getOrCreatePerson(library, bookPath.getAuthorName(), bookPath.getAuthorYear());
+        BookEntity book = scannerHelperService.getOrCreateBook(library, author, bookPath.getBookName(), bookPath.getBookYear());
+        ChapterEntity chapter = scannerHelperService.getOrCreateChapter(author, book, bookPath.getChapterNumber());
+
+        Optional<MediaFileEntity> existing = mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString());
+        final String directoryName = directoryEntity.getName();
+        if (existing.isEmpty()) {
+            MediaFileEntity entity = MediaFileEntity.builder()
+                    .directoryEntityId(directoryEntity.getId())
+                    .chapterEntity(chapter)
+                    .path(path.toString())
+                    .size(size).build();
+            mediaFileRepository.save(entity);
+            sendAudioFileFoundAfterCommit(AudioFileFoundData.builder()
+                    .eventType(EventType.AUDIO_FILE_FOUND)
+                    .directoryEntityUUID(directoryEntity.getId())
+                    .chapterEntityUUID(chapter.getId())
+                    .path(path.toString()).build(), directoryName);
+        } else {
+            MediaFileEntity existingFile = existing.get();
+            if (existingFile.getChapterEntity() == null || !existingFile.getChapterEntity().getId().equals(chapter.getId())) {
+                log.warn("Fixing wrong chapter association for {}: now chapter {} ({})",
+                        path, chapter.getNumber(), chapter.getId());
+                existingFile.setChapterEntity(chapter);
+                mediaFileRepository.save(existingFile);
+                sendAudioFileFoundAfterCommit(AudioFileFoundData.fromMediaFileEntity(existingFile), directoryName);
+            }
+        }
+        return Optional.of(chapter);
     }
 
     private void sendAudioFileFoundAfterCommit(AudioFileFoundData data, String directoryName) {

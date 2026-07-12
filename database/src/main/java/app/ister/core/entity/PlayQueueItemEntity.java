@@ -59,4 +59,10 @@ public class PlayQueueItemEntity extends BaseEntity {
 
     @Column(name = "track_entity_id")
     private UUID trackEntityId;
+
+    @Column(name = "chapter_entity_id")
+    private UUID chapterEntityId;
+
+    @Column(name = "podcast_episode_entity_id")
+    private UUID podcastEpisodeEntityId;
 }

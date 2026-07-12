@@ -10,6 +10,9 @@ import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayQueueSourceType;
 import app.ister.core.enums.SubtitleFormat;
+import app.ister.core.entity.ChapterEntity;
+import app.ister.core.repository.ChapterRepository;
+import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.MovieRepository;
@@ -42,6 +45,10 @@ public class PlayQueueService {
 
     private final TrackRepository trackRepository;
 
+    private final ChapterRepository chapterRepository;
+
+    private final PodcastEpisodeRepository podcastEpisodeRepository;
+
     private final LibraryRepository libraryRepository;
 
     private final UserService userService;
@@ -66,11 +73,13 @@ public class PlayQueueService {
     // Bound for the shuffle exclusion parameter when there is no start item; matches no row.
     private static final UUID NIL_UUID = new UUID(0, 0);
 
-    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, LibraryRepository libraryRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService) {
+    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, ChapterRepository chapterRepository, PodcastEpisodeRepository podcastEpisodeRepository, LibraryRepository libraryRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService) {
         this.playQueueRepository = playQueueRepository;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
         this.trackRepository = trackRepository;
+        this.chapterRepository = chapterRepository;
+        this.podcastEpisodeRepository = podcastEpisodeRepository;
         this.libraryRepository = libraryRepository;
         this.userService = userService;
         this.watchStatusRepository = watchStatusRepository;
@@ -320,12 +329,14 @@ public class PlayQueueService {
                 case LIBRARY -> mediaType == MediaType.MOVIE
                         ? movieRepository.findMovieIdsForLibraryShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset)
                         : trackRepository.findTrackIdsForLibraryShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset);
-                case MOVIE -> List.of();
+                case MOVIE, BOOK, PODCAST -> List.of();
             };
         }
         return switch (queue.getSourceType()) {
             case SHOW -> episodeRepository.findEpisodeIdsForShowOrdered(sourceId, CHUNK_SIZE, offset);
             case ALBUM -> trackRepository.findTrackIdsForAlbumOrdered(sourceId, CHUNK_SIZE, offset);
+            case BOOK -> chapterRepository.findChapterIdsForBookOrdered(sourceId, CHUNK_SIZE, offset);
+            case PODCAST -> podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(sourceId, CHUNK_SIZE, offset);
             default -> List.of();
         };
     }
@@ -335,6 +346,18 @@ public class PlayQueueService {
             case MOVIE -> MediaType.MOVIE;
             case SHOW -> MediaType.EPISODE;
             case ALBUM -> MediaType.TRACK;
+            case BOOK -> {
+                if (shuffle) {
+                    throw new IllegalArgumentException("Book play queues cannot be shuffled; chapters only make sense in order");
+                }
+                yield MediaType.CHAPTER;
+            }
+            case PODCAST -> {
+                if (shuffle) {
+                    throw new IllegalArgumentException("Podcast play queues cannot be shuffled; episodes play newest to oldest");
+                }
+                yield MediaType.PODCAST_EPISODE;
+            }
             case LIBRARY -> {
                 if (!shuffle) {
                     throw new IllegalArgumentException("Library play queues require shuffle");
@@ -345,6 +368,8 @@ public class PlayQueueService {
                     case MOVIE -> MediaType.MOVIE;
                     case MUSIC -> MediaType.TRACK;
                     case SHOW -> throw new IllegalArgumentException("Show libraries cannot be shuffled; shuffle a single show instead");
+                    case BOOK -> throw new IllegalArgumentException("Book libraries cannot be shuffled; play a single book instead");
+                    case PODCAST -> throw new IllegalArgumentException("Podcast libraries cannot be shuffled; play a single podcast instead");
                 };
             }
         };
@@ -369,6 +394,11 @@ public class PlayQueueService {
                     .stream()
                     .map(TrackEntity::getId)
                     .toList();
+            case BOOK -> chapterRepository.findByBookEntity_Id(sourceId, Sort.by("number").ascending())
+                    .stream()
+                    .map(ChapterEntity::getId)
+                    .toList();
+            case PODCAST -> podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(sourceId, Integer.MAX_VALUE, 0);
             default -> List.of();
         };
         int index = ids.indexOf(startId);
@@ -389,7 +419,9 @@ public class PlayQueueService {
         return items.stream()
                 .filter(item -> startId.equals(item.getMovieEntityId())
                         || startId.equals(item.getEpisodeEntityId())
-                        || startId.equals(item.getTrackEntityId()))
+                        || startId.equals(item.getTrackEntityId())
+                        || startId.equals(item.getChapterEntityId())
+                        || startId.equals(item.getPodcastEpisodeEntityId()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Start item not in queue"));
     }
@@ -418,6 +450,9 @@ public class PlayQueueService {
             case MOVIE -> item.setMovieEntityId(mediaId);
             case EPISODE -> item.setEpisodeEntityId(mediaId);
             case TRACK -> item.setTrackEntityId(mediaId);
+            case CHAPTER -> item.setChapterEntityId(mediaId);
+            case PODCAST_EPISODE -> item.setPodcastEpisodeEntityId(mediaId);
+            case BOOK -> throw new IllegalArgumentException("Books cannot be played; queue their chapters instead");
         }
         return item;
     }
@@ -427,6 +462,9 @@ public class PlayQueueService {
             case MOVIE -> movieRepository.existsById(mediaId);
             case EPISODE -> episodeRepository.existsById(mediaId);
             case TRACK -> trackRepository.existsById(mediaId);
+            case CHAPTER -> chapterRepository.existsById(mediaId);
+            case PODCAST_EPISODE -> podcastEpisodeRepository.existsById(mediaId);
+            case BOOK -> throw new IllegalArgumentException("Books cannot be added to a play queue; add their chapters instead");
         };
         if (!exists) {
             throw new IllegalArgumentException("Media item not found");
@@ -530,6 +568,10 @@ public class PlayQueueService {
                     updateEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
                 } else if (playQueueItemEntity.getType() == MediaType.MOVIE) {
                     updateMovieWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
+                } else if (playQueueItemEntity.getType() == MediaType.CHAPTER) {
+                    updateChapterWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
+                } else if (playQueueItemEntity.getType() == MediaType.PODCAST_EPISODE) {
+                    updatePodcastEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
                 }
             }
         });
@@ -546,6 +588,20 @@ public class PlayQueueService {
         movieRepository.findById(playQueueItemEntity.getMovieEntityId()).ifPresent(movieEntity -> {
             WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreate(authentication, playQueueItemId, null, movieEntity);
             updateWatchStatus(progressInMilliseconds, watchStatusEntity, movieEntity.getMediaFileEntities());
+        });
+    }
+
+    private void updateChapterWatchStatus(long progressInMilliseconds, UUID playQueueItemId, Authentication authentication, PlayQueueItemEntity playQueueItemEntity) {
+        chapterRepository.findById(playQueueItemEntity.getChapterEntityId()).ifPresent(chapterEntity -> {
+            WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreateForChapter(authentication, playQueueItemId, chapterEntity);
+            updateWatchStatus(progressInMilliseconds, watchStatusEntity, chapterEntity.getMediaFileEntities());
+        });
+    }
+
+    private void updatePodcastEpisodeWatchStatus(long progressInMilliseconds, UUID playQueueItemId, Authentication authentication, PlayQueueItemEntity playQueueItemEntity) {
+        podcastEpisodeRepository.findById(playQueueItemEntity.getPodcastEpisodeEntityId()).ifPresent(episodeEntity -> {
+            WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreateForPodcastEpisode(authentication, playQueueItemId, episodeEntity);
+            updateWatchStatus(progressInMilliseconds, watchStatusEntity, episodeEntity.getMediaFileEntities());
         });
     }
 

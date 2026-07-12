@@ -26,14 +26,16 @@ public class FileScanRequestedHandle implements Handle<FileScanRequestedData> {
     private final NfoScanner nfoScanner;
     private final SubtitleScanner subtitleScanner;
     private final AudioScanner audioScanner;
+    private final EpubScanner epubScanner;
 
-    public FileScanRequestedHandle(DirectoryRepository directoryRepository, MediaFileScanner mediaFileScanner, ImageScanner imageScanner, NfoScanner nfoScanner, SubtitleScanner subtitleScanner, AudioScanner audioScanner) {
+    public FileScanRequestedHandle(DirectoryRepository directoryRepository, MediaFileScanner mediaFileScanner, ImageScanner imageScanner, NfoScanner nfoScanner, SubtitleScanner subtitleScanner, AudioScanner audioScanner, EpubScanner epubScanner) {
         this.directoryRepository = directoryRepository;
         this.mediaFileScanner = mediaFileScanner;
         this.imageScanner = imageScanner;
         this.nfoScanner = nfoScanner;
         this.subtitleScanner = subtitleScanner;
         this.audioScanner = audioScanner;
+        this.epubScanner = epubScanner;
     }
 
     @RabbitListener(queues = "#{@diskQueueNamingConfig.getFileScanRequestedQueues()}")
@@ -50,15 +52,23 @@ public class FileScanRequestedHandle implements Handle<FileScanRequestedData> {
     @Override
     public void handle(app.ister.core.eventdata.FileScanRequestedData messageData) {
         DirectoryEntity directoryEntity = directoryRepository.findById(messageData.getDirectoryEntityUUID()).orElseThrow();
-        boolean isMusic = directoryEntity.getLibraryEntity() != null
-                && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.MUSIC;
-        List<Scanner> scanners = isMusic
-                ? List.of(audioScanner, imageScanner, nfoScanner)
-                : List.of(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner);
+        LibraryType libraryType = directoryEntity.getLibraryEntity() != null
+                ? directoryEntity.getLibraryEntity().getLibraryType() : null;
+        boolean isMusic = libraryType == LibraryType.MUSIC;
+        boolean isBook = libraryType == LibraryType.BOOK;
+        List<Scanner> scanners;
+        if (isMusic) {
+            scanners = List.of(audioScanner, imageScanner, nfoScanner);
+        } else if (isBook) {
+            scanners = List.of(epubScanner, audioScanner, imageScanner, nfoScanner);
+        } else {
+            scanners = List.of(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner);
+        }
         for (Scanner scanner : scanners) {
-            boolean canAnalyze = isMusic
+            boolean canAnalyze = isMusic || isBook
                     ? switch (scanner) {
                         case AudioScanner s -> s.analyzable(messageData.getPath(), messageData.getRegularFile(), directoryEntity);
+                        case EpubScanner s -> s.analyzable(messageData.getPath(), messageData.getRegularFile(), directoryEntity);
                         case ImageScanner s -> s.analyzable(messageData.getPath(), messageData.getRegularFile(), messageData.getSize(), directoryEntity);
                         case NfoScanner s -> s.analyzable(messageData.getPath(), messageData.getRegularFile(), messageData.getSize(), directoryEntity);
                         default -> scanner.analyzable(messageData.getPath(), messageData.getRegularFile(), messageData.getSize());

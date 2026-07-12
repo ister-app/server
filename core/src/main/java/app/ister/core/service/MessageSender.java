@@ -124,6 +124,36 @@ public class MessageSender {
         send(APP_ISTER_SERVER_AUDIO_FILE_FOUND, directoryName, audioFileFoundData);
     }
 
+    public void sendBookFound(BookFoundData bookFoundData) {
+        send(APP_ISTER_SERVER_BOOK_FOUND, bookFoundData);
+    }
+
+    public void sendChapterFound(ChapterFoundData chapterFoundData) {
+        send(APP_ISTER_SERVER_CHAPTER_FOUND, chapterFoundData);
+    }
+
+    public void sendEpubFileFound(EpubFileFoundData epubFileFoundData, String directoryName) {
+        send(APP_ISTER_SERVER_EPUB_FILE_FOUND, directoryName, epubFileFoundData);
+    }
+
+    public void sendPodcastFound(PodcastFoundData podcastFoundData) {
+        send(APP_ISTER_SERVER_PODCAST_FOUND, podcastFoundData);
+    }
+
+    public void sendPodcastEpisodeFound(PodcastEpisodeFoundData podcastEpisodeFoundData) {
+        send(APP_ISTER_SERVER_PODCAST_EPISODE_FOUND, podcastEpisodeFoundData);
+    }
+
+    /** Global queue: any worker node may pick up a feed refresh. */
+    public void sendPodcastRefreshRequested(PodcastRefreshRequestedData data) {
+        send(APP_ISTER_SERVER_PODCAST_REFRESH_REQUESTED, data);
+    }
+
+    /** Directory-scoped to a cache directory: the download lands on that node's disk. */
+    public void sendPodcastEpisodeDownloadRequested(PodcastEpisodeDownloadRequestedData data, String cacheDirectoryName) {
+        send(APP_ISTER_SERVER_PODCAST_EPISODE_DOWNLOAD_REQUESTED, cacheDirectoryName, data);
+    }
+
     // Worker → disk (directory-scoped, like sendMediaFileFound)
     public void sendAnalyzeData(AnalyzeData data, String directoryName) {
         send(APP_ISTER_SERVER_ANALYZE_DATA, directoryName, data);

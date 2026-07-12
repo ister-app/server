@@ -70,6 +70,8 @@ class HandleAudioFileFoundTest {
     @Mock
     private AlbumRepository albumRepositoryMock;
     @Mock
+    private app.ister.core.repository.ChapterRepository chapterRepositoryMock;
+    @Mock
     private MediaFileFoundGetDuration mediaFileFoundGetDurationMock;
     @Mock
     private MediaFileFoundCheckForStreams mediaFileFoundCheckForStreamsMock;
@@ -104,6 +106,7 @@ class HandleAudioFileFoundTest {
                 metadataRepositoryMock,
                 trackRepositoryMock,
                 albumRepositoryMock,
+                chapterRepositoryMock,
                 imageRepositoryMock,
                 scannerHelperServiceMock,
                 mediaFileFoundGetDurationMock,

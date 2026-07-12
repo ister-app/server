@@ -10,6 +10,7 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.utils.Jaffree;
+import app.ister.disk.scanner.BookPathObject;
 import app.ister.disk.scanner.MusicPathObject;
 import app.ister.disk.scanner.PathObject;
 import app.ister.disk.scanner.enums.DirType;
@@ -48,10 +49,13 @@ public class ImageScanner implements Scanner {
         if (!isRegularFile) {
             return false;
         }
-        if (directoryEntity.getLibraryEntity() != null
-                && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.MUSIC) {
+        if (isMusicLibrary(directoryEntity)) {
             MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), path.toString());
             return musicPath.getFileType().equals(FileType.IMAGE);
+        }
+        if (isBookLibrary(directoryEntity)) {
+            BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), path.toString());
+            return bookPath.getFileType().equals(FileType.IMAGE);
         }
         return analyzable(path, isRegularFile, size);
     }
@@ -71,11 +75,13 @@ public class ImageScanner implements Scanner {
                 .path(path.toString())
                 .type(imageType);
 
-        // Only run the video-path linker for non-music libraries. Otherwise the video PathObject
-        // parser classifies music folder names (e.g. "Qmusic Top 500 ...") as a SHOW/MOVIE and
-        // getOrCreateShow spawns an orphan show entity inside the MUSIC library.
+        // Only run the video-path linker for non-music/non-book libraries. Otherwise the video
+        // PathObject parser classifies music folder names (e.g. "Qmusic Top 500 ...") as a
+        // SHOW/MOVIE and getOrCreateShow spawns an orphan show entity inside the MUSIC library.
         if (isMusicLibrary(directoryEntity)) {
             linkToMusicLibraryEntity(imageEntity, directoryEntity, path);
+        } else if (isBookLibrary(directoryEntity)) {
+            linkToBookLibraryEntity(imageEntity, directoryEntity, path);
         } else {
             linkToVideoLibraryEntity(imageEntity, new PathObject(path.toString()), directoryEntity);
         }
@@ -102,6 +108,22 @@ public class ImageScanner implements Scanner {
     private boolean isMusicLibrary(DirectoryEntity directoryEntity) {
         return directoryEntity.getLibraryEntity() != null
                 && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.MUSIC;
+    }
+
+    private boolean isBookLibrary(DirectoryEntity directoryEntity) {
+        return directoryEntity.getLibraryEntity() != null
+                && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.BOOK;
+    }
+
+    private void linkToBookLibraryEntity(ImageEntity.ImageEntityBuilder<?, ?> imageEntity,
+                                          DirectoryEntity directoryEntity, Path path) {
+        BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), path.toString());
+        if (bookPath.getDirType() == DirType.ARTIST) {
+            imageEntity.personEntity(scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), bookPath.getAuthorName(), bookPath.getAuthorYear()));
+        } else if (bookPath.getDirType() == DirType.ALBUM) {
+            var author = scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), bookPath.getAuthorName(), bookPath.getAuthorYear());
+            imageEntity.bookEntity(scannerHelperService.getOrCreateBook(directoryEntity.getLibraryEntity(), author, bookPath.getBookName(), bookPath.getBookYear()));
+        }
     }
 
     private void linkToMusicLibraryEntity(ImageEntity.ImageEntityBuilder<?, ?> imageEntity,

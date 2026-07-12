@@ -1,10 +1,12 @@
 package app.ister.worker.events.tmdbmetadata;
 
 import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
+import app.ister.core.entity.PodcastEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
@@ -23,7 +25,22 @@ public class ImageSave {
                                   @Nullable ShowEntity show,
                                   @Nullable EpisodeEntity episode,
                                   @Nullable PersonEntity person,
-                                  @Nullable AlbumEntity album) {}
+                                  @Nullable AlbumEntity album,
+                                  @Nullable BookEntity book,
+                                  @Nullable PodcastEntity podcast) {
+
+        public MediaEntityRef(@Nullable MovieEntity movie, @Nullable ShowEntity show,
+                              @Nullable EpisodeEntity episode, @Nullable PersonEntity person,
+                              @Nullable AlbumEntity album) {
+            this(movie, show, episode, person, album, null, null);
+        }
+
+        public MediaEntityRef(@Nullable MovieEntity movie, @Nullable ShowEntity show,
+                              @Nullable EpisodeEntity episode, @Nullable PersonEntity person,
+                              @Nullable AlbumEntity album, @Nullable BookEntity book) {
+            this(movie, show, episode, person, album, book, null);
+        }
+    }
 
     public void save(DirectoryEntity cacheDisk,
                      String path,
@@ -43,6 +60,8 @@ public class ImageSave {
                 .episodeEntityId(mediaEntityRef.episode() == null ? null : mediaEntityRef.episode().getId())
                 .personEntityId(mediaEntityRef.person() == null ? null : mediaEntityRef.person().getId())
                 .albumEntityId(mediaEntityRef.album() == null ? null : mediaEntityRef.album().getId())
+                .bookEntityId(mediaEntityRef.book() == null ? null : mediaEntityRef.book().getId())
+                .podcastEntityId(mediaEntityRef.podcast() == null ? null : mediaEntityRef.podcast().getId())
                 // Route by the cache DIRECTORY name (matches HandleImageFound's queue), not the
                 // node name — the IMAGE_FOUND queues are named per directory, so using the node
                 // name sent every downloaded TMDB image to a queue with no consumer (silently

@@ -1,12 +1,14 @@
 package app.ister.api.controller;
 
 import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.CreditEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
+import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.CreditRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.ImageRepository;
@@ -37,6 +39,7 @@ public class PersonController {
     private final ImageRepository imageRepository;
     private final LibraryRepository libraryRepository;
     private final CreditRepository creditRepository;
+    private final BookRepository bookRepository;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -62,6 +65,11 @@ public class PersonController {
     @SchemaMapping(typeName = "Person", field = "albums")
     public List<AlbumEntity> albums(PersonEntity personEntity) {
         return personEntity.getAlbumEntities();
+    }
+
+    @SchemaMapping(typeName = "Person", field = "books")
+    public List<BookEntity> books(PersonEntity personEntity) {
+        return bookRepository.findByPersonEntityId(personEntity.getId());
     }
 
     @SchemaMapping(typeName = "Person", field = "metadata")

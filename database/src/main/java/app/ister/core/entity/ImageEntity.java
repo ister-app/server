@@ -108,4 +108,43 @@ public class ImageEntity extends FileFromPathEntity {
         this.albumEntity = albumEntity;
         this.albumEntityId = (albumEntity != null) ? albumEntity.getId() : null;
     }
+
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "book_entity_id", referencedColumnName = "id", insertable = false, updatable = false)
+    private BookEntity bookEntity;
+
+    @Column(name = "book_entity_id")
+    private UUID bookEntityId;
+
+    public void setBookEntity(BookEntity bookEntity) {
+        this.bookEntity = bookEntity;
+        this.bookEntityId = (bookEntity != null) ? bookEntity.getId() : null;
+    }
+
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "podcast_entity_id", referencedColumnName = "id", insertable = false, updatable = false)
+    private PodcastEntity podcastEntity;
+
+    @Column(name = "podcast_entity_id")
+    private UUID podcastEntityId;
+
+    public void setPodcastEntity(PodcastEntity podcastEntity) {
+        this.podcastEntity = podcastEntity;
+        this.podcastEntityId = (podcastEntity != null) ? podcastEntity.getId() : null;
+    }
+
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "podcast_episode_entity_id", referencedColumnName = "id", insertable = false, updatable = false)
+    private PodcastEpisodeEntity podcastEpisodeEntity;
+
+    @Column(name = "podcast_episode_entity_id")
+    private UUID podcastEpisodeEntityId;
+
+    public void setPodcastEpisodeEntity(PodcastEpisodeEntity podcastEpisodeEntity) {
+        this.podcastEpisodeEntity = podcastEpisodeEntity;
+        this.podcastEpisodeEntityId = (podcastEpisodeEntity != null) ? podcastEpisodeEntity.getId() : null;
+    }
 }

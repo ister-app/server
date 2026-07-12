@@ -7,4 +7,6 @@ public enum SearchEntityType {
     PERSON,
     ALBUM,
     TRACK,
+    BOOK,
+    PODCAST,
 }

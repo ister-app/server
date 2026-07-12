@@ -17,6 +17,8 @@ import java.util.UUID;
 public class AudioFileFoundData extends MessageData {
     private UUID directoryEntityUUID;
     private UUID trackEntityUUID;
+    /** Set instead of trackEntityUUID for audiobook chapters in a book library. */
+    private UUID chapterEntityUUID;
     private String path;
 
     public static AudioFileFoundData fromMediaFileEntity(MediaFileEntity m) {
@@ -24,6 +26,7 @@ public class AudioFileFoundData extends MessageData {
                 .eventType(EventType.AUDIO_FILE_FOUND)
                 .directoryEntityUUID(m.getDirectoryEntityId())
                 .trackEntityUUID(m.getTrackEntity() != null ? m.getTrackEntity().getId() : null)
+                .chapterEntityUUID(m.getChapterEntity() != null ? m.getChapterEntity().getId() : null)
                 .path(m.getPath())
                 .build();
     }

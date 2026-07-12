@@ -8,4 +8,6 @@ import java.util.UUID;
 
 public interface LibraryRepository extends JpaRepository<LibraryEntity, UUID> {
     Optional<LibraryEntity> findByName(String name);
+
+    Optional<LibraryEntity> findFirstByLibraryType(app.ister.core.enums.LibraryType libraryType);
 }

@@ -99,6 +99,18 @@ public class DiskQueueNamingConfig {
         ).toArray(String[]::new);
     }
 
+    public String[] getEpubFileFoundQueues() {
+        return Stream.concat(
+                config.getDirectories().stream()
+                        .map(dir -> APP_ISTER_SERVER_EPUB_FILE_FOUND + "." + dir.getName()),
+                Stream.of(APP_ISTER_SERVER_EPUB_FILE_FOUND + "." + cacheDirName())
+        ).toArray(String[]::new);
+    }
+
+    public String getPodcastEpisodeDownloadRequestedQueue() {
+        return APP_ISTER_SERVER_PODCAST_EPISODE_DOWNLOAD_REQUESTED + "." + cacheDirName();
+    }
+
     public String getPersonFoundQueue() {
         return APP_ISTER_SERVER_PERSON_FOUND + "." + nodeName;
     }

@@ -56,12 +56,42 @@ public class ServerEventService {
         createSearchIndexEvent(SearchEntityType.ALBUM, albumId);
     }
 
+    public void createBookFoundEvent(UUID bookId) {
+        messageSender.sendBookFound(BookFoundData.builder()
+                .eventType(EventType.BOOK_FOUND)
+                .bookId(bookId)
+                .build());
+        createSearchIndexEvent(SearchEntityType.BOOK, bookId);
+    }
+
+    public void createChapterFoundEvent(UUID chapterId) {
+        messageSender.sendChapterFound(ChapterFoundData.builder()
+                .eventType(EventType.CHAPTER_FOUND)
+                .chapterId(chapterId)
+                .build());
+    }
+
     public void createTrackFoundEvent(UUID trackId) {
         messageSender.sendTrackFound(TrackFoundData.builder()
                 .eventType(EventType.TRACK_FOUND)
                 .trackId(trackId)
                 .build());
         createSearchIndexEvent(SearchEntityType.TRACK, trackId);
+    }
+
+    public void createPodcastFoundEvent(UUID podcastId) {
+        messageSender.sendPodcastFound(PodcastFoundData.builder()
+                .eventType(EventType.PODCAST_FOUND)
+                .podcastId(podcastId)
+                .build());
+        createSearchIndexEvent(SearchEntityType.PODCAST, podcastId);
+    }
+
+    public void createPodcastEpisodeFoundEvent(UUID podcastEpisodeId) {
+        messageSender.sendPodcastEpisodeFound(PodcastEpisodeFoundData.builder()
+                .eventType(EventType.PODCAST_EPISODE_FOUND)
+                .podcastEpisodeId(podcastEpisodeId)
+                .build());
     }
 
     public void createSearchIndexEvent(SearchEntityType entityType, UUID entityId) {

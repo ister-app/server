@@ -9,6 +9,7 @@ import app.ister.core.enums.PathFileType;
 import app.ister.core.eventdata.NfoFileFoundData;
 import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.MessageSender;
+import app.ister.disk.scanner.BookPathObject;
 import app.ister.disk.scanner.MusicPathObject;
 import app.ister.disk.scanner.PathObject;
 import app.ister.disk.scanner.enums.DirType;
@@ -48,6 +49,11 @@ public class NfoScanner implements Scanner {
                 && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.MUSIC) {
             MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), path.toString());
             return musicPath.getFileType().equals(FileType.NFO);
+        }
+        if (directoryEntity.getLibraryEntity() != null
+                && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.BOOK) {
+            BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), path.toString());
+            return bookPath.getFileType().equals(FileType.NFO);
         }
         return analyzable(path, isRegularFile, size);
     }

@@ -54,6 +54,10 @@ class SearchIndexServiceTest {
     @Mock
     private TrackRepository trackRepository;
     @Mock
+    private app.ister.core.repository.BookRepository bookRepository;
+    @Mock
+    private app.ister.core.repository.PodcastRepository podcastRepository;
+    @Mock
     private TypesenseClient typesenseClient;
     @Mock
     private PlatformTransactionManager transactionManager;
@@ -76,7 +80,7 @@ class SearchIndexServiceTest {
         properties.setCollection("media");
         lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         subject = new SearchIndexService(movieRepository, showRepository, episodeRepository, personRepository,
-                albumRepository, trackRepository, new SearchDocumentMapper(new LanguageProperties()), typesenseClient, properties,
+                albumRepository, trackRepository, bookRepository, podcastRepository, new SearchDocumentMapper(new LanguageProperties()), typesenseClient, properties,
                 transactionManager);
     }
 

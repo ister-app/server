@@ -22,15 +22,31 @@ public class StreamTokenAuthenticationFilter extends OncePerRequestFilter {
     private final StreamTokenService streamTokenService;
     private final String pathPrefix;
 
+    /**
+     * Cookie fallback for the epub reader: chapter subresources (images, css) are loaded by the
+     * browser itself, so a query parameter cannot be attached. The reader stores its stream token
+     * in this same-origin cookie once and every epub request carries it automatically.
+     */
+    public static final String STREAM_TOKEN_COOKIE = "IsterStreamToken";
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         String token = request.getParameter("token");
+        if ((token == null || token.isBlank()) && request.getCookies() != null) {
+            for (var cookie : request.getCookies()) {
+                if (STREAM_TOKEN_COOKIE.equals(cookie.getName())) {
+                    token = cookie.getValue();
+                    break;
+                }
+            }
+        }
         if (token != null && !token.isBlank() && SecurityContextHolder.getContext().getAuthentication() == null) {
             Optional<StreamTokenEntity> tokenEntity = streamTokenService.validateStreamToken(token);
             tokenEntity.ifPresent(entity -> {
                 String path = request.getRequestURI();
-                if ((path.startsWith(pathPrefix + "/hls/") || path.startsWith(pathPrefix + "/images/"))
+                if ((path.startsWith(pathPrefix + "/hls/") || path.startsWith(pathPrefix + "/images/")
+                        || path.startsWith(pathPrefix + "/epub/") || path.startsWith(pathPrefix + "/reading-progress"))
                         && entity.getUserEntity() != null) {
                     setAuth(entity.getUserEntity().getExternalId(), "ROLE_user");
                 } else if (path.startsWith(pathPrefix + "/mediaFile/") && entity.isDownload()) {
@@ -57,6 +73,8 @@ public class StreamTokenAuthenticationFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         return !path.startsWith(pathPrefix + "/hls/")
                 && !path.startsWith(pathPrefix + "/images/")
+                && !path.startsWith(pathPrefix + "/epub/")
+                && !path.startsWith(pathPrefix + "/reading-progress")
                 && !path.startsWith(pathPrefix + "/mediaFile/")
                 && !path.startsWith(pathPrefix + "/transcode/upload/");
     }

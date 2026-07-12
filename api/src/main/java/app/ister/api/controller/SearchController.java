@@ -4,9 +4,11 @@ import app.ister.api.error.SearchUnavailableException;
 import app.ister.core.entity.BaseEntity;
 import app.ister.core.enums.SearchEntityType;
 import app.ister.core.repository.AlbumRepository;
+import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.PersonRepository;
+import app.ister.core.repository.PodcastRepository;
 import app.ister.core.repository.ShowRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.ServerEventService;
@@ -42,6 +44,8 @@ public class SearchController {
     private final PersonRepository personRepository;
     private final AlbumRepository albumRepository;
     private final TrackRepository trackRepository;
+    private final BookRepository bookRepository;
+    private final PodcastRepository podcastRepository;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -91,6 +95,8 @@ public class SearchController {
             case PERSON -> personRepository;
             case ALBUM -> albumRepository;
             case TRACK -> trackRepository;
+            case BOOK -> bookRepository;
+            case PODCAST -> podcastRepository;
         };
     }
 }

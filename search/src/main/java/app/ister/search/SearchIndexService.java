@@ -2,9 +2,11 @@ package app.ister.search;
 
 import app.ister.core.enums.SearchEntityType;
 import app.ister.core.repository.AlbumRepository;
+import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.PersonRepository;
+import app.ister.core.repository.PodcastRepository;
 import app.ister.core.repository.ShowRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.search.config.TypesenseProperties;
@@ -33,6 +35,8 @@ public class SearchIndexService {
     private final PersonRepository personRepository;
     private final AlbumRepository albumRepository;
     private final TrackRepository trackRepository;
+    private final BookRepository bookRepository;
+    private final PodcastRepository podcastRepository;
     private final SearchDocumentMapper searchDocumentMapper;
     private final TypesenseClient typesenseClient;
     private final TypesenseProperties properties;
@@ -45,6 +49,8 @@ public class SearchIndexService {
                               PersonRepository personRepository,
                               AlbumRepository albumRepository,
                               TrackRepository trackRepository,
+                              BookRepository bookRepository,
+                              PodcastRepository podcastRepository,
                               SearchDocumentMapper searchDocumentMapper,
                               TypesenseClient typesenseClient,
                               TypesenseProperties properties,
@@ -55,6 +61,8 @@ public class SearchIndexService {
         this.personRepository = personRepository;
         this.albumRepository = albumRepository;
         this.trackRepository = trackRepository;
+        this.bookRepository = bookRepository;
+        this.podcastRepository = podcastRepository;
         this.searchDocumentMapper = searchDocumentMapper;
         this.typesenseClient = typesenseClient;
         this.properties = properties;
@@ -91,6 +99,8 @@ public class SearchIndexService {
         indexAll(personRepository, searchDocumentMapper::toDocument, newCollection);
         indexAll(albumRepository, searchDocumentMapper::toDocument, newCollection);
         indexAll(trackRepository, searchDocumentMapper::toDocument, newCollection);
+        indexAll(bookRepository, searchDocumentMapper::toDocument, newCollection);
+        indexAll(podcastRepository, searchDocumentMapper::toDocument, newCollection);
         typesenseClient.upsertAlias(properties.getCollection(), newCollection);
         dropOldCollections(newCollection);
         log.info("Search reindex finished; alias {} now points to {}", properties.getCollection(), newCollection);
@@ -114,6 +124,8 @@ public class SearchIndexService {
             case PERSON -> personRepository.findById(entityId).map(searchDocumentMapper::toDocument);
             case ALBUM -> albumRepository.findById(entityId).map(searchDocumentMapper::toDocument);
             case TRACK -> trackRepository.findById(entityId).map(searchDocumentMapper::toDocument);
+            case BOOK -> bookRepository.findById(entityId).map(searchDocumentMapper::toDocument);
+            case PODCAST -> podcastRepository.findById(entityId).map(searchDocumentMapper::toDocument);
         };
     }
 

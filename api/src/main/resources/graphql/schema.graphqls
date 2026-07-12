@@ -22,10 +22,20 @@ type Query {
     albums(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, artistId: ID, libraryId: ID): AlbumPage
     albumById(id: ID): Album
     trackById(id: ID): Track
+    books(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, authorId: ID, libraryId: ID): BookPage
+    bookById(id: ID): Book
+    chapterById(id: ID): Chapter
+    podcasts(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): PodcastPage
+    podcastById(id: ID): Podcast
+    "Episodes of one podcast, newest first. Always paged: feeds can hold hundreds of episodes."
+    podcastEpisodes(podcastId: ID!, page: Int, size: Int): PodcastEpisodePage!
+    podcastEpisodeById(id: ID): PodcastEpisode
+    "Podcast directory search (iTunes Search API); subscribe with the returned feedUrl."
+    searchPodcastDirectory(term: String!): [PodcastDirectoryResult!]!
     search(term: String!, size: Int, libraryId: ID): [SearchResult!]!
 }
 
-union SearchResult = Movie | Show | Episode | Person | Album | Track
+union SearchResult = Movie | Show | Episode | Person | Album | Track | Book | Podcast
 
 type Mutation {
     scanLibrary: Boolean!
@@ -51,6 +61,20 @@ type Mutation {
     reindexSearch: Boolean!
     "Sets the calling user's rating (1-10) for a media item. Pass rating: null to clear it. Returns true."
     setRating(mediaType: RatingMediaType!, mediaId: ID!, rating: Int): Boolean!
+    """
+    Stores the calling user's epub reading position for a book. location is an epubcfi string,
+    progress runs 0.0-1.0; the book counts as read from 0.97. Reading has no play queue: there is
+    one watch status row per user per book.
+    """
+    updateReadingProgress(bookId: ID!, location: String!, progress: Float!): WatchStatus!
+    "Subscribes to an RSS feed (or reactivates an unsubscribed one) and queues the first refresh."
+    subscribePodcast(feedUrl: String!): Podcast!
+    "Deactivates the subscription; episodes and listening history are kept."
+    unsubscribePodcast(id: ID!): Boolean!
+    "Queues a feed refresh for every active podcast."
+    refreshPodcasts: Boolean!
+    "Queues a download of the episode's audio to this node's cache directory."
+    downloadPodcastEpisode(episodeId: ID!): Boolean!
     """
     Sends a remote-control command to the client playing the given queue. Any authenticated
     user may control any session. Delivered over the cluster status exchange, so it reaches
@@ -181,12 +205,20 @@ enum LibraryType {
     MOVIE
     SHOW
     MUSIC
+    BOOK
+    PODCAST
 }
 
 enum MediaType {
     MOVIE
     EPISODE
     TRACK
+    "An audiobook chapter; streams like a track."
+    CHAPTER
+    "An epub being read; only used for watch status and recently-watched."
+    BOOK
+    "A podcast episode; streams like a track once downloaded."
+    PODCAST_EPISODE
 }
 
 enum RatingMediaType {
@@ -195,6 +227,8 @@ enum RatingMediaType {
     EPISODE
     ALBUM
     TRACK
+    BOOK
+    PODCAST
 }
 
 enum PlayQueueSourceType {
@@ -202,6 +236,8 @@ enum PlayQueueSourceType {
     SHOW
     ALBUM
     LIBRARY
+    BOOK
+    PODCAST
 }
 
 enum SubtitleFormat {
@@ -279,6 +315,8 @@ type MediaFile {
     durationInMilliseconds: Int
     mediaFileStreams: [MediaFileStream]
     directory: Directory!
+    "For epub files: true when the epub has EPUB 3 media overlays (read-aloud audio). Null for other files."
+    mediaOverlays: Boolean
 }
 
 type Directory {
@@ -350,6 +388,8 @@ type PlayQueueItem {
     movie: Movie
     episode: Episode
     track: Track
+    chapter: Chapter
+    podcastEpisode: PodcastEpisode
 }
 
 type Season {
@@ -380,6 +420,7 @@ type Person {
     name: String!
     birthYear: Int
     albums: [Album!]
+    books: [Book!]
     images: [Image!]
     metadata: [Metadata!]
     credits: [Credit!]
@@ -425,6 +466,94 @@ type Track {
     rating: Int
 }
 
+type Book {
+    id: ID!
+    name: String!
+    releaseYear: Int!
+    author: Person!
+    "Audiobook chapters, in play order; empty when the book only has epub files."
+    chapters: [Chapter!]
+    "Epub files of this book; mediaOverlays = true marks the read-aloud edition."
+    epubFiles: [MediaFile!]
+    images: [Image!]
+    metadata: [Metadata!]
+    "Reading progress (book-level rows) for the calling user."
+    watchStatus: [WatchStatus!]
+    "The calling user's rating (1-10), or null if unrated."
+    rating: Int
+}
+
+type Chapter {
+    id: ID!
+    "From the filename's leading digits; may be zero-based, only the ordering matters."
+    number: Int!
+    author: Person!
+    book: Book!
+    metadata: [Metadata!]
+    mediaFile: [MediaFile!]
+    watchStatus: [WatchStatus!]
+}
+
+type BookPage {
+    content: [Book!]!
+    totalPages: Int!
+    totalElements: Int!
+    number: Int!
+    size: Int!
+}
+
+type Podcast {
+    id: ID!
+    title: String!
+    "Publisher/author from the feed (plain text, not a Person)."
+    author: String
+    feedUrl: String!
+    active: Boolean!
+    lastRefreshedAt: String
+    images: [Image!]
+    metadata: [Metadata!]
+    "The calling user's rating (1-10), or null if unrated."
+    rating: Int
+}
+
+type PodcastEpisode {
+    id: ID!
+    podcast: Podcast!
+    publishedAt: String
+    episodeNumber: Int
+    seasonNumber: Int
+    "True once the audio is downloaded to a cache directory and playable."
+    downloaded: Boolean!
+    "ffprobe duration of the download, or the feed's duration hint before that."
+    durationInMilliseconds: Int
+    metadata: [Metadata!]
+    mediaFile: [MediaFile!]
+    watchStatus: [WatchStatus!]
+}
+
+type PodcastPage {
+    content: [Podcast!]!
+    totalPages: Int!
+    totalElements: Int!
+    number: Int!
+    size: Int!
+}
+
+type PodcastEpisodePage {
+    content: [PodcastEpisode!]!
+    totalPages: Int!
+    totalElements: Int!
+    number: Int!
+    size: Int!
+}
+
+type PodcastDirectoryResult {
+    name: String
+    author: String
+    feedUrl: String!
+    artworkUrl: String
+}
+
 type PersonPage {
     content: [Person!]!
     totalPages: Int!
@@ -466,6 +595,12 @@ type RecentlyWatched {
     type: MediaType!
     episode: Episode
     movie: Movie
+    "Next unfinished audiobook chapter (type CHAPTER)."
+    chapter: Chapter
+    "Book being read (type BOOK) or the book of the chapter (type CHAPTER)."
+    book: Book
+    "Partially played podcast episode (type PODCAST_EPISODE)."
+    podcastEpisode: PodcastEpisode
 }
 
 type StreamToken {
@@ -479,6 +614,13 @@ type WatchStatus {
     playQueueItemId: String!
     episode: Episode
     movie: Movie
+    chapter: Chapter
+    book: Book
+    podcastEpisode: PodcastEpisode
     watched: Boolean!
     progressInMilliseconds: Int!
+    "Epub reading position (epubcfi); only on book-level rows."
+    readingLocation: String
+    "Epub reading progress 0.0-1.0; only on book-level rows."
+    readingProgress: Float
 }

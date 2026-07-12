@@ -1,6 +1,7 @@
 package app.ister.disk.events.audiofilefound;
 
 import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
@@ -14,6 +15,7 @@ import app.ister.core.eventdata.AudioFileFoundData;
 import app.ister.core.eventdata.ImageFoundData;
 import app.ister.core.eventdata.TranscodeRequestedData;
 import app.ister.core.repository.AlbumRepository;
+import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
@@ -60,6 +62,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
     private final MetadataRepository metadataRepository;
     private final TrackRepository trackRepository;
     private final AlbumRepository albumRepository;
+    private final ChapterRepository chapterRepository;
     private final ImageRepository imageRepository;
     private final ScannerHelperService scannerHelperService;
     private final MediaFileFoundGetDuration mediaFileFoundGetDuration;
@@ -81,6 +84,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                                 MetadataRepository metadataRepository,
                                 TrackRepository trackRepository,
                                 AlbumRepository albumRepository,
+                                ChapterRepository chapterRepository,
                                 ImageRepository imageRepository,
                                 ScannerHelperService scannerHelperService,
                                 MediaFileFoundGetDuration mediaFileFoundGetDuration,
@@ -95,6 +99,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         this.metadataRepository = metadataRepository;
         this.trackRepository = trackRepository;
         this.albumRepository = albumRepository;
+        this.chapterRepository = chapterRepository;
         this.imageRepository = imageRepository;
         this.scannerHelperService = scannerHelperService;
         this.mediaFileFoundGetDuration = mediaFileFoundGetDuration;
@@ -145,6 +150,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                             freshEntity.getId(), s.getPath(), s.getStreamIndex(), s.getTitle(), s.getWidth())));
 
             saveTrackMetadataFromTags(messageData.getTrackEntityUUID(), freshEntity);
+            saveChapterMetadataFromTags(messageData.getChapterEntityUUID(), freshEntity);
             extractEmbeddedCoverArt(freshDirectory, freshEntity, checkResult.hasAttachedPic());
             deleteHlsCache(freshEntity.getId());
             requestPlaylistPreGenerationAfterCommit(freshEntity.getId(), freshDirectory.getName());
@@ -208,6 +214,28 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         }
 
         saveAlbumMetadataFromTags(track, mediaFile, format);
+    }
+
+    /**
+     * Audiobook chapters keep their path-derived number (the ordering is what matters); only the
+     * chapter title is taken from the ID3 title tag, falling back to the filename.
+     */
+    private void saveChapterMetadataFromTags(UUID chapterEntityUUID, MediaFileEntity mediaFile) {
+        if (chapterEntityUUID == null) return;
+        Optional<ChapterEntity> chapterOpt = chapterRepository.findById(chapterEntityUUID);
+        if (chapterOpt.isEmpty()) return;
+
+        ChapterEntity chapter = chapterOpt.get();
+        var format = jaffree.getFFPROBE().setShowFormat(true).setInput(mediaFile.getPath()).execute().getFormat();
+        String title = extractTitle(format, mediaFile.getPath());
+        if (title == null) return;
+
+        metadataRepository.deleteAll(metadataRepository.findByChapterEntityId(chapter.getId()));
+        metadataRepository.save(MetadataEntity.builder()
+                .title(title)
+                .chapterEntity(chapter)
+                .sourceUri(FILE_URI_SCHEME + mediaFile.getPath())
+                .build());
     }
 
     /**
@@ -378,18 +406,27 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
 
     private void extractEmbeddedCoverArt(DirectoryEntity libraryDir, MediaFileEntity mediaFile, boolean hasAttachedPic) {
         if (!hasAttachedPic) return;
+        UUID albumId = null;
+        UUID bookId = null;
         TrackEntity track = mediaFile.getTrackEntity();
-        if (track == null || track.getAlbumEntity() == null) return;
-
-        UUID albumId = track.getAlbumEntity().getId();
-        if (!imageRepository.findByAlbumEntityId(albumId).isEmpty()) return;
+        if (track != null && track.getAlbumEntity() != null) {
+            albumId = track.getAlbumEntity().getId();
+            if (!imageRepository.findByAlbumEntityId(albumId).isEmpty()) return;
+        } else if (mediaFile.getChapterEntity() != null && mediaFile.getChapterEntity().getBookEntity() != null) {
+            bookId = mediaFile.getChapterEntity().getBookEntity().getId();
+            if (!imageRepository.findByBookEntityId(bookId).isEmpty()) return;
+        } else {
+            return;
+        }
 
         List<DirectoryEntity> cacheDirs = directoryRepository
                 .findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, libraryDir.getNodeEntity());
         if (cacheDirs.isEmpty()) return;
         DirectoryEntity cacheDir = cacheDirs.get(0);
 
-        Path outputPath = Paths.get(cacheDir.getPath(), "album-covers", albumId.toString(), "cover.jpg");
+        Path outputPath = albumId != null
+                ? Paths.get(cacheDir.getPath(), "album-covers", albumId.toString(), "cover.jpg")
+                : Paths.get(cacheDir.getPath(), "book-covers", bookId.toString(), "cover.jpg");
         try {
             audioFileFoundExtractCoverArt.extract(outputPath, mediaFile.getPath(), dirOfFFmpeg);
         } catch (Exception e) {
@@ -404,6 +441,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                 .imageType(ImageType.COVER)
                 .sourceUri(FILE_URI_SCHEME + mediaFile.getPath())
                 .albumEntityId(albumId)
+                .bookEntityId(bookId)
                 .build(), cacheDir.getName());
     }
 

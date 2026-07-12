@@ -1,5 +1,7 @@
 package app.ister.core.repository;
 
+import app.ister.core.entity.BookEntity;
+import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.UserEntity;
@@ -19,6 +21,19 @@ public interface WatchStatusRepository extends CrudRepository<WatchStatusEntity,
     List<WatchStatusEntity> findByUserEntityExternalIdAndEpisodeEntity(String userEntityExternalId, EpisodeEntity episodeEntity, Sort sort);
 
     List<WatchStatusEntity> findByUserEntityExternalIdAndMovieEntity(String userEntityExternalId, MovieEntity movieEntity, Sort sort);
+
+    Optional<WatchStatusEntity> findByUserEntityAndPlayQueueItemIdAndChapterEntity(UserEntity userEntity, UUID playQueueItemId, ChapterEntity chapterEntity);
+
+    /** Reading rows: one per user per book, keyed by the book itself (no play queue). */
+    Optional<WatchStatusEntity> findByUserEntityAndBookEntity(UserEntity userEntity, BookEntity bookEntity);
+
+    Optional<WatchStatusEntity> findByUserEntityAndPlayQueueItemIdAndPodcastEpisodeEntity(UserEntity userEntity, UUID playQueueItemId, app.ister.core.entity.PodcastEpisodeEntity podcastEpisodeEntity);
+
+    List<WatchStatusEntity> findByUserEntityExternalIdAndPodcastEpisodeEntityIn(String userEntityExternalId, java.util.Collection<app.ister.core.entity.PodcastEpisodeEntity> podcastEpisodeEntities, Sort sort);
+
+    List<WatchStatusEntity> findByUserEntityExternalIdAndChapterEntityIn(String userEntityExternalId, java.util.Collection<ChapterEntity> chapterEntities, Sort sort);
+
+    List<WatchStatusEntity> findByUserEntityExternalIdAndBookEntityIn(String userEntityExternalId, java.util.Collection<BookEntity> bookEntities, Sort sort);
 
     // Batch variants (used by GraphQL @BatchMapping to avoid N+1)
     List<WatchStatusEntity> findByUserEntityExternalIdAndEpisodeEntityIn(String userEntityExternalId, java.util.Collection<EpisodeEntity> episodeEntities, Sort sort);
@@ -117,4 +132,55 @@ public interface WatchStatusRepository extends CrudRepository<WatchStatusEntity,
             ORDER BY wse.movie_entity_id, wse.date_updated DESC
             """, nativeQuery = true)
     List<String> findRecentMovieIdsByUserId(@Param("userId") UUID userId);
+
+    /**
+     * The most recently listened chapter per book (analog of
+     * {@link #findRecentEpisodesAndShowIdsByUserId}): rows of [chapter_entity_id, book_entity_id].
+     */
+    @Query(
+            value = """
+                    WITH added_row_number AS (
+                      SELECT
+                        wse.chapter_entity_id,
+                        ce.book_entity_id,
+                        ROW_NUMBER() OVER(PARTITION BY ce.book_entity_id ORDER BY wse.date_updated DESC) AS row_number
+                      FROM watch_status_entity wse
+                      LEFT JOIN chapter_entity ce ON wse.chapter_entity_id = ce.id
+                      WHERE wse.user_entity_id = :userId AND wse.chapter_entity_id IS NOT NULL
+                        AND wse.date_updated >= CURRENT_DATE - INTERVAL '150 days'
+                      ORDER BY wse.date_updated DESC
+                    )
+                    SELECT
+                      added_row_number.chapter_entity_id, added_row_number.book_entity_id
+                    FROM added_row_number
+                    WHERE row_number = 1;
+                    """,
+            nativeQuery = true
+    )
+    List<String[]> findRecentChaptersAndBookIdsByUserId(@Param("userId") UUID userId);
+
+    /** True when someone is mid-episode: started (progress > 0) but not finished. */
+    boolean existsByPodcastEpisodeEntityIdAndWatchedFalseAndProgressInMillisecondsGreaterThan(UUID podcastEpisodeId, long progressInMilliseconds);
+
+    /** Podcast episodes the user recently listened to (latest watch status per episode). */
+    @Query(value = """
+            SELECT DISTINCT ON (wse.podcast_episode_entity_id) wse.podcast_episode_entity_id
+            FROM watch_status_entity wse
+            WHERE wse.user_entity_id = :userId
+              AND wse.podcast_episode_entity_id IS NOT NULL
+              AND wse.date_updated >= CURRENT_DATE - INTERVAL '150 days'
+            ORDER BY wse.podcast_episode_entity_id, wse.date_updated DESC
+            """, nativeQuery = true)
+    List<String> findRecentPodcastEpisodeIdsByUserId(@Param("userId") UUID userId);
+
+    /** Books the user recently read in (reading rows: book_entity_id set, no chapter). */
+    @Query(value = """
+            SELECT DISTINCT ON (wse.book_entity_id) wse.book_entity_id
+            FROM watch_status_entity wse
+            WHERE wse.user_entity_id = :userId
+              AND wse.book_entity_id IS NOT NULL
+              AND wse.date_updated >= CURRENT_DATE - INTERVAL '150 days'
+            ORDER BY wse.book_entity_id, wse.date_updated DESC
+            """, nativeQuery = true)
+    List<String> findRecentBookIdsByUserId(@Param("userId") UUID userId);
 }

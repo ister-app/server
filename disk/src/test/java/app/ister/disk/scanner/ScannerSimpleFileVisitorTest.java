@@ -7,6 +7,7 @@ import app.ister.core.enums.DirectoryType;
 import app.ister.core.eventdata.FileScanRequestedData;
 import app.ister.core.service.MessageSender;
 import app.ister.disk.scanner.scanners.AudioScanner;
+import app.ister.disk.scanner.scanners.EpubScanner;
 import app.ister.disk.scanner.scanners.ImageScanner;
 import app.ister.disk.scanner.scanners.MediaFileScanner;
 import app.ister.disk.scanner.scanners.NfoScanner;
@@ -49,6 +50,8 @@ class ScannerSimpleFileVisitorTest {
     private SubtitleScanner subtitleScanner;
     @Mock
     private AudioScanner audioScanner;
+    @Mock
+    private EpubScanner epubScanner;
 
     @Mock
     private BasicFileAttributes basicFileAttributes;
@@ -91,7 +94,7 @@ class ScannerSimpleFileVisitorTest {
         when(nfoScanner.analyzable(path, false, 0)).thenReturn(false);
         when(subtitleScanner.analyzable(path, false, 0)).thenReturn(true);
 
-        var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner));
+        var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner));
 
         assertEquals(FileVisitResult.CONTINUE, subject.visitFile(path, basicFileAttributes));
 
@@ -103,7 +106,7 @@ class ScannerSimpleFileVisitorTest {
         @Test
         void theRootDirWillReturnContinue() {
             Path resourceFilePath = fileSystem.getPath("/disk/show");
-            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner));
+            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner));
 
             var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
 
@@ -113,7 +116,7 @@ class ScannerSimpleFileVisitorTest {
         @Test
         void dotDirsWillBeSkipped() {
             Path resourceFilePath = fileSystem.getPath("/disk/show/.tmp");
-            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner));
+            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner));
 
             var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
 

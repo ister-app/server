@@ -1,6 +1,7 @@
 package app.ister.api.controller;
 
 import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.RatingEntity;
@@ -77,6 +78,23 @@ public class RatingController {
                 .findByUserEntityExternalIdAndTrackEntityIn(authentication.getName(), tracks).stream()
                 .collect(Collectors.toMap(r -> r.getTrackEntity().getId(), RatingEntity::getValue));
         return ratingsFor(tracks, TrackEntity::getId, byId);
+    }
+
+    @BatchMapping(typeName = "Book", field = "rating")
+    public Map<BookEntity, Integer> bookRating(List<BookEntity> books, Authentication authentication) {
+        Map<UUID, Integer> byId = ratingRepository
+                .findByUserEntityExternalIdAndBookEntityIn(authentication.getName(), books).stream()
+                .collect(Collectors.toMap(r -> r.getBookEntity().getId(), RatingEntity::getValue));
+        return ratingsFor(books, BookEntity::getId, byId);
+    }
+
+    @BatchMapping(typeName = "Podcast", field = "rating")
+    public Map<app.ister.core.entity.PodcastEntity, Integer> podcastRating(
+            List<app.ister.core.entity.PodcastEntity> podcasts, Authentication authentication) {
+        Map<UUID, Integer> byId = ratingRepository
+                .findByUserEntityExternalIdAndPodcastEntityIn(authentication.getName(), podcasts).stream()
+                .collect(Collectors.toMap(r -> r.getPodcastEntity().getId(), RatingEntity::getValue));
+        return ratingsFor(podcasts, app.ister.core.entity.PodcastEntity::getId, byId);
     }
 
     /**

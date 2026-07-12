@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Ister Reader</title>
+    <link rel="stylesheet" href="reader.css">
+    <script src="vendor/epub.min.js"></script>
+</head>
+<body>
+<header id="topbar">
+    <button id="backButton" title="Back" aria-label="Back">&#10005;</button>
+    <div id="title"></div>
+    <div id="controls">
+        <button id="readAloudButton" class="hidden" title="Read aloud" aria-label="Read aloud">&#9654;</button>
+        <div id="progressLabel"></div>
+    </div>
+</header>
+<main id="main">
+    <div id="prevZone" class="navZone" title="Previous page"></div>
+    <div id="viewer"></div>
+    <div id="nextZone" class="navZone" title="Next page"></div>
+</main>
+<div id="message" class="hidden"></div>
+<script src="reader.js"></script>
+</body>
+</html>
