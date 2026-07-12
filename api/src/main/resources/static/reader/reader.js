@@ -2,6 +2,11 @@
  * Ister epub reader.
  *
  * Loaded as /reader/index.html?mediaFileId=<id>&bookId=<id>&token=<streamToken>[&title=...]
+ *                              [&chapter=<0-based index>][&readAloud=1]
+ *
+ * Without a chapter the book opens at the saved reading position; with one it opens at that
+ * chapter (matched against the TOC, falling back to the spine). readAloud=1 starts the media
+ * overlay playback as soon as the section is displayed.
  *
  * The epub is never downloaded as a whole: epub.js is pointed at the server's
  * /epub/{mediaFileId}/resource/ base, so container.xml, the OPF and every chapter, image and
@@ -23,6 +28,9 @@
     const bookId = params.get("bookId");
     const token = params.get("token");
     const titleParam = params.get("title");
+    const chapterParam = params.get("chapter");
+    const chapterIndex = chapterParam !== null && chapterParam !== "" ? parseInt(chapterParam, 10) : null;
+    const autoReadAloud = params.get("readAloud") === "1";
 
     // The reader is served from <base>/reader/, the API lives at <base>.
     const apiBase = window.location.pathname.replace(/\/reader\/.*$/, "");
@@ -87,6 +95,8 @@
 
     let locationsReady = false;
     let suppressProgressSync = true;
+    // Resolves once the media overlays have been detected (see the bottom of this file).
+    let overlayReady;
 
     book.loaded.metadata.then(function (metadata) {
         if (!titleParam && metadata.title) {
@@ -95,15 +105,47 @@
         }
     });
 
+    /** The chapter's spine href, matched against the TOC and falling back to the spine order. */
+    async function chapterHref(index) {
+        try {
+            const navigation = await book.loaded.navigation;
+            const toc = (navigation && navigation.toc) || [];
+            if (index < toc.length && toc[index].href) {
+                return toc[index].href;
+            }
+            const section = book.spine.get(index);
+            return section ? section.href : null;
+        } catch (error) {
+            console.warn("Could not resolve chapter " + index, error);
+            return null;
+        }
+    }
+
+    /** A requested chapter wins over the saved position; otherwise resume where the user left off. */
+    async function startLocation() {
+        if (chapterIndex !== null && !isNaN(chapterIndex) && chapterIndex >= 0) {
+            const href = await chapterHref(chapterIndex);
+            if (href) {
+                return href;
+            }
+        }
+        const saved = await api(`/reading-progress?bookId=${bookId}`).catch(() => null);
+        return saved && saved.location ? saved.location : undefined;
+    }
+
     Promise.resolve()
-        .then(() => api(`/reading-progress?bookId=${bookId}`).catch(() => null))
-        .then(function (saved) {
-            const location = saved && saved.location ? saved.location : undefined;
-            return rendition.display(location);
-        })
+        .then(startLocation)
+        .then(location => rendition.display(location))
         .then(function () {
             hideMessage();
             suppressProgressSync = false;
+            if (autoReadAloud) {
+                overlayReady.then(function () {
+                    if (overlay.available && !overlay.playing) {
+                        overlay.toggle();
+                    }
+                });
+            }
             return book.locations.generate(1000);
         })
         .then(function () {
@@ -328,8 +370,11 @@
                 readAloudButton.innerHTML = "&#10074;&#10074;";
             }).catch(error => {
                 console.warn("Audio playback failed", error);
-                showMessage("Could not play the audio.");
-                setTimeout(hideMessage, 2000);
+                // Autoplay without a user gesture is blocked by most browsers; point at the button.
+                showMessage(error && error.name === "NotAllowedError"
+                        ? "Tap ▶ to start reading along."
+                        : "Could not play the audio.");
+                setTimeout(hideMessage, 3000);
             });
         },
 
@@ -456,5 +501,5 @@
         }
     });
 
-    book.opened.then(() => overlay.init());
+    overlayReady = book.opened.then(() => overlay.init());
 })();

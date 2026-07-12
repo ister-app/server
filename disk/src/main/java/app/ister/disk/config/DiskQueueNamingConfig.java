@@ -86,9 +86,11 @@ public class DiskQueueNamingConfig {
     }
 
     public String[] getPreTranscodeRecentlyWatchedQueues() {
-        return config.getDirectories().stream()
-                .map(dir -> APP_ISTER_SERVER_PRE_TRANSCODE_RECENTLY_WATCHED + "." + dir.getName())
-                .toArray(String[]::new);
+        return Stream.concat(
+                config.getDirectories().stream()
+                        .map(dir -> APP_ISTER_SERVER_PRE_TRANSCODE_RECENTLY_WATCHED + "." + dir.getName()),
+                Stream.of(APP_ISTER_SERVER_PRE_TRANSCODE_RECENTLY_WATCHED + "." + cacheDirName())
+        ).toArray(String[]::new);
     }
 
     public String[] getAudioFileFoundQueues() {

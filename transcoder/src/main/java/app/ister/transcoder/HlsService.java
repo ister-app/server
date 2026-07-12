@@ -12,6 +12,7 @@ import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.service.MessageSender;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
+import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -36,6 +37,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
+
+import static app.ister.core.MessageQueue.APP_ISTER_SERVER_TRANSCODE_REQUESTED;
 
 /**
  * HLS service — coordinates playlist building, transcoding, and subtitle handling.
@@ -64,6 +67,7 @@ public class HlsService {
     private final MessageSender messageSender;
     private final RemoteNodeClient remoteNodeClient;
     private final NodeTokenManager nodeTokenManager;
+    private final AmqpAdmin amqpAdmin;
 
     /**
      * Short read-only transactions for the HTTP request paths. The HLS endpoints poll for
@@ -79,7 +83,8 @@ public class HlsService {
                       HlsTranscodeService transcodeService, MediaFileRepository mediaFileRepository,
                       MediaFileStreamRepository mediaFileStreamRepository, MessageSender messageSender,
                       RemoteNodeClient remoteNodeClient, NodeTokenManager nodeTokenManager,
-                      PlatformTransactionManager transactionManager) {
+                      AmqpAdmin amqpAdmin, PlatformTransactionManager transactionManager) {
+        this.amqpAdmin = amqpAdmin;
         this.playlistBuilder = playlistBuilder;
         this.subtitleService = subtitleService;
         this.transcodeService = transcodeService;
@@ -148,6 +153,7 @@ public class HlsService {
         if (directoryName == null) {
             throw new IOException("Media file not yet analyzed, no stream entries for: " + mediaFileId);
         }
+        requireTranscodeQueue(directoryName, mediaFileId);
         log.debug("Master playlist cache miss for {}, sending TRANSCODE_REQUESTED to directory queue {}", mediaFileId, directoryName);
 
         TranscodeRequestedData request = TranscodeRequestedData.builder()
@@ -826,6 +832,20 @@ public class HlsService {
     }
 
     // ========== Polling ==========
+
+    /**
+     * Transcode events are published to the default exchange with the queue name as routing key,
+     * so a message for a queue no node declared is discarded by the broker without a trace. Rather
+     * than pinning a request thread for the full master-playlist timeout waiting for a playlist
+     * that can never arrive, fail immediately when the target queue does not exist.
+     */
+    private void requireTranscodeQueue(String directoryName, UUID mediaFileId) throws IOException {
+        String queue = APP_ISTER_SERVER_TRANSCODE_REQUESTED + "." + directoryName;
+        if (amqpAdmin.getQueueProperties(queue) == null) {
+            throw new IOException("No transcoder is listening on queue " + queue
+                    + " for media file " + mediaFileId + "; its directory is not served by any node");
+        }
+    }
 
     private String waitForMasterPlaylist(Path cacheFile, long timeoutMs) throws IOException {
         long deadline = System.currentTimeMillis() + timeoutMs;

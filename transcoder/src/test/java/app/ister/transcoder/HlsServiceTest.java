@@ -56,6 +56,7 @@ class HlsServiceTest {
     @Mock private MessageSender messageSender;
     @Mock private RemoteNodeClient remoteNodeClient;
     @Mock private NodeTokenManager nodeTokenManager;
+    @Mock private org.springframework.amqp.core.AmqpAdmin amqpAdmin;
     // With a mocked manager the TransactionTemplate executes its callback inline.
     @Mock private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
@@ -84,9 +85,11 @@ class HlsServiceTest {
         ReflectionTestUtils.setField(transcodeService, "cacheRetentionHours", 2L);
         transcodeService.init();
         ReflectionTestUtils.setField(transcodeService, "concurrentFileSlots", new Semaphore(10));
+        // By default the transcode queue for the media file's directory exists.
+        lenient().when(amqpAdmin.getQueueProperties(anyString())).thenReturn(new java.util.Properties());
         hlsService = new HlsService(playlistBuilder, subtitleService, transcodeService,
                 mediaFileRepository, mediaFileStreamRepository, messageSender,
-                remoteNodeClient, nodeTokenManager, transactionManager);
+                remoteNodeClient, nodeTokenManager, amqpAdmin, transactionManager);
         ReflectionTestUtils.setField(hlsService, "tmpDir", tempDir.toString());
         ReflectionTestUtils.setField(hlsService, "localNodeName", LOCAL_NODE_NAME);
         ReflectionTestUtils.setField(hlsService, "uploadDrainTimeoutMs", 5000L);
@@ -1161,6 +1164,21 @@ class HlsServiceTest {
                 () -> hlsService.getMasterPlaylist(id, true, false, SubtitleFormat.WEBVTT));
         // Sent once on cache miss, re-sent once after the first wait times out
         verify(messageSender, times(2)).sendTranscodeRequested(any(), any());
+    }
+
+    @Test
+    void getMasterPlaylistFailsFastWhenNoTranscodeQueueExists() {
+        UUID id = UUID.randomUUID();
+        // A long timeout: the point is that we never start waiting for it.
+        ReflectionTestUtils.setField(hlsService, "masterPlaylistTimeoutMs", 60_000L);
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream(0, 1920, 1080));
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+        // No node declared a transcode queue for this directory, so the event would be dropped.
+        when(amqpAdmin.getQueueProperties(anyString())).thenReturn(null);
+
+        assertThrows(IOException.class,
+                () -> hlsService.getMasterPlaylist(id, true, false, SubtitleFormat.WEBVTT));
+        verify(messageSender, never()).sendTranscodeRequested(any(), any());
     }
 
     @Test

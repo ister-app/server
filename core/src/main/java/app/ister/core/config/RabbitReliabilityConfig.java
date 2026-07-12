@@ -9,6 +9,7 @@ import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.retry.MessageRecoverer;
 import org.springframework.amqp.rabbit.retry.RepublishMessageRecoverer;
+import org.springframework.boot.amqp.autoconfigure.RabbitTemplateCustomizer;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -32,6 +33,28 @@ public class RabbitReliabilityConfig {
     @Bean
     public Queue deadLetterQueue() {
         return new Queue(DEAD_LETTER_QUEUE);
+    }
+
+    /**
+     * All events are published to the default exchange with the queue name as the routing key, so a
+     * message for a queue that no node declared is silently dropped by the broker. With mandatory
+     * publishing (spring.rabbitmq.template.mandatory) the broker returns those messages here, which
+     * turns a routing bug into a loud log line instead of an event that just never happens.
+     */
+    @Bean
+    public RabbitTemplateCustomizer unroutableMessageLogger(ObjectProvider<MeterRegistry> meterRegistry) {
+        return template -> template.setReturnsCallback(returned -> {
+            String queue = returned.getRoutingKey();
+            log.error("Message returned as unroutable: no queue {} exists (replyCode={}, replyText={}). "
+                            + "The event is lost; check the queue naming/declaration config for this directory or node.",
+                    queue, returned.getReplyCode(), returned.getReplyText());
+            meterRegistry.ifAvailable(registry -> Counter
+                    .builder("ister.events.unroutable")
+                    .description("Messages returned by the broker because no queue was bound to the routing key")
+                    .tag("queue", queue)
+                    .register(registry)
+                    .increment());
+        });
     }
 
     @Bean
