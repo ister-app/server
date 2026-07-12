@@ -46,18 +46,21 @@ ALTER TABLE play_queue_item_entity
 ALTER TABLE watch_status_entity
     ADD COLUMN IF NOT EXISTS podcast_episode_entity_id UUID REFERENCES podcast_episode_entity(id);
 
--- Recreate the watch-status unique constraint to include the new podcast episode column
--- (same recipe as V13).
+-- Recreate the watch-status unique constraint to include the new podcast episode column.
+-- Unlike V13 this drops ALL unique constraints on the table, not just the first row
+-- SELECT INTO happens to return: pre-Flyway (Hibernate-era) databases still carry a
+-- legacy uk… constraint next to V13's watch_status_entity_media_item_key, and dropping
+-- the wrong one made the ADD below fail in production.
 DO $$
 DECLARE
     con text;
 BEGIN
-    SELECT conname INTO con
-    FROM pg_constraint
-    WHERE conrelid = 'watch_status_entity'::regclass AND contype = 'u';
-    IF con IS NOT NULL THEN
+    FOR con IN
+        SELECT conname FROM pg_constraint
+        WHERE conrelid = 'watch_status_entity'::regclass AND contype = 'u'
+    LOOP
         EXECUTE format('ALTER TABLE watch_status_entity DROP CONSTRAINT %I', con);
-    END IF;
+    END LOOP;
 END $$;
 
 ALTER TABLE watch_status_entity
