@@ -22,7 +22,10 @@ public interface WatchStatusRepository extends CrudRepository<WatchStatusEntity,
 
     List<WatchStatusEntity> findByUserEntityExternalIdAndMovieEntity(String userEntityExternalId, MovieEntity movieEntity, Sort sort);
 
-    Optional<WatchStatusEntity> findByUserEntityAndPlayQueueItemIdAndChapterEntity(UserEntity userEntity, UUID playQueueItemId, ChapterEntity chapterEntity);
+    /** Listening rows: one per user per chapter, keyed by the chapter itself (no play queue). */
+    Optional<WatchStatusEntity> findByUserEntityAndChapterEntity(UserEntity userEntity, ChapterEntity chapterEntity);
+
+    List<WatchStatusEntity> findByUserEntityAndChapterEntityBookEntity(UserEntity userEntity, BookEntity bookEntity);
 
     /** Reading rows: one per user per book, keyed by the book itself (no play queue). */
     Optional<WatchStatusEntity> findByUserEntityAndBookEntity(UserEntity userEntity, BookEntity bookEntity);

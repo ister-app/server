@@ -37,6 +37,9 @@ import java.util.UUID;
 @Slf4j
 @Service
 public class PlayQueueService {
+    /** Audiobook chapters record progress from here on; see updatePlayQueueItemWithProgress. */
+    private static final long CHAPTER_PROGRESS_THRESHOLD_MS = 5000;
+
     private final PlayQueueRepository playQueueRepository;
 
     private final EpisodeRepository episodeRepository;
@@ -562,15 +565,19 @@ public class PlayQueueService {
             playQueueEntity.setProgressInMilliseconds(progressInMilliseconds);
             playQueueRepository.save(playQueueEntity);
             maybeExtend(playQueueEntity);
-            // Update the watch status of an episode if it's played for more then one minute
-            if (progressInMilliseconds > 60000) {
-                if (playQueueItemEntity.getType() == MediaType.EPISODE) {
+            // Update the watch status of an episode if it's played for more then one minute.
+            // Audiobook chapters use a lower threshold: their position is shared with the reader,
+            // so the first minute of a chapter has to be recoverable when switching to text.
+            MediaType type = playQueueItemEntity.getType();
+            long minimumProgress = type == MediaType.CHAPTER ? CHAPTER_PROGRESS_THRESHOLD_MS : 60000;
+            if (progressInMilliseconds > minimumProgress) {
+                if (type == MediaType.EPISODE) {
                     updateEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
-                } else if (playQueueItemEntity.getType() == MediaType.MOVIE) {
+                } else if (type == MediaType.MOVIE) {
                     updateMovieWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
-                } else if (playQueueItemEntity.getType() == MediaType.CHAPTER) {
-                    updateChapterWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
-                } else if (playQueueItemEntity.getType() == MediaType.PODCAST_EPISODE) {
+                } else if (type == MediaType.CHAPTER) {
+                    updateChapterWatchStatus(progressInMilliseconds, authentication, playQueueItemEntity);
+                } else if (type == MediaType.PODCAST_EPISODE) {
                     updatePodcastEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
                 }
             }
@@ -591,9 +598,9 @@ public class PlayQueueService {
         });
     }
 
-    private void updateChapterWatchStatus(long progressInMilliseconds, UUID playQueueItemId, Authentication authentication, PlayQueueItemEntity playQueueItemEntity) {
+    private void updateChapterWatchStatus(long progressInMilliseconds, Authentication authentication, PlayQueueItemEntity playQueueItemEntity) {
         chapterRepository.findById(playQueueItemEntity.getChapterEntityId()).ifPresent(chapterEntity -> {
-            WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreateForChapter(authentication, playQueueItemId, chapterEntity);
+            WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreateForChapter(authentication, chapterEntity);
             updateWatchStatus(progressInMilliseconds, watchStatusEntity, chapterEntity.getMediaFileEntities());
         });
     }

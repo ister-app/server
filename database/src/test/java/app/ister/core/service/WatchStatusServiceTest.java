@@ -1,5 +1,6 @@
 package app.ister.core.service;
 
+import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.UserEntity;
@@ -66,6 +67,40 @@ class WatchStatusServiceTest {
 
         assertFalse(result.isWatched());
         verify(watchStatusRepository).save(any(WatchStatusEntity.class));
+    }
+
+    /**
+     * Listening progress must not be scoped to a play queue: a second queue over the same book has
+     * to find the row the first one wrote, and the reader (which has no queue at all) writes it too.
+     */
+    @Test
+    void getOrCreateForChapterIsSharedAcrossPlayQueues() {
+        UserEntity user = UserEntity.builder().build();
+        ChapterEntity chapter = ChapterEntity.builder().build();
+        chapter.setId(UUID.randomUUID());
+        WatchStatusEntity existing = WatchStatusEntity.builder().userEntity(user).chapterEntity(chapter).build();
+
+        when(userService.getOrCreateUser(authentication)).thenReturn(user);
+        when(watchStatusRepository.findByUserEntityAndChapterEntity(user, chapter))
+                .thenReturn(Optional.of(existing));
+
+        assertEquals(existing, subject.getOrCreateForChapter(authentication, chapter));
+    }
+
+    @Test
+    void getOrCreateForChapterKeysNewRowsOnTheChapter() {
+        UserEntity user = UserEntity.builder().build();
+        ChapterEntity chapter = ChapterEntity.builder().build();
+        chapter.setId(UUID.randomUUID());
+
+        when(userService.getOrCreateUser(authentication)).thenReturn(user);
+        when(watchStatusRepository.findByUserEntityAndChapterEntity(user, chapter)).thenReturn(Optional.empty());
+        when(watchStatusRepository.save(any(WatchStatusEntity.class))).thenAnswer(call -> call.getArgument(0));
+
+        WatchStatusEntity result = subject.getOrCreateForChapter(authentication, chapter);
+
+        assertEquals(chapter.getId(), result.getPlayQueueItemId());
+        assertFalse(result.isWatched());
     }
 
     @Test

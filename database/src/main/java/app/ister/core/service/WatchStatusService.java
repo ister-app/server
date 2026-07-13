@@ -40,12 +40,18 @@ public class WatchStatusService {
         }
     }
 
-    public WatchStatusEntity getOrCreateForChapter(Authentication authentication, UUID playQueueItemId, ChapterEntity chapterEntity) {
+    /**
+     * Listening progress for an audiobook chapter. Deliberately not scoped to a play queue item:
+     * the reader web app writes this position too (reading has no queue), and clients read
+     * {@code Chapter.watchStatus} expecting a single row. The chapter id doubles as the play queue
+     * item id, exactly like {@link #getOrCreateForBook} does with the book id.
+     */
+    public WatchStatusEntity getOrCreateForChapter(Authentication authentication, ChapterEntity chapterEntity) {
         UserEntity userEntity = userService.getOrCreateUser(authentication);
-        return watchStatusRepository.findByUserEntityAndPlayQueueItemIdAndChapterEntity(userEntity, playQueueItemId, chapterEntity)
+        return watchStatusRepository.findByUserEntityAndChapterEntity(userEntity, chapterEntity)
                 .orElseGet(() -> watchStatusRepository.save(WatchStatusEntity.builder()
                         .userEntity(userEntity)
-                        .playQueueItemId(playQueueItemId)
+                        .playQueueItemId(chapterEntity.getId())
                         .chapterEntity(chapterEntity)
                         .watched(false).build()));
     }

@@ -23,7 +23,9 @@ public class WatchStatusEntity extends BaseEntity {
      * When watching a media item it needs to update the correct WatchStatusEntity.
      *
      * <p>Epub reading has no play queue; for reading rows ({@link #bookEntity} set) this holds the
-     * book id, which keeps the column non-null and gives one row per user per book.
+     * book id, which keeps the column non-null and gives one row per user per book. Audiobook
+     * chapters do the same with the chapter id: their progress has to be shared with the reader,
+     * which has no play queue either, so it cannot be scoped to one listening session.
      */
     @Column(nullable = false)
     private UUID playQueueItemId;
@@ -64,4 +66,11 @@ public class WatchStatusEntity extends BaseEntity {
 
     /** Epub reading progress 0.0–1.0; only set on reading rows. */
     private Double readingProgress;
+
+    /**
+     * The epub file {@link #readingLocation} was recorded in. An epubcfi is only valid inside the
+     * file that produced it, and a book can have both a plain and a read-aloud edition; a reader
+     * opening the other edition derives its position from the chapter progress instead.
+     */
+    private UUID readingLocationMediaFileId;
 }

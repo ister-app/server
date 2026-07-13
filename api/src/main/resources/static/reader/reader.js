@@ -19,6 +19,14 @@
  * the chapter audio via the same resource endpoint (with Range support); on timeupdate the active
  * fragment is highlighted inside the rendition iframe and the page turns when it moves out of
  * view. Tapping a sentence seeks the audio to that sentence.
+ *
+ * The same book can also be listened to as an audiobook (separate chapter files, played by the
+ * native app), and both have to resume in the same place. Translating between the two coordinate
+ * systems happens here, in `sync`, because this is the only component that knows the epub's
+ * structure. It reads both positions from /book-progress, opens at whichever was touched last, and
+ * writes both back on every save. Where a read-aloud edition exists and its SMIL timeline matches
+ * the audiobook's chapter durations, the mapping is sentence-exact; otherwise it interpolates
+ * within the chapter, which is accurate to about a paragraph.
  */
 (function () {
     "use strict";
@@ -121,16 +129,59 @@
         }
     }
 
-    /** A requested chapter wins over the saved position; otherwise resume where the user left off. */
+    const explicitChapter = chapterIndex !== null && !isNaN(chapterIndex) && chapterIndex >= 0;
+    let bookProgress = null;
+
+    /** A stored reading location only means something inside the epub it was recorded in. */
+    function savedReadingLocation() {
+        const reading = bookProgress && bookProgress.reading;
+        if (!reading || !reading.location) return null;
+        if (reading.mediaFileId && reading.mediaFileId !== mediaFileId) return null;
+        return reading.location;
+    }
+
+    /**
+     * A requested chapter wins over the saved position; otherwise resume where the user left off.
+     * The progress is fetched either way: even when opening at a chapter, saving has to map the
+     * reading position back onto the audiobook, which needs the chapter list.
+     */
     async function startLocation() {
-        if (chapterIndex !== null && !isNaN(chapterIndex) && chapterIndex >= 0) {
+        bookProgress = await api(`/book-progress?bookId=${bookId}`).catch(() => null);
+        if (explicitChapter) {
             const href = await chapterHref(chapterIndex);
             if (href) {
                 return href;
             }
         }
-        const saved = await api(`/reading-progress?bookId=${bookId}`).catch(() => null);
-        return saved && saved.location ? saved.location : undefined;
+        return savedReadingLocation() || undefined;
+    }
+
+    /**
+     * Opens at the audiobook position when that is the newer of the two. Runs after the first
+     * display because the mapping needs the generated locations (and, for the exact mode, the media
+     * overlays), which are only available by then; the jump is why progress sync stays suppressed
+     * until this settles — otherwise the initial position would overwrite the very position we are
+     * about to restore.
+     */
+    async function resumeFromNewestPosition() {
+        if (explicitChapter || !bookProgress) return;
+        const listening = sync.listeningPosition();
+        const reading = bookProgress.reading;
+        const readingTime = savedReadingLocation() && reading.updatedAt ? Date.parse(reading.updatedAt) : 0;
+
+        if (!listening || listening.updatedAt <= readingTime) {
+            // Nothing newer on the audio side. A reading position from the *other* epub edition is
+            // still worth something: its percentage lands us on roughly the right page here.
+            if (!savedReadingLocation() && reading && reading.progress > 0) {
+                const cfi = book.locations.cfiFromPercentage(reading.progress);
+                if (cfi) await rendition.display(cfi);
+            }
+            return;
+        }
+        const cfi = await sync.audioToCfi(listening.chapterIndex, listening.positionInMilliseconds);
+        if (cfi) {
+            await rendition.display(cfi);
+        }
     }
 
     Promise.resolve()
@@ -138,7 +189,6 @@
         .then(location => rendition.display(location))
         .then(function () {
             hideMessage();
-            suppressProgressSync = false;
             if (autoReadAloud) {
                 overlayReady.then(function () {
                     if (overlay.available && !overlay.playing) {
@@ -150,11 +200,17 @@
         })
         .then(function () {
             locationsReady = true;
-            updateProgressLabel(rendition.currentLocation());
+            return overlayReady;
         })
+        .then(() => sync.init(bookProgress ? bookProgress.chapters : []))
+        .then(resumeFromNewestPosition)
         .catch(function (error) {
             console.error(error);
             showMessage("Could not load the book.");
+        })
+        .then(function () {
+            suppressProgressSync = false;
+            updateProgressLabel(rendition.currentLocation());
         });
 
     /* ------------------------------------------------------------------ */
@@ -195,13 +251,26 @@
             return;
         }
         clearTimeout(syncTimer);
-        syncTimer = setTimeout(function () {
+        syncTimer = setTimeout(async function () {
             const cfi = location.start.cfi;
             const progress = locationsReady ? book.locations.percentageFromCfi(cfi) : 0;
+            // Store the equivalent audiobook position too, so listening picks up where reading
+            // stopped. The audiobook is the only representation the native player understands.
+            const audio = await sync.cfiToAudio(cfi).catch(function (error) {
+                console.warn("Could not map the reading position onto the audiobook", error);
+                return null;
+            });
             api("/reading-progress", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({bookId: bookId, location: cfi, progress: progress || 0})
+                body: JSON.stringify({
+                    bookId: bookId,
+                    location: cfi,
+                    progress: progress || 0,
+                    readingLocationMediaFileId: mediaFileId,
+                    chapterId: audio ? audio.chapterId : null,
+                    positionInMilliseconds: audio ? audio.positionInMilliseconds : null
+                })
             }).catch(error => console.warn("Progress sync failed", error));
         }, 1500);
     });
@@ -214,6 +283,270 @@
         const percentage = book.locations.percentageFromCfi(location.start.cfi);
         progressEl.textContent = Math.round((percentage || 0) * 100) + "%";
     }
+
+    /* ------------------------------------------------------------------ */
+    /* Audio ⇄ text position mapping                                       */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Translates between an audiobook position (chapter + milliseconds) and a text position
+     * (epubcfi), in both directions.
+     *
+     * Audiobook chapters are separate files that know nothing about the epub, so they are aligned
+     * with the spine positionally: through the TOC when it has one entry per chapter, otherwise
+     * through the spine itself. Books where neither lines up fall back to mapping the whole book
+     * proportionally, which is coarse but never wrong by more than the unevenness of the chapters.
+     *
+     * Within a chapter there are two modes. When the book has a read-aloud edition whose SMIL
+     * timeline matches the chapter's duration, every sentence has a clip time and the mapping is
+     * exact. Otherwise the position is interpolated over the chapter's share of the generated
+     * locations, which lands within a paragraph or two.
+     */
+    const sync = {
+        chapters: [],        // audiobook chapters, ordered, from /book-progress
+        sections: null,      // chapter index -> spine Section; null when they could not be aligned
+        chapterBySpine: new Map(),
+        ranges: new Map(),   // spine index -> {first, last} indexes into book.locations
+        parsCache: new Map(),// chapter index -> pars, or [] when unusable for mapping
+        cfiCache: new Map(), // chapter index -> Map(fragment -> cfi)
+
+        get totalDuration() {
+            return this.chapters.reduce((total, chapter) => total + (chapter.durationInMilliseconds || 0), 0);
+        },
+
+        /** Aligns the audiobook chapters with the spine. Called once the book and locations are up. */
+        async init(chapters) {
+            this.chapters = chapters || [];
+            if (!this.chapters.length) {
+                return;
+            }
+            this.sections = await this.alignSections();
+            if (this.sections) {
+                this.sections.forEach((section, index) => this.chapterBySpine.set(section.index, index));
+            } else {
+                console.info("Chapters could not be aligned with the spine; mapping the book proportionally.");
+            }
+            this.indexLocations();
+        },
+
+        async alignSections() {
+            const count = this.chapters.length;
+            try {
+                const navigation = await book.loaded.navigation;
+                const toc = (navigation && navigation.toc) || [];
+                if (toc.length === count) {
+                    const sections = toc.map(entry => book.spine.get(entry.href));
+                    if (sections.every(Boolean)) {
+                        return sections;
+                    }
+                }
+            } catch (error) {
+                console.warn("Could not read the navigation", error);
+            }
+            const spineItems = book.spine.spineItems || [];
+            return spineItems.length === count ? spineItems.slice() : null;
+        },
+
+        /** Which slice of the generated locations belongs to each spine item. */
+        indexLocations() {
+            const locations = book.locations._locations || [];
+            locations.forEach((cfi, index) => {
+                const section = book.spine.get(cfi);
+                if (!section) return;
+                const range = this.ranges.get(section.index);
+                if (range) {
+                    range.last = index;
+                } else {
+                    this.ranges.set(section.index, {first: index, last: index});
+                }
+            });
+        },
+
+        /**
+         * The SMIL pars of a chapter, but only when they can be trusted as that chapter's timeline:
+         * the read-aloud audio has to be the same recording as the audiobook file, which we check by
+         * comparing the SMIL's end time with the chapter's duration.
+         */
+        async parsFor(chapterIndex) {
+            if (this.parsCache.has(chapterIndex)) {
+                return this.parsCache.get(chapterIndex);
+            }
+            let pars = [];
+            const section = this.sections && this.sections[chapterIndex];
+            if (section) {
+                pars = await overlay.parsForHref(section.href).catch(() => []);
+                const duration = this.chapters[chapterIndex].durationInMilliseconds;
+                const smilEnd = pars.length ? pars[pars.length - 1].end * 1000 : 0;
+                const tolerance = Math.max(2000, (duration || 0) * 0.02);
+                if (!duration || !pars.length || Math.abs(smilEnd - duration) > tolerance) {
+                    if (pars.length && duration) {
+                        console.info(`Chapter ${chapterIndex}: SMIL timeline (${Math.round(smilEnd)}ms) does not `
+                                + `match the audiobook file (${duration}ms); interpolating instead.`);
+                    }
+                    pars = [];
+                }
+            }
+            this.parsCache.set(chapterIndex, pars);
+            return pars;
+        },
+
+        /** fragment id -> cfi for a chapter's SMIL pars, resolved against the loaded section. */
+        async fragmentCfis(chapterIndex, pars) {
+            if (this.cfiCache.has(chapterIndex)) {
+                return this.cfiCache.get(chapterIndex);
+            }
+            const section = this.sections[chapterIndex];
+            const cfis = new Map();
+            try {
+                await section.load(book.load.bind(book));
+                for (const par of pars) {
+                    const element = section.document && section.document.getElementById(par.fragment);
+                    if (element) {
+                        cfis.set(par.fragment, section.cfiFromElement(element));
+                    }
+                }
+            } catch (error) {
+                console.warn("Could not resolve the sentences of chapter " + chapterIndex, error);
+            }
+            this.cfiCache.set(chapterIndex, cfis);
+            return cfis;
+        },
+
+        /** The cfi at [fraction] through a spine item, via its slice of the generated locations. */
+        cfiInSection(spineIndex, fraction) {
+            const locations = book.locations._locations || [];
+            const range = this.ranges.get(spineIndex);
+            if (!range || !locations.length) {
+                return null;
+            }
+            const index = Math.round(range.first + Math.min(Math.max(fraction, 0), 1) * (range.last - range.first));
+            return locations[Math.min(index, locations.length - 1)];
+        },
+
+        /** Where in the book (0–1) a chapter position falls, treating the audiobook as one timeline. */
+        bookFraction(chapterIndex, positionInMilliseconds) {
+            const total = this.totalDuration;
+            if (!total) return 0;
+            let elapsed = 0;
+            for (let i = 0; i < chapterIndex; i++) {
+                elapsed += this.chapters[i].durationInMilliseconds || 0;
+            }
+            return Math.min((elapsed + positionInMilliseconds) / total, 1);
+        },
+
+        /** The text position of an audiobook position. */
+        async audioToCfi(chapterIndex, positionInMilliseconds) {
+            const chapter = this.chapters[chapterIndex];
+            if (!chapter) return null;
+            const section = this.sections && this.sections[chapterIndex];
+            if (!section) {
+                return book.locations.cfiFromPercentage(this.bookFraction(chapterIndex, positionInMilliseconds));
+            }
+
+            const pars = await this.parsFor(chapterIndex);
+            if (pars.length) {
+                const seconds = positionInMilliseconds / 1000;
+                let par = pars[0];
+                for (const candidate of pars) {
+                    if (candidate.begin <= seconds) par = candidate;
+                    else break;
+                }
+                const cfis = await this.fragmentCfis(chapterIndex, pars);
+                const cfi = cfis.get(par.fragment);
+                if (cfi) {
+                    return cfi;
+                }
+            }
+
+            const duration = chapter.durationInMilliseconds || 0;
+            const fraction = duration ? positionInMilliseconds / duration : 0;
+            return this.cfiInSection(section.index, fraction)
+                    || book.locations.cfiFromPercentage(this.bookFraction(chapterIndex, positionInMilliseconds));
+        },
+
+        /** The audiobook position of a text position, as {chapterId, positionInMilliseconds}. */
+        async cfiToAudio(cfi) {
+            if (!this.chapters.length) return null;
+            const section = book.spine.get(cfi);
+            const chapterIndex = section ? this.chapterBySpine.get(section.index) : undefined;
+            if (chapterIndex === undefined) {
+                return this.audioPositionFromFraction(book.locations.percentageFromCfi(cfi) || 0);
+            }
+            const chapter = this.chapters[chapterIndex];
+
+            const pars = await this.parsFor(chapterIndex);
+            if (pars.length) {
+                const cfis = await this.fragmentCfis(chapterIndex, pars);
+                const comparator = new ePub.CFI();
+                let begin = null;
+                for (const par of pars) {
+                    const parCfi = cfis.get(par.fragment);
+                    if (!parCfi) continue;
+                    try {
+                        if (comparator.compare(parCfi, cfi) > 0) break;
+                    } catch (error) {
+                        continue;
+                    }
+                    begin = par.begin;
+                }
+                if (begin !== null) {
+                    return {chapterId: chapter.id, positionInMilliseconds: Math.round(begin * 1000)};
+                }
+            }
+
+            const range = this.ranges.get(section.index);
+            const locationIndex = book.locations.locationFromCfi(cfi);
+            const duration = chapter.durationInMilliseconds || 0;
+            let fraction = 0;
+            if (range && range.last > range.first && locationIndex >= 0) {
+                fraction = (locationIndex - range.first) / (range.last - range.first);
+            }
+            return {
+                chapterId: chapter.id,
+                positionInMilliseconds: Math.round(Math.min(Math.max(fraction, 0), 1) * duration)
+            };
+        },
+
+        /** Fallback for unaligned books: a fraction of the book is a fraction of the audiobook. */
+        audioPositionFromFraction(fraction) {
+            const total = this.totalDuration;
+            if (!total) return null;
+            let target = Math.min(Math.max(fraction, 0), 1) * total;
+            for (const chapter of this.chapters) {
+                const duration = chapter.durationInMilliseconds || 0;
+                if (target <= duration || chapter === this.chapters[this.chapters.length - 1]) {
+                    return {chapterId: chapter.id, positionInMilliseconds: Math.round(Math.min(target, duration))};
+                }
+                target -= duration;
+            }
+            return null;
+        },
+
+        /**
+         * Where listening left off: the chapter touched last, or the next one when it was finished
+         * — the same resume rule the player uses. Null when the book was never listened to.
+         */
+        listeningPosition() {
+            let latest = -1;
+            let latestTime = 0;
+            this.chapters.forEach((chapter, index) => {
+                if (!chapter.updatedAt) return;
+                const time = Date.parse(chapter.updatedAt);
+                if (time >= latestTime) {
+                    latestTime = time;
+                    latest = index;
+                }
+            });
+            if (latest < 0) return null;
+            let index = latest;
+            let position = this.chapters[latest].progressInMilliseconds || 0;
+            if (this.chapters[latest].watched && latest + 1 < this.chapters.length) {
+                index = latest + 1;
+                position = this.chapters[index].progressInMilliseconds || 0;
+            }
+            return {chapterIndex: index, positionInMilliseconds: position, updatedAt: latestTime};
+        }
+    };
 
     /* ------------------------------------------------------------------ */
     /* Media overlays (read-aloud)                                         */
@@ -268,6 +601,20 @@
             return new DOMParser().parseFromString(text, "application/xml");
         },
 
+        /** The SMIL pars of an arbitrary spine item, or [] when it has no media overlay. */
+        async parsForHref(href) {
+            if (!this.manifest || !href) {
+                return [];
+            }
+            const manifestItem = Object.values(this.manifest).find(item =>
+                    this.resolve(this.opfDir, item.href) === href || item.href === href);
+            const overlayId = manifestItem ? manifestItem.mediaOverlay : null;
+            if (!overlayId || !this.manifest[overlayId]) {
+                return [];
+            }
+            return this.loadSmil(this.resolve(this.opfDir, this.manifest[overlayId].href));
+        },
+
         /** Loads the SMIL pars for the spine item currently displayed. */
         async loadCurrentSection() {
             const location = rendition.currentLocation();
@@ -278,16 +625,7 @@
             if (this.parsHref === href && this.pars.length) {
                 return true;
             }
-            const manifestItem = Object.values(this.manifest).find(item =>
-                    this.resolve(this.opfDir, item.href) === href || item.href === href);
-            const overlayId = manifestItem ? manifestItem.mediaOverlay : null;
-            if (!overlayId || !this.manifest[overlayId]) {
-                this.pars = [];
-                this.parsHref = href;
-                return false;
-            }
-            const smilEntry = this.resolve(this.opfDir, this.manifest[overlayId].href);
-            this.pars = await this.loadSmil(smilEntry);
+            this.pars = await this.parsForHref(href);
             this.parsHref = href;
             this.activeIndex = -1;
             return this.pars.length > 0;

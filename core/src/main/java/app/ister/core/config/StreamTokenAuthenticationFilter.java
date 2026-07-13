@@ -46,7 +46,8 @@ public class StreamTokenAuthenticationFilter extends OncePerRequestFilter {
             tokenEntity.ifPresent(entity -> {
                 String path = request.getRequestURI();
                 if ((path.startsWith(pathPrefix + "/hls/") || path.startsWith(pathPrefix + "/images/")
-                        || path.startsWith(pathPrefix + "/epub/") || path.startsWith(pathPrefix + "/reading-progress"))
+                        || path.startsWith(pathPrefix + "/epub/") || path.startsWith(pathPrefix + "/reading-progress")
+                        || path.startsWith(pathPrefix + "/book-progress"))
                         && entity.getUserEntity() != null) {
                     setAuth(entity.getUserEntity().getExternalId(), "ROLE_user");
                 } else if (path.startsWith(pathPrefix + "/mediaFile/") && entity.isDownload()) {
@@ -75,6 +76,7 @@ public class StreamTokenAuthenticationFilter extends OncePerRequestFilter {
                 && !path.startsWith(pathPrefix + "/images/")
                 && !path.startsWith(pathPrefix + "/epub/")
                 && !path.startsWith(pathPrefix + "/reading-progress")
+                && !path.startsWith(pathPrefix + "/book-progress")
                 && !path.startsWith(pathPrefix + "/mediaFile/")
                 && !path.startsWith(pathPrefix + "/transcode/upload/");
     }
