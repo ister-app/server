@@ -124,6 +124,8 @@ class SearchIndexServiceTest {
         when(personRepository.findAll(any(PageRequest.class))).thenAnswer(invocation -> Page.empty(invocation.getArgument(0)));
         when(albumRepository.findAll(any(PageRequest.class))).thenAnswer(invocation -> Page.empty(invocation.getArgument(0)));
         when(trackRepository.findAll(any(PageRequest.class))).thenAnswer(invocation -> Page.empty(invocation.getArgument(0)));
+        when(bookRepository.findAll(any(PageRequest.class))).thenAnswer(invocation -> Page.empty(invocation.getArgument(0)));
+        when(podcastRepository.findAll(any(PageRequest.class))).thenAnswer(invocation -> Page.empty(invocation.getArgument(0)));
         when(typesenseClient.listCollectionNames()).thenReturn(List.of("media_v1", "other"));
 
         subject.reindex();

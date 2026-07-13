@@ -3,6 +3,7 @@ package app.ister.api.controller;
 import app.ister.core.entity.CreditEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.enums.CreditType;
+import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.CreditRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
@@ -46,6 +47,9 @@ class PersonControllerGraphQlTest {
 
     @MockitoBean
     private CreditRepository creditRepository;
+
+    @MockitoBean
+    private BookRepository bookRepository;
 
     @Test
     void personsQueryResolvesPageWithBirthYearAndCredits() {
