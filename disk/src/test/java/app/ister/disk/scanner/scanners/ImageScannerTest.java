@@ -1,12 +1,16 @@
 package app.ister.disk.scanner.scanners;
 
+import app.ister.core.entity.AlbumEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.LibraryEntity;
+import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.NodeEntity;
+import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.repository.ImageRepository;
+import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.utils.Jaffree;
@@ -38,6 +42,8 @@ class ImageScannerTest {
     private ScannerHelperService scannerHelperService;
     @Mock
     private ImageRepository imageRepository;
+    @Mock
+    private MediaFileRepository mediaFileRepository;
     @Mock
     private BasicFileAttributes basicFileAttributes;
     @Mock
@@ -202,6 +208,48 @@ class ImageScannerTest {
         subject.analyze(musicDir, Path.of("/music/Grease_ Soundtrack (1991)/cover.jpg"), false, 0);
 
         verify(scannerHelperService).getOrCreateAlbum(any(), any(), eq("Grease_ Soundtrack"), eq(1991));
+    }
+
+    @Test
+    void analyzeMusicAlbumImageLinksToTheAlbumOfItsSiblingTracks() throws IOException {
+        Path albumDir = Files.createDirectories(tempDir.resolve("The Beatles/Abbey Road"));
+        Path track = Files.createFile(albumDir.resolve("01 - Come Together.flac"));
+
+        LibraryEntity musicLib = LibraryEntity.builder().libraryType(LibraryType.MUSIC).build();
+        DirectoryEntity musicDir = DirectoryEntity.builder()
+                .path(tempDir.toString())
+                .libraryEntity(musicLib)
+                .nodeEntity(NodeEntity.builder().name("disk1").build())
+                .build();
+        AlbumEntity album = AlbumEntity.builder().name("Abbey Road 1969 remaster").build();
+        when(mediaFileRepository.findByDirectoryEntityAndPath(musicDir, track.toString()))
+                .thenReturn(Optional.of(MediaFileEntity.builder()
+                        .trackEntity(TrackEntity.builder().albumEntity(album).build())
+                        .build()));
+
+        ImageEntity result = (ImageEntity) subject.analyze(musicDir, albumDir.resolve("cover.jpg"), false, 0).orElseThrow();
+
+        // The album the tracks are on wins over the one the directory name spells out, so no
+        // second, track-less album is created for the cover.
+        assertEquals(album, result.getAlbumEntity());
+        verify(scannerHelperService, never()).getOrCreateAlbum(any(), any(), any(), anyInt());
+    }
+
+    @Test
+    void analyzeMusicAlbumImageFallsBackToPathWhenTracksAreNotScannedYet() throws IOException {
+        Path albumDir = Files.createDirectories(tempDir.resolve("The Beatles/Abbey Road (1969)"));
+        Files.createFile(albumDir.resolve("01 - Come Together.flac"));
+
+        LibraryEntity musicLib = LibraryEntity.builder().libraryType(LibraryType.MUSIC).build();
+        DirectoryEntity musicDir = DirectoryEntity.builder()
+                .path(tempDir.toString())
+                .libraryEntity(musicLib)
+                .nodeEntity(NodeEntity.builder().name("disk1").build())
+                .build();
+
+        subject.analyze(musicDir, albumDir.resolve("cover.jpg"), false, 0);
+
+        verify(scannerHelperService).getOrCreateAlbum(any(), any(), eq("Abbey Road"), eq(1969));
     }
 
     @Test

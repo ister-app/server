@@ -1,12 +1,16 @@
 package app.ister.disk.scanner.scanners;
 
+import app.ister.core.entity.AlbumEntity;
 import app.ister.core.entity.BaseEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.ImageEntity;
+import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.ImageFoundData;
 import app.ister.core.repository.ImageRepository;
+import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.utils.Jaffree;
@@ -25,6 +29,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Component
@@ -37,6 +42,7 @@ public class ImageScanner implements Scanner {
     private static final List<String> AUDIO_EXTENSIONS = List.of("mp3", "flac", "aac", "opus", "ogg", "wav", "m4a", "wma");
     private final ScannerHelperService scannerHelperService;
     private final ImageRepository imageRepository;
+    private final MediaFileRepository mediaFileRepository;
     private final MessageSender messageSender;
     private final Jaffree jaffree;
 
@@ -129,22 +135,64 @@ public class ImageScanner implements Scanner {
     private void linkToMusicLibraryEntity(ImageEntity.ImageEntityBuilder<?, ?> imageEntity,
                                            DirectoryEntity directoryEntity, Path path) {
         MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), path.toString());
-        if (musicPath.getDirType() == DirType.ARTIST && musicPath.isFlatAlbumStructure()) {
-            String artistName = readAlbumArtistFromDirectory(path.getParent(), musicPath.getArtistName());
-            var artist = scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), artistName, musicPath.getArtistYear());
-            imageEntity.albumEntity(scannerHelperService.getOrCreateAlbum(directoryEntity.getLibraryEntity(), artist, musicPath.getAlbumName(), musicPath.getAlbumYear()));
-        } else if (musicPath.getDirType() == DirType.ARTIST) {
+        if (musicPath.getDirType() == DirType.ARTIST && !musicPath.isFlatAlbumStructure()) {
             imageEntity.personEntity(scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), musicPath.getArtistName(), musicPath.getArtistYear()));
-        } else if (musicPath.getDirType() == DirType.ALBUM) {
-            var artist = scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), musicPath.getArtistName(), musicPath.getArtistYear());
-            imageEntity.albumEntity(scannerHelperService.getOrCreateAlbum(directoryEntity.getLibraryEntity(), artist, musicPath.getAlbumName(), musicPath.getAlbumYear()));
+            return;
         }
+        if (musicPath.getDirType() != DirType.ARTIST && musicPath.getDirType() != DirType.ALBUM) {
+            return;
+        }
+        Optional<AlbumEntity> siblingAlbum = albumOfSiblingTracks(directoryEntity, path);
+        if (siblingAlbum.isPresent()) {
+            imageEntity.albumEntity(siblingAlbum.get());
+            return;
+        }
+        String artistName = musicPath.isFlatAlbumStructure()
+                ? readAlbumArtistFromDirectory(path.getParent(), musicPath.getArtistName())
+                : musicPath.getArtistName();
+        var artist = scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), artistName, musicPath.getArtistYear());
+        imageEntity.albumEntity(scannerHelperService.getOrCreateAlbum(directoryEntity.getLibraryEntity(), artist, musicPath.getAlbumName(), musicPath.getAlbumYear()));
+    }
+
+    /**
+     * The album a cover belongs to is the album its sibling audio files are already on — not the one
+     * its own directory name spells out. Both are supposed to agree, but an album row created before
+     * the name and year came from the path (rather than the audio tags) carries a name no scanner can
+     * derive again, and matching on that name creates a fresh, track-less album per cover.jpg.
+     *
+     * <p>Empty when the audio in this directory has not been scanned yet; the caller then falls back
+     * to the path-derived identity, which is what the audio scanner will use for the same files.
+     */
+    private Optional<AlbumEntity> albumOfSiblingTracks(DirectoryEntity directoryEntity, Path imagePath) {
+        Path directory = imagePath.getParent();
+        if (directory == null) {
+            return Optional.empty();
+        }
+        try (var stream = Files.list(directory)) {
+            return stream
+                    .filter(this::isAudioFile)
+                    .map(audioFile -> mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, audioFile.toString()))
+                    .flatMap(Optional::stream)
+                    .map(MediaFileEntity::getTrackEntity)
+                    .filter(Objects::nonNull)
+                    .map(TrackEntity::getAlbumEntity)
+                    .filter(Objects::nonNull)
+                    .findFirst();
+        } catch (IOException e) {
+            log.warn("Could not list directory {}: {}", directory, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private boolean isAudioFile(Path path) {
+        String name = path.toString().toLowerCase();
+        return AUDIO_EXTENSIONS.stream().anyMatch(ext -> name.endsWith("." + ext));
     }
 
     private String readAlbumArtistFromDirectory(Path directory, String fallback) {
         try (var stream = Files.list(directory)) {
             return stream
-                    .filter(p -> AUDIO_EXTENSIONS.stream().anyMatch(ext -> p.toString().toLowerCase().endsWith("." + ext)))
+                    .filter(this::isAudioFile)
                     .findFirst()
                     .map(audioFile -> {
                         try {
