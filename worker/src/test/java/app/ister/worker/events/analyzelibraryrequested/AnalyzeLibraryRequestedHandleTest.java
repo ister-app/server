@@ -2,9 +2,12 @@ package app.ister.worker.events.analyzelibraryrequested;
 
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.NodeEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
+import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.AnalyzeLibraryRequestedData;
+import app.ister.core.eventdata.PersonFoundData;
 import app.ister.core.eventdata.UpdateImagesRequestedData;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.PersonRepository;
@@ -30,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -108,6 +112,26 @@ class AnalyzeLibraryRequestedHandleTest {
         verify(messageSender).sendShowFound(any());
         verify(messageSender).sendEpisodeFound(any());
         verify(messageSender).sendMovieFound(any());
+    }
+
+    @Test
+    void handleDispatchesPersonFoundForMusicArtistsAndBookAuthorsWithoutMetadata() {
+        NodeEntity nodeEntity = NodeEntity.builder().name("TestServer").build();
+        PersonEntity artist = PersonEntity.builder().id(UUID.randomUUID()).name("Artist").build();
+        PersonEntity author = PersonEntity.builder().id(UUID.randomUUID()).name("Author").build();
+
+        when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(nodeEntity);
+        when(personRepository.findByLibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(LibraryType.MUSIC))
+                .thenReturn(List.of(artist));
+        when(personRepository.findByLibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(LibraryType.BOOK))
+                .thenReturn(List.of(author));
+
+        subject.handle(AnalyzeLibraryRequestedData.builder().eventType(EventType.ANALYZE_LIBRARY_REQUEST).build());
+
+        ArgumentCaptor<PersonFoundData> captor = ArgumentCaptor.forClass(PersonFoundData.class);
+        verify(messageSender, times(2)).sendPersonFound(captor.capture(), eq("TestServer"));
+        assertEquals(List.of(artist.getId(), author.getId()),
+                captor.getAllValues().stream().map(PersonFoundData::getPersonId).toList());
     }
 
     @Test

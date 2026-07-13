@@ -1,5 +1,6 @@
 package app.ister.worker.events.musicbrainz;
 
+import app.ister.worker.events.wikipedia.WikipediaService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -18,7 +19,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.http.HttpMethod.GET;
+import static org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class MusicBrainzServiceTest {
@@ -30,6 +33,7 @@ class MusicBrainzServiceTest {
     private static final String WIKIPEDIA_SUMMARY_ENDPOINT = "https://en.wikipedia.org/api/rest_v1/page/summary/";
     private static final String WIKIPEDIA_NL_SUMMARY_ENDPOINT = "https://nl.wikipedia.org/api/rest_v1/page/summary/";
     private static final String WIKIDATA_ENDPOINT = "https://www.wikidata.org/wiki/Special:EntityData/";
+    private static final String WIKIDATA_API = "https://www.wikidata.org/w/api.php";
     private static final List<String> EN = List.of("en");
     private static final List<String> EN_NL = List.of("en", "nl");
 
@@ -38,12 +42,14 @@ class MusicBrainzServiceTest {
 
     @BeforeEach
     void setUp() {
-        subject = new MusicBrainzService("https://commons.wikimedia.org/wiki/Special:FilePath/");
-        // The service builds its own RestClient in the constructor; rebind it to a mock server
-        // so no real network calls are made.
+        WikipediaService wikipediaService = new WikipediaService(WIKIDATA_ENDPOINT, WIKIDATA_API);
+        subject = new MusicBrainzService("https://commons.wikimedia.org/wiki/Special:FilePath/", wikipediaService);
+        // Both services build their own RestClient in the constructor; rebind them to one mock
+        // server so no real network calls are made.
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
         ReflectionTestUtils.setField(subject, "restClient", builder.build());
+        ReflectionTestUtils.setField(wikipediaService, "restClient", builder.build());
     }
 
     // ========== getCoverArtUrl ==========
@@ -359,5 +365,130 @@ class MusicBrainzServiceTest {
                 .andRespond(withServerError());
 
         assertEquals(Optional.empty(), subject.getAlbumInfo("Radiohead", "OK Computer"));
+    }
+
+    @Test
+    void getAlbumInfoReturnsEmptyOnEmptyBody() {
+        server.expect(requestTo(startsWith(RELEASE_GROUP_ENDPOINT)))
+                .andRespond(withSuccess());
+
+        assertEquals(Optional.empty(), subject.getAlbumInfo("Radiohead", "OK Computer"));
+        server.verify();
+    }
+
+    // ========== rate limiting (HTTP 503) ==========
+
+    @Test
+    void getCoverArtUrlRetriesAfterRateLimit() {
+        server.expect(requestTo(startsWith(RELEASE_GROUP_ENDPOINT)))
+                .andRespond(withStatus(SERVICE_UNAVAILABLE));
+        server.expect(requestTo(startsWith(RELEASE_GROUP_ENDPOINT)))
+                .andRespond(withSuccess("{\"release-groups\":[{\"id\":\"rg-1\",\"title\":\"OK Computer\"}]}", MediaType.APPLICATION_JSON));
+
+        Optional<String> result = subject.getCoverArtUrl("Radiohead", "OK Computer");
+
+        assertEquals(Optional.of("https://coverartarchive.org/release-group/rg-1/front"), result);
+        server.verify();
+    }
+
+    @Test
+    void getCoverArtUrlGivesUpAfterRepeatedRateLimit() {
+        // Three attempts on the release-group endpoint, then three on the release fallback.
+        for (int i = 0; i < 3; i++) {
+            server.expect(requestTo(startsWith(RELEASE_GROUP_ENDPOINT))).andRespond(withStatus(SERVICE_UNAVAILABLE));
+        }
+        for (int i = 0; i < 3; i++) {
+            server.expect(requestTo(startsWith(RELEASE_ENDPOINT))).andRespond(withStatus(SERVICE_UNAVAILABLE));
+        }
+
+        assertEquals(Optional.empty(), subject.getCoverArtUrl("Radiohead", "OK Computer"));
+        server.verify();
+    }
+
+    @Test
+    void getCoverArtUrlReturnsEmptyOnEmptyBody() {
+        // An empty body yields no release-group id, so the release fallback runs and is empty too.
+        server.expect(requestTo(startsWith(RELEASE_GROUP_ENDPOINT)))
+                .andRespond(withSuccess());
+        server.expect(requestTo(startsWith(RELEASE_ENDPOINT)))
+                .andRespond(withSuccess());
+
+        assertEquals(Optional.empty(), subject.getCoverArtUrl("Radiohead", "OK Computer"));
+        server.verify();
+    }
+
+    @Test
+    void getArtistInfoRetriesAfterRateLimit() {
+        server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
+                .andRespond(withStatus(SERVICE_UNAVAILABLE));
+        server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
+                .andRespond(withSuccess("{\"artists\":[{\"id\":\"mbid-1\",\"name\":\"Radiohead\",\"tags\":[{\"name\":\"rock\"}]}]}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(ARTIST_LOOKUP_ENDPOINT)))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Radiohead", EN);
+
+        assertTrue(result.isPresent());
+        assertEquals("rock", result.get().genre());
+        server.verify();
+    }
+
+    @Test
+    void getArtistInfoGivesUpAfterRepeatedRateLimit() {
+        for (int i = 0; i < 3; i++) {
+            server.expect(requestTo(startsWith(ARTIST_ENDPOINT))).andRespond(withStatus(SERVICE_UNAVAILABLE));
+        }
+
+        assertEquals(Optional.empty(), subject.getArtistInfo("Radiohead", EN));
+        server.verify();
+    }
+
+    @Test
+    void getArtistInfoReturnsEmptyOnEmptyBody() {
+        server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
+                .andRespond(withSuccess());
+
+        assertEquals(Optional.empty(), subject.getArtistInfo("Radiohead", EN));
+        server.verify();
+    }
+
+    // ========== relation parsing edge cases ==========
+
+    @Test
+    void getArtistInfoIgnoresImageRelationThatIsNotACommonsFilePage() {
+        server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
+                .andRespond(withSuccess("{\"artists\":[{\"id\":\"m\",\"name\":\"Radiohead\"}]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(ARTIST_LOOKUP_ENDPOINT)))
+                .andRespond(withSuccess("""
+                        {"relations":[
+                          {"type":"image","url":{"resource":"https://example.com/photo.jpg"}},
+                          {"type":"wikidata","url":{"resource":"https://www.wikidata.org/wiki/not-an-entity"}}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Radiohead", EN);
+
+        assertTrue(result.isPresent());
+        assertNull(result.get().imageUrl());
+        assertTrue(result.get().bios().isEmpty());
+        // The wikidata resource is not a Q-entity, so no Wikidata/Wikipedia calls follow.
+        server.verify();
+    }
+
+    @Test
+    void getArtistInfoIgnoresRelationsWithoutMatchingType() {
+        server.expect(requestTo(startsWith(ARTIST_ENDPOINT)))
+                .andRespond(withSuccess("{\"artists\":[{\"id\":\"m\",\"name\":\"Radiohead\"}]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(ARTIST_LOOKUP_ENDPOINT)))
+                .andRespond(withSuccess("{\"relations\":[{\"type\":\"discogs\",\"url\":{\"resource\":\"https://discogs.com/x\"}}],\"tags\":[{\"name\":\"rock\"}]}",
+                        MediaType.APPLICATION_JSON));
+
+        Optional<MusicBrainzService.ArtistInfo> result = subject.getArtistInfo("Radiohead", EN);
+
+        assertTrue(result.isPresent());
+        // The genre falls back to the lookup's top tag when the search result carries none.
+        assertEquals("rock", result.get().genre());
+        assertNull(result.get().imageUrl());
+        server.verify();
     }
 }

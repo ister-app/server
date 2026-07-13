@@ -1,16 +1,19 @@
 package app.ister.worker.events.personfound;
 
 import app.ister.core.config.LanguageProperties;
+import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
+import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.PersonFoundData;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.worker.events.musicbrainz.MusicBrainzService;
+import app.ister.worker.events.openlibrary.OpenLibraryService;
 import app.ister.worker.events.tmdbmetadata.ImageDownloadService;
 import app.ister.worker.events.tmdbmetadata.ImageSave;
 import app.ister.core.service.ServerEventService;
@@ -44,6 +47,7 @@ import static org.mockito.Mockito.when;
 class HandlePersonFoundTest {
 
     private static final String IMAGE_URL = "https://upload.wikimedia.org/artist.jpg";
+    private static final String PHOTO_URL = "https://covers.openlibrary.org/a/olid/OL1A-L.jpg";
 
     @Mock
     private ServerEventService serverEventServiceMock;
@@ -62,6 +66,9 @@ class HandlePersonFoundTest {
 
     @Mock
     private MusicBrainzService musicBrainzService;
+
+    @Mock
+    private OpenLibraryService openLibraryService;
 
     @Mock
     private ImageDownloadService imageDownloadService;
@@ -270,5 +277,72 @@ class HandlePersonFoundTest {
 
         verify(metadataRepository, never()).save(any());
         verifyNoInteractions(imageDownloadService);
+    }
+
+    // ========== book authors ==========
+
+    private PersonEntity author() {
+        return PersonEntity.builder()
+                .id(personId)
+                .name("Artist")
+                .libraryEntity(LibraryEntity.builder().libraryType(LibraryType.BOOK).build())
+                .build();
+    }
+
+    @Test
+    void handleEnrichesAnAuthorFromOpenLibraryInsteadOfMusicBrainz() throws IOException {
+        PersonEntity author = author();
+        when(personRepository.findById(personId)).thenReturn(Optional.of(author));
+        when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of());
+        when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
+        when(openLibraryService.getAuthorInfo(eq("Artist"), any()))
+                .thenReturn(Optional.of(new OpenLibraryService.AuthorInfo(
+                        Map.of("en", "A writer."), PHOTO_URL, 1967, "OL1A")));
+
+        subject.handle(data);
+
+        verifyNoInteractions(musicBrainzService);
+        assertEquals(1967, author.getBirthYear());
+        verify(personRepository).save(author);
+        ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
+        verify(metadataRepository).save(captor.capture());
+        MetadataEntity saved = captor.getValue();
+        assertEquals("A writer.", saved.getDescription());
+        assertEquals("eng", saved.getLanguage());
+        assertEquals("openlibrary://author/OL1A", saved.getSourceUri());
+        verify(imageDownloadService).downloadAndSave(
+                PHOTO_URL, ImageType.COVER, "eng", "openlibrary://author/OL1A",
+                new ImageSave.MediaEntityRef(null, null, null, author, null));
+    }
+
+    @Test
+    void handleKeepsAnExistingAuthorBirthYear() {
+        PersonEntity author = author();
+        author.setBirthYear(1900);
+        when(personRepository.findById(personId)).thenReturn(Optional.of(author));
+        when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of());
+        when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
+        when(openLibraryService.getAuthorInfo(eq("Artist"), any()))
+                .thenReturn(Optional.of(new OpenLibraryService.AuthorInfo(Map.of(), null, 1967, "OL1A")));
+
+        subject.handle(data);
+
+        assertEquals(1900, author.getBirthYear());
+        verify(personRepository, never()).save(any());
+        verify(metadataRepository, never()).save(any());
+        verifyNoInteractions(imageDownloadService);
+    }
+
+    @Test
+    void handleDoesNothingWhenNoAuthorInfoFound() {
+        when(personRepository.findById(personId)).thenReturn(Optional.of(author()));
+        when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of());
+        when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
+        when(openLibraryService.getAuthorInfo(eq("Artist"), any())).thenReturn(Optional.empty());
+
+        subject.handle(data);
+
+        verifyNoInteractions(musicBrainzService, imageDownloadService);
+        verify(metadataRepository, never()).save(any());
     }
 }

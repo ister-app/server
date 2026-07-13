@@ -27,6 +27,8 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.stream.Stream;
+
 /**
  * Handles {@link EventType#ANALYZE_LIBRARY_REQUEST} by:
  * 1. Publishing an update-images event for this node.
@@ -75,15 +77,20 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
                                 .build(),
                         dir.getName()));
         dispatchMissingMetadataEvents(nodeEntity.getName());
+        dispatchMissingPersonMetadataEvents(nodeEntity.getName());
         dispatchMissingMusicMetadataEvents(nodeEntity.getName());
     }
 
-    private void dispatchMissingMusicMetadataEvents(String nodeName) {
-        personRepository.findByLibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(LibraryType.MUSIC)
-                .forEach(a -> messageSender.sendPersonFound(
-                        PersonFoundData.builder().eventType(EventType.PERSON_FOUND).personId(a.getId()).build(),
+    /** Music artists and book authors are both persons; PERSON_FOUND picks the metadata source. */
+    private void dispatchMissingPersonMetadataEvents(String nodeName) {
+        Stream.of(LibraryType.MUSIC, LibraryType.BOOK)
+                .flatMap(type -> personRepository.findByLibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(type).stream())
+                .forEach(p -> messageSender.sendPersonFound(
+                        PersonFoundData.builder().eventType(EventType.PERSON_FOUND).personId(p.getId()).build(),
                         nodeName));
+    }
 
+    private void dispatchMissingMusicMetadataEvents(String nodeName) {
         albumRepository.findByLibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(LibraryType.MUSIC)
                 .forEach(a -> messageSender.sendAlbumFound(
                         AlbumFoundData.builder().eventType(EventType.ALBUM_FOUND).albumId(a.getId()).build(),
