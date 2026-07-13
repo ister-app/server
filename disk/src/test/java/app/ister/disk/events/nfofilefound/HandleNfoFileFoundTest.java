@@ -22,6 +22,7 @@ import app.ister.core.service.ServerEventService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -29,6 +30,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -151,7 +153,14 @@ class HandleNfoFileFoundTest {
 
         subject.handle(data);
 
-        verify(metadataRepository).save(any(MetadataEntity.class));
+        MetadataEntity saved = savedMetadata();
+        assertEquals("Star Trek: Discovery", saved.getTitle());
+        assertEquals("Follow the voyages of Starfleet on their missions to discover new worlds and new life forms, "
+                + "and one Starfleet officer who must learn that to truly understand all things alien, "
+                + "you must first understand yourself.", saved.getDescription());
+        assertEquals(LocalDate.of(2017, 9, 24), saved.getReleased());
+        assertEquals(show, saved.getShowEntity());
+        assertEquals("file://" + nfoFile, saved.getSourceUri());
     }
 
     @Test
@@ -177,7 +186,13 @@ class HandleNfoFileFoundTest {
 
         subject.handle(data);
 
-        verify(metadataRepository).save(any(MetadataEntity.class));
+        MetadataEntity saved = savedMetadata();
+        assertEquals("Filmed Before a Live Studio Audience", saved.getTitle());
+        assertEquals("Wanda and Vision struggle to conceal their powers during dinner with Vision’s boss and his wife.",
+                saved.getDescription());
+        assertEquals(LocalDate.of(2021, 1, 15), saved.getReleased());
+        assertEquals(episode, saved.getEpisodeEntity());
+        assertEquals("file://" + nfoFile, saved.getSourceUri());
     }
 
     @Test
@@ -220,7 +235,13 @@ class HandleNfoFileFoundTest {
 
         subject.handle(data);
 
-        verify(metadataRepository).save(any(MetadataEntity.class));
+        MetadataEntity saved = savedMetadata();
+        assertEquals("Inception", saved.getTitle());
+        assertEquals("A thief who steals corporate secrets through the use of dream-sharing technology is given "
+                + "the inverse task of planting an idea into the mind of a C.E.O.", saved.getDescription());
+        assertEquals(LocalDate.of(2010, 7, 16), saved.getReleased());
+        assertEquals(movie, saved.getMovieEntity());
+        assertEquals("file://" + nfoFile, saved.getSourceUri());
     }
 
     @Test
@@ -263,7 +284,13 @@ class HandleNfoFileFoundTest {
         when(scannerHelperService.getOrCreatePerson(library, "The Beatles", 0)).thenReturn(artist);
 
         subject.handle(data);
-        verify(metadataRepository).save(any(MetadataEntity.class));
+
+        MetadataEntity saved = savedMetadata();
+        assertEquals("The Beatles", saved.getTitle());
+        assertEquals("The Beatles were an English rock band formed in Liverpool in 1960.", saved.getDescription());
+        assertEquals("Rock", saved.getGenre());
+        assertEquals(artist, saved.getPersonEntity());
+        assertEquals("file://" + nfoFile, saved.getSourceUri());
     }
 
     @Test
@@ -310,7 +337,14 @@ class HandleNfoFileFoundTest {
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Abbey Road", 1969)).thenReturn(album);
 
         subject.handle(data);
-        verify(metadataRepository).save(any(MetadataEntity.class));
+
+        MetadataEntity saved = savedMetadata();
+        assertEquals("Abbey Road", saved.getTitle());
+        assertEquals("The eleventh studio album by the English rock band the Beatles.", saved.getDescription());
+        assertEquals("Rock", saved.getGenre());
+        assertEquals(LocalDate.of(1969, 9, 26), saved.getReleased());
+        assertEquals(album, saved.getAlbumEntity());
+        assertEquals("file://" + nfoFile, saved.getSourceUri());
     }
 
     @Test
@@ -336,7 +370,13 @@ class HandleNfoFileFoundTest {
 
         subject.handle(data);
 
-        verify(metadataRepository).save(any(MetadataEntity.class));
+        // The author.nfo shape is the music artist.nfo shape: name → title, biography → description.
+        MetadataEntity saved = savedMetadata();
+        assertEquals("The Beatles", saved.getTitle());
+        assertEquals("The Beatles were an English rock band formed in Liverpool in 1960.", saved.getDescription());
+        assertEquals("Rock", saved.getGenre());
+        assertEquals(author, saved.getPersonEntity());
+        assertEquals("file://" + nfoFile, saved.getSourceUri());
     }
 
     @Test
@@ -365,7 +405,13 @@ class HandleNfoFileFoundTest {
         subject.handle(data);
 
         verify(scannerHelperService).getOrCreateBook(library, author, "Abbey Road", 1969);
-        verify(metadataRepository).save(any(MetadataEntity.class));
+        MetadataEntity saved = savedMetadata();
+        assertEquals("Abbey Road", saved.getTitle());
+        assertEquals("The eleventh studio album by the English rock band the Beatles.", saved.getDescription());
+        assertEquals("Rock", saved.getGenre());
+        assertEquals(LocalDate.of(1969, 9, 26), saved.getReleased());
+        assertEquals(book, saved.getBookEntity());
+        assertEquals("file://" + nfoFile, saved.getSourceUri());
     }
 
     @Test
@@ -439,5 +485,12 @@ class HandleNfoFileFoundTest {
 
         verify(otherPathFileRepository).save(otherFile);
         assertEquals(savedMetadata, otherFile.getMetadataEntity());
+    }
+
+    /** The single MetadataEntity row the handler persisted for the parsed nfo. */
+    private MetadataEntity savedMetadata() {
+        ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
+        verify(metadataRepository).save(captor.capture());
+        return captor.getValue();
     }
 }

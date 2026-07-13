@@ -38,6 +38,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -45,11 +46,14 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -244,7 +248,13 @@ class HandleAudioFileFoundTest {
         subject.handle(data);
 
         verify(metadataRepositoryMock).deleteAll(any());
-        verify(metadataRepositoryMock).save(any(MetadataEntity.class));
+        MetadataEntity saved = savedMetadata();
+        assertEquals("My Track", saved.getTitle());
+        assertEquals("Nice song", saved.getDescription());
+        assertNull(saved.getReleased());
+        assertNull(saved.getGenre());
+        assertEquals(track, saved.getTrackEntity());
+        assertEquals("file://" + PATH, saved.getSourceUri());
     }
 
     @Test
@@ -328,8 +338,11 @@ class HandleAudioFileFoundTest {
 
         subject.handle(data);
 
-        // Title derived from filename: "01 - Track" → "Track"
-        verify(metadataRepositoryMock).save(any(MetadataEntity.class));
+        // Title derived from filename: "01 - Track.flac" → "Track" (extension and "NN - " prefix stripped)
+        MetadataEntity saved = savedMetadata();
+        assertEquals("Track", saved.getTitle());
+        assertEquals(track, saved.getTrackEntity());
+        assertEquals("file://" + PATH, saved.getSourceUri());
     }
 
     @Test
@@ -387,10 +400,21 @@ class HandleAudioFileFoundTest {
         subject.handle(data);
 
         // The scanners identify an album by its path-derived name and year; tags must not move it.
-        org.junit.jupiter.api.Assertions.assertEquals("FolderArtist", artist.getName());
-        org.junit.jupiter.api.Assertions.assertEquals("FolderAlbum", album.getName());
-        org.junit.jupiter.api.Assertions.assertEquals(0, album.getReleaseYear());
+        assertEquals("FolderArtist", artist.getName());
+        assertEquals("FolderAlbum", album.getName());
+        assertEquals(0, album.getReleaseYear());
         verify(albumRepositoryMock, never()).save(any(AlbumEntity.class));
+
+        // The tag values land in metadata instead: one row for the track, one for the album.
+        ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
+        verify(metadataRepositoryMock, times(2)).save(captor.capture());
+        MetadataEntity trackMetadata = captor.getAllValues().getFirst();
+        assertEquals("Track Title", trackMetadata.getTitle());
+        assertEquals(track, trackMetadata.getTrackEntity());
+        MetadataEntity albumMetadata = captor.getAllValues().getLast();
+        assertEquals("Tag Album (2010)", albumMetadata.getTitle());
+        assertEquals(LocalDate.of(2010, 1, 1), albumMetadata.getReleased());
+        assertEquals(album, albumMetadata.getAlbumEntity());
     }
 
     @Test
@@ -444,7 +468,11 @@ class HandleAudioFileFoundTest {
         subject.handle(data);
 
         // Only the track's own metadata row is written; the album already has one.
-        verify(metadataRepositoryMock, times(1)).save(any(MetadataEntity.class));
+        MetadataEntity saved = savedMetadata();
+        assertEquals("Track Title", saved.getTitle());
+        assertEquals(track, saved.getTrackEntity());
+        assertNull(saved.getAlbumEntity());
+        assertEquals(LocalDate.of(2010, 1, 1), saved.getReleased());
     }
 
     @Test
@@ -512,7 +540,11 @@ class HandleAudioFileFoundTest {
 
         verify(scannerHelperServiceMock).getOrCreateTrack(artist, album, 1, 1);
         verify(mediaFileRepositoryMock, atLeastOnce()).save(any(MediaFileEntity.class));
-        verify(metadataRepositoryMock).save(any(MetadataEntity.class));
+        // The file is re-pointed at the track the tag says it is, and its metadata follows it there.
+        assertEquals(correctTrack, mediaFile.getTrackEntity());
+        MetadataEntity saved = savedMetadata();
+        assertEquals("Bring out Your Dead", saved.getTitle());
+        assertEquals(correctTrack, saved.getTrackEntity());
     }
 
     @Test
@@ -885,5 +917,12 @@ class HandleAudioFileFoundTest {
         org.junit.jupiter.api.Assertions.assertEquals(Boolean.TRUE, captor.getValue().getDirect());
         org.junit.jupiter.api.Assertions.assertEquals(Boolean.TRUE, captor.getValue().getTranscode());
         org.junit.jupiter.api.Assertions.assertNull(captor.getValue().getPreTranscode());
+    }
+
+    /** The single MetadataEntity row the handler persisted. */
+    private MetadataEntity savedMetadata() {
+        ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
+        verify(metadataRepositoryMock).save(captor.capture());
+        return captor.getValue();
     }
 }

@@ -46,6 +46,7 @@ class ServerEventServiceTest {
         ArgumentCaptor<MovieFoundData> captor = ArgumentCaptor.forClass(MovieFoundData.class);
         verify(messageSender).sendMovieFound(captor.capture());
         assertEquals(movieId, captor.getValue().getMovieId());
+        assertEquals(EventType.MOVIE_FOUND, captor.getValue().getEventType());
     }
 
     @Test
@@ -57,6 +58,7 @@ class ServerEventServiceTest {
         ArgumentCaptor<ShowFoundData> captor = ArgumentCaptor.forClass(ShowFoundData.class);
         verify(messageSender).sendShowFound(captor.capture());
         assertEquals(showId, captor.getValue().getShowId());
+        assertEquals(EventType.SHOW_FOUND, captor.getValue().getEventType());
     }
 
     @Test
@@ -68,6 +70,7 @@ class ServerEventServiceTest {
         ArgumentCaptor<EpisodeFoundData> captor = ArgumentCaptor.forClass(EpisodeFoundData.class);
         verify(messageSender).sendEpisodeFound(captor.capture());
         assertEquals(episodeId, captor.getValue().getEpisodeId());
+        assertEquals(EventType.EPISODE_FOUND, captor.getValue().getEventType());
     }
 
     @Test
@@ -79,6 +82,7 @@ class ServerEventServiceTest {
         ArgumentCaptor<PersonFoundData> captor = ArgumentCaptor.forClass(PersonFoundData.class);
         verify(messageSender).sendPersonFound(captor.capture());
         assertEquals(personId, captor.getValue().getPersonId());
+        assertEquals(EventType.PERSON_FOUND, captor.getValue().getEventType());
     }
 
     @Test
@@ -90,6 +94,7 @@ class ServerEventServiceTest {
         ArgumentCaptor<AlbumFoundData> captor = ArgumentCaptor.forClass(AlbumFoundData.class);
         verify(messageSender).sendAlbumFound(captor.capture());
         assertEquals(albumId, captor.getValue().getAlbumId());
+        assertEquals(EventType.ALBUM_FOUND, captor.getValue().getEventType());
     }
 
     @Test
@@ -101,6 +106,7 @@ class ServerEventServiceTest {
         ArgumentCaptor<TrackFoundData> captor = ArgumentCaptor.forClass(TrackFoundData.class);
         verify(messageSender).sendTrackFound(captor.capture());
         assertEquals(trackId, captor.getValue().getTrackId());
+        assertEquals(EventType.TRACK_FOUND, captor.getValue().getEventType());
     }
 
     @Test
@@ -112,6 +118,7 @@ class ServerEventServiceTest {
         ArgumentCaptor<BookFoundData> captor = ArgumentCaptor.forClass(BookFoundData.class);
         verify(messageSender).sendBookFound(captor.capture());
         assertEquals(bookId, captor.getValue().getBookId());
+        assertEquals(EventType.BOOK_FOUND, captor.getValue().getEventType());
         assertEquals(SearchEntityType.BOOK, captureSearchIndexEvent().getEntityType());
     }
 
@@ -125,6 +132,7 @@ class ServerEventServiceTest {
         ArgumentCaptor<ChapterFoundData> captor = ArgumentCaptor.forClass(ChapterFoundData.class);
         verify(messageSender).sendChapterFound(captor.capture());
         assertEquals(chapterId, captor.getValue().getChapterId());
+        assertEquals(EventType.CHAPTER_FOUND, captor.getValue().getEventType());
         verify(messageSender, never()).sendSearchIndexRequested(any());
     }
 
@@ -137,6 +145,7 @@ class ServerEventServiceTest {
         ArgumentCaptor<PodcastFoundData> captor = ArgumentCaptor.forClass(PodcastFoundData.class);
         verify(messageSender).sendPodcastFound(captor.capture());
         assertEquals(podcastId, captor.getValue().getPodcastId());
+        assertEquals(EventType.PODCAST_FOUND, captor.getValue().getEventType());
         assertEquals(SearchEntityType.PODCAST, captureSearchIndexEvent().getEntityType());
     }
 
@@ -149,6 +158,7 @@ class ServerEventServiceTest {
         ArgumentCaptor<PodcastEpisodeFoundData> captor = ArgumentCaptor.forClass(PodcastEpisodeFoundData.class);
         verify(messageSender).sendPodcastEpisodeFound(captor.capture());
         assertEquals(episodeId, captor.getValue().getPodcastEpisodeId());
+        assertEquals(EventType.PODCAST_EPISODE_FOUND, captor.getValue().getEventType());
         verify(messageSender, never()).sendSearchIndexRequested(any());
     }
 
@@ -159,6 +169,7 @@ class ServerEventServiceTest {
         subject.createMovieFoundEvent(movieId);
 
         SearchIndexRequestedData data = captureSearchIndexEvent();
+        assertEquals(EventType.SEARCH_INDEX_REQUESTED, data.getEventType());
         assertEquals(SearchEntityType.MOVIE, data.getEntityType());
         assertEquals(movieId, data.getEntityId());
         assertEquals(SearchIndexRequestedData.Action.UPSERT, data.getAction());

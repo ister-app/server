@@ -2,13 +2,16 @@ package app.ister.transcoder;
 
 import app.ister.core.utils.Jaffree;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
+import com.github.kokorin.jaffree.ffmpeg.FFmpegResult;
 import com.github.kokorin.jaffree.ffmpeg.FFmpegResultFuture;
+import com.github.kokorin.jaffree.ffmpeg.Output;
 import com.github.kokorin.jaffree.process.Stopper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -20,14 +23,18 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
@@ -87,6 +94,46 @@ class HlsTranscodeServiceTest {
 
     private static FFmpegResultFuture neverCompletingFFmpegFuture() {
         return new FFmpegResultFuture(new CompletableFuture<>(), NOOP_STOPPER);
+    }
+
+    /**
+     * A future that is already completed but whose first timed {@code get} still reports a timeout.
+     * That deterministically drives the pass loop through its TimeoutException branch — where the
+     * stall check lives — exactly once, without any sleeping or wall-clock racing.
+     */
+    private static final class TimesOutOnceFuture extends CompletableFuture<FFmpegResult> {
+        private final AtomicInteger timeouts = new AtomicInteger();
+        private final AtomicInteger gets = new AtomicInteger();
+
+        @Override
+        public FFmpegResult get(long timeout, TimeUnit unit)
+                throws InterruptedException, ExecutionException, TimeoutException {
+            if (gets.getAndIncrement() == 0) {
+                timeouts.incrementAndGet();
+                throw new TimeoutException("still encoding");
+            }
+            return super.get(timeout, unit);
+        }
+
+        int timeouts() {
+            return timeouts.get();
+        }
+    }
+
+    /** The FFmpeg arguments of the single output the service handed to FFmpeg. */
+    private static List<String> outputArgsOf(FFmpeg ffmpegMock) {
+        ArgumentCaptor<Output> captor = ArgumentCaptor.forClass(Output.class);
+        verify(ffmpegMock).addOutput(captor.capture());
+        return captor.getValue().buildArguments();
+    }
+
+    private static void assertContainsSequence(List<String> args, String... expected) {
+        assertTrue(Collections.indexOfSubList(args, List.of(expected)) >= 0,
+                () -> args + " should contain " + List.of(expected));
+    }
+
+    private static void assertDoesNotContain(List<String> args, String argument) {
+        assertFalse(args.contains(argument), () -> args + " should not contain " + argument);
     }
 
     @SuppressWarnings("unchecked")
@@ -639,6 +686,13 @@ class HlsTranscodeServiceTest {
         service.startAudioPass("/test/audio.mkv", tempDir, 0, AudioQuality.Q192K, "opus");
 
         verify(ffmpegMock).executeAsync();
+        List<String> args = outputArgsOf(ffmpegMock);
+        assertContainsSequence(args, "-c:a", "aac");
+        assertContainsSequence(args, "-b:a", "192k");
+        // Without keyframes there are no cut points to align to: fixed 10s segments, no -segment_times.
+        assertContainsSequence(args, "-segment_time", "10");
+        assertDoesNotContain(args, "-segment_times");
+        assertDoesNotContain(args, "-force_key_frames");
     }
 
     @Test
@@ -653,6 +707,10 @@ class HlsTranscodeServiceTest {
         service.startAudioPass("/test/audio.m4a", tempDir, 0, AudioQuality.Q192K, "aac");
 
         verify(ffmpegMock).executeAsync();
+        List<String> args = outputArgsOf(ffmpegMock);
+        assertContainsSequence(args, "-c:a", "copy");
+        // -force_key_frames is meaningless (and rejected) with -c:a copy
+        assertDoesNotContain(args, "-force_key_frames");
     }
 
     @Test
@@ -686,6 +744,10 @@ class HlsTranscodeServiceTest {
         service.generateVideoSegment("/test/video.mkv", tempDir.resolve("out.ts"), 0.0, 10.0, VideoQuality.COPY);
 
         verify(ffmpegMock).executeAsync();
+        List<String> args = outputArgsOf(ffmpegMock);
+        assertContainsSequence(args, "-c:v", "copy");
+        assertDoesNotContain(args, "-b:v");
+        assertDoesNotContain(args, "-vf");
     }
 
     @Test
@@ -697,6 +759,11 @@ class HlsTranscodeServiceTest {
         service.generateVideoSegment("/test/video.mkv", tempDir.resolve("out.ts"), 0.0, 10.0, VideoQuality.Q720P);
 
         verify(ffmpegMock).executeAsync();
+        List<String> args = outputArgsOf(ffmpegMock);
+        assertContainsSequence(args, "-c:v", "libx264");
+        assertContainsSequence(args, "-vf", "scale=1280:720");
+        assertContainsSequence(args, "-b:v", "2000k");
+        assertContainsSequence(args, "-preset", "ultrafast");
     }
 
     // ========== generateAudioSegment ==========
@@ -768,21 +835,44 @@ class HlsTranscodeServiceTest {
 
     @Test
     void startVideoPassKeepsRunningWhileItProducesSegments() throws IOException {
-        // Stall deadline has passed, but a segment is on disk → the pass is healthy and runs on
-        // until the FFmpeg future completes.
+        // The stall deadline has already passed and the FFmpeg future times out on the first poll,
+        // so the pass loop really enters its TimeoutException branch and evaluates the stall check.
+        // A segment is on disk → the pass is judged healthy and runs on to completion.
         ReflectionTestUtils.setField(service, "passStallTimeoutSeconds", 0L);
         Path cacheDir = Files.createDirectories(tempDir.resolve("producing"));
         Files.writeString(cacheDir.resolve("seg_video_720p_00000.ts"), "data");
         when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
+        TimesOutOnceFuture ffmpegFuture = new TimesOutOnceFuture();
+        ffmpegFuture.complete(null);
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
-        when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
+        when(ffmpegMock.executeAsync()).thenReturn(new FFmpegResultFuture(ffmpegFuture, NOOP_STOPPER));
 
         service.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P);
 
+        assertEquals(1, ffmpegFuture.timeouts(), "the pass must have gone through the stall check");
         assertTrue(service.hasDoneMarker(cacheDir, "seg_video_720p_"));
+    }
+
+    @Test
+    void startVideoPassIsForceStoppedWhenItProducesNoSegmentBeforeTheStallDeadline() throws IOException {
+        // Same timing as the test above, but with an empty cache dir: the stall check now trips.
+        ReflectionTestUtils.setField(service, "passStallTimeoutSeconds", 0L);
+        Path cacheDir = Files.createDirectories(tempDir.resolve("stalled"));
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
+
+        TimesOutOnceFuture ffmpegFuture = new TimesOutOnceFuture();
+        ffmpegFuture.complete(null);
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        when(ffmpegMock.executeAsync()).thenReturn(new FFmpegResultFuture(ffmpegFuture, NOOP_STOPPER));
+
+        assertThrows(IllegalStateException.class,
+                () -> service.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P));
+        assertFalse(service.hasDoneMarker(cacheDir, "seg_video_720p_"));
     }
 
     // ========== done markers ==========
@@ -930,6 +1020,14 @@ class HlsTranscodeServiceTest {
         service.startAudioPass("/test/audio.mkv", tempDir, 0, AudioQuality.Q64K, "opus");
 
         verify(ffmpegMock).executeAsync();
+        List<String> args = outputArgsOf(ffmpegMock);
+        assertContainsSequence(args, "-c:a", "aac");
+        assertContainsSequence(args, "-b:a", "64k");
+        // The keyframe list (0, 5, 10) drives both the encoder's key frames and the segment cuts;
+        // the leading 0.0 is not a cut point.
+        assertContainsSequence(args, "-force_key_frames", "5.000000,10.000000");
+        assertContainsSequence(args, "-segment_times", "5.000000,10.000000");
+        assertContainsSequence(args, "-segment_time_delta", "0.05");
         assertTrue(service.hasDoneMarker(tempDir, "seg_audio_0_64k_"));
     }
 

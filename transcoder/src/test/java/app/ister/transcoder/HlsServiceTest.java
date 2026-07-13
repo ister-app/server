@@ -18,12 +18,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.FFmpegResultFuture;
+import com.github.kokorin.jaffree.ffmpeg.Input;
+import com.github.kokorin.jaffree.ffmpeg.Output;
 import com.github.kokorin.jaffree.process.Stopper;
 
 import java.io.IOException;
@@ -31,6 +34,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -127,6 +131,25 @@ class HlsServiceTest {
 
     private static FFmpegResultFuture failedFFmpegFuture(Throwable cause) {
         return new FFmpegResultFuture(CompletableFuture.failedFuture(cause), NOOP_STOPPER);
+    }
+
+    /** The FFmpeg arguments of the single input the service handed to FFmpeg. */
+    private static List<String> inputArgsOf(FFmpeg ffmpegMock) {
+        ArgumentCaptor<Input> captor = ArgumentCaptor.forClass(Input.class);
+        verify(ffmpegMock).addInput(captor.capture());
+        return captor.getValue().buildArguments();
+    }
+
+    /** The FFmpeg arguments of the single output the service handed to FFmpeg. */
+    private static List<String> outputArgsOf(FFmpeg ffmpegMock) {
+        ArgumentCaptor<Output> captor = ArgumentCaptor.forClass(Output.class);
+        verify(ffmpegMock).addOutput(captor.capture());
+        return captor.getValue().buildArguments();
+    }
+
+    private static void assertContainsSequence(List<String> args, String... expected) {
+        assertTrue(Collections.indexOfSubList(args, List.of(expected)) >= 0,
+                () -> args + " should contain " + List.of(expected));
     }
 
     // ========== Master playlist ==========
@@ -705,6 +728,11 @@ class HlsServiceTest {
 
         assertNotNull(result);
         verify(ffmpegMock, times(1)).executeAsync();
+        // -vaapi_device must precede -i, and the VAAPI encoder + hwupload filter must be used.
+        assertContainsSequence(inputArgsOf(ffmpegMock), "-vaapi_device", "/dev/dri/renderD128");
+        List<String> outputArgs = outputArgsOf(ffmpegMock);
+        assertContainsSequence(outputArgs, "-c:v", "h264_vaapi");
+        assertContainsSequence(outputArgs, "-vf", "scale=1280:720,format=nv12,hwupload");
     }
 
     @Test
@@ -731,6 +759,13 @@ class HlsServiceTest {
 
         assertNotNull(result);
         verify(ffmpegMock, times(1)).executeAsync();
+        // CUDA decode is requested on the input; the NVENC encoder and cuda scaler on the output.
+        assertContainsSequence(inputArgsOf(ffmpegMock), "-hwaccel", "cuda");
+        assertContainsSequence(inputArgsOf(ffmpegMock), "-hwaccel_output_format", "cuda");
+        List<String> outputArgs = outputArgsOf(ffmpegMock);
+        assertContainsSequence(outputArgs, "-c:v", "h264_nvenc");
+        assertContainsSequence(outputArgs, "-vf", "scale_cuda=1280:720:format=nv12");
+        assertContainsSequence(outputArgs, "-preset", "fast");
     }
 
     @Test
@@ -757,6 +792,8 @@ class HlsServiceTest {
 
         assertNotNull(result);
         verify(ffmpegMock, times(1)).executeAsync();
+        // An audio-only pass never touches the video hardware, whatever the hwaccel setting is.
+        assertFalse(inputArgsOf(ffmpegMock).contains("-vaapi_device"));
     }
 
     // ========== Concurrent file limit ==========

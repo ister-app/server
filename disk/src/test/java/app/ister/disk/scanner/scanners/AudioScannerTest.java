@@ -214,6 +214,7 @@ class AudioScannerTest {
 
         assertTrue(result.isPresent());
         verify(mediaFileRepository).save(existing);
+        assertEquals(correctTrack, existing.getTrackEntity());
     }
 
     @Test
@@ -243,6 +244,7 @@ class AudioScannerTest {
 
         assertTrue(result.isPresent());
         verify(mediaFileRepository).save(existing);
+        assertEquals(track, existing.getTrackEntity());
     }
 
     // ========== flat album structure (album_artist tag) ==========

@@ -70,11 +70,15 @@ class NodeActivityPublisherTest {
     @Test
     void publishesAgainWhenTheFailedCountChanges() {
         long token = registry.started("app.ister.server.MovieFound", "MOVIE_FOUND", Instant.now());
-        registry.finished(token, true);
-
         subject.publishIfChanged();
 
-        verify(messageSender).sendStatus(any(NodeActivityStatusData.class));
+        registry.finished(token, true);
+        subject.publishIfChanged();
+
+        ArgumentCaptor<NodeActivityStatusData> captor = ArgumentCaptor.forClass(NodeActivityStatusData.class);
+        verify(messageSender, times(2)).sendStatus(captor.capture());
+        assertEquals(0, captor.getAllValues().getFirst().getFailedCount());
+        assertEquals(1, captor.getAllValues().getLast().getFailedCount());
     }
 
     @Test
