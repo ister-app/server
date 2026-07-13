@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -187,6 +188,13 @@ public class HlsTranscodeService {
 
     /** Generation keys whose running pass was individually preempted (removed from activeGenerations on failure). */
     private final Set<String> preemptedKeys = ConcurrentHashMap.newKeySet();
+
+    /** Called with the media file ID after each background pass finished successfully; set by {@link HlsService}. */
+    private volatile Consumer<UUID> backgroundPassFinishedListener;
+
+    public void setBackgroundPassFinishedListener(Consumer<UUID> listener) {
+        this.backgroundPassFinishedListener = listener;
+    }
 
     /** Bookkeeping for a pass that is currently executing on a pool thread. */
     private static final class RunningPass {
@@ -461,8 +469,28 @@ public class HlsTranscodeService {
             runningPasses.remove(generationKey);
             if (background) {
                 backgroundPassBudget.release();
+                notifyBackgroundPassFinished(mediaFileId, future);
             }
             releaseTranscodeSlotIfDone(mediaFileId);
+        }
+    }
+
+    /**
+     * Lets a finished background pass hand its freed budget to the next pass of the same file.
+     * Without it, the passes that found no budget when the file was first requested stay dropped
+     * until the next pre-transcode cycle, so a file with many streams needs as many cycles as it
+     * has passes to finish. Fired before the file's active-pass counter drops to zero, so the
+     * follow-up pass inherits the file slot rather than racing another file for it.
+     */
+    private void notifyBackgroundPassFinished(String mediaFileId, CompletableFuture<Void> future) {
+        Consumer<UUID> listener = backgroundPassFinishedListener;
+        if (listener == null || future.isCompletedExceptionally() || preemptedFiles.contains(mediaFileId)) {
+            return;
+        }
+        try {
+            listener.accept(UUID.fromString(mediaFileId));
+        } catch (RuntimeException e) {
+            log.warn("Failed to start a follow-up background pass for {}", mediaFileId, e);
         }
     }
 

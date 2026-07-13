@@ -10,6 +10,7 @@ import app.ister.core.eventdata.TranscodeRequestedData;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.service.MessageSender;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
 import org.springframework.amqp.core.AmqpAdmin;
@@ -29,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -114,6 +116,14 @@ public class HlsService {
 
     /** Per-subtitle locks to prevent duplicate segment generation for the same subtitle stream. */
     private final ConcurrentHashMap<String, Object> subtitleLocks = new ConcurrentHashMap<>();
+
+    /** direct/transcode flags per pre-transcoded file, so its remaining passes can be resumed. */
+    private final ConcurrentHashMap<UUID, boolean[]> preTranscodeQualities = new ConcurrentHashMap<>();
+
+    @PostConstruct
+    void registerBackgroundPassResume() {
+        transcodeService.setBackgroundPassFinishedListener(this::startNextPendingPass);
+    }
 
     /** Daemon thread pool for segment-upload watcher threads (remote transcoding). */
     private final ExecutorService watcherExecutor = Executors.newCachedThreadPool(r -> {
@@ -296,7 +306,40 @@ public class HlsService {
     @Transactional(readOnly = true)
     public void startAllPasses(UUID mediaFileId, boolean direct, boolean transcode) {
         MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
+        preTranscodeQualities.put(mediaFileId, new boolean[]{direct, transcode});
+        pendingPasses(mediaFileId, mediaFile, direct, transcode).forEach(pass -> doStartPass(pass, mediaFile));
+    }
+
+    /**
+     * Starts the next pass of a pre-transcoded file that is not transcoded yet; called by
+     * {@link HlsTranscodeService} whenever a background pass frees its budget. Passes that find
+     * no budget at request time are dropped rather than queued, so without this a file gains only
+     * as many passes per pre-transcode cycle as the background budget allows — a file with many
+     * audio streams would need days to finish.
+     */
+    private void startNextPendingPass(UUID mediaFileId) {
+        boolean[] qualities = preTranscodeQualities.get(mediaFileId);
+        if (qualities == null) {
+            return;
+        }
+        readOnlyTransaction.executeWithoutResult(status ->
+                mediaFileRepository.findById(mediaFileId).ifPresentOrElse(mediaFile -> {
+                    List<TranscodePassRequestedData> pending = pendingPasses(mediaFileId, mediaFile, qualities[0], qualities[1]);
+                    if (pending.isEmpty()) {
+                        preTranscodeQualities.remove(mediaFileId);
+                        log.debug("All pre-transcode passes finished for {}", mediaFileId);
+                        return;
+                    }
+                    log.debug("Starting next pre-transcode pass for {} ({} pending)", mediaFileId, pending.size());
+                    doStartPass(pending.getFirst(), mediaFile);
+                }, () -> preTranscodeQualities.remove(mediaFileId)));
+    }
+
+    /** The passes of this media file that are neither running nor already completed on disk. */
+    private List<TranscodePassRequestedData> pendingPasses(UUID mediaFileId, MediaFileEntity mediaFile,
+                                                           boolean direct, boolean transcode) {
         String inputPath = resolveInputPath(mediaFile);
+        List<TranscodePassRequestedData> pending = new ArrayList<>();
 
         boolean[] includeQuality = {direct, transcode, transcode};
         VideoQuality[] videoQualities = VideoQuality.values();
@@ -312,7 +355,7 @@ public class HlsService {
                 .anyMatch(HlsPlaylistBuilder::isRealVideoStream);
         for (int i = 0; hasVideo && i < videoQualities.length; i++) {
             if (includeQuality[i]) {
-                startVideoPassIfNeeded(mediaFileId, inputPath, videoQualities[i], mediaFile);
+                pendingVideoPass(mediaFileId, inputPath, videoQualities[i]).ifPresent(pending::add);
             }
         }
 
@@ -320,20 +363,21 @@ public class HlsService {
             if (!includeQuality[qi] || audioQualities[qi] == AudioQuality.COPY) continue;
             String qualityLabel = audioQualities[qi].getLabel();
             for (MediaFileStreamEntity audioStream : audioStreams) {
-                startAudioPassIfNeeded(mediaFileId, inputPath, qualityLabel, audioStream.getStreamIndex(), mediaFile);
+                pendingAudioPass(mediaFileId, inputPath, qualityLabel, audioStream.getStreamIndex()).ifPresent(pending::add);
             }
         }
+        return pending;
     }
 
-    private void startVideoPassIfNeeded(UUID mediaFileId, String inputPath, VideoQuality vq, MediaFileEntity mediaFile) {
+    private Optional<TranscodePassRequestedData> pendingVideoPass(UUID mediaFileId, String inputPath, VideoQuality vq) {
         String qualityLabel = vq.getLabel();
         String passKey = mediaFileId + "_video_" + qualityLabel;
-        if (transcodeService.isPassActive(passKey) || transcodeService.hasCompletedPass(passKey)) return;
+        if (transcodeService.isPassActive(passKey) || transcodeService.hasCompletedPass(passKey)) return Optional.empty();
         if (transcodeService.hasDoneMarker(cacheDir(mediaFileId), SEG_VIDEO_PREFIX + qualityLabel + "_")) {
             log.debug("Skipping video pass for {} quality={} — pass already completed on disk", mediaFileId, qualityLabel);
-            return;
+            return Optional.empty();
         }
-        doStartPass(TranscodePassRequestedData.builder()
+        return Optional.of(TranscodePassRequestedData.builder()
                 .eventType(EventType.TRANSCODE_PASS_REQUESTED)
                 .mediaFileId(mediaFileId)
                 .passKey(passKey)
@@ -341,18 +385,18 @@ public class HlsService {
                 .passCategory(PASS_CATEGORY_VIDEO)
                 .qualityLabel(qualityLabel)
                 .background(true)
-                .build(), mediaFile);
+                .build());
     }
 
-    private void startAudioPassIfNeeded(UUID mediaFileId, String inputPath, String qualityLabel,
-                                         int streamIdx, MediaFileEntity mediaFile) {
+    private Optional<TranscodePassRequestedData> pendingAudioPass(UUID mediaFileId, String inputPath,
+                                                                  String qualityLabel, int streamIdx) {
         String passKey = mediaFileId + "_audio_" + streamIdx + "_" + qualityLabel;
-        if (transcodeService.isPassActive(passKey) || transcodeService.hasCompletedPass(passKey)) return;
+        if (transcodeService.isPassActive(passKey) || transcodeService.hasCompletedPass(passKey)) return Optional.empty();
         if (transcodeService.hasDoneMarker(cacheDir(mediaFileId), SEG_AUDIO_PREFIX + streamIdx + "_" + qualityLabel + "_")) {
             log.debug("Skipping audio pass for {} streamIdx={} quality={} — pass already completed on disk", mediaFileId, streamIdx, qualityLabel);
-            return;
+            return Optional.empty();
         }
-        doStartPass(TranscodePassRequestedData.builder()
+        return Optional.of(TranscodePassRequestedData.builder()
                 .eventType(EventType.TRANSCODE_PASS_REQUESTED)
                 .mediaFileId(mediaFileId)
                 .passKey(passKey)
@@ -361,7 +405,7 @@ public class HlsService {
                 .qualityLabel(qualityLabel)
                 .audioStreamIndex(streamIdx)
                 .background(true)
-                .build(), mediaFile);
+                .build());
     }
 
     /**

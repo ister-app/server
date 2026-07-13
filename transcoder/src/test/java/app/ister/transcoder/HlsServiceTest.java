@@ -1068,6 +1068,40 @@ class HlsServiceTest {
         verify(ffmpegMock, times(6)).executeAsync();
     }
 
+    @Test
+    void preTranscodeFinishesAllPassesEvenWhenOnlyOneMayRunAtATime() throws Exception {
+        // Only one background pass fits at a time, so five of the six passes are dropped at
+        // request time. Each finished pass must pull in the next one, or the file would need
+        // six pre-transcode cycles to complete.
+        ReflectionTestUtils.setField(transcodeService, "backgroundPassBudget", new Semaphore(1));
+        hlsService.registerBackgroundPassResume();
+
+        UUID id = UUID.randomUUID();
+        Path cacheDir = tempDir.resolve(id.toString());
+        Files.createDirectories(cacheDir);
+
+        MediaFileStreamEntity audio1 = audioStream(1, "eng", "English");
+        MediaFileStreamEntity audio2 = audioStream(2, "nld", "Dutch");
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream(0, 1920, 1080), audio1, audio2);
+
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+
+        CountDownLatch allDone = new CountDownLatch(6);
+        doAnswer(inv -> {
+            allDone.countDown();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
+
+        hlsService.startAllPasses(id, false, true);
+
+        assertTrue(allDone.await(10, TimeUnit.SECONDS), "All 6 passes should have run despite the budget of 1");
+        verify(ffmpegMock, times(6)).executeAsync();
+    }
+
     // ========== generateAllPlaylists edge cases ==========
 
     @Test
