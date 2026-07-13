@@ -26,6 +26,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -197,9 +198,9 @@ class BookControllerTest {
     void releaseYearFallsBackToTheEarliestMetadataYear() {
         BookEntity book = BookEntity.builder().name("Dit zijn de namen")
                 .metadataEntities(List.of(
-                        MetadataEntity.builder().released(LocalDate.of(2015, 1, 1)).build(),
+                        MetadataEntity.builder().released(LocalDate.of(2015, Month.JANUARY, 1)).build(),
                         MetadataEntity.builder().build(),
-                        MetadataEntity.builder().released(LocalDate.of(2012, 6, 1)).build()))
+                        MetadataEntity.builder().released(LocalDate.of(2012, Month.JUNE, 1)).build()))
                 .build();
 
         assertEquals(2012, subject.releaseYear(book));

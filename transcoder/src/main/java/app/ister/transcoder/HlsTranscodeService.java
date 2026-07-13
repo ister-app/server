@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -190,10 +191,10 @@ public class HlsTranscodeService {
     private final Set<String> preemptedKeys = ConcurrentHashMap.newKeySet();
 
     /** Called with the media file ID after each background pass finished successfully; set by {@link HlsService}. */
-    private volatile Consumer<UUID> backgroundPassFinishedListener;
+    private final AtomicReference<Consumer<UUID>> backgroundPassFinishedListener = new AtomicReference<>();
 
     public void setBackgroundPassFinishedListener(Consumer<UUID> listener) {
-        this.backgroundPassFinishedListener = listener;
+        backgroundPassFinishedListener.set(listener);
     }
 
     /** Bookkeeping for a pass that is currently executing on a pool thread. */
@@ -483,7 +484,7 @@ public class HlsTranscodeService {
      * follow-up pass inherits the file slot rather than racing another file for it.
      */
     private void notifyBackgroundPassFinished(String mediaFileId, CompletableFuture<Void> future) {
-        Consumer<UUID> listener = backgroundPassFinishedListener;
+        Consumer<UUID> listener = backgroundPassFinishedListener.get();
         if (listener == null || future.isCompletedExceptionally() || preemptedFiles.contains(mediaFileId)) {
             return;
         }

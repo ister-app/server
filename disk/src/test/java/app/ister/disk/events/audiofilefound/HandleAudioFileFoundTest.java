@@ -47,6 +47,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -413,7 +414,7 @@ class HandleAudioFileFoundTest {
         assertEquals(track, trackMetadata.getTrackEntity());
         MetadataEntity albumMetadata = captor.getAllValues().getLast();
         assertEquals("Tag Album (2010)", albumMetadata.getTitle());
-        assertEquals(LocalDate.of(2010, 1, 1), albumMetadata.getReleased());
+        assertEquals(LocalDate.of(2010, Month.JANUARY, 1), albumMetadata.getReleased());
         assertEquals(album, albumMetadata.getAlbumEntity());
     }
 
@@ -472,7 +473,7 @@ class HandleAudioFileFoundTest {
         assertEquals("Track Title", saved.getTitle());
         assertEquals(track, saved.getTrackEntity());
         assertNull(saved.getAlbumEntity());
-        assertEquals(LocalDate.of(2010, 1, 1), saved.getReleased());
+        assertEquals(LocalDate.of(2010, Month.JANUARY, 1), saved.getReleased());
     }
 
     @Test

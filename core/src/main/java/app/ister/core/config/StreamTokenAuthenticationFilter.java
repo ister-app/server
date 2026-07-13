@@ -29,9 +29,13 @@ public class StreamTokenAuthenticationFilter extends OncePerRequestFilter {
      */
     public static final String STREAM_TOKEN_COOKIE = "IsterStreamToken";
 
+    // Route prefixes, not file locations: they must match the controller mappings, so making them
+    // configurable would only let a deployment break its own stream authentication.
     private static final List<String> USER_PATHS =
             List.of("/hls/", "/images/", "/epub/", "/reading-progress", "/book-progress");
+    @SuppressWarnings("java:S1075")
     private static final String DOWNLOAD_PATH = "/mediaFile/";
+    @SuppressWarnings("java:S1075")
     private static final String UPLOAD_PATH = "/transcode/upload/";
 
     @Override

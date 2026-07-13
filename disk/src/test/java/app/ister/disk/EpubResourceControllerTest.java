@@ -7,6 +7,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
@@ -124,9 +126,11 @@ class EpubResourceControllerTest {
         assertArrayEquals("abcdef".getBytes(StandardCharsets.UTF_8), bodyOf(response));
     }
 
-    @Test
-    void invalidRangeFallsBackToFullResponse() throws IOException {
-        var response = controller.resource(mediaFileId, "/OEBPS/audio/chapter_001.mp3", "bytes=99-100", null);
+    /** Out of range, unparseable and multi-range headers all fall back to the whole entry. */
+    @ParameterizedTest
+    @ValueSource(strings = {"bytes=99-100", "bytes=abc-def", "bytes=0-1,4-5"})
+    void unusableRangeFallsBackToFullResponse(String range) throws IOException {
+        var response = controller.resource(mediaFileId, "/OEBPS/audio/chapter_001.mp3", range, null);
 
         assertEquals(200, response.getStatusCode().value());
         assertArrayEquals(AUDIO, bodyOf(response));
@@ -198,22 +202,6 @@ class EpubResourceControllerTest {
 
         assertEquals(206, response.getStatusCode().value());
         assertArrayEquals("cdef".getBytes(StandardCharsets.UTF_8), bodyOf(response));
-    }
-
-    @Test
-    void malformedRangeFallsBackToFullResponse() throws IOException {
-        var response = controller.resource(mediaFileId, "/OEBPS/audio/chapter_001.mp3", "bytes=abc-def", null);
-
-        assertEquals(200, response.getStatusCode().value());
-        assertArrayEquals(AUDIO, bodyOf(response));
-    }
-
-    @Test
-    void multiRangeHeaderFallsBackToFullResponse() throws IOException {
-        var response = controller.resource(mediaFileId, "/OEBPS/audio/chapter_001.mp3", "bytes=0-1,4-5", null);
-
-        assertEquals(200, response.getStatusCode().value());
-        assertArrayEquals(AUDIO, bodyOf(response));
     }
 
     @Test

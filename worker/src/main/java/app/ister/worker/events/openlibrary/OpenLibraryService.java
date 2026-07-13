@@ -104,9 +104,8 @@ public class OpenLibraryService {
         // Open Library bios are English prose, so they can only fill the English slot — filing one
         // under whatever language happens to be configured first would show English text to a user
         // who asked for a Dutch biography. A deployment without English simply gets no fallback.
-        if (openLibraryBio != null && languageTags != null && languageTags.contains(ENGLISH)
-                && !bios.containsKey(ENGLISH)) {
-            bios.put(ENGLISH, openLibraryBio);
+        if (openLibraryBio != null && languageTags != null && languageTags.contains(ENGLISH)) {
+            bios.putIfAbsent(ENGLISH, openLibraryBio);
         }
 
         String photoUrl = hasPhoto(author) ? AUTHOR_PHOTO_BASE + authorKey + "-L.jpg" : wiki.thumbnail();

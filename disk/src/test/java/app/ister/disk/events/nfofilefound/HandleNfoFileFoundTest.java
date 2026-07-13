@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -158,7 +159,7 @@ class HandleNfoFileFoundTest {
         assertEquals("Follow the voyages of Starfleet on their missions to discover new worlds and new life forms, "
                 + "and one Starfleet officer who must learn that to truly understand all things alien, "
                 + "you must first understand yourself.", saved.getDescription());
-        assertEquals(LocalDate.of(2017, 9, 24), saved.getReleased());
+        assertEquals(LocalDate.of(2017, Month.SEPTEMBER, 24), saved.getReleased());
         assertEquals(show, saved.getShowEntity());
         assertEquals("file://" + nfoFile, saved.getSourceUri());
     }
@@ -190,7 +191,7 @@ class HandleNfoFileFoundTest {
         assertEquals("Filmed Before a Live Studio Audience", saved.getTitle());
         assertEquals("Wanda and Vision struggle to conceal their powers during dinner with Vision’s boss and his wife.",
                 saved.getDescription());
-        assertEquals(LocalDate.of(2021, 1, 15), saved.getReleased());
+        assertEquals(LocalDate.of(2021, Month.JANUARY, 15), saved.getReleased());
         assertEquals(episode, saved.getEpisodeEntity());
         assertEquals("file://" + nfoFile, saved.getSourceUri());
     }
@@ -239,7 +240,7 @@ class HandleNfoFileFoundTest {
         assertEquals("Inception", saved.getTitle());
         assertEquals("A thief who steals corporate secrets through the use of dream-sharing technology is given "
                 + "the inverse task of planting an idea into the mind of a C.E.O.", saved.getDescription());
-        assertEquals(LocalDate.of(2010, 7, 16), saved.getReleased());
+        assertEquals(LocalDate.of(2010, Month.JULY, 16), saved.getReleased());
         assertEquals(movie, saved.getMovieEntity());
         assertEquals("file://" + nfoFile, saved.getSourceUri());
     }
@@ -342,7 +343,7 @@ class HandleNfoFileFoundTest {
         assertEquals("Abbey Road", saved.getTitle());
         assertEquals("The eleventh studio album by the English rock band the Beatles.", saved.getDescription());
         assertEquals("Rock", saved.getGenre());
-        assertEquals(LocalDate.of(1969, 9, 26), saved.getReleased());
+        assertEquals(LocalDate.of(1969, Month.SEPTEMBER, 26), saved.getReleased());
         assertEquals(album, saved.getAlbumEntity());
         assertEquals("file://" + nfoFile, saved.getSourceUri());
     }
@@ -409,7 +410,7 @@ class HandleNfoFileFoundTest {
         assertEquals("Abbey Road", saved.getTitle());
         assertEquals("The eleventh studio album by the English rock band the Beatles.", saved.getDescription());
         assertEquals("Rock", saved.getGenre());
-        assertEquals(LocalDate.of(1969, 9, 26), saved.getReleased());
+        assertEquals(LocalDate.of(1969, Month.SEPTEMBER, 26), saved.getReleased());
         assertEquals(book, saved.getBookEntity());
         assertEquals("file://" + nfoFile, saved.getSourceUri());
     }

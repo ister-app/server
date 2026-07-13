@@ -50,12 +50,16 @@ public class UserSettingsService {
     @Transactional(readOnly = true)
     public UserSettings get(Authentication authentication) {
         UserEntity user = userService.getOrCreateUser(authentication);
-        return forUser(user.getId());
+        return load(user.getId());
     }
 
     /** The settings of the given user, or the defaults when they never saved any. */
     @Transactional(readOnly = true)
     public UserSettings forUser(UUID userId) {
+        return load(userId);
+    }
+
+    private UserSettings load(UUID userId) {
         return userSettingsRepository.findByUserEntityId(userId)
                 .map(UserSettingsService::toSettings)
                 .orElseGet(this::defaults);

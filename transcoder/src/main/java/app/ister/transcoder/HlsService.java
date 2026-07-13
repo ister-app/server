@@ -310,7 +310,7 @@ public class HlsService {
      */
     @Transactional(readOnly = true)
     public void startAllPasses(UUID mediaFileId, boolean direct, boolean transcode) {
-        startAllPasses(mediaFileId, direct, transcode, PassFilter.none());
+        startPasses(mediaFileId, direct, transcode, PassFilter.none());
     }
 
     /**
@@ -318,6 +318,10 @@ public class HlsService {
      */
     @Transactional(readOnly = true)
     public void startAllPasses(UUID mediaFileId, boolean direct, boolean transcode, PassFilter filter) {
+        startPasses(mediaFileId, direct, transcode, filter);
+    }
+
+    private void startPasses(UUID mediaFileId, boolean direct, boolean transcode, PassFilter filter) {
         MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
         PreTranscodeRequest request = new PreTranscodeRequest(direct, transcode, filter);
         preTranscodeRequests.put(mediaFileId, request);
@@ -374,16 +378,23 @@ public class HlsService {
 
         for (int qi = 0; qi < audioQualities.length; qi++) {
             AudioQuality aq = audioQualities[qi];
-            if (!includeQuality[qi] || aq == AudioQuality.COPY) continue;
-            // No master playlist ever points at the 64k group — the builder folds it into 192k — so
-            // producing it in the background is wasted work. Interactive requests still get it on demand.
-            if (filter.preTranscode() && aq == AudioQuality.Q64K) continue;
-            String qualityLabel = aq.getLabel();
-            for (MediaFileStreamEntity audioStream : audioStreams) {
-                pendingAudioPass(mediaFileId, inputPath, qualityLabel, audioStream.getStreamIndex()).ifPresent(pending::add);
+            if (includeQuality[qi] && producesAudioPass(aq, filter)) {
+                String qualityLabel = aq.getLabel();
+                for (MediaFileStreamEntity audioStream : audioStreams) {
+                    pendingAudioPass(mediaFileId, inputPath, qualityLabel, audioStream.getStreamIndex()).ifPresent(pending::add);
+                }
             }
         }
         return pending;
+    }
+
+    /**
+     * No master playlist ever points at the 64k group — the builder folds it into 192k — so producing
+     * it in the background is wasted work. Interactive requests still get it on demand.
+     */
+    private static boolean producesAudioPass(AudioQuality quality, PassFilter filter) {
+        return quality != AudioQuality.COPY
+                && !(filter.preTranscode() && quality == AudioQuality.Q64K);
     }
 
     private static boolean exceedsQualityCap(VideoQuality quality, PassFilter filter) {

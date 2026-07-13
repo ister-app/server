@@ -121,7 +121,7 @@ class HandleTranscodeRequestedTest {
     }
 
     @Test
-    void preTranscodePassesTheUsersLanguagesAndQualityCapOn() throws Exception {
+    void preTranscodePassesTheUsersLanguagesAndQualityCapOn() {
         UUID id = UUID.randomUUID();
         when(transcodeService.hasAnyActiveOrCompletedPassForFile(id)).thenReturn(false);
 
