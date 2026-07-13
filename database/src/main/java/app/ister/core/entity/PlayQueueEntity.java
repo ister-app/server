@@ -48,6 +48,12 @@ public class PlayQueueEntity extends BaseEntity {
     // Start item that was materialized up-front for a shuffled queue; excluded from chunk queries.
     private UUID sourceStartId;
 
+    // Podcast queues only: built oldest-first, from the user's episode order at creation time.
+    // Frozen here rather than re-read per chunk, so changing the preference can't flip a queue
+    // that is already playing.
+    @Column(nullable = false)
+    private boolean sourceAscending;
+
     // Last-known stream settings the client reported via updatePlayQueue; used to prefetch
     // the next queue item in the same format. Null until a client reports them.
     private Boolean streamDirect;

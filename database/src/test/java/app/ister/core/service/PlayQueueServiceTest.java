@@ -4,6 +4,7 @@ import app.ister.core.entity.*;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayQueueSourceType;
+import app.ister.core.enums.SortingOrder;
 import app.ister.core.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,6 +61,12 @@ class PlayQueueServiceTest {
 
     @Mock
     private WatchStatusService watchStatusService;
+
+    @Mock
+    private PodcastEpisodeRepository podcastEpisodeRepository;
+
+    @Mock
+    private PodcastPreferenceService podcastPreferenceService;
 
     @Mock
     private Authentication authentication;
@@ -189,6 +196,77 @@ class PlayQueueServiceTest {
         assertEquals(50, result.getSourceOffset());
         assertFalse(result.isSourceExhausted());
         assertEquals(result.getItems().getFirst().getId(), result.getCurrentItem());
+    }
+
+    @Test
+    void createPlayQueueForPodcastFollowsTheUsersEpisodeOrder() {
+        mockUser();
+        mockSaveAssignsItemIds();
+        UUID podcastId = UUID.randomUUID();
+        List<UUID> oldestFirst = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+        when(podcastPreferenceService.getEpisodeOrder(authentication, podcastId))
+                .thenReturn(SortingOrder.ASCENDING);
+        when(podcastEpisodeRepository.findEpisodeIdsForPodcastOrderedAsc(podcastId, 50, 0))
+                .thenReturn(oldestFirst);
+
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.PODCAST, podcastId, null, false, authentication);
+
+        assertTrue(result.isSourceAscending());
+        assertEquals(oldestFirst.getFirst(), result.getItems().getFirst().getPodcastEpisodeEntityId());
+        verify(podcastEpisodeRepository, never()).findEpisodeIdsForPodcastOrdered(any(), anyInt(), anyInt());
+    }
+
+    @Test
+    void createPlayQueueForPodcastDefaultsToNewestFirst() {
+        mockUser();
+        mockSaveAssignsItemIds();
+        UUID podcastId = UUID.randomUUID();
+        when(podcastPreferenceService.getEpisodeOrder(authentication, podcastId))
+                .thenReturn(SortingOrder.DESCENDING);
+        when(podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(podcastId, 50, 0))
+                .thenReturn(List.of(UUID.randomUUID()));
+
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.PODCAST, podcastId, null, false, authentication);
+
+        assertFalse(result.isSourceAscending());
+    }
+
+    /**
+     * The order is frozen on the queue at creation: a queue that is already playing must not flip
+     * around when the user changes the preference, so extension chunks never re-read it.
+     */
+    @Test
+    void extendingAPodcastQueueKeepsTheOrderItWasBuiltWith() {
+        UUID podcastId = UUID.randomUUID();
+        PlayQueueEntity queue = PlayQueueEntity.builder()
+                .id(UUID.randomUUID())
+                .userEntity(user)
+                .sourceType(PlayQueueSourceType.PODCAST)
+                .sourceId(podcastId)
+                .sourceAscending(true)
+                .sourceOffset(50)
+                .items(new ArrayList<>(List.of(podcastItem(UUID.randomUUID(), GAP))))
+                .build();
+        queue.setCurrentItem(queue.getItems().getFirst().getId());
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        when(podcastEpisodeRepository.findEpisodeIdsForPodcastOrderedAsc(podcastId, 50, 50))
+                .thenReturn(List.of(UUID.randomUUID()));
+
+        subject.getPlayQueue(queue.getId(), authentication);
+
+        assertEquals(2, queue.getItems().size());
+        verify(podcastPreferenceService, never()).getEpisodeOrder(any(), any());
+        verify(podcastEpisodeRepository, never()).findEpisodeIdsForPodcastOrdered(any(), anyInt(), anyInt());
+    }
+
+    private PlayQueueItemEntity podcastItem(UUID episodeId, BigDecimal position) {
+        PlayQueueItemEntity item = PlayQueueItemEntity.builder()
+                .type(MediaType.PODCAST_EPISODE)
+                .podcastEpisodeEntityId(episodeId)
+                .position(position)
+                .build();
+        item.setId(UUID.randomUUID());
+        return item;
     }
 
     @Test

@@ -19,8 +19,15 @@ public interface PodcastEpisodeRepository extends JpaRepository<PodcastEpisodeEn
     Page<PodcastEpisodeEntity> findByPodcastEntityIdOrderByPublishedAtDesc(UUID podcastId, Pageable pageable);
 
     /**
-     * Returns a page of episode IDs of a podcast, newest first (the natural play order of a
-     * podcast queue is reverse-chronological).
+     * Episodes of a podcast in the sort order carried by the pageable — used by the GraphQL query,
+     * which sorts by the caller's stored preference instead of a fixed direction.
+     */
+    Page<PodcastEpisodeEntity> findByPodcastEntityId(UUID podcastId, Pageable pageable);
+
+    /**
+     * Returns a page of episode IDs of a podcast, newest first. Besides being the default play
+     * order, this is how the refresh worker picks the N newest episodes to auto-download — that
+     * always means newest, regardless of any user's sort preference.
      */
     @Query(value = """
             SELECT e.id FROM podcast_episode_entity e
@@ -28,4 +35,12 @@ public interface PodcastEpisodeRepository extends JpaRepository<PodcastEpisodeEn
             ORDER BY e.published_at DESC NULLS LAST, e.id
             LIMIT :limit OFFSET :offset""", nativeQuery = true)
     List<UUID> findEpisodeIdsForPodcastOrdered(@Param("podcastId") UUID podcastId, @Param("limit") int limit, @Param("offset") int offset);
+
+    /** Oldest first: the play order of a podcast queue built for a user who prefers ASCENDING. */
+    @Query(value = """
+            SELECT e.id FROM podcast_episode_entity e
+            WHERE e.podcast_entity_id = :podcastId
+            ORDER BY e.published_at ASC NULLS LAST, e.id
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findEpisodeIdsForPodcastOrderedAsc(@Param("podcastId") UUID podcastId, @Param("limit") int limit, @Param("offset") int offset);
 }

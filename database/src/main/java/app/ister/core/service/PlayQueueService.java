@@ -9,6 +9,7 @@ import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayQueueSourceType;
+import app.ister.core.enums.SortingOrder;
 import app.ister.core.enums.SubtitleFormat;
 import app.ister.core.entity.ChapterEntity;
 import app.ister.core.repository.ChapterRepository;
@@ -60,6 +61,8 @@ public class PlayQueueService {
 
     private final WatchStatusService watchStatusService;
 
+    private final PodcastPreferenceService podcastPreferenceService;
+
     /** Stream settings a client reports via updatePlayQueue; used to prefetch the next item in the same format. */
     public record StreamSettings(Boolean direct, Boolean transcode, SubtitleFormat subtitleFormat) {
     }
@@ -76,7 +79,7 @@ public class PlayQueueService {
     // Bound for the shuffle exclusion parameter when there is no start item; matches no row.
     private static final UUID NIL_UUID = new UUID(0, 0);
 
-    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, ChapterRepository chapterRepository, PodcastEpisodeRepository podcastEpisodeRepository, LibraryRepository libraryRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService) {
+    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, ChapterRepository chapterRepository, PodcastEpisodeRepository podcastEpisodeRepository, LibraryRepository libraryRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService, PodcastPreferenceService podcastPreferenceService) {
         this.playQueueRepository = playQueueRepository;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
@@ -87,6 +90,7 @@ public class PlayQueueService {
         this.userService = userService;
         this.watchStatusRepository = watchStatusRepository;
         this.watchStatusService = watchStatusService;
+        this.podcastPreferenceService = podcastPreferenceService;
     }
 
     /**
@@ -124,6 +128,13 @@ public class PlayQueueService {
         } else {
             MediaType mediaType = mediaTypeForSource(sourceType, sourceId, shuffle);
             queue.setShuffle(shuffle);
+            if (sourceType == PlayQueueSourceType.PODCAST) {
+                // Freeze the user's preferred order onto the queue. The queue materializes its
+                // items in chunks as playback goes on, and re-reading the preference per chunk
+                // would flip a running queue around the moment the user changes the setting.
+                queue.setSourceAscending(podcastPreferenceService.getEpisodeOrder(authentication, sourceId)
+                        == SortingOrder.ASCENDING);
+            }
             if (shuffle) {
                 queue.setShuffleSeed(UUID.randomUUID().toString());
                 if (startId != null) {
@@ -135,7 +146,8 @@ public class PlayQueueService {
             } else if (startId != null) {
                 // Start the materialized window a bit before the start item so the client
                 // still has some back-scroll context. Earlier items are never materialized.
-                queue.setSourceOffset(Math.max(0, orderedIndexOf(sourceType, sourceId, startId) - BACK_WINDOW));
+                queue.setSourceOffset(Math.max(0,
+                        orderedIndexOf(sourceType, sourceId, startId, queue.isSourceAscending()) - BACK_WINDOW));
             }
             appendChunk(queue);
         }
@@ -339,7 +351,9 @@ public class PlayQueueService {
             case SHOW -> episodeRepository.findEpisodeIdsForShowOrdered(sourceId, CHUNK_SIZE, offset);
             case ALBUM -> trackRepository.findTrackIdsForAlbumOrdered(sourceId, CHUNK_SIZE, offset);
             case BOOK -> chapterRepository.findChapterIdsForBookOrdered(sourceId, CHUNK_SIZE, offset);
-            case PODCAST -> podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(sourceId, CHUNK_SIZE, offset);
+            case PODCAST -> queue.isSourceAscending()
+                    ? podcastEpisodeRepository.findEpisodeIdsForPodcastOrderedAsc(sourceId, CHUNK_SIZE, offset)
+                    : podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(sourceId, CHUNK_SIZE, offset);
             default -> List.of();
         };
     }
@@ -357,7 +371,7 @@ public class PlayQueueService {
             }
             case PODCAST -> {
                 if (shuffle) {
-                    throw new IllegalArgumentException("Podcast play queues cannot be shuffled; episodes play newest to oldest");
+                    throw new IllegalArgumentException("Podcast play queues cannot be shuffled; episodes play in the user's chosen order");
                 }
                 yield MediaType.PODCAST_EPISODE;
             }
@@ -380,8 +394,9 @@ public class PlayQueueService {
 
     /**
      * Index of the start item in the full natural order of an ordered (non-shuffled) source.
+     * [ascending] only applies to podcasts, whose order is the user's choice rather than intrinsic.
      */
-    private int orderedIndexOf(PlayQueueSourceType sourceType, UUID sourceId, UUID startId) {
+    private int orderedIndexOf(PlayQueueSourceType sourceType, UUID sourceId, UUID startId, boolean ascending) {
         List<UUID> ids = switch (sourceType) {
             case SHOW -> episodeRepository
                     .findIdsOnlyByShowEntityId(
@@ -401,7 +416,9 @@ public class PlayQueueService {
                     .stream()
                     .map(ChapterEntity::getId)
                     .toList();
-            case PODCAST -> podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(sourceId, Integer.MAX_VALUE, 0);
+            case PODCAST -> ascending
+                    ? podcastEpisodeRepository.findEpisodeIdsForPodcastOrderedAsc(sourceId, Integer.MAX_VALUE, 0)
+                    : podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(sourceId, Integer.MAX_VALUE, 0);
             default -> List.of();
         };
         int index = ids.indexOf(startId);

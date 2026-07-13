@@ -27,8 +27,11 @@ type Query {
     chapterById(id: ID): Chapter
     podcasts(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): PodcastPage
     podcastById(id: ID): Podcast
-    "Episodes of one podcast, newest first. Always paged: feeds can hold hundreds of episodes."
-    podcastEpisodes(podcastId: ID!, page: Int, size: Int): PodcastEpisodePage!
+    """
+    Episodes of one podcast. Always paged: feeds can hold hundreds of episodes. Without an explicit
+    sortingOrder the calling user's stored order for this podcast is used (newest first when unset).
+    """
+    podcastEpisodes(podcastId: ID!, page: Int, size: Int, sortingOrder: SortingOrder): PodcastEpisodePage!
     podcastEpisodeById(id: ID): PodcastEpisode
     "Podcast directory search (iTunes Search API); subscribe with the returned feedUrl."
     searchPodcastDirectory(term: String!): [PodcastDirectoryResult!]!
@@ -71,6 +74,12 @@ type Mutation {
     subscribePodcast(feedUrl: String!): Podcast!
     "Deactivates the subscription; episodes and listening history are kept."
     unsubscribePodcast(id: ID!): Boolean!
+    """
+    Sets the calling user's episode sort order for one podcast. It applies to every client of that
+    user, and to podcast play queues created from then on — a queue that is already playing keeps
+    the order it was built with. Returns true.
+    """
+    setPodcastEpisodeOrder(podcastId: ID!, order: SortingOrder!): Boolean!
     "Queues a feed refresh for every active podcast."
     refreshPodcasts: Boolean!
     "Queues a download of the episode's audio to this node's cache directory."
@@ -514,6 +523,8 @@ type Podcast {
     metadata: [Metadata!]
     "The calling user's rating (1-10), or null if unrated."
     rating: Int
+    "The calling user's episode sort order for this podcast; DESCENDING (newest first) when unset."
+    episodeOrder: SortingOrder!
 }
 
 type PodcastEpisode {
