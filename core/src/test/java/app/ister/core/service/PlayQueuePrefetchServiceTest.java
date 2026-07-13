@@ -7,6 +7,7 @@ import app.ister.core.entity.MediaFileStreamEntity;
 import app.ister.core.entity.PlayQueueEntity;
 import app.ister.core.entity.PlayQueueItemEntity;
 import app.ister.core.entity.TrackEntity;
+import app.ister.core.entity.UserEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.SubtitleFormat;
@@ -42,6 +43,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class PlayQueuePrefetchServiceTest {
 
     private static final long TEN_MINUTES_MS = 10 * 60 * 1000L;
+    private static final UUID USER_ID = UUID.randomUUID();
 
     @InjectMocks
     private PlayQueuePrefetchService subject;
@@ -50,9 +52,12 @@ class PlayQueuePrefetchServiceTest {
     @Mock private EpisodeRepository episodeRepository;
     @Mock private TrackRepository trackRepository;
     @Mock private MessageSender messageSender;
+    @Mock private UserSettingsService userSettingsService;
 
     @BeforeEach
     void setUp() {
+        lenient().when(userSettingsService.forUser(USER_ID)).thenReturn(
+                new UserSettingsService.UserSettings(List.of("nl", "en"), List.of("nl"), true, true, null));
         ReflectionTestUtils.setField(subject, "prefetchEnabled", true);
         ReflectionTestUtils.setField(subject, "videoThresholdSeconds", 120L);
         ReflectionTestUtils.setField(subject, "trackThresholdSeconds", 60L);
@@ -198,8 +203,11 @@ class PlayQueuePrefetchServiceTest {
     // ===== Helpers =====
 
     private PlayQueueEntity queue(PlayQueueItemEntity... items) {
+        UserEntity user = UserEntity.builder().externalId("user-1").build();
+        ReflectionTestUtils.setField(user, "id", USER_ID);
         PlayQueueEntity queue = PlayQueueEntity.builder()
                 .items(new ArrayList<>(List.of(items)))
+                .userEntity(user)
                 .build();
         ReflectionTestUtils.setField(queue, "id", UUID.randomUUID());
         return queue;

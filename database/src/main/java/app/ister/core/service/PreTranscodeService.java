@@ -6,6 +6,7 @@ import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.UserRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.UserSettingsService.UserSettings;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,11 +17,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -31,6 +34,7 @@ public class PreTranscodeService {
     private final WatchStatusRepository watchStatusRepository;
     private final EpisodeRepository episodeRepository;
     private final MovieRepository movieRepository;
+    private final UserSettingsService userSettingsService;
 
     /**
      * How recently (in days) an episode must have been watched for the <em>next</em> episode
@@ -46,10 +50,49 @@ public class PreTranscodeService {
     }
 
     /**
-     * @param mediaFileIds    deduplicated media file IDs ready for pre-transcoding
+     * A media file to pre-transcode, with the audio languages and video quality the interested
+     * users actually need. Transcoding every audio stream of a file in every bitrate is what made a
+     * seven-language episode take days of background passes.
+     *
+     * @param audioLanguages audio languages worth transcoding, merged across the interested users
+     * @param maxVideoHeight highest video variant to produce, or null when a user wants them all
+     */
+    public record PreTranscodeTarget(UUID mediaFileId, Set<String> audioLanguages, Integer maxVideoHeight) {
+    }
+
+    /**
+     * @param targets         media files ready for pre-transcoding, deduplicated per media file
      * @param unanalyzedFiles media files that first need (re-)analysis before they can be transcoded
      */
-    public record PreTranscodeCollection(Set<UUID> mediaFileIds, Set<UnanalyzedMediaFile> unanalyzedFiles) {
+    public record PreTranscodeCollection(Set<PreTranscodeTarget> targets, Set<UnanalyzedMediaFile> unanalyzedFiles) {
+
+        /** The media files to pre-transcode, without the per-user wishes attached to them. */
+        public Set<UUID> mediaFileIds() {
+            return targets.stream()
+                    .map(PreTranscodeTarget::mediaFileId)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+        }
+    }
+
+    /** Accumulates the wishes of every user interested in one media file. */
+    private static final class TargetAccumulator {
+        private final Set<String> audioLanguages = new LinkedHashSet<>();
+        private Integer maxVideoHeight;
+        private boolean uncappedVideo;
+
+        void add(UserSettings settings) {
+            audioLanguages.addAll(settings.preferredAudioLanguages());
+            if (settings.maxVideoHeight() == null) {
+                uncappedVideo = true;
+            } else if (maxVideoHeight == null || settings.maxVideoHeight() > maxVideoHeight) {
+                maxVideoHeight = settings.maxVideoHeight();
+            }
+        }
+
+        PreTranscodeTarget toTarget(UUID mediaFileId) {
+            return new PreTranscodeTarget(mediaFileId, Set.copyOf(audioLanguages),
+                    uncappedVideo ? null : maxVideoHeight);
+        }
     }
 
     /**
@@ -59,6 +102,7 @@ public class PreTranscodeService {
      * (resuming a half-watched episode stays instant); if it was watched within the last
      * {@code nextEpisodeRecentDays} days, the next episode in show order is also included.
      * Movies: only recently-watched movies that are not fully watched are included.
+     * Each file is tagged with the audio languages and video quality of the users that pulled it in.
      * Media files without analyzed streams cannot be transcoded and are returned separately
      * so the caller can trigger (re-)analysis.
      * All DB access is performed within this transaction to avoid LazyInitializationException.
@@ -68,22 +112,29 @@ public class PreTranscodeService {
     @Transactional(readOnly = true)
     public PreTranscodeCollection collectMediaFilesToPreTranscode(String diskName) {
         Map<UUID, List<EpisodeEntity>> episodesByShow = new HashMap<>();
-        PreTranscodeCollection result = new PreTranscodeCollection(new LinkedHashSet<>(), new LinkedHashSet<>());
+        Map<UUID, TargetAccumulator> targetsByMediaFile = new LinkedHashMap<>();
+        Set<UnanalyzedMediaFile> unanalyzedFiles = new LinkedHashSet<>();
         Instant recentCutoff = Instant.now().minus(Duration.ofDays(nextEpisodeRecentDays));
 
         userRepository.findAll().forEach(user -> {
-            collectEpisodeMediaFiles(user.getId(), diskName, recentCutoff, episodesByShow, result);
-            collectMovieMediaFiles(user.getId(), diskName, result);
+            UserSettings settings = userSettingsService.forUser(user.getId());
+            collectEpisodeMediaFiles(user.getId(), settings, diskName, recentCutoff, episodesByShow,
+                    targetsByMediaFile, unanalyzedFiles);
+            collectMovieMediaFiles(user.getId(), settings, diskName, targetsByMediaFile, unanalyzedFiles);
         });
 
+        Set<PreTranscodeTarget> targets = new LinkedHashSet<>();
+        targetsByMediaFile.forEach((mediaFileId, accumulator) -> targets.add(accumulator.toTarget(mediaFileId)));
+
         log.debug("Collected {} media files ({} unanalyzed) to pre-transcode for disk: {}",
-                result.mediaFileIds().size(), result.unanalyzedFiles().size(), diskName);
-        return result;
+                targets.size(), unanalyzedFiles.size(), diskName);
+        return new PreTranscodeCollection(targets, unanalyzedFiles);
     }
 
-    private void collectEpisodeMediaFiles(UUID userId, String diskName, Instant recentCutoff,
+    private void collectEpisodeMediaFiles(UUID userId, UserSettings settings, String diskName, Instant recentCutoff,
                                           Map<UUID, List<EpisodeEntity>> episodesByShow,
-                                          PreTranscodeCollection result) {
+                                          Map<UUID, TargetAccumulator> targetsByMediaFile,
+                                          Set<UnanalyzedMediaFile> unanalyzedFiles) {
         List<Object[]> rows = watchStatusRepository.findRecentEpisodesWithDateByUserId(userId);
         for (Object[] row : rows) {
             UUID episodeId = UUID.fromString(row[0].toString());
@@ -94,49 +145,56 @@ public class PreTranscodeService {
                 if (!watched) {
                     // Only a half-watched episode itself is kept warm; a finished episode
                     // needs no cache anymore, just its successor below.
-                    addMediaFiles(lastWatchedEpisode.getMediaFileEntities(), diskName, result,
-                            lastWatchedEpisode.getId(), null);
+                    addMediaFiles(lastWatchedEpisode.getMediaFileEntities(), settings, diskName,
+                            targetsByMediaFile, unanalyzedFiles, lastWatchedEpisode.getId(), null);
                 }
                 if (lastWatched.isAfter(recentCutoff)) {
-                    addNextEpisodeMediaFiles(showId, lastWatchedEpisode, diskName, episodesByShow, result);
+                    addNextEpisodeMediaFiles(showId, lastWatchedEpisode, settings, diskName, episodesByShow,
+                            targetsByMediaFile, unanalyzedFiles);
                 }
             });
         }
     }
 
-    private void addNextEpisodeMediaFiles(UUID showId, EpisodeEntity lastWatched, String diskName,
+    private void addNextEpisodeMediaFiles(UUID showId, EpisodeEntity lastWatched, UserSettings settings, String diskName,
                                           Map<UUID, List<EpisodeEntity>> episodesByShow,
-                                          PreTranscodeCollection result) {
+                                          Map<UUID, TargetAccumulator> targetsByMediaFile,
+                                          Set<UnanalyzedMediaFile> unanalyzedFiles) {
         List<EpisodeEntity> showEpisodes = episodesByShow.computeIfAbsent(showId,
                 id -> episodeRepository.findByShowEntityId(id,
                         Sort.by("seasonEntity.number").ascending().and(Sort.by("number").ascending())));
         for (int i = 0; i < showEpisodes.size(); i++) {
             if (showEpisodes.get(i).getId().equals(lastWatched.getId()) && i + 1 < showEpisodes.size()) {
                 EpisodeEntity next = showEpisodes.get(i + 1);
-                addMediaFiles(next.getMediaFileEntities(), diskName, result, next.getId(), null);
+                addMediaFiles(next.getMediaFileEntities(), settings, diskName, targetsByMediaFile,
+                        unanalyzedFiles, next.getId(), null);
                 break;
             }
         }
     }
 
-    private void collectMovieMediaFiles(UUID userId, String diskName, PreTranscodeCollection result) {
+    private void collectMovieMediaFiles(UUID userId, UserSettings settings, String diskName,
+                                        Map<UUID, TargetAccumulator> targetsByMediaFile,
+                                        Set<UnanalyzedMediaFile> unanalyzedFiles) {
         watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(userId).forEach(movieIdStr -> {
             UUID movieId = UUID.fromString(movieIdStr);
             movieRepository.findById(movieId).ifPresent(movie ->
-                    addMediaFiles(movie.getMediaFileEntities(), diskName, result, null, movieId));
+                    addMediaFiles(movie.getMediaFileEntities(), settings, diskName, targetsByMediaFile,
+                            unanalyzedFiles, null, movieId));
         });
     }
 
-    private static void addMediaFiles(List<MediaFileEntity> mediaFiles, String diskName,
-                                      PreTranscodeCollection result, UUID episodeId, UUID movieId) {
+    private static void addMediaFiles(List<MediaFileEntity> mediaFiles, UserSettings settings, String diskName,
+                                      Map<UUID, TargetAccumulator> targetsByMediaFile,
+                                      Set<UnanalyzedMediaFile> unanalyzedFiles, UUID episodeId, UUID movieId) {
         mediaFiles.stream()
                 .filter(mf -> diskName.equals(mf.getDirectoryEntity().getName()))
                 .forEach(mf -> {
                     if (mf.getMediaFileStreamEntity() == null || mf.getMediaFileStreamEntity().isEmpty()) {
-                        result.unanalyzedFiles().add(new UnanalyzedMediaFile(
+                        unanalyzedFiles.add(new UnanalyzedMediaFile(
                                 mf.getId(), mf.getDirectoryEntity().getId(), mf.getPath(), episodeId, movieId));
                     } else {
-                        result.mediaFileIds().add(mf.getId());
+                        targetsByMediaFile.computeIfAbsent(mf.getId(), id -> new TargetAccumulator()).add(settings);
                     }
                 });
     }

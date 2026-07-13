@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -116,7 +117,29 @@ class HandleTranscodeRequestedTest {
         handler.handle(data);
 
         verify(hlsService).generateAllPlaylists(id, false, true, SubtitleFormat.WEBVTT);
-        verify(hlsService).startAllPasses(id, false, true);
+        verify(hlsService).startAllPasses(id, false, true, PassFilter.preTranscode(null, null));
+    }
+
+    @Test
+    void preTranscodePassesTheUsersLanguagesAndQualityCapOn() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(transcodeService.hasAnyActiveOrCompletedPassForFile(id)).thenReturn(false);
+
+        TranscodeRequestedData data = TranscodeRequestedData.builder()
+                .eventType(EventType.TRANSCODE_REQUESTED)
+                .mediaFileId(id)
+                .direct(false)
+                .transcode(true)
+                .subtitleFormat(SubtitleFormat.WEBVTT)
+                .preTranscode(true)
+                .audioLanguages(List.of("nld", "eng"))
+                .maxVideoHeight(480)
+                .build();
+
+        handler.handle(data);
+
+        verify(hlsService).startAllPasses(id, false, true,
+                PassFilter.preTranscode(List.of("nld", "eng"), 480));
     }
 
     @Test

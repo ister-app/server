@@ -17,6 +17,7 @@ import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.TrackRepository;
+import app.ister.core.service.UserSettingsService.UserSettings;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -46,6 +47,7 @@ public class PlayQueuePrefetchService {
     private final ChapterRepository chapterRepository;
     private final PodcastEpisodeRepository podcastEpisodeRepository;
     private final MessageSender messageSender;
+    private final UserSettingsService userSettingsService;
 
     @Value("${app.ister.server.prefetch.enabled:true}")
     private boolean prefetchEnabled;
@@ -141,6 +143,8 @@ public class PlayQueuePrefetchService {
      */
     private void prefetchItem(PlayQueueEntity queue, PlayQueueItemEntity item) {
         long keepUntilEpochMillis = System.currentTimeMillis() + Duration.ofHours(keepHours).toMillis();
+        // Prefetch only what the owner of the queue will play: their audio languages and quality cap.
+        UserSettings settings = userSettingsService.forUser(queue.getUserEntity().getId());
         for (MediaFileEntity mediaFile : mediaFilesOf(item)) {
             if (mediaFile.getMediaFileStreamEntity() == null || mediaFile.getMediaFileStreamEntity().isEmpty()) {
                 log.debug("Skipping prefetch of unanalyzed media file {}", mediaFile.getId());
@@ -155,6 +159,8 @@ public class PlayQueuePrefetchService {
                             .subtitleFormat(queue.getStreamSubtitleFormat() != null ? queue.getStreamSubtitleFormat() : SubtitleFormat.WEBVTT)
                             .preTranscode(true)
                             .keepUntilEpochMillis(keepUntilEpochMillis)
+                            .audioLanguages(settings.preferredAudioLanguages())
+                            .maxVideoHeight(settings.maxVideoHeight())
                             .build(),
                     mediaFile.getDirectoryEntity().getName());
         }

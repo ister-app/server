@@ -8,6 +8,7 @@ import app.ister.core.eventdata.PreTranscodeRecentlyWatchedData;
 import app.ister.core.eventdata.TranscodeRequestedData;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.PreTranscodeService;
+import app.ister.core.service.PreTranscodeService.PreTranscodeTarget;
 import app.ister.core.service.PreTranscodeService.UnanalyzedMediaFile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -56,26 +58,28 @@ public class HandlePreTranscodeRecentlyWatched implements Handle<PreTranscodeRec
         log.info("Handling PRE_TRANSCODE_RECENTLY_WATCHED for disk: {}", diskName);
 
         PreTranscodeService.PreTranscodeCollection collection = preTranscodeService.collectMediaFilesToPreTranscode(diskName);
-        Set<UUID> mediaFileIds = collection.mediaFileIds();
+        Set<PreTranscodeTarget> targets = collection.targets();
         long keepUntilEpochMillis = System.currentTimeMillis() + Duration.ofMinutes(keepMinutes).toMillis();
 
-        mediaFileIds.forEach(mediaFileId ->
+        targets.forEach(target ->
                 messageSender.sendTranscodeRequested(
                         TranscodeRequestedData.builder()
                                 .eventType(EventType.TRANSCODE_REQUESTED)
-                                .mediaFileId(mediaFileId)
+                                .mediaFileId(target.mediaFileId())
                                 .direct(false)
                                 .transcode(true)
                                 .subtitleFormat(SubtitleFormat.WEBVTT)
                                 .preTranscode(true)
                                 .keepUntilEpochMillis(keepUntilEpochMillis)
+                                .audioLanguages(List.copyOf(target.audioLanguages()))
+                                .maxVideoHeight(target.maxVideoHeight())
                                 .build(),
                         diskName)
         );
 
         requestAnalysisForUnanalyzed(diskName, collection.unanalyzedFiles());
 
-        log.info("Queued {} media files for pre-transcoding on disk: {}", mediaFileIds.size(), diskName);
+        log.info("Queued {} media files for pre-transcoding on disk: {}", targets.size(), diskName);
     }
 
     /**

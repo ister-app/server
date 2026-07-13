@@ -5,6 +5,7 @@ import app.ister.core.Handle;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.TranscodeRequestedData;
 import app.ister.transcoder.HlsService;
+import app.ister.transcoder.PassFilter;
 import app.ister.transcoder.HlsTranscodeService;
 import app.ister.transcoder.config.TranscoderQueueNamingConfig;
 import lombok.RequiredArgsConstructor;
@@ -46,7 +47,8 @@ public class HandleTranscodeRequested implements Handle<TranscodeRequestedData> 
                 if (transcodeService.hasAnyActiveOrCompletedPassForFile(data.getMediaFileId())) {
                     log.debug("Skipping pre-transcode passes for {} - already transcoding or recently completed", data.getMediaFileId());
                 } else {
-                    hlsService.startAllPasses(data.getMediaFileId(), data.getDirect(), data.getTranscode());
+                    hlsService.startAllPasses(data.getMediaFileId(), data.getDirect(), data.getTranscode(),
+                            PassFilter.preTranscode(data.getAudioLanguages(), data.getMaxVideoHeight()));
                 }
             }
         } catch (IOException e) {

@@ -7,6 +7,7 @@ import app.ister.core.eventdata.TranscodeRequestedData;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.PreTranscodeService;
 import app.ister.core.service.PreTranscodeService.PreTranscodeCollection;
+import app.ister.core.service.PreTranscodeService.PreTranscodeTarget;
 import app.ister.core.service.PreTranscodeService.UnanalyzedMediaFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,9 +17,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -47,7 +50,10 @@ class HandlePreTranscodeRecentlyWatchedTest {
     }
 
     private static PreTranscodeCollection collection(Set<UUID> ids) {
-        return new PreTranscodeCollection(ids, Set.of());
+        Set<PreTranscodeTarget> targets = ids.stream()
+                .map(id -> new PreTranscodeTarget(id, Set.of("nl", "en"), null))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        return new PreTranscodeCollection(targets, Set.of());
     }
 
     @Test

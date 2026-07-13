@@ -11,6 +11,7 @@ import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.UserRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.PreTranscodeService.PreTranscodeTarget;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,9 +44,12 @@ class PreTranscodeServiceTest {
     @Mock private WatchStatusRepository watchStatusRepository;
     @Mock private EpisodeRepository episodeRepository;
     @Mock private MovieRepository movieRepository;
+    @Mock private UserSettingsService userSettingsService;
 
     @BeforeEach
     void setUp() {
+        lenient().when(userSettingsService.forUser(any())).thenReturn(
+                new UserSettingsService.UserSettings(List.of("en", "nl"), List.of("nl"), true, true, null));
         ReflectionTestUtils.setField(subject, "nextEpisodeRecentDays", NEXT_EPISODE_RECENT_DAYS);
     }
 
@@ -297,6 +301,57 @@ class PreTranscodeServiceTest {
 
         assertEquals(1, result.size());
         assertTrue(result.contains(mediaFileId));
+    }
+
+    // ===== User settings drive what gets transcoded =====
+
+    @Test
+    void audioLanguagesOfEveryInterestedUserAreMerged() {
+        UUID userId1 = UUID.randomUUID();
+        UUID userId2 = UUID.randomUUID();
+        UUID episodeId = UUID.randomUUID();
+        UUID mediaFileId = UUID.randomUUID();
+        EpisodeEntity ep = episode(episodeId, mediaFile(mediaFileId, "disk1"));
+
+        when(userSettingsService.forUser(userId1)).thenReturn(
+                new UserSettingsService.UserSettings(List.of("nl"), List.of("nl"), true, true, 480));
+        when(userSettingsService.forUser(userId2)).thenReturn(
+                new UserSettingsService.UserSettings(List.of("en"), List.of("en"), true, true, 720));
+        when(userRepository.findAll()).thenReturn(List.of(user(userId1), user(userId2)));
+        when(watchStatusRepository.findRecentEpisodesWithDateByUserId(any()))
+                .thenReturn(rows(episodeId, UUID.randomUUID(), daysAgo(30)));
+        when(watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(any())).thenReturn(List.of());
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(ep));
+
+        Set<PreTranscodeTarget> targets = subject.collectMediaFilesToPreTranscode("disk1").targets();
+
+        assertEquals(1, targets.size());
+        PreTranscodeTarget target = targets.iterator().next();
+        assertEquals(mediaFileId, target.mediaFileId());
+        assertEquals(Set.of("nl", "en"), target.audioLanguages(), "both users must get their language");
+        assertEquals(720, target.maxVideoHeight(), "the highest cap of the interested users wins");
+    }
+
+    @Test
+    void oneUserWithoutAQualityCapLiftsItForTheFile() {
+        UUID cappedUser = UUID.randomUUID();
+        UUID uncappedUser = UUID.randomUUID();
+        UUID episodeId = UUID.randomUUID();
+        EpisodeEntity ep = episode(episodeId, mediaFile(UUID.randomUUID(), "disk1"));
+
+        when(userSettingsService.forUser(cappedUser)).thenReturn(
+                new UserSettingsService.UserSettings(List.of("nl"), List.of(), true, true, 480));
+        when(userSettingsService.forUser(uncappedUser)).thenReturn(
+                new UserSettingsService.UserSettings(List.of("nl"), List.of(), true, true, null));
+        when(userRepository.findAll()).thenReturn(List.of(user(cappedUser), user(uncappedUser)));
+        when(watchStatusRepository.findRecentEpisodesWithDateByUserId(any()))
+                .thenReturn(rows(episodeId, UUID.randomUUID(), daysAgo(30)));
+        when(watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(any())).thenReturn(List.of());
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(ep));
+
+        PreTranscodeTarget target = subject.collectMediaFilesToPreTranscode("disk1").targets().iterator().next();
+
+        assertNull(target.maxVideoHeight());
     }
 
     @Test

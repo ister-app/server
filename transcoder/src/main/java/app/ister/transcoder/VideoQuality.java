@@ -4,20 +4,23 @@ import lombok.Getter;
 
 @Getter
 public enum VideoQuality {
-    COPY("copy", null, null, null),
-    Q720P("720p", "1280:720", "libx264", "2000k"),
-    Q480P("480p", "854:480", "libx264", "1000k");
+    COPY("copy", null, null, null, null),
+    Q720P("720p", "1280:720", "libx264", "2000k", 720),
+    Q480P("480p", "854:480", "libx264", "1000k", 480);
 
     private final String label;
     private final String scale;
     private final String codec;
     private final String bitrate;
+    /** Output height, used to honour a user's quality cap. Null for COPY: it keeps the source height. */
+    private final Integer height;
 
-    VideoQuality(String label, String scale, String codec, String bitrate) {
+    VideoQuality(String label, String scale, String codec, String bitrate, Integer height) {
         this.label = label;
         this.scale = scale;
         this.codec = codec;
         this.bitrate = bitrate;
+        this.height = height;
     }
 
     public static VideoQuality fromLabel(String label) {

@@ -36,6 +36,8 @@ type Query {
     "Podcast directory search (iTunes Search API); subscribe with the returned feedUrl."
     searchPodcastDirectory(term: String!): [PodcastDirectoryResult!]!
     search(term: String!, size: Int, libraryId: ID): [SearchResult!]!
+    "The calling user's playback settings; defaults (the server's languages) when they never saved any."
+    userSettings: UserSettings!
 }
 
 union SearchResult = Movie | Show | Episode | Person | Album | Track | Book | Podcast
@@ -91,6 +93,12 @@ type Mutation {
     active session for the queue was known when the command was sent.
     """
     sendPlaybackCommand(playQueueId: ID!, command: PlaybackCommandType!, positionInMilliseconds: Int, playQueueItemId: ID): Boolean!
+    """
+    Saves the calling user's playback settings. They apply to every client of that user and steer
+    pre-transcoding: only the preferred audio languages (and video variants up to maxVideoHeight)
+    are transcoded in the background.
+    """
+    updateUserSettings(input: UserSettingsInput!): UserSettings!
 }
 
 type Subscription {
@@ -261,6 +269,29 @@ input StreamSettingsInput {
     "Include the re-encoded (720p/480p) quality variants."
     transcode: Boolean!
     subtitleFormat: SubtitleFormat
+}
+
+"""
+A user's playback settings, stored server-side so they follow the account to every device — and so
+pre-transcoding knows which audio tracks are worth producing.
+"""
+type UserSettings {
+    "Preferred spoken languages, most preferred first (ISO-639 tags)."
+    preferredAudioLanguages: [String!]!
+    "Preferred subtitle languages, most preferred first. Empty means: no subtitles by default."
+    preferredSubtitleLanguages: [String!]!
+    directPlay: Boolean!
+    transcode: Boolean!
+    "Highest video variant to pre-transcode (720 or 480); null means every variant."
+    maxVideoHeight: Int
+}
+
+input UserSettingsInput {
+    preferredAudioLanguages: [String!]!
+    preferredSubtitleLanguages: [String!]!
+    directPlay: Boolean!
+    transcode: Boolean!
+    maxVideoHeight: Int
 }
 
 input CreatePlayQueueInput {

@@ -1139,6 +1139,93 @@ class HlsServiceTest {
         verify(ffmpegMock, times(6)).executeAsync();
     }
 
+    @Test
+    void preTranscodeOnlyTranscodesThePreferredLanguagesAt192k() throws Exception {
+        // The case this filter exists for: an episode with seven audio streams used to cost
+        // 2 video + 7 x 2 audio = 16 passes. With the users' languages known it is 4.
+        UUID id = UUID.randomUUID();
+        Files.createDirectories(tempDir.resolve(id.toString()));
+
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv",
+                videoStream(0, 1920, 1080),
+                audioStream(1, "eng", "English"), audioStream(2, "nld", "Dutch"),
+                audioStream(3, "fra", "French"), audioStream(4, "deu", "German"),
+                audioStream(5, "spa", "Spanish"), audioStream(6, "ita", "Italian"),
+                audioStream(7, "pol", "Polish"));
+
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+
+        CountDownLatch allDone = new CountDownLatch(4);
+        doAnswer(inv -> {
+            allDone.countDown();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
+
+        hlsService.startAllPasses(id, false, true, PassFilter.preTranscode(List.of("nl", "en"), null));
+
+        assertTrue(allDone.await(5, TimeUnit.SECONDS), "720p, 480p and the two preferred audio streams");
+        // 720p + 480p + audio_1_192k (eng) + audio_2_192k (nld). No 64k: no master playlist points at it.
+        verify(ffmpegMock, times(4)).executeAsync();
+    }
+
+    @Test
+    void preTranscodeFallsBackToTheFirstAudioStreamWhenNoLanguageMatches() throws Exception {
+        UUID id = UUID.randomUUID();
+        Files.createDirectories(tempDir.resolve(id.toString()));
+
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream(0, 1920, 1080),
+                audioStream(1, "jpn", "Japanese"), audioStream(2, "kor", "Korean"));
+
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+
+        CountDownLatch allDone = new CountDownLatch(3);
+        doAnswer(inv -> {
+            allDone.countDown();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
+
+        hlsService.startAllPasses(id, false, true, PassFilter.preTranscode(List.of("nl", "en"), null));
+
+        assertTrue(allDone.await(5, TimeUnit.SECONDS), "a warm file must not be mute");
+        // 720p + 480p + the first audio stream at 192k
+        verify(ffmpegMock, times(3)).executeAsync();
+    }
+
+    @Test
+    void preTranscodeHonoursTheUsersVideoQualityCap() throws Exception {
+        UUID id = UUID.randomUUID();
+        Files.createDirectories(tempDir.resolve(id.toString()));
+
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream(0, 1920, 1080),
+                audioStream(1, "nld", "Dutch"));
+
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+
+        CountDownLatch allDone = new CountDownLatch(2);
+        doAnswer(inv -> {
+            allDone.countDown();
+            return completedFFmpegFuture();
+        }).when(ffmpegMock).executeAsync();
+
+        hlsService.startAllPasses(id, false, true, PassFilter.preTranscode(List.of("nl"), 480));
+
+        assertTrue(allDone.await(5, TimeUnit.SECONDS));
+        // 480p only (720p exceeds the cap) + the Dutch audio stream at 192k
+        verify(ffmpegMock, times(2)).executeAsync();
+    }
+
     // ========== generateAllPlaylists edge cases ==========
 
     @Test

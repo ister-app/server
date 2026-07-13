@@ -1,5 +1,6 @@
 package app.ister.transcoder;
 
+import app.ister.core.config.LanguageMatcher;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MediaFileStreamEntity;
 import app.ister.core.enums.EventType;
@@ -117,8 +118,12 @@ public class HlsService {
     /** Per-subtitle locks to prevent duplicate segment generation for the same subtitle stream. */
     private final ConcurrentHashMap<String, Object> subtitleLocks = new ConcurrentHashMap<>();
 
-    /** direct/transcode flags per pre-transcoded file, so its remaining passes can be resumed. */
-    private final ConcurrentHashMap<UUID, boolean[]> preTranscodeQualities = new ConcurrentHashMap<>();
+    /** What a pre-transcode of one media file asked for, so its remaining passes can be resumed. */
+    private record PreTranscodeRequest(boolean direct, boolean transcode, PassFilter filter) {
+    }
+
+    /** The pre-transcode request per file being warmed up; removed once every pass is done. */
+    private final ConcurrentHashMap<UUID, PreTranscodeRequest> preTranscodeRequests = new ConcurrentHashMap<>();
 
     @PostConstruct
     void registerBackgroundPassResume() {
@@ -305,9 +310,18 @@ public class HlsService {
      */
     @Transactional(readOnly = true)
     public void startAllPasses(UUID mediaFileId, boolean direct, boolean transcode) {
+        startAllPasses(mediaFileId, direct, transcode, PassFilter.none());
+    }
+
+    /**
+     * @param filter which passes are worth producing — see {@link PassFilter}
+     */
+    @Transactional(readOnly = true)
+    public void startAllPasses(UUID mediaFileId, boolean direct, boolean transcode, PassFilter filter) {
         MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
-        preTranscodeQualities.put(mediaFileId, new boolean[]{direct, transcode});
-        pendingPasses(mediaFileId, mediaFile, direct, transcode).forEach(pass -> doStartPass(pass, mediaFile));
+        PreTranscodeRequest request = new PreTranscodeRequest(direct, transcode, filter);
+        preTranscodeRequests.put(mediaFileId, request);
+        pendingPasses(mediaFileId, mediaFile, request).forEach(pass -> doStartPass(pass, mediaFile));
     }
 
     /**
@@ -318,55 +332,82 @@ public class HlsService {
      * audio streams would need days to finish.
      */
     private void startNextPendingPass(UUID mediaFileId) {
-        boolean[] qualities = preTranscodeQualities.get(mediaFileId);
-        if (qualities == null) {
+        PreTranscodeRequest request = preTranscodeRequests.get(mediaFileId);
+        if (request == null) {
             return;
         }
         readOnlyTransaction.executeWithoutResult(status ->
                 mediaFileRepository.findById(mediaFileId).ifPresentOrElse(mediaFile -> {
-                    List<TranscodePassRequestedData> pending = pendingPasses(mediaFileId, mediaFile, qualities[0], qualities[1]);
+                    List<TranscodePassRequestedData> pending = pendingPasses(mediaFileId, mediaFile, request);
                     if (pending.isEmpty()) {
-                        preTranscodeQualities.remove(mediaFileId);
+                        preTranscodeRequests.remove(mediaFileId);
                         log.debug("All pre-transcode passes finished for {}", mediaFileId);
                         return;
                     }
                     log.debug("Starting next pre-transcode pass for {} ({} pending)", mediaFileId, pending.size());
                     doStartPass(pending.getFirst(), mediaFile);
-                }, () -> preTranscodeQualities.remove(mediaFileId)));
+                }, () -> preTranscodeRequests.remove(mediaFileId)));
     }
 
     /** The passes of this media file that are neither running nor already completed on disk. */
     private List<TranscodePassRequestedData> pendingPasses(UUID mediaFileId, MediaFileEntity mediaFile,
-                                                           boolean direct, boolean transcode) {
+                                                           PreTranscodeRequest request) {
         String inputPath = resolveInputPath(mediaFile);
+        PassFilter filter = request.filter();
         List<TranscodePassRequestedData> pending = new ArrayList<>();
 
-        boolean[] includeQuality = {direct, transcode, transcode};
+        boolean[] includeQuality = {request.direct(), request.transcode(), request.transcode()};
         VideoQuality[] videoQualities = VideoQuality.values();
         AudioQuality[] audioQualities = AudioQuality.values();
 
-        List<MediaFileStreamEntity> audioStreams = mediaFile.getMediaFileStreamEntity().stream()
-                .filter(s -> s.getCodecType() == StreamCodecType.AUDIO)
-                .toList();
+        List<MediaFileStreamEntity> audioStreams = audioStreamsToTranscode(mediaFile, filter);
 
         // Never start video passes for a file without a real video stream: FFmpeg's
         // -map 0:v:0 would grab embedded cover art and fail (or transcode a JPEG).
         boolean hasVideo = mediaFile.getMediaFileStreamEntity().stream()
                 .anyMatch(HlsPlaylistBuilder::isRealVideoStream);
         for (int i = 0; hasVideo && i < videoQualities.length; i++) {
-            if (includeQuality[i]) {
+            if (includeQuality[i] && !exceedsQualityCap(videoQualities[i], filter)) {
                 pendingVideoPass(mediaFileId, inputPath, videoQualities[i]).ifPresent(pending::add);
             }
         }
 
         for (int qi = 0; qi < audioQualities.length; qi++) {
-            if (!includeQuality[qi] || audioQualities[qi] == AudioQuality.COPY) continue;
-            String qualityLabel = audioQualities[qi].getLabel();
+            AudioQuality aq = audioQualities[qi];
+            if (!includeQuality[qi] || aq == AudioQuality.COPY) continue;
+            // No master playlist ever points at the 64k group — the builder folds it into 192k — so
+            // producing it in the background is wasted work. Interactive requests still get it on demand.
+            if (filter.preTranscode() && aq == AudioQuality.Q64K) continue;
+            String qualityLabel = aq.getLabel();
             for (MediaFileStreamEntity audioStream : audioStreams) {
                 pendingAudioPass(mediaFileId, inputPath, qualityLabel, audioStream.getStreamIndex()).ifPresent(pending::add);
             }
         }
         return pending;
+    }
+
+    private static boolean exceedsQualityCap(VideoQuality quality, PassFilter filter) {
+        return filter.maxVideoHeight() != null
+                && quality.getHeight() != null
+                && quality.getHeight() > filter.maxVideoHeight();
+    }
+
+    /**
+     * The audio streams worth transcoding: the ones in a preferred language, or all of them when no
+     * preference was given. A file whose streams match no preference still gets its first stream, so
+     * a pre-transcoded file is never warm but mute.
+     */
+    private static List<MediaFileStreamEntity> audioStreamsToTranscode(MediaFileEntity mediaFile, PassFilter filter) {
+        List<MediaFileStreamEntity> audioStreams = mediaFile.getMediaFileStreamEntity().stream()
+                .filter(s -> s.getCodecType() == StreamCodecType.AUDIO)
+                .toList();
+        if (filter.audioLanguages().isEmpty() || audioStreams.isEmpty()) {
+            return audioStreams;
+        }
+        List<MediaFileStreamEntity> preferred = audioStreams.stream()
+                .filter(s -> LanguageMatcher.matches(s.getLanguage(), filter.audioLanguages()))
+                .toList();
+        return preferred.isEmpty() ? List.of(audioStreams.getFirst()) : preferred;
     }
 
     private Optional<TranscodePassRequestedData> pendingVideoPass(UUID mediaFileId, String inputPath, VideoQuality vq) {
