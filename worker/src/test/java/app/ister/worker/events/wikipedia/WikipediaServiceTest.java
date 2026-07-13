@@ -128,6 +128,40 @@ class WikipediaServiceTest {
     }
 
     @Test
+    void followsAWikidataRedirectToTheMergedEntity() {
+        // Wikidata merges duplicate items: asking for the old id answers with a document keyed by
+        // the id it was merged into. Reading only under the requested key loses every merged person.
+        server.expect(requestTo(WIKIDATA_ENDPOINT + "Q1.json"))
+                .andRespond(withSuccess("""
+                        {"entities":{"Q42":{"sitelinks":{"enwiki":{"title":"Kate Bush"}}}}}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(EN_SUMMARY + "Kate%20Bush"))
+                .andRespond(withSuccess("{\"extract\":\"English singer.\"}", MediaType.APPLICATION_JSON));
+
+        WikipediaService.Content content = subject.fetchContent("Q1", List.of("en"));
+
+        assertEquals("English singer.", content.bios().get("en"));
+        server.verify();
+    }
+
+    @Test
+    void nonLatinNameDoesNotMatchAnUnrelatedPerson() {
+        server.expect(requestTo(startsWith(WIKIDATA_API)))
+                .andRespond(withSuccess("{\"search\":[{\"id\":\"Q9\"}]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(WIKIDATA_ENDPOINT + "Q9.json"))
+                .andRespond(withSuccess("""
+                        {"entities":{"Q9":{"claims":{"P31":[{"mainsnak":{"datavalue":{"value":{"id":"Q5"}}}}]},
+                          "labels":{"en":{"value":"Лев Толстой"}},
+                          "sitelinks":{"enwiki":{"title":"Leo Tolstoy"}}}}}
+                        """, MediaType.APPLICATION_JSON));
+
+        // Both names are Cyrillic: an [a-z0-9] normaliser reduces both to "" and they compare equal,
+        // so Dostoevsky would be handed Tolstoy's biography and portrait.
+        assertTrue(subject.fetchContentForPerson("Фёдор Достоевский", EN_NL).bios().isEmpty());
+        server.verify();
+    }
+
+    @Test
     void wikidataErrorReturnsEmpty() {
         server.expect(requestTo(WIKIDATA_ENDPOINT + "Q1.json")).andRespond(withServerError());
 

@@ -1,5 +1,6 @@
 package app.ister.worker.events.wikipedia;
 
+import app.ister.worker.http.MetadataRestClients;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -10,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static app.ister.worker.events.musicbrainz.MusicBrainzService.namesMatch;
 import static app.ister.worker.events.musicbrainz.MusicBrainzService.normalizeTitle;
 
 /**
@@ -22,7 +24,6 @@ import static app.ister.worker.events.musicbrainz.MusicBrainzService.normalizeTi
 @Component
 public class WikipediaService {
 
-    private static final String USER_AGENT = "IsterServer/1.0 (info@ister.app)";
     /** Wikidata id of "human", the P31 (instance of) value every person carries. */
     private static final String HUMAN = "Q5";
     private static final int MAX_CANDIDATES = 3;
@@ -45,10 +46,7 @@ public class WikipediaService {
             String wikidataApiBase) {
         this.wikidataEntityBase = wikidataEntityBase;
         this.wikidataApiBase = wikidataApiBase;
-        this.restClient = RestClient.builder()
-                .defaultHeader("User-Agent", USER_AGENT)
-                .defaultHeader("Accept", "application/json")
-                .build();
+        this.restClient = MetadataRestClients.json();
     }
 
     /** Fetches the Wikidata entity once and reads one Wikipedia summary per requested language tag. */
@@ -150,15 +148,23 @@ public class WikipediaService {
         }
         return languageTags.stream().anyMatch(tag -> labels.get(tag) instanceof Map<?, ?> label
                 && label.get("value") instanceof String value
-                && wantedName.equals(normalizeTitle(value)));
+                && namesMatch(wantedName, value));
     }
 
+    /**
+     * A field of the requested entity. Wikidata merges duplicate items, and Special:EntityData for a
+     * merged id answers with the document keyed by the <em>target</em> id, so looking only under the
+     * id we asked for would silently return nothing for every person whose item has been merged.
+     */
     private Object entityField(Map<String, Object> wikidata, String wikidataId, String field) {
-        if (wikidata.get("entities") instanceof Map<?, ?> entities
-                && entities.get(wikidataId) instanceof Map<?, ?> entity) {
-            return entity.get(field);
+        if (!(wikidata.get("entities") instanceof Map<?, ?> entities) || entities.isEmpty()) {
+            return null;
         }
-        return null;
+        Object entity = entities.get(wikidataId);
+        if (entity == null && entities.size() == 1) {
+            entity = entities.values().iterator().next();
+        }
+        return entity instanceof Map<?, ?> entityMap ? entityMap.get(field) : null;
     }
 
     /** Wikidata entity document, or an empty map when the fetch failed or the body was null. */

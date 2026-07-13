@@ -31,6 +31,7 @@ class OpenLibraryServiceTest {
     private static final String WIKIDATA_API = "https://www.wikidata.org/w/api.php";
     private static final String WIKIPEDIA_NL_SUMMARY_ENDPOINT = "https://nl.wikipedia.org/api/rest_v1/page/summary/";
     private static final List<String> NL = List.of("nl");
+    private static final List<String> EN_NL = List.of("en", "nl");
 
     private OpenLibraryService subject;
     private MockRestServiceServer server;
@@ -145,10 +146,13 @@ class OpenLibraryServiceTest {
                 """);
         expectNoWikidataMatch();
 
-        Optional<OpenLibraryService.AuthorInfo> result = subject.getAuthorInfo("Tommy Wieringa", NL);
+        Optional<OpenLibraryService.AuthorInfo> result = subject.getAuthorInfo("Tommy Wieringa", EN_NL);
 
         assertTrue(result.isPresent());
-        assertEquals("Nederlands schrijver.", result.get().bios().get("nl"));
+        // Open Library prose is English, so it fills the English slot -- never the Dutch one, which
+        // would show English text to a reader who asked for a Dutch biography.
+        assertEquals("Nederlands schrijver.", result.get().bios().get("en"));
+        assertNull(result.get().bios().get("nl"));
         assertEquals("https://covers.openlibrary.org/a/olid/OL1A-L.jpg", result.get().photoUrl());
         assertEquals(1967, result.get().birthYear());
         assertEquals("OL1A", result.get().sourceKey());
@@ -183,7 +187,7 @@ class OpenLibraryServiceTest {
         expectAuthorSearchAndFetch("{\"bio\":\"Bio.\",\"photos\":[-1]}");
         expectNoWikidataMatch();
 
-        Optional<OpenLibraryService.AuthorInfo> result = subject.getAuthorInfo("Tommy Wieringa", NL);
+        Optional<OpenLibraryService.AuthorInfo> result = subject.getAuthorInfo("Tommy Wieringa", EN_NL);
 
         assertTrue(result.isPresent());
         assertNull(result.get().photoUrl());
@@ -201,7 +205,7 @@ class OpenLibraryServiceTest {
                 .andRespond(withSuccess("{\"bio\":\"Bio.\"}", MediaType.APPLICATION_JSON));
         expectNoWikidataMatch();
 
-        assertTrue(subject.getAuthorInfo("J.R.R. Tolkien", NL).isPresent());
+        assertTrue(subject.getAuthorInfo("J.R.R. Tolkien", EN_NL).isPresent());
         server.verify();
     }
 
@@ -261,6 +265,50 @@ class OpenLibraryServiceTest {
     }
 
     /** The author has no wikidata link, so Wikidata is searched by name — with no hit here. */
+    @Test
+    void openLibraryBioIsDroppedWhenEnglishIsNotAConfiguredLanguage() {
+        expectAuthorSearchAndFetch("""
+                {"bio":"English prose from Open Library.","birth_date":"1967"}
+                """);
+        expectNoWikidataMatch();
+
+        Optional<OpenLibraryService.AuthorInfo> result = subject.getAuthorInfo("Tommy Wieringa", NL);
+
+        // Better no biography than English text served as the Dutch one.
+        assertTrue(result.isPresent());
+        assertTrue(result.get().bios().isEmpty());
+        assertEquals(1967, result.get().birthYear());
+    }
+
+    @Test
+    void authorWithANonLatinNameOnlyMatchesThatName() {
+        server.expect(requestTo(startsWith(AUTHOR_SEARCH_ENDPOINT)))
+                .andRespond(withSuccess("""
+                        {"docs":[{"key":"OL9A","name":"Лев Толстой"}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        // Cyrillic normalises to the empty string under an [a-z0-9] filter, and two empty strings
+        // compare equal -- which would hand this author's record to a completely different person.
+        assertTrue(subject.getAuthorInfo("Фёдор Достоевский", NL).isEmpty());
+        server.verify();
+    }
+
+    @Test
+    void authorWithANonLatinNameStillMatchesItself() {
+        server.expect(requestTo(startsWith(AUTHOR_SEARCH_ENDPOINT)))
+                .andRespond(withSuccess("""
+                        {"docs":[{"key":"OL1A","name":"Лев Толстой"}]}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(AUTHOR_ENDPOINT))
+                .andRespond(withSuccess("{\"birth_date\":\"1828\"}", MediaType.APPLICATION_JSON));
+        expectNoWikidataMatch();
+
+        Optional<OpenLibraryService.AuthorInfo> result = subject.getAuthorInfo("Лев Толстой", NL);
+
+        assertTrue(result.isPresent());
+        assertEquals(1828, result.get().birthYear());
+    }
+
     private void expectNoWikidataMatch() {
         server.expect(requestTo(startsWith(WIKIDATA_API)))
                 .andRespond(withSuccess("{\"search\":[]}", MediaType.APPLICATION_JSON));

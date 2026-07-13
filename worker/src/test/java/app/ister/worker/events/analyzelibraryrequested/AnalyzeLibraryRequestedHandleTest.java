@@ -32,7 +32,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -128,8 +130,12 @@ class AnalyzeLibraryRequestedHandleTest {
 
         subject.handle(AnalyzeLibraryRequestedData.builder().eventType(EventType.ANALYZE_LIBRARY_REQUEST).build());
 
+        // Unrouted, i.e. onto the global queue: only the worker's HandlePersonFound (MusicBrainz /
+        // Open Library / Wikipedia) listens there. A node-scoped send would reach the disk handler,
+        // which merely re-parses artist.nfo, and the enrichment this dispatch exists for never runs.
         ArgumentCaptor<PersonFoundData> captor = ArgumentCaptor.forClass(PersonFoundData.class);
-        verify(messageSender, times(2)).sendPersonFound(captor.capture(), eq("TestServer"));
+        verify(messageSender, times(2)).sendPersonFound(captor.capture());
+        verify(messageSender, never()).sendPersonFound(any(), anyString());
         assertEquals(List.of(artist.getId(), author.getId()),
                 captor.getAllValues().stream().map(PersonFoundData::getPersonId).toList());
     }

@@ -1,6 +1,7 @@
 package app.ister.worker.events.musicbrainz;
 
 import app.ister.worker.events.wikipedia.WikipediaService;
+import app.ister.worker.http.MetadataRestClients;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -22,9 +23,10 @@ public class MusicBrainzService {
     private static final String COVER_ART_BASE = "https://coverartarchive.org/release";
     private static final String COVER_ART_RELEASE_GROUP_BASE = "https://coverartarchive.org/release-group";
     private static final int IMAGE_WIDTH = 1000;
-    private static final String USER_AGENT = "IsterServer/1.0 (info@ister.app)";
     private static final String ARTIST_QUERY_PREFIX = "artist:";
     private static final int MAX_ATTEMPTS = 3;
+    /** Language tag of the provider's own free-text prose (MusicBrainz annotations are English). */
+    private static final String ENGLISH = "en";
 
     /** Base URL for downloadable Wikimedia Commons files (Special:FilePath). */
     private final String commonsFilepathBase;
@@ -37,10 +39,7 @@ public class MusicBrainzService {
             WikipediaService wikipediaService) {
         this.commonsFilepathBase = commonsFilepathBase;
         this.wikipediaService = wikipediaService;
-        this.restClient = RestClient.builder()
-                .defaultHeader("User-Agent", USER_AGENT)
-                .defaultHeader("Accept", "application/json")
-                .build();
+        this.restClient = MetadataRestClients.json();
     }
 
     /**
@@ -132,7 +131,7 @@ public class MusicBrainzService {
             return Optional.empty();
         }
         Optional<String> match = results.stream()
-                .filter(r -> wanted.equals(normalizeTitle((String) r.get("title"))))
+                .filter(r -> namesMatch(wanted, (String) r.get("title")))
                 .map(r -> (String) r.get("id"))
                 .filter(Objects::nonNull)
                 .findFirst();
@@ -145,12 +144,23 @@ public class MusicBrainzService {
 
     /** Lowercases and removes everything that is not a letter or digit, collapsing stylisation
      * (interpunct, accents-as-punctuation, spacing) so "E•MO•TION" and "Emotion" compare equal.
-     * Public: OpenLibraryService reuses the same match rule. */
+     * Letters of any script are kept: an [a-z0-9] filter would reduce a Cyrillic or Japanese name to
+     * the empty string, and two empty strings compare equal — every candidate would "match".
+     * Public: OpenLibraryService and WikipediaService reuse the same match rule. */
     public static String normalizeTitle(String title) {
         if (title == null) {
             return "";
         }
-        return title.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]", "");
+        return title.toLowerCase(java.util.Locale.ROOT).codePoints()
+                .filter(Character::isLetterOrDigit)
+                .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
+                .toString();
+    }
+
+    /** Match rule for names/titles: normalised equality, where an unnormalisable name never matches. */
+    public static boolean namesMatch(String wanted, String candidate) {
+        String normalized = normalizeTitle(candidate);
+        return !wanted.isEmpty() && wanted.equals(normalized);
     }
 
     /**
@@ -211,9 +221,11 @@ public class MusicBrainzService {
         String imageUrl = details.imageUrl() != null ? details.imageUrl() : wiki.thumbnail();
 
         Map<String, String> bios = new LinkedHashMap<>(wiki.bios());
-        // Fall back to the (rare) MusicBrainz annotation for the primary language if Wikipedia gave nothing.
-        if (bios.isEmpty() && details.annotationBio() != null && languageTags != null && !languageTags.isEmpty()) {
-            bios.put(languageTags.getFirst(), details.annotationBio());
+        // Fall back to the (rare) MusicBrainz annotation, which is English prose — so it fills the
+        // English slot only, never whichever language happens to be configured first.
+        if (details.annotationBio() != null && languageTags != null && languageTags.contains(ENGLISH)
+                && !bios.containsKey(ENGLISH)) {
+            bios.put(ENGLISH, details.annotationBio());
         }
 
         // Return whenever the artist was found, so the birth year (life-span) flows through even for

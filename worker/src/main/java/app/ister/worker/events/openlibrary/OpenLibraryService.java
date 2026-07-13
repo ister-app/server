@@ -1,6 +1,7 @@
 package app.ister.worker.events.openlibrary;
 
 import app.ister.worker.events.wikipedia.WikipediaService;
+import app.ister.worker.http.MetadataRestClients;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -14,6 +15,7 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static app.ister.worker.events.musicbrainz.MusicBrainzService.namesMatch;
 import static app.ister.worker.events.musicbrainz.MusicBrainzService.normalizeTitle;
 
 /**
@@ -25,9 +27,10 @@ import static app.ister.worker.events.musicbrainz.MusicBrainzService.normalizeTi
 @Component
 public class OpenLibraryService {
 
-    private static final String USER_AGENT = "IsterServer/1.0 (info@ister.app)";
     private static final String COVERS_BASE = "https://covers.openlibrary.org/b/id/";
     private static final String AUTHOR_PHOTO_BASE = "https://covers.openlibrary.org/a/olid/";
+    /** Language tag of the provider's own free-text prose (Open Library bios are English). */
+    private static final String ENGLISH = "en";
     /** Open Library birth dates are free text ("5 September 1929", "1929-09-05", "c. 1929"). */
     private static final Pattern YEAR = Pattern.compile("\\d{4}");
 
@@ -40,10 +43,7 @@ public class OpenLibraryService {
             WikipediaService wikipediaService) {
         this.openLibraryBase = openLibraryBase;
         this.wikipediaService = wikipediaService;
-        this.restClient = RestClient.builder()
-                .defaultHeader("User-Agent", USER_AGENT)
-                .defaultHeader("Accept", "application/json")
-                .build();
+        this.restClient = MetadataRestClients.json();
     }
 
     /**
@@ -101,9 +101,12 @@ public class OpenLibraryService {
                 : wikipediaService.fetchContentForPerson(name, languageTags);
         Map<String, String> bios = new LinkedHashMap<>(wiki.bios());
         String openLibraryBio = textValue(author.get("bio"));
-        // The English-only Open Library bio only fills a language Wikipedia had nothing for.
-        if (bios.isEmpty() && openLibraryBio != null && languageTags != null && !languageTags.isEmpty()) {
-            bios.put(languageTags.getFirst(), openLibraryBio);
+        // Open Library bios are English prose, so they can only fill the English slot — filing one
+        // under whatever language happens to be configured first would show English text to a user
+        // who asked for a Dutch biography. A deployment without English simply gets no fallback.
+        if (openLibraryBio != null && languageTags != null && languageTags.contains(ENGLISH)
+                && !bios.containsKey(ENGLISH)) {
+            bios.put(ENGLISH, openLibraryBio);
         }
 
         String photoUrl = hasPhoto(author) ? AUTHOR_PHOTO_BASE + authorKey + "-L.jpg" : wiki.thumbnail();
@@ -147,11 +150,11 @@ public class OpenLibraryService {
 
     /** Matches on the canonical name or any alternate spelling ("J.R.R. Tolkien" vs "J. R. R. Tolkien"). */
     private boolean matchesName(Map<?, ?> doc, String wanted) {
-        if (doc.get("name") instanceof String name && wanted.equals(normalizeTitle(name))) {
+        if (doc.get("name") instanceof String name && namesMatch(wanted, name)) {
             return true;
         }
         return doc.get("alternate_names") instanceof List<?> alternates
-                && alternates.stream().anyMatch(alt -> alt instanceof String s && wanted.equals(normalizeTitle(s)));
+                && alternates.stream().anyMatch(alt -> alt instanceof String s && namesMatch(wanted, s));
     }
 
     /** The author record ("/authors/OL...A"), or an empty map when the fetch failed. */
@@ -212,7 +215,7 @@ public class OpenLibraryService {
             String wanted = normalizeTitle(title);
             for (Object doc : docs) {
                 if (doc instanceof Map<?, ?> docMap
-                        && wanted.equals(normalizeTitle((String) docMap.get("title")))) {
+                        && namesMatch(wanted, (String) docMap.get("title"))) {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> match = (Map<String, Object>) docMap;
                     return Optional.of(match);

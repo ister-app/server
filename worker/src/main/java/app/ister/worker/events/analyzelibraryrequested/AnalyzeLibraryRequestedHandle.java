@@ -77,17 +77,21 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
                                 .build(),
                         dir.getName()));
         dispatchMissingMetadataEvents(nodeEntity.getName());
-        dispatchMissingPersonMetadataEvents(nodeEntity.getName());
+        dispatchMissingPersonMetadataEvents();
         dispatchMissingMusicMetadataEvents(nodeEntity.getName());
     }
 
-    /** Music artists and book authors are both persons; PERSON_FOUND picks the metadata source. */
-    private void dispatchMissingPersonMetadataEvents(String nodeName) {
+    /**
+     * Music artists and book authors are both persons; PERSON_FOUND picks the metadata source.
+     * Deliberately unrouted: the enrichment handler (MusicBrainz/Open Library/Wikipedia) is the
+     * worker's, which listens on the global queue. A node-scoped send would land on the disk
+     * handler's queue instead, which only re-parses artist.nfo — no external lookup would happen.
+     */
+    private void dispatchMissingPersonMetadataEvents() {
         Stream.of(LibraryType.MUSIC, LibraryType.BOOK)
                 .flatMap(type -> personRepository.findByLibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(type).stream())
                 .forEach(p -> messageSender.sendPersonFound(
-                        PersonFoundData.builder().eventType(EventType.PERSON_FOUND).personId(p.getId()).build(),
-                        nodeName));
+                        PersonFoundData.builder().eventType(EventType.PERSON_FOUND).personId(p.getId()).build()));
     }
 
     private void dispatchMissingMusicMetadataEvents(String nodeName) {
