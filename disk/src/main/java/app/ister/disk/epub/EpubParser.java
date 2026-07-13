@@ -8,6 +8,8 @@ import org.w3c.dom.NodeList;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import org.xml.sax.SAXException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -73,7 +75,7 @@ public class EpubParser {
         }
     }
 
-    private String findOpfEntryName(ZipFile zipFile) throws Exception {
+    private String findOpfEntryName(ZipFile zipFile) throws IOException, ParserConfigurationException, SAXException {
         ZipEntry container = zipFile.getEntry(CONTAINER_ENTRY);
         if (container == null) {
             throw new IllegalArgumentException("missing " + CONTAINER_ENTRY);
@@ -86,7 +88,7 @@ public class EpubParser {
         return ((Element) rootFiles.item(0)).getAttribute("full-path");
     }
 
-    private Document parseXml(ZipFile zipFile, ZipEntry entry) throws Exception {
+    private Document parseXml(ZipFile zipFile, ZipEntry entry) throws IOException, ParserConfigurationException, SAXException {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setNamespaceAware(true);
         // Epubs are untrusted input: no external entities or DTDs.
@@ -200,7 +202,7 @@ public class EpubParser {
                 seconds = seconds * 60 + Double.parseDouble(part);
             }
             return (long) (seconds * 1000);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return 0;
         }
     }

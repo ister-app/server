@@ -144,9 +144,11 @@ class CreditControllerTest {
 
     @Test
     void castThrowsWhenMultipleIdsProvided() {
+        Optional<UUID> movieId = Optional.of(UUID.randomUUID());
+        Optional<UUID> showId = Optional.of(UUID.randomUUID());
+
         assertThrows(IllegalArgumentException.class, () -> subject.cast(
-                Optional.of(UUID.randomUUID()), Optional.of(UUID.randomUUID()), Optional.empty(),
-                Optional.empty(), Optional.empty()));
+                movieId, showId, Optional.empty(), Optional.empty(), Optional.empty()));
         verifyNoInteractions(creditRepository);
     }
 }

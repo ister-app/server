@@ -1,6 +1,7 @@
 package app.ister.disk.cleanup;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -32,6 +33,7 @@ public class CacheCleanupService {
 
     private final Clock clock;
 
+    @Autowired
     public CacheCleanupService() {
         this(Clock.systemUTC());
     }
@@ -55,26 +57,30 @@ public class CacheCleanupService {
             files = walk.filter(Files::isRegularFile).toList();
         }
         for (Path file : files) {
-            if (referencedPaths.contains(file.toString())) {
-                kept++;
-                continue;
-            }
             BasicFileAttributes attrs = Files.readAttributes(file, BasicFileAttributes.class);
-            if (attrs.lastModifiedTime().toInstant().isAfter(cutoff)) {
-                // Too recent: could be an in-flight download whose IMAGE_FOUND event is still queued.
-                kept++;
-                continue;
-            }
-            long size = attrs.size();
-            if (dryRun) {
-                log.info("Cache cleanup [dry-run] would delete zombie {} ({} bytes)", file, size);
+            if (isZombie(file, attrs, referencedPaths, cutoff)) {
+                long size = attrs.size();
+                if (dryRun) {
+                    log.info("Cache cleanup [dry-run] would delete zombie {} ({} bytes)", file, size);
+                } else {
+                    Files.delete(file);
+                    log.debug("Cache cleanup deleted zombie {} ({} bytes)", file, size);
+                }
+                deleted++;
+                bytes += size;
             } else {
-                Files.delete(file);
-                log.debug("Cache cleanup deleted zombie {} ({} bytes)", file, size);
+                kept++;
             }
-            deleted++;
-            bytes += size;
         }
         return new CleanupResult(deleted, bytes, kept);
+    }
+
+    /**
+     * A file is a zombie when no database row references it and it is old enough that no in-flight
+     * download whose {@code IMAGE_FOUND} event is still queued could have produced it.
+     */
+    private static boolean isZombie(Path file, BasicFileAttributes attrs, Set<String> referencedPaths, Instant cutoff) {
+        return !referencedPaths.contains(file.toString())
+                && !attrs.lastModifiedTime().toInstant().isAfter(cutoff);
     }
 }

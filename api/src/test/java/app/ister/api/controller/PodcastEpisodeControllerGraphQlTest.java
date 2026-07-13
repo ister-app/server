@@ -28,6 +28,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -109,7 +110,7 @@ class PodcastEpisodeControllerGraphQlTest {
                 .path("podcastEpisodes.content").entityList(Object.class).hasSize(1);
 
         assertEquals(Sort.by("publishedAt").descending(), capturedSort());
-        verify(podcastPreferenceService, org.mockito.Mockito.never()).getEpisodeOrder(any(), any());
+        verify(podcastPreferenceService, never()).getEpisodeOrder(any(), any());
     }
 
     @Test

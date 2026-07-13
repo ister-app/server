@@ -29,35 +29,53 @@ public class StreamTokenAuthenticationFilter extends OncePerRequestFilter {
      */
     public static final String STREAM_TOKEN_COOKIE = "IsterStreamToken";
 
+    private static final List<String> USER_PATHS =
+            List.of("/hls/", "/images/", "/epub/", "/reading-progress", "/book-progress");
+    private static final String DOWNLOAD_PATH = "/mediaFile/";
+    private static final String UPLOAD_PATH = "/transcode/upload/";
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+        String token = extractToken(request);
+        if (!token.isBlank() && SecurityContextHolder.getContext().getAuthentication() == null) {
+            Optional<StreamTokenEntity> tokenEntity = streamTokenService.validateStreamToken(token);
+            tokenEntity.ifPresent(entity -> authenticate(entity, request.getRequestURI()));
+        }
+        filterChain.doFilter(request, response);
+    }
+
+    private String extractToken(HttpServletRequest request) {
         String token = request.getParameter("token");
-        if ((token == null || token.isBlank()) && request.getCookies() != null) {
+        if (token != null && !token.isBlank()) {
+            return token;
+        }
+        if (request.getCookies() != null) {
             for (var cookie : request.getCookies()) {
                 if (STREAM_TOKEN_COOKIE.equals(cookie.getName())) {
-                    token = cookie.getValue();
-                    break;
+                    return cookie.getValue() == null ? "" : cookie.getValue();
                 }
             }
         }
-        if (token != null && !token.isBlank() && SecurityContextHolder.getContext().getAuthentication() == null) {
-            Optional<StreamTokenEntity> tokenEntity = streamTokenService.validateStreamToken(token);
-            tokenEntity.ifPresent(entity -> {
-                String path = request.getRequestURI();
-                if ((path.startsWith(pathPrefix + "/hls/") || path.startsWith(pathPrefix + "/images/")
-                        || path.startsWith(pathPrefix + "/epub/") || path.startsWith(pathPrefix + "/reading-progress")
-                        || path.startsWith(pathPrefix + "/book-progress"))
-                        && entity.getUserEntity() != null) {
-                    setAuth(entity.getUserEntity().getExternalId(), "ROLE_user");
-                } else if (path.startsWith(pathPrefix + "/mediaFile/") && entity.isDownload()) {
-                    setAuth("node", "ROLE_node");
-                } else if (path.startsWith(pathPrefix + "/transcode/upload/") && entity.isUpload()) {
-                    setAuth("node", "ROLE_node");
-                }
-            });
+        return "";
+    }
+
+    private void authenticate(StreamTokenEntity entity, String path) {
+        if (matchesAny(path, USER_PATHS) && entity.getUserEntity() != null) {
+            setAuth(entity.getUserEntity().getExternalId(), "ROLE_user");
+        } else if (matches(path, DOWNLOAD_PATH) && entity.isDownload()) {
+            setAuth("node", "ROLE_node");
+        } else if (matches(path, UPLOAD_PATH) && entity.isUpload()) {
+            setAuth("node", "ROLE_node");
         }
-        filterChain.doFilter(request, response);
+    }
+
+    private boolean matches(String path, String suffix) {
+        return path.startsWith(pathPrefix + suffix);
+    }
+
+    private boolean matchesAny(String path, List<String> suffixes) {
+        return suffixes.stream().anyMatch(suffix -> matches(path, suffix));
     }
 
     private void setAuth(String principal, String role) {
@@ -72,12 +90,8 @@ public class StreamTokenAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return !path.startsWith(pathPrefix + "/hls/")
-                && !path.startsWith(pathPrefix + "/images/")
-                && !path.startsWith(pathPrefix + "/epub/")
-                && !path.startsWith(pathPrefix + "/reading-progress")
-                && !path.startsWith(pathPrefix + "/book-progress")
-                && !path.startsWith(pathPrefix + "/mediaFile/")
-                && !path.startsWith(pathPrefix + "/transcode/upload/");
+        return !matchesAny(path, USER_PATHS)
+                && !matches(path, DOWNLOAD_PATH)
+                && !matches(path, UPLOAD_PATH);
     }
 }

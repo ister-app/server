@@ -100,24 +100,33 @@ public class CacheCleanupScheduler {
         List<MediaFileEntity> downloads = mediaFileRepository
                 .findByDirectoryEntityIdAndPodcastEpisodeEntityIsNotNullOrderByDateCreatedAsc(cacheDir.getId());
         for (MediaFileEntity download : downloads) {
-            if (download.getDateCreated().isAfter(cutoff)) {
-                continue;
+            if (isExpired(download, cutoff)) {
+                removeExpiredDownload(download);
             }
-            java.util.UUID episodeId = download.getPodcastEpisodeEntity().getId();
-            if (watchStatusRepository.existsByPodcastEpisodeEntityIdAndWatchedFalseAndProgressInMillisecondsGreaterThan(episodeId, 0)) {
-                continue; // someone is mid-episode
-            }
-            if (dryRun) {
-                log.info("Cache cleanup [dry-run] would remove expired podcast download {}", download.getPath());
-                continue;
-            }
-            try {
-                java.nio.file.Files.deleteIfExists(Path.of(download.getPath()));
-                mediaFileRepository.delete(download);
-                log.info("Removed expired podcast download {}", download.getPath());
-            } catch (IOException e) {
-                log.warn("Could not remove expired podcast download {}: {}", download.getPath(), e.getMessage());
-            }
+        }
+    }
+
+    private boolean isExpired(MediaFileEntity download, java.time.Instant cutoff) {
+        if (download.getDateCreated().isAfter(cutoff)) {
+            return false;
+        }
+        java.util.UUID episodeId = download.getPodcastEpisodeEntity().getId();
+        // Someone is mid-episode: keep the file so playback does not stall on a re-download.
+        return !watchStatusRepository
+                .existsByPodcastEpisodeEntityIdAndWatchedFalseAndProgressInMillisecondsGreaterThan(episodeId, 0);
+    }
+
+    private void removeExpiredDownload(MediaFileEntity download) {
+        if (dryRun) {
+            log.info("Cache cleanup [dry-run] would remove expired podcast download {}", download.getPath());
+            return;
+        }
+        try {
+            java.nio.file.Files.deleteIfExists(Path.of(download.getPath()));
+            mediaFileRepository.delete(download);
+            log.info("Removed expired podcast download {}", download.getPath());
+        } catch (IOException e) {
+            log.warn("Could not remove expired podcast download {}: {}", download.getPath(), e.getMessage());
         }
     }
 }

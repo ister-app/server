@@ -56,6 +56,8 @@ public class HlsService {
     private static final String EXT_M3U8 = ".m3u8";
     private static final String EXT_X_MEDIA = "#EXT-X-MEDIA";
     private static final String EXT_X_STREAM_INF = "#EXT-X-STREAM-INF";
+    private static final String SEG_VIDEO_PREFIX = "seg_video_";
+    private static final String SEG_AUDIO_PREFIX = "seg_audio_";
     private static final String PASS_CATEGORY_VIDEO = "video";
     private static final String PASS_CATEGORY_AUDIO = "audio";
 
@@ -257,12 +259,12 @@ public class HlsService {
 
         if (PASS_CATEGORY_VIDEO.equals(data.getPassCategory())) {
             VideoQuality vq = VideoQuality.fromLabel(data.getQualityLabel());
-            segmentPrefix = "seg_video_" + data.getQualityLabel() + "_";
+            segmentPrefix = SEG_VIDEO_PREFIX + data.getQualityLabel() + "_";
             passStarter = () -> transcodeService.startVideoPass(mediaFilePath, cacheDirPath, vq, background);
         } else {
             AudioQuality aq = AudioQuality.fromLabel(data.getQualityLabel());
             int audioStreamIndex = data.getAudioStreamIndex();
-            segmentPrefix = "seg_audio_" + audioStreamIndex + "_" + data.getQualityLabel() + "_";
+            segmentPrefix = SEG_AUDIO_PREFIX + audioStreamIndex + "_" + data.getQualityLabel() + "_";
             String sourceCodec = mediaFile.getMediaFileStreamEntity().stream()
                     .filter(s -> s.getStreamIndex() == audioStreamIndex)
                     .map(MediaFileStreamEntity::getCodecName)
@@ -327,7 +329,7 @@ public class HlsService {
         String qualityLabel = vq.getLabel();
         String passKey = mediaFileId + "_video_" + qualityLabel;
         if (transcodeService.isPassActive(passKey) || transcodeService.hasCompletedPass(passKey)) return;
-        if (transcodeService.hasDoneMarker(cacheDir(mediaFileId), "seg_video_" + qualityLabel + "_")) {
+        if (transcodeService.hasDoneMarker(cacheDir(mediaFileId), SEG_VIDEO_PREFIX + qualityLabel + "_")) {
             log.debug("Skipping video pass for {} quality={} — pass already completed on disk", mediaFileId, qualityLabel);
             return;
         }
@@ -346,7 +348,7 @@ public class HlsService {
                                          int streamIdx, MediaFileEntity mediaFile) {
         String passKey = mediaFileId + "_audio_" + streamIdx + "_" + qualityLabel;
         if (transcodeService.isPassActive(passKey) || transcodeService.hasCompletedPass(passKey)) return;
-        if (transcodeService.hasDoneMarker(cacheDir(mediaFileId), "seg_audio_" + streamIdx + "_" + qualityLabel + "_")) {
+        if (transcodeService.hasDoneMarker(cacheDir(mediaFileId), SEG_AUDIO_PREFIX + streamIdx + "_" + qualityLabel + "_")) {
             log.debug("Skipping audio pass for {} streamIdx={} quality={} — pass already completed on disk", mediaFileId, streamIdx, qualityLabel);
             return;
         }
@@ -408,7 +410,7 @@ public class HlsService {
         String[] parts = segmentFilename.replace(".ts", "").split("_");
         String qualityLabel = parts[2];
         String passKey = mediaFileId + "_video_" + qualityLabel;
-        Path completed = completedSegmentOrNull(mediaFileId, cacheFile, "seg_video_" + qualityLabel + "_");
+        Path completed = completedSegmentOrNull(mediaFileId, cacheFile, SEG_VIDEO_PREFIX + qualityLabel + "_");
         if (completed != null) return completed;
         requestPassIfNeeded(mediaFileId, passKey, PASS_CATEGORY_VIDEO, qualityLabel, null);
         return transcodeService.waitForSegment(cacheFile, passKey);
@@ -458,7 +460,7 @@ public class HlsService {
         int streamIdx = Integer.parseInt(parts[2]);
         String bitrateLabel = parts[3];
         String passKey = mediaFileId + "_audio_" + streamIdx + "_" + bitrateLabel;
-        Path completed = completedSegmentOrNull(mediaFileId, cacheFile, "seg_audio_" + streamIdx + "_" + bitrateLabel + "_");
+        Path completed = completedSegmentOrNull(mediaFileId, cacheFile, SEG_AUDIO_PREFIX + streamIdx + "_" + bitrateLabel + "_");
         if (completed != null) return completed;
         requestPassIfNeeded(mediaFileId, passKey, PASS_CATEGORY_AUDIO, bitrateLabel, streamIdx);
         return transcodeService.waitForSegment(cacheFile, passKey);

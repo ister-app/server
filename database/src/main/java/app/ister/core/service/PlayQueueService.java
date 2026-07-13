@@ -40,6 +40,7 @@ import java.util.UUID;
 public class PlayQueueService {
     /** Audiobook chapters record progress from here on; see updatePlayQueueItemWithProgress. */
     private static final long CHAPTER_PROGRESS_THRESHOLD_MS = 5000;
+    private static final String FIELD_NUMBER = "number";
 
     private final PlayQueueRepository playQueueRepository;
 
@@ -402,17 +403,17 @@ public class PlayQueueService {
                     .findIdsOnlyByShowEntityId(
                             sourceId,
                             Sort.by("seasonEntity.number").ascending()
-                                    .and(Sort.by("number").ascending()))
+                                    .and(Sort.by(FIELD_NUMBER).ascending()))
                     .stream()
                     .map(EpisodeRepository.IdOnly::getId)
                     .toList();
             case ALBUM -> trackRepository.findByAlbumEntity_Id(
                             sourceId,
-                            Sort.by("discNumber").ascending().and(Sort.by("number").ascending()))
+                            Sort.by("discNumber").ascending().and(Sort.by(FIELD_NUMBER).ascending()))
                     .stream()
                     .map(TrackEntity::getId)
                     .toList();
-            case BOOK -> chapterRepository.findByBookEntity_Id(sourceId, Sort.by("number").ascending())
+            case BOOK -> chapterRepository.findByBookEntity_Id(sourceId, Sort.by(FIELD_NUMBER).ascending())
                     .stream()
                     .map(ChapterEntity::getId)
                     .toList();

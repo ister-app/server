@@ -182,8 +182,9 @@ class HandlePodcastEpisodeDownloadRequestedTest {
     @Test
     void htmlResponseIsRejected() {
         episode.setEnclosureUrl(baseUrl + "/error.mp3");
+        var event = event();
 
-        assertThrows(EventHandlingException.class, () -> subject.handle(event()));
+        assertThrows(EventHandlingException.class, () -> subject.handle(event));
         verify(mediaFileRepository, never()).save(any());
     }
 

@@ -29,11 +29,13 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -116,10 +118,10 @@ class HandlePodcastRefreshRequestedTest {
         assertNotNull(podcast.getLastRefreshedAt());
 
         ArgumentCaptor<PodcastEpisodeEntity> saved = ArgumentCaptor.forClass(PodcastEpisodeEntity.class);
-        verify(podcastEpisodeRepository, org.mockito.Mockito.times(2)).save(saved.capture());
+        verify(podcastEpisodeRepository, times(2)).save(saved.capture());
         assertEquals(List.of("guid-1", "guid-2"),
                 saved.getAllValues().stream().map(PodcastEpisodeEntity::getGuid).toList());
-        verify(serverEventService, org.mockito.Mockito.times(2)).createPodcastEpisodeFoundEvent(any());
+        verify(serverEventService, times(2)).createPodcastEpisodeFoundEvent(any());
 
         // Only the not-yet-downloaded episode gets a download request, on this node's cache dir.
         ArgumentCaptor<PodcastEpisodeDownloadRequestedData> download =
@@ -173,7 +175,7 @@ class HandlePodcastRefreshRequestedTest {
 
         subject.handle(event());
 
-        assertTrue(podcast.getLastRefreshedAt() == null);
+        assertNull(podcast.getLastRefreshedAt());
         verify(podcastRepository, never()).save(any());
     }
 }

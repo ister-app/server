@@ -51,41 +51,48 @@ public class TmpCleanupService {
             dirs = s.filter(Files::isDirectory).toList();
         }
         for (Path dir : dirs) {
-            UUID mediaFileId = parseUuid(dir.getFileName().toString());
-            if (mediaFileId == null) {
+            String reason = deletionReason(dir, mediaFileExists, hasActivePass, cutoff);
+            if (reason == null) {
                 kept++;
-                continue;
-            }
-            boolean orphan = !mediaFileExists.test(mediaFileId);
-            if (!orphan) {
-                if (hasActivePass.test(mediaFileId)) {
-                    kept++;
-                    continue;
-                }
-                if (lastActivity(dir).isAfter(cutoff)) {
-                    kept++;
-                    continue;
-                }
-            }
-            long size = sizeOf(dir);
-            if (dryRun) {
-                log.info("Tmp cleanup [dry-run] would delete {} transcode dir {} ({} bytes)",
-                        orphan ? "orphan" : "idle", dir, size);
             } else {
-                deleteRecursively(dir);
-                log.debug("Tmp cleanup deleted {} transcode dir {} ({} bytes)",
-                        orphan ? "orphan" : "idle", dir, size);
+                long size = sizeOf(dir);
+                if (dryRun) {
+                    log.info("Tmp cleanup [dry-run] would delete {} transcode dir {} ({} bytes)", reason, dir, size);
+                } else {
+                    deleteRecursively(dir);
+                    log.debug("Tmp cleanup deleted {} transcode dir {} ({} bytes)", reason, dir, size);
+                }
+                deleted++;
+                bytes += size;
             }
-            deleted++;
-            bytes += size;
         }
         return new CleanupResult(deleted, bytes, kept);
+    }
+
+    /**
+     * Why this directory may be removed, or {@code null} when it must be kept.
+     */
+    private static String deletionReason(Path dir,
+                                         Predicate<UUID> mediaFileExists,
+                                         Predicate<UUID> hasActivePass,
+                                         java.time.Instant cutoff) throws IOException {
+        UUID mediaFileId = parseUuid(dir.getFileName().toString());
+        if (mediaFileId == null) {
+            return null;
+        }
+        if (!mediaFileExists.test(mediaFileId)) {
+            return "orphan";
+        }
+        if (hasActivePass.test(mediaFileId) || lastActivity(dir).isAfter(cutoff)) {
+            return null;
+        }
+        return "idle";
     }
 
     private static UUID parseUuid(String name) {
         try {
             return UUID.fromString(name);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return null;
         }
     }
