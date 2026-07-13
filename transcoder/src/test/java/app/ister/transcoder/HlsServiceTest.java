@@ -1767,6 +1767,62 @@ class HlsServiceTest {
         assertTrue(isDaemon.get());
     }
 
+    // ========== Passes already completed on disk ==========
+
+    @Test
+    void startAllPassesSkipsPassesThatCompletedOnDisk() throws IOException {
+        UUID id = UUID.randomUUID();
+        Path cacheDir = Files.createDirectories(tempDir.resolve(id.toString()));
+        for (String prefix : List.of("done_seg_video_720p_", "done_seg_video_480p_",
+                "done_seg_audio_1_192k_", "done_seg_audio_1_64k_")) {
+            Files.writeString(cacheDir.resolve(prefix), "");
+        }
+
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv",
+                videoStream(0, 1920, 1080), audioStream(1, "eng", "English"));
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+
+        hlsService.startAllPasses(id, false, true);
+
+        // Every pass already wrote its done marker — no FFmpeg is started at all.
+        verify(jaffree, never()).getFFMPEG();
+    }
+
+    @Test
+    void getVideoSegmentServesStableSegmentWithoutRequestingAPass() throws IOException {
+        ReflectionTestUtils.setField(transcodeService, "segmentStabilityMs", 0L);
+        UUID id = UUID.randomUUID();
+        Path cacheDir = Files.createDirectories(tempDir.resolve(id.toString()));
+        Path segment = cacheDir.resolve("seg_video_720p_00000.ts");
+        Files.writeString(segment, "video-data");
+        // First observation records the size sample; the segment is stable from the next call on.
+        transcodeService.stableSegmentOrNull(segment);
+
+        Path result = hlsService.getVideoSegment(id, "seg_video_720p_00000.ts");
+
+        assertEquals(segment, result);
+        verify(messageSender, never()).sendTranscodePassRequested(any(), any());
+        verify(jaffree, never()).getFFMPEG();
+    }
+
+    // ========== Audio-only stream playlist ==========
+
+    @Test
+    void getStreamPlaylistForAudioOnlyFileUsesSyntheticKeyframes() throws IOException {
+        UUID id = UUID.randomUUID();
+        MediaFileEntity mediaFile = mediaFileEntity("/test/audio.flac", audioStream(0, "eng", "English"));
+        mediaFile.setDurationInMilliseconds(25_000);
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+
+        String playlist = hlsService.getStreamPlaylist(id, "stream_audio_0_192k.m3u8");
+
+        // Synthetic 10s grid: 0-10, 10-20, 20-25
+        assertTrue(playlist.contains("seg_audio_0_192k_00000.ts"));
+        assertTrue(playlist.contains("seg_audio_0_192k_00002.ts"));
+        verify(ffprobeService, never()).getKeyframes(any());
+        verify(ffprobeService, never()).getTotalDuration(any());
+    }
+
     // ========== Helpers ==========
 
     private MediaFileEntity mediaFileEntity(String path, MediaFileStreamEntity... streams) {

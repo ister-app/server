@@ -1,12 +1,19 @@
 package app.ister.api.controller;
 
+import app.ister.core.entity.BookEntity;
+import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
+import app.ister.core.entity.PodcastEntity;
+import app.ister.core.entity.PodcastEpisodeEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.MediaType;
+import app.ister.core.repository.BookRepository;
+import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
+import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import app.ister.core.service.UserService;
 import org.junit.jupiter.api.Test;
@@ -42,6 +49,15 @@ class RecentlyWatchedControllerTest {
     private MovieRepository movieRepository;
 
     @Mock
+    private ChapterRepository chapterRepository;
+
+    @Mock
+    private BookRepository bookRepository;
+
+    @Mock
+    private PodcastEpisodeRepository podcastEpisodeRepository;
+
+    @Mock
     private WatchStatusRepository watchStatusRepository;
 
     @Mock
@@ -49,6 +65,18 @@ class RecentlyWatchedControllerTest {
 
     @Mock
     private Authentication authentication;
+
+    private UserEntity user() {
+        UserEntity user = UserEntity.builder().name("test-user").externalId("sub-123").build();
+        user.setId(UUID.randomUUID());
+        return user;
+    }
+
+    private static WatchStatusEntity status(boolean watched, Instant updated) {
+        WatchStatusEntity status = WatchStatusEntity.builder().watched(watched).build();
+        status.setDateUpdated(updated);
+        return status;
+    }
 
     @Test
     void recentlyWatchedReturnsCurrentEpisodeWhenNotWatched() {
@@ -323,5 +351,165 @@ class RecentlyWatchedControllerTest {
         assertEquals(2, result.size());
         assertEquals(MediaType.EPISODE, result.get(0).type());
         assertEquals(MediaType.MOVIE, result.get(1).type());
+    }
+
+    // --- continue listening / reading ---
+
+    /** After finishing a chapter the audiobook resumes at the next one. */
+    @Test
+    void recentlyWatchedReturnsNextUnfinishedChapter() {
+        UserEntity user = user();
+        BookEntity book = BookEntity.builder().name("Dit zijn de namen").build();
+        book.setId(UUID.randomUUID());
+        ChapterEntity chapter1 = ChapterEntity.builder().number(1).bookEntity(book).build();
+        chapter1.setId(UUID.randomUUID());
+        ChapterEntity chapter2 = ChapterEntity.builder().number(2).bookEntity(book).build();
+        chapter2.setId(UUID.randomUUID());
+
+        WatchStatusEntity finished = status(true, Instant.now());
+        finished.setChapterEntity(chapter1);
+
+        when(userService.getOrCreateUser(authentication)).thenReturn(user);
+        when(watchStatusRepository.findRecentChaptersAndBookIdsByUserId(user.getId()))
+                .thenReturn(List.<String[]>of(new String[]{chapter1.getId().toString(), book.getId().toString()}));
+        when(chapterRepository.findByBookEntity_Id(eq(book.getId()), any(Sort.class)))
+                .thenReturn(List.of(chapter1, chapter2));
+        when(watchStatusRepository.findByUserEntityExternalIdAndChapterEntityIn(eq("sub-123"),
+                eq(List.of(chapter1, chapter2)), any(Sort.class))).thenReturn(List.of(finished));
+
+        List<RecentlyWatched> result = subject.recentlyWatched(authentication);
+
+        assertEquals(1, result.size());
+        assertEquals(MediaType.CHAPTER, result.getFirst().type());
+        assertEquals(chapter2, result.getFirst().chapter());
+        assertEquals(book, result.getFirst().book());
+    }
+
+    /** Finishing the last chapter finishes the audiobook: nothing left to continue. */
+    @Test
+    void recentlyWatchedDropsAFinishedAudiobook() {
+        UserEntity user = user();
+        BookEntity book = BookEntity.builder().name("Dit zijn de namen").build();
+        book.setId(UUID.randomUUID());
+        ChapterEntity chapter = ChapterEntity.builder().number(1).bookEntity(book).build();
+        chapter.setId(UUID.randomUUID());
+
+        WatchStatusEntity finished = status(true, Instant.now());
+        finished.setChapterEntity(chapter);
+
+        when(userService.getOrCreateUser(authentication)).thenReturn(user);
+        when(watchStatusRepository.findRecentChaptersAndBookIdsByUserId(user.getId()))
+                .thenReturn(List.<String[]>of(new String[]{chapter.getId().toString(), book.getId().toString()}));
+        when(chapterRepository.findByBookEntity_Id(eq(book.getId()), any(Sort.class))).thenReturn(List.of(chapter));
+        when(watchStatusRepository.findByUserEntityExternalIdAndChapterEntityIn(eq("sub-123"),
+                eq(List.of(chapter)), any(Sort.class))).thenReturn(List.of(finished));
+
+        assertTrue(subject.recentlyWatched(authentication).isEmpty());
+    }
+
+    @Test
+    void recentlyWatchedReturnsAPartiallyReadBook() {
+        UserEntity user = user();
+        BookEntity book = BookEntity.builder().name("Dit zijn de namen").build();
+        book.setId(UUID.randomUUID());
+        WatchStatusEntity reading = status(false, Instant.now());
+        reading.setReadingProgress(0.3);
+
+        when(userService.getOrCreateUser(authentication)).thenReturn(user);
+        when(watchStatusRepository.findRecentBookIdsByUserId(user.getId()))
+                .thenReturn(List.of(book.getId().toString()));
+        when(bookRepository.findById(book.getId())).thenReturn(Optional.of(book));
+        when(watchStatusRepository.findByUserEntityAndBookEntity(user, book)).thenReturn(Optional.of(reading));
+
+        List<RecentlyWatched> result = subject.recentlyWatched(authentication);
+
+        assertEquals(1, result.size());
+        assertEquals(MediaType.BOOK, result.getFirst().type());
+        assertEquals(book, result.getFirst().book());
+        assertNull(result.getFirst().chapter());
+    }
+
+    @Test
+    void recentlyWatchedDropsAFinishedBook() {
+        UserEntity user = user();
+        BookEntity book = BookEntity.builder().name("Dit zijn de namen").build();
+        book.setId(UUID.randomUUID());
+        WatchStatusEntity read = status(true, Instant.now());
+        read.setReadingProgress(1.0);
+
+        when(userService.getOrCreateUser(authentication)).thenReturn(user);
+        when(watchStatusRepository.findRecentBookIdsByUserId(user.getId()))
+                .thenReturn(List.of(book.getId().toString()));
+        when(bookRepository.findById(book.getId())).thenReturn(Optional.of(book));
+        when(watchStatusRepository.findByUserEntityAndBookEntity(user, book)).thenReturn(Optional.of(read));
+
+        assertTrue(subject.recentlyWatched(authentication).isEmpty());
+    }
+
+    @Test
+    void recentlyWatchedReturnsAStartedPodcastEpisode() {
+        UserEntity user = user();
+        PodcastEntity podcast = PodcastEntity.builder().title("Serial")
+                .feedUrl("https://example.org/feed").build();
+        podcast.setId(UUID.randomUUID());
+        PodcastEpisodeEntity episode = PodcastEpisodeEntity.builder().podcastEntity(podcast)
+                .guid("ep-1").enclosureUrl("https://example.org/ep-1.mp3").build();
+        episode.setId(UUID.randomUUID());
+        WatchStatusEntity started = status(false, Instant.now());
+        started.setProgressInMilliseconds(60_000L);
+
+        when(userService.getOrCreateUser(authentication)).thenReturn(user);
+        when(watchStatusRepository.findRecentPodcastEpisodeIdsByUserId(user.getId()))
+                .thenReturn(List.of(episode.getId().toString()));
+        when(podcastEpisodeRepository.findById(episode.getId())).thenReturn(Optional.of(episode));
+        when(watchStatusRepository.findByUserEntityExternalIdAndPodcastEpisodeEntityIn(eq("sub-123"),
+                eq(List.of(episode)), any(Sort.class))).thenReturn(List.of(started));
+
+        List<RecentlyWatched> result = subject.recentlyWatched(authentication);
+
+        assertEquals(1, result.size());
+        assertEquals(MediaType.PODCAST_EPISODE, result.getFirst().type());
+        assertEquals(episode, result.getFirst().podcastEpisode());
+    }
+
+    /** A podcast episode that was played to the end is not something to continue. */
+    @Test
+    void recentlyWatchedDropsAFinishedPodcastEpisode() {
+        UserEntity user = user();
+        PodcastEntity podcast = PodcastEntity.builder().title("Serial")
+                .feedUrl("https://example.org/feed").build();
+        podcast.setId(UUID.randomUUID());
+        PodcastEpisodeEntity episode = PodcastEpisodeEntity.builder().podcastEntity(podcast)
+                .guid("ep-1").enclosureUrl("https://example.org/ep-1.mp3").build();
+        episode.setId(UUID.randomUUID());
+        WatchStatusEntity finished = status(true, Instant.now());
+        finished.setProgressInMilliseconds(60_000L);
+
+        when(userService.getOrCreateUser(authentication)).thenReturn(user);
+        when(watchStatusRepository.findRecentPodcastEpisodeIdsByUserId(user.getId()))
+                .thenReturn(List.of(episode.getId().toString()));
+        when(podcastEpisodeRepository.findById(episode.getId())).thenReturn(Optional.of(episode));
+        when(watchStatusRepository.findByUserEntityExternalIdAndPodcastEpisodeEntityIn(eq("sub-123"),
+                eq(List.of(episode)), any(Sort.class))).thenReturn(List.of(finished));
+
+        assertTrue(subject.recentlyWatched(authentication).isEmpty());
+    }
+
+    @Test
+    void schemaMappingsExposeTheItemsMedia() {
+        EpisodeEntity episode = EpisodeEntity.builder().number(1).build();
+        MovieEntity movie = MovieEntity.builder().name("Heat").releaseYear(1995).build();
+        BookEntity book = BookEntity.builder().name("Dit zijn de namen").build();
+        ChapterEntity chapter = ChapterEntity.builder().number(1).bookEntity(book).build();
+        PodcastEpisodeEntity podcastEpisode = PodcastEpisodeEntity.builder()
+                .guid("ep-1").enclosureUrl("https://example.org/ep-1.mp3").build();
+        Instant now = Instant.now();
+
+        assertEquals(episode, subject.episode(RecentlyWatched.ofEpisode(episode, now)));
+        assertEquals(movie, subject.movie(RecentlyWatched.ofMovie(movie, now)));
+        assertEquals(chapter, subject.chapter(RecentlyWatched.ofChapter(chapter, now)));
+        assertEquals(book, subject.book(RecentlyWatched.ofBook(book, now)));
+        assertEquals(podcastEpisode,
+                subject.podcastEpisode(RecentlyWatched.ofPodcastEpisode(podcastEpisode, now)));
     }
 }

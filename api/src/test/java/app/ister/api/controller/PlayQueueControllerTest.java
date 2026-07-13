@@ -1,18 +1,35 @@
 package app.ister.api.controller;
 
 import app.ister.api.dto.CreatePlayQueueInput;
+import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.BookEntity;
+import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.ImageEntity;
+import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PlayQueueEntity;
 import app.ister.core.entity.PlayQueueItemEntity;
+import app.ister.core.entity.PodcastEntity;
+import app.ister.core.entity.PodcastEpisodeEntity;
+import app.ister.core.entity.SeasonEntity;
+import app.ister.core.entity.ShowEntity;
+import app.ister.core.entity.TrackEntity;
 import app.ister.core.entity.UserEntity;
+import app.ister.core.enums.ImageType;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayQueueSourceType;
 import app.ister.api.dto.StreamSettingsInput;
 import app.ister.core.enums.PlayState;
 import app.ister.core.enums.SubtitleFormat;
+import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.ImageRepository;
+import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MovieRepository;
+import app.ister.core.repository.PodcastEpisodeRepository;
+import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.PlayQueuePrefetchService;
 import app.ister.core.service.PlayQueueService;
 import app.ister.core.status.PlaybackStatusService;
@@ -47,6 +64,21 @@ class PlayQueueControllerTest {
 
     @Mock
     private MovieRepository movieRepository;
+
+    @Mock
+    private TrackRepository trackRepository;
+
+    @Mock
+    private ChapterRepository chapterRepository;
+
+    @Mock
+    private PodcastEpisodeRepository podcastEpisodeRepository;
+
+    @Mock
+    private MediaFileRepository mediaFileRepository;
+
+    @Mock
+    private ImageRepository imageRepository;
 
     @Mock
     private PlayQueuePrefetchService playQueuePrefetchService;
@@ -472,5 +504,244 @@ class PlayQueueControllerTest {
 
         assertTrue(result.isEmpty());
         verifyNoInteractions(movieRepository);
+    }
+
+    // --- now-playing heartbeat: title / duration / artwork per media type ---
+
+    /** Puts a single item in a queue and runs updatePlayQueue over it, as the client does. */
+    private void updateWith(PlayQueueItemEntity item) {
+        UUID id = UUID.randomUUID();
+        PlayQueueEntity queue = buildQueueWithUser();
+        queue.setItems(new ArrayList<>(List.of(item)));
+        when(playQueueService.updatePlayQueue(id, 1000L, item.getId(), null, authentication))
+                .thenReturn(Optional.of(queue));
+
+        subject.updatePlayQueue(id, 1000L, item.getId(), null, PlayState.PLAYING, authentication);
+    }
+
+    private static PlayQueueItemEntity identified(PlayQueueItemEntity item) {
+        item.setId(UUID.randomUUID());
+        return item;
+    }
+
+    @Test
+    void heartbeatForAMovieCarriesTitleLongestDurationAndCoverImage() {
+        MovieEntity movie = MovieEntity.builder().name("Heat").releaseYear(1995).build();
+        movie.setId(UUID.randomUUID());
+        PlayQueueItemEntity item = identified(PlayQueueItemEntity.builder()
+                .type(MediaType.MOVIE).position(BigDecimal.ZERO).build());
+        item.setMovieEntity(movie);
+
+        ImageEntity background = ImageEntity.builder().type(ImageType.BACKGROUND).build();
+        background.setId(UUID.randomUUID());
+        ImageEntity cover = ImageEntity.builder().type(ImageType.COVER).build();
+        cover.setId(UUID.randomUUID());
+        when(mediaFileRepository.findByMovieEntityId(movie.getId())).thenReturn(List.of(
+                MediaFileEntity.builder().durationInMilliseconds(0).build(),
+                MediaFileEntity.builder().durationInMilliseconds(90_000L).build(),
+                MediaFileEntity.builder().durationInMilliseconds(120_000L).build()));
+        when(imageRepository.findByMovieEntityId(movie.getId())).thenReturn(List.of(background, cover));
+
+        updateWith(item);
+
+        verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
+                eq("test-user"), eq(MediaType.MOVIE), eq(movie.getId()), eq("Heat"), eq(120_000L),
+                eq(cover.getId()), eq(1000L), eq(PlayState.PLAYING));
+    }
+
+    /** An episode without a still of its own borrows the show's image. */
+    @Test
+    void heartbeatForAnEpisodeFallsBackToTheShowImage() {
+        ShowEntity show = ShowEntity.builder().name("The Wire").build();
+        show.setId(UUID.randomUUID());
+        SeasonEntity season = SeasonEntity.builder().number(1).showEntity(show).build();
+        EpisodeEntity episode = EpisodeEntity.builder().number(2).showEntity(show).seasonEntity(season).build();
+        episode.setId(UUID.randomUUID());
+        PlayQueueItemEntity item = identified(PlayQueueItemEntity.builder()
+                .type(MediaType.EPISODE).position(BigDecimal.ZERO).build());
+        item.setEpisodeEntity(episode);
+
+        ImageEntity showImage = ImageEntity.builder().type(ImageType.BACKGROUND).build();
+        showImage.setId(UUID.randomUUID());
+        when(mediaFileRepository.findByEpisodeEntityId(episode.getId())).thenReturn(List.of());
+        when(imageRepository.findByEpisodeEntityId(episode.getId())).thenReturn(List.of());
+        when(imageRepository.findByShowEntityId(show.getId())).thenReturn(List.of(showImage));
+
+        updateWith(item);
+
+        // No COVER among the images, so the first image is used.
+        verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
+                eq("test-user"), eq(MediaType.EPISODE), eq(episode.getId()), eq("The Wire S01E02"),
+                isNull(), eq(showImage.getId()), eq(1000L), eq(PlayState.PLAYING));
+    }
+
+    @Test
+    void heartbeatForATrackUsesTheMetadataTitleAndAlbumCover() {
+        AlbumEntity album = AlbumEntity.builder().name("Kid A").build();
+        album.setId(UUID.randomUUID());
+        TrackEntity track = TrackEntity.builder().number(3).albumEntity(album)
+                .metadataEntities(List.of(MetadataEntity.builder().title("Idioteque").build())).build();
+        track.setId(UUID.randomUUID());
+        PlayQueueItemEntity item = identified(PlayQueueItemEntity.builder()
+                .type(MediaType.TRACK).position(BigDecimal.ZERO).build());
+        item.setTrackEntityId(track.getId());
+
+        ImageEntity cover = ImageEntity.builder().type(ImageType.COVER).build();
+        cover.setId(UUID.randomUUID());
+        when(trackRepository.findById(track.getId())).thenReturn(Optional.of(track));
+        when(mediaFileRepository.findByTrackEntityId(track.getId()))
+                .thenReturn(List.of(MediaFileEntity.builder().durationInMilliseconds(240_000L).build()));
+        when(imageRepository.findByAlbumEntityId(album.getId())).thenReturn(List.of(cover));
+
+        updateWith(item);
+
+        verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
+                eq("test-user"), eq(MediaType.TRACK), eq(track.getId()), eq("Idioteque"), eq(240_000L),
+                eq(cover.getId()), eq(1000L), eq(PlayState.PLAYING));
+    }
+
+    /** A chapter without metadata is named after its book. */
+    @Test
+    void heartbeatForAChapterFallsBackToTheBookName() {
+        BookEntity book = BookEntity.builder().name("Dit zijn de namen").build();
+        book.setId(UUID.randomUUID());
+        ChapterEntity chapter = ChapterEntity.builder().number(4).bookEntity(book)
+                .metadataEntities(List.of()).build();
+        chapter.setId(UUID.randomUUID());
+        PlayQueueItemEntity item = identified(PlayQueueItemEntity.builder()
+                .type(MediaType.CHAPTER).position(BigDecimal.ZERO).build());
+        item.setChapterEntityId(chapter.getId());
+
+        when(chapterRepository.findById(chapter.getId())).thenReturn(Optional.of(chapter));
+        when(mediaFileRepository.findByChapterEntityId(chapter.getId())).thenReturn(List.of());
+        when(imageRepository.findByBookEntityId(book.getId())).thenReturn(List.of());
+
+        updateWith(item);
+
+        verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
+                eq("test-user"), eq(MediaType.CHAPTER), eq(chapter.getId()),
+                eq("Dit zijn de namen – chapter 4"), isNull(), isNull(), eq(1000L), eq(PlayState.PLAYING));
+    }
+
+    /** An episode the feed gave no image gets the podcast cover, and its title falls back to the podcast. */
+    @Test
+    void heartbeatForAPodcastEpisodeFallsBackToThePodcast() {
+        PodcastEntity podcast = PodcastEntity.builder().title("Serial")
+                .feedUrl("https://example.org/feed").build();
+        podcast.setId(UUID.randomUUID());
+        PodcastEpisodeEntity episode = PodcastEpisodeEntity.builder().podcastEntity(podcast)
+                .guid("ep-1").enclosureUrl("https://example.org/ep-1.mp3").metadataEntities(List.of()).build();
+        episode.setId(UUID.randomUUID());
+        PlayQueueItemEntity item = identified(PlayQueueItemEntity.builder()
+                .type(MediaType.PODCAST_EPISODE).position(BigDecimal.ZERO).build());
+        item.setPodcastEpisodeEntityId(episode.getId());
+
+        ImageEntity podcastCover = ImageEntity.builder().type(ImageType.COVER).build();
+        podcastCover.setId(UUID.randomUUID());
+        when(podcastEpisodeRepository.findById(episode.getId())).thenReturn(Optional.of(episode));
+        when(mediaFileRepository.findByPodcastEpisodeEntityId(episode.getId()))
+                .thenReturn(List.of(MediaFileEntity.builder().durationInMilliseconds(3_600_000L).build()));
+        when(imageRepository.findByPodcastEpisodeEntityId(episode.getId())).thenReturn(List.of());
+        when(imageRepository.findByPodcastEntityId(podcast.getId())).thenReturn(List.of(podcastCover));
+
+        updateWith(item);
+
+        verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
+                eq("test-user"), eq(MediaType.PODCAST_EPISODE), eq(episode.getId()), eq("Serial"),
+                eq(3_600_000L), eq(podcastCover.getId()), eq(1000L), eq(PlayState.PLAYING));
+    }
+
+    /** An epub is not playable, so it carries no media id, title, duration or artwork. */
+    @Test
+    void heartbeatForABookItemCarriesNoMediaDetails() {
+        PlayQueueItemEntity item = identified(PlayQueueItemEntity.builder()
+                .type(MediaType.BOOK).position(BigDecimal.ZERO).build());
+
+        updateWith(item);
+
+        verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
+                eq("test-user"), eq(MediaType.BOOK), isNull(), isNull(), isNull(), isNull(),
+                eq(1000L), eq(PlayState.PLAYING));
+        verifyNoInteractions(mediaFileRepository, imageRepository);
+    }
+
+    /** The heartbeat still goes out when the updated item is no longer in the (trimmed) queue. */
+    @Test
+    void heartbeatWithoutAMatchingQueueItemHasNoMediaDetails() {
+        UUID id = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        PlayQueueEntity queue = buildQueueWithUser();
+        queue.setItems(null);
+        when(playQueueService.updatePlayQueue(id, 1000L, itemId, null, authentication))
+                .thenReturn(Optional.of(queue));
+
+        subject.updatePlayQueue(id, 1000L, itemId, null, PlayState.PLAYING, authentication);
+
+        verify(playbackStatusService).publishHeartbeat(queue.getId(), itemId, queue.getUserEntity().getId(),
+                "sub-123", "test-user", null, null, null, null, null, 1000L, PlayState.PLAYING);
+    }
+
+    // --- PlayQueueItem schema mappings for the audio types ---
+
+    @Test
+    void playQueueItemTrackReturnsTrackWhenTrackIdSet() {
+        UUID trackId = UUID.randomUUID();
+        PlayQueueItemEntity item = PlayQueueItemEntity.builder()
+                .type(MediaType.TRACK).position(BigDecimal.ZERO).build();
+        item.setTrackEntityId(trackId);
+        when(trackRepository.findById(trackId)).thenReturn(Optional.of(TrackEntity.builder().number(1).build()));
+
+        assertTrue(subject.playQueueItemTrack(item).isPresent());
+    }
+
+    @Test
+    void playQueueItemTrackReturnsEmptyWhenNoTrackId() {
+        PlayQueueItemEntity item = PlayQueueItemEntity.builder()
+                .type(MediaType.MOVIE).position(BigDecimal.ZERO).build();
+
+        assertTrue(subject.playQueueItemTrack(item).isEmpty());
+        verifyNoInteractions(trackRepository);
+    }
+
+    @Test
+    void playQueueItemChapterReturnsChapterWhenChapterIdSet() {
+        UUID chapterId = UUID.randomUUID();
+        PlayQueueItemEntity item = PlayQueueItemEntity.builder()
+                .type(MediaType.CHAPTER).position(BigDecimal.ZERO).build();
+        item.setChapterEntityId(chapterId);
+        when(chapterRepository.findById(chapterId))
+                .thenReturn(Optional.of(ChapterEntity.builder().number(1).build()));
+
+        assertTrue(subject.playQueueItemChapter(item).isPresent());
+    }
+
+    @Test
+    void playQueueItemChapterReturnsEmptyWhenNoChapterId() {
+        PlayQueueItemEntity item = PlayQueueItemEntity.builder()
+                .type(MediaType.MOVIE).position(BigDecimal.ZERO).build();
+
+        assertTrue(subject.playQueueItemChapter(item).isEmpty());
+        verifyNoInteractions(chapterRepository);
+    }
+
+    @Test
+    void playQueueItemPodcastEpisodeReturnsEpisodeWhenIdSet() {
+        UUID episodeId = UUID.randomUUID();
+        PlayQueueItemEntity item = PlayQueueItemEntity.builder()
+                .type(MediaType.PODCAST_EPISODE).position(BigDecimal.ZERO).build();
+        item.setPodcastEpisodeEntityId(episodeId);
+        when(podcastEpisodeRepository.findById(episodeId)).thenReturn(Optional.of(
+                PodcastEpisodeEntity.builder().guid("ep-1").enclosureUrl("https://example.org/ep-1.mp3").build()));
+
+        assertTrue(subject.playQueueItemPodcastEpisode(item).isPresent());
+    }
+
+    @Test
+    void playQueueItemPodcastEpisodeReturnsEmptyWhenNoId() {
+        PlayQueueItemEntity item = PlayQueueItemEntity.builder()
+                .type(MediaType.MOVIE).position(BigDecimal.ZERO).build();
+
+        assertTrue(subject.playQueueItemPodcastEpisode(item).isEmpty());
+        verifyNoInteractions(podcastEpisodeRepository);
     }
 }

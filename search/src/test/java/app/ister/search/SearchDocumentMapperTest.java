@@ -2,11 +2,13 @@ package app.ister.search;
 
 import app.ister.core.config.LanguageProperties;
 import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PersonEntity;
+import app.ister.core.entity.PodcastEntity;
 import app.ister.core.entity.SeasonEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.entity.TrackEntity;
@@ -199,6 +201,52 @@ class SearchDocumentMapperTest {
         TrackEntity track = track(null);
 
         assertEquals("Track 1", subject.toDocument(track).fields().get("title"));
+    }
+
+    @Test
+    void bookUsesAuthorAsContextAndIndexesLocalizedDescription() {
+        PersonEntity author = withId(PersonEntity.builder().name("J.R.R. Tolkien").build());
+        MetadataEntity english = MetadataEntity.builder()
+                .language("eng").title("The Hobbit").description("There and back again.").genre("Fantasy").build();
+        BookEntity book = withId(BookEntity.builder()
+                .name("The Hobbit")
+                .releaseYear(1937)
+                .personEntity(author)
+                .libraryEntity(library)
+                .metadataEntities(List.of(english))
+                .build());
+
+        Map<String, Object> fields = subject.toDocument(book).fields();
+
+        assertEquals("BOOK", fields.get("type"));
+        assertEquals("The Hobbit", fields.get("title"));
+        assertEquals("J.R.R. Tolkien", fields.get("context"));
+        assertEquals(1937, fields.get("year"));
+        assertEquals(library.getId().toString(), fields.get("libraryId"));
+        assertEquals("There and back again.", fields.get("description_en"));
+        assertEquals("Fantasy", fields.get("genre_en"));
+        assertFalse(fields.containsKey("description_nl"));
+    }
+
+    @Test
+    void podcastUsesTitleAndAuthorAndHasNoYear() {
+        PodcastEntity podcast = withId(PodcastEntity.builder()
+                .feedUrl("https://example.com/feed.xml")
+                .title("Sample Podcast")
+                .author("Some Publisher")
+                .libraryEntity(library)
+                .metadataEntities(List.of(
+                        MetadataEntity.builder().language("nld").description("Een podcast").build()))
+                .build());
+
+        Map<String, Object> fields = subject.toDocument(podcast).fields();
+
+        assertEquals("PODCAST", fields.get("type"));
+        assertEquals("Sample Podcast", fields.get("title"));
+        assertEquals("Some Publisher", fields.get("context"));
+        assertEquals(library.getId().toString(), fields.get("libraryId"));
+        assertEquals("Een podcast", fields.get("description_nl"));
+        assertFalse(fields.containsKey("year"));
     }
 
     private TrackEntity track(String metadataTitle) {

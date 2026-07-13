@@ -1,5 +1,6 @@
 package app.ister.core.service;
 
+import app.ister.core.config.StatusExchangeConfig;
 import app.ister.core.eventdata.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -175,5 +176,76 @@ class MessageSenderTest {
         AudioFileFoundData data = AudioFileFoundData.builder().build();
         subject.sendAudioFileFound(data, "disk1");
         verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_AUDIO_FILE_FOUND + ".disk1", data);
+    }
+
+    @Test
+    void sendBookFound() {
+        BookFoundData data = BookFoundData.builder().build();
+        subject.sendBookFound(data);
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_BOOK_FOUND, data);
+    }
+
+    @Test
+    void sendChapterFound() {
+        ChapterFoundData data = ChapterFoundData.builder().build();
+        subject.sendChapterFound(data);
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_CHAPTER_FOUND, data);
+    }
+
+    @Test
+    void sendEpubFileFound() {
+        EpubFileFoundData data = EpubFileFoundData.builder().build();
+        subject.sendEpubFileFound(data, "disk1");
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_EPUB_FILE_FOUND + ".disk1", data);
+    }
+
+    @Test
+    void sendPodcastFound() {
+        PodcastFoundData data = PodcastFoundData.builder().build();
+        subject.sendPodcastFound(data);
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_PODCAST_FOUND, data);
+    }
+
+    @Test
+    void sendPodcastEpisodeFound() {
+        PodcastEpisodeFoundData data = PodcastEpisodeFoundData.builder().build();
+        subject.sendPodcastEpisodeFound(data);
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_PODCAST_EPISODE_FOUND, data);
+    }
+
+    @Test
+    void sendPodcastRefreshRequested() {
+        PodcastRefreshRequestedData data = PodcastRefreshRequestedData.builder().build();
+        subject.sendPodcastRefreshRequested(data);
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_PODCAST_REFRESH_REQUESTED, data);
+    }
+
+    @Test
+    void sendPodcastEpisodeDownloadRequested() {
+        PodcastEpisodeDownloadRequestedData data = PodcastEpisodeDownloadRequestedData.builder().build();
+        subject.sendPodcastEpisodeDownloadRequested(data, "cache1");
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_PODCAST_EPISODE_DOWNLOAD_REQUESTED + ".cache1", data);
+    }
+
+    @Test
+    void sendSearchIndexRequested() {
+        SearchIndexRequestedData data = SearchIndexRequestedData.builder().build();
+        subject.sendSearchIndexRequested(data);
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_SEARCH_INDEX_REQUESTED, data);
+    }
+
+    @Test
+    void sendSearchReindexRequested() {
+        SearchReindexRequestedData data = SearchReindexRequestedData.builder().build();
+        subject.sendSearchReindexRequested(data);
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_SEARCH_REINDEX_REQUESTED, data);
+    }
+
+    /** Status messages go to the fan-out exchange, not to a named queue. */
+    @Test
+    void sendStatusPublishesOnTheStatusExchange() {
+        PlaybackStatusData data = PlaybackStatusData.builder().build();
+        subject.sendStatus(data);
+        verify(rabbitTemplateMock).convertAndSend(StatusExchangeConfig.STATUS_EXCHANGE, "", (Object) data);
     }
 }

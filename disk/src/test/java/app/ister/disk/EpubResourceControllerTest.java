@@ -64,6 +64,12 @@ class EpubResourceControllerTest {
             zip.putNextEntry(stored);
             zip.write(AUDIO);
             zip.closeEntry();
+            zip.putNextEntry(new ZipEntry("mimetype"));
+            zip.write("application/epub+zip".getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+            zip.putNextEntry(new ZipEntry("OEBPS/data.bin"));
+            zip.write(new byte[]{1, 2, 3});
+            zip.closeEntry();
         }
 
         MediaFileEntity mediaFile = mock(MediaFileEntity.class);
@@ -154,5 +160,75 @@ class EpubResourceControllerTest {
         when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.empty());
         var response = controller.resource(mediaFileId, "/OEBPS/chapter_001.xhtml", null, null);
         assertEquals(404, response.getStatusCode().value());
+    }
+
+    @Test
+    void nonEpubMediaFileIs404() throws IOException {
+        UUID otherId = UUID.randomUUID();
+        MediaFileEntity mp3 = mock(MediaFileEntity.class);
+        when(mp3.getBookEntity()).thenReturn(mock(BookEntity.class));
+        when(mp3.getPath()).thenReturn(tempDir.resolve("chapter.mp3").toString());
+        when(mediaFileRepository.findById(otherId)).thenReturn(Optional.of(mp3));
+
+        var response = controller.resource(otherId, "/OEBPS/chapter_001.xhtml", null, null);
+        assertEquals(404, response.getStatusCode().value());
+    }
+
+    @Test
+    void missingEpubOnDiskIs404() throws IOException {
+        UUID otherId = UUID.randomUUID();
+        MediaFileEntity gone = mock(MediaFileEntity.class);
+        when(gone.getBookEntity()).thenReturn(mock(BookEntity.class));
+        when(gone.getPath()).thenReturn(tempDir.resolve("gone.epub").toString());
+        when(mediaFileRepository.findById(otherId)).thenReturn(Optional.of(gone));
+
+        var response = controller.resource(otherId, "/OEBPS/chapter_001.xhtml", null, null);
+        assertEquals(404, response.getStatusCode().value());
+    }
+
+    @Test
+    void blankEntryPathIs400() throws IOException {
+        var response = controller.resource(mediaFileId, "/", null, null);
+        assertEquals(400, response.getStatusCode().value());
+    }
+
+    @Test
+    void servesSuffixRange() throws IOException {
+        var response = controller.resource(mediaFileId, "/OEBPS/audio/chapter_001.mp3", "bytes=-4", null);
+
+        assertEquals(206, response.getStatusCode().value());
+        assertArrayEquals("cdef".getBytes(StandardCharsets.UTF_8), bodyOf(response));
+    }
+
+    @Test
+    void malformedRangeFallsBackToFullResponse() throws IOException {
+        var response = controller.resource(mediaFileId, "/OEBPS/audio/chapter_001.mp3", "bytes=abc-def", null);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertArrayEquals(AUDIO, bodyOf(response));
+    }
+
+    @Test
+    void multiRangeHeaderFallsBackToFullResponse() throws IOException {
+        var response = controller.resource(mediaFileId, "/OEBPS/audio/chapter_001.mp3", "bytes=0-1,4-5", null);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertArrayEquals(AUDIO, bodyOf(response));
+    }
+
+    @Test
+    void mimetypeEntryIsServedAsPlainText() throws IOException {
+        var response = controller.resource(mediaFileId, "/mimetype", null, null);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("text/plain", String.valueOf(response.getHeaders().getContentType()));
+    }
+
+    @Test
+    void unknownExtensionIsServedAsOctetStream() throws IOException {
+        var response = controller.resource(mediaFileId, "/OEBPS/data.bin", null, null);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("application/octet-stream", String.valueOf(response.getHeaders().getContentType()));
     }
 }

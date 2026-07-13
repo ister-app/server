@@ -89,7 +89,6 @@ subprojects {
 					'app/ister/*/config/**',
 					'app/ister/server/**',
 					'app/ister/disk/StartupTasks*',
-					'app/ister/disk/FileController*',
 				])
 			}))
 		}

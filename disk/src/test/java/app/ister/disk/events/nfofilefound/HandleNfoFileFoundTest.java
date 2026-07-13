@@ -1,6 +1,7 @@
 package app.ister.disk.events.nfofilefound;
 
 import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
@@ -310,6 +311,99 @@ class HandleNfoFileFoundTest {
 
         subject.handle(data);
         verify(metadataRepository).save(any(MetadataEntity.class));
+    }
+
+    @Test
+    void analyzeAuthorNfoInBookLibrary(@TempDir Path tempDir) throws IOException {
+        Path authorDir = tempDir.resolve("Author");
+        Files.createDirectories(authorDir);
+        Path nfoFile = authorDir.resolve("artist.nfo");
+        try (var in = HandleNfoFileFoundTest.class.getResourceAsStream("/nfo/artist.nfo")) {
+            Files.write(nfoFile, in.readAllBytes());
+        }
+
+        UUID uuid = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.BOOK).name("Books").build();
+        DirectoryEntity directoryEntity = DirectoryEntity.builder().id(uuid).path(tempDir.toString()).libraryEntity(library).build();
+        PersonEntity author = PersonEntity.builder().libraryEntity(library).name("Author").build();
+        NfoFileFoundData data = NfoFileFoundData.builder()
+                .directoryEntityUUID(uuid)
+                .path(nfoFile.toString())
+                .build();
+
+        when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
+        when(scannerHelperService.getOrCreatePerson(library, "Author", 0)).thenReturn(author);
+
+        subject.handle(data);
+
+        verify(metadataRepository).save(any(MetadataEntity.class));
+    }
+
+    @Test
+    void analyzeBookNfoInBookLibrary(@TempDir Path tempDir) throws IOException {
+        Path bookDir = tempDir.resolve("Author").resolve("Abbey Road (1969)");
+        Files.createDirectories(bookDir);
+        Path nfoFile = bookDir.resolve("album.nfo");
+        try (var in = HandleNfoFileFoundTest.class.getResourceAsStream("/nfo/album.nfo")) {
+            Files.write(nfoFile, in.readAllBytes());
+        }
+
+        UUID uuid = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.BOOK).name("Books").build();
+        DirectoryEntity directoryEntity = DirectoryEntity.builder().id(uuid).path(tempDir.toString()).libraryEntity(library).build();
+        PersonEntity author = PersonEntity.builder().libraryEntity(library).name("Author").build();
+        BookEntity book = BookEntity.builder().libraryEntity(library).personEntity(author).name("Abbey Road").build();
+        NfoFileFoundData data = NfoFileFoundData.builder()
+                .directoryEntityUUID(uuid)
+                .path(nfoFile.toString())
+                .build();
+
+        when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
+        when(scannerHelperService.getOrCreatePerson(library, "Author", 0)).thenReturn(author);
+        when(scannerHelperService.getOrCreateBook(library, author, "Abbey Road", 1969)).thenReturn(book);
+
+        subject.handle(data);
+
+        verify(scannerHelperService).getOrCreateBook(library, author, "Abbey Road", 1969);
+        verify(metadataRepository).save(any(MetadataEntity.class));
+    }
+
+    @Test
+    void analyzeBookNfoWithMissingFileSavesNoMetadata() {
+        UUID uuid = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.BOOK).name("Books").build();
+        DirectoryEntity directoryEntity = DirectoryEntity.builder().id(uuid).path("/books").libraryEntity(library).build();
+        PersonEntity author = PersonEntity.builder().libraryEntity(library).name("Author").build();
+        BookEntity book = BookEntity.builder().libraryEntity(library).personEntity(author).name("Book").build();
+        NfoFileFoundData data = NfoFileFoundData.builder()
+                .directoryEntityUUID(uuid)
+                .path("/books/Author/Book/album.nfo")
+                .build();
+
+        when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
+        when(scannerHelperService.getOrCreatePerson(library, "Author", 0)).thenReturn(author);
+        when(scannerHelperService.getOrCreateBook(library, author, "Book", 0)).thenReturn(book);
+
+        subject.handle(data);
+
+        verifyNoInteractions(metadataRepository);
+    }
+
+    @Test
+    void musicNfoOfUnknownDirTypeIsIgnored() {
+        UUID uuid = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
+        DirectoryEntity directoryEntity = DirectoryEntity.builder().id(uuid).path("/music").libraryEntity(library).build();
+        NfoFileFoundData data = NfoFileFoundData.builder()
+                .directoryEntityUUID(uuid)
+                .path("/other/place/artist.nfo")
+                .build();
+
+        when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
+
+        subject.handle(data);
+
+        verifyNoInteractions(scannerHelperService, metadataRepository);
     }
 
     @Test

@@ -4,6 +4,7 @@ import app.ister.core.entity.StreamTokenEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.service.StreamTokenService;
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -184,6 +185,132 @@ class StreamTokenAuthenticationFilterTest {
 
         assertNull(SecurityContextHolder.getContext().getAuthentication());
         verify(filterChain).doFilter(request, response);
+    }
+
+    // ========== cookie fallback ==========
+
+    /**
+     * Epub subresources (images, css) are loaded by the browser itself, so the reader cannot
+     * attach a query parameter; the token travels in a same-origin cookie instead.
+     */
+    @Test
+    void doFilterInternalAcceptsTheTokenFromTheCookie() throws ServletException, IOException {
+        UserEntity user = UserEntity.builder().externalId("user-xyz").build();
+        StreamTokenEntity tokenEntity = StreamTokenEntity.builder().userEntity(user).build();
+        when(request.getParameter("token")).thenReturn(null);
+        when(request.getCookies()).thenReturn(new Cookie[]{
+                new Cookie("other", "irrelevant"),
+                new Cookie(StreamTokenAuthenticationFilter.STREAM_TOKEN_COOKIE, "cookie-token")});
+        when(request.getRequestURI()).thenReturn("/api/epub/some-uuid/resource/chapter1.xhtml");
+        when(streamTokenService.validateStreamToken("cookie-token")).thenReturn(Optional.of(tokenEntity));
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        assertNotNull(auth);
+        assertEquals("user-xyz", auth.getPrincipal());
+        verify(filterChain).doFilter(request, response);
+    }
+
+    /** The query parameter wins when both are present. */
+    @Test
+    void doFilterInternalPrefersTheQueryParameterOverTheCookie() throws ServletException, IOException {
+        UserEntity user = UserEntity.builder().externalId("user-xyz").build();
+        when(request.getParameter("token")).thenReturn("query-token");
+        when(request.getRequestURI()).thenReturn("/api/hls/some-uuid/master.m3u8");
+        when(streamTokenService.validateStreamToken("query-token"))
+                .thenReturn(Optional.of(StreamTokenEntity.builder().userEntity(user).build()));
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+        verify(streamTokenService, never()).validateStreamToken("cookie-token");
+    }
+
+    @Test
+    void doFilterInternalIgnoresACookieWithoutAValue() throws ServletException, IOException {
+        when(request.getParameter("token")).thenReturn(null);
+        when(request.getCookies()).thenReturn(new Cookie[]{
+                new Cookie(StreamTokenAuthenticationFilter.STREAM_TOKEN_COOKIE, "")});
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        verifyNoInteractions(streamTokenService);
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void doFilterInternalIgnoresUnrelatedCookies() throws ServletException, IOException {
+        when(request.getParameter("token")).thenReturn(null);
+        when(request.getCookies()).thenReturn(new Cookie[]{new Cookie("other", "irrelevant")});
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        verifyNoInteractions(streamTokenService);
+    }
+
+    // ========== token/path mismatches ==========
+
+    @Test
+    void aNodeTokenDoesNotAuthenticateOnAUserPath() throws ServletException, IOException {
+        StreamTokenEntity tokenEntity = StreamTokenEntity.builder().download(true).upload(true).build();
+        when(request.getParameter("token")).thenReturn("node-token");
+        when(request.getRequestURI()).thenReturn("/api/hls/some-uuid/master.m3u8");
+        when(streamTokenService.validateStreamToken("node-token")).thenReturn(Optional.of(tokenEntity));
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void aUserTokenWithoutTheDownloadFlagCannotDownload() throws ServletException, IOException {
+        UserEntity user = UserEntity.builder().externalId("user-xyz").build();
+        StreamTokenEntity tokenEntity = StreamTokenEntity.builder().userEntity(user).download(false).build();
+        when(request.getParameter("token")).thenReturn("user-token");
+        when(request.getRequestURI()).thenReturn("/api/mediaFile/some-uuid/download");
+        when(streamTokenService.validateStreamToken("user-token")).thenReturn(Optional.of(tokenEntity));
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void aTokenWithoutTheUploadFlagCannotUpload() throws ServletException, IOException {
+        StreamTokenEntity tokenEntity = StreamTokenEntity.builder().download(true).upload(false).build();
+        when(request.getParameter("token")).thenReturn("download-only-token");
+        when(request.getRequestURI()).thenReturn("/api/transcode/upload/some-uuid/seg.ts");
+        when(streamTokenService.validateStreamToken("download-only-token")).thenReturn(Optional.of(tokenEntity));
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "/api/hls/uuid/master.m3u8",
+        "/api/images/uuid.jpg",
+        "/api/epub/uuid/resource/chapter1.xhtml",
+        "/api/reading-progress",
+        "/api/book-progress"
+    })
+    void everyUserPathAuthenticatesAUserToken(String uri) throws ServletException, IOException {
+        UserEntity user = UserEntity.builder().externalId("user-xyz").build();
+        when(request.getParameter("token")).thenReturn("user-token");
+        when(request.getRequestURI()).thenReturn(uri);
+        when(streamTokenService.validateStreamToken("user-token"))
+                .thenReturn(Optional.of(StreamTokenEntity.builder().userEntity(user).build()));
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        assertNotNull(auth, "Path should authenticate: " + uri);
+        assertEquals("user-xyz", auth.getPrincipal());
     }
 
     @Test

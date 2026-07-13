@@ -35,6 +35,10 @@ class ScannerHelperServiceTest {
     @Mock
     private TrackRepository trackRepository;
     @Mock
+    private BookRepository bookRepository;
+    @Mock
+    private ChapterRepository chapterRepository;
+    @Mock
     private ServerEventService serverEventService;
 
     private final LibraryEntity library = LibraryEntity.builder().build();
@@ -313,5 +317,72 @@ class ScannerHelperServiceTest {
         assertEquals(1, result.getDiscNumber());
         verify(trackRepository).save(result);
         verify(serverEventService).createTrackFoundEvent(result.getId());
+    }
+
+    @Test
+    void getOrCreateBookReturnsExistingBook() {
+        PersonEntity author = PersonEntity.builder().name("Tolkien").build();
+        BookEntity existing = BookEntity.builder().name("The Hobbit").releaseYear(1937).build();
+        when(bookRepository.findByPersonEntityAndNameAndReleaseYear(author, "The Hobbit", 1937))
+                .thenReturn(Optional.of(existing));
+
+        assertEquals(existing, subject.getOrCreateBook(library, author, "The Hobbit", 1937));
+        verify(bookRepository, never()).save(any());
+        verify(serverEventService, never()).createBookFoundEvent(any());
+    }
+
+    /**
+     * The epub and the audiobook folder of one book converge on a single row: a year-less name
+     * matches the oldest book with that name, exactly like albums.
+     */
+    @Test
+    void getOrCreateBookMatchesOnNameAloneWhenTheDirectoryHasNoYear() {
+        PersonEntity author = PersonEntity.builder().name("Tolkien").build();
+        BookEntity existing = BookEntity.builder().name("The Hobbit").releaseYear(1937).build();
+        when(bookRepository.findFirstByPersonEntityAndNameOrderByDateCreatedAsc(author, "The Hobbit"))
+                .thenReturn(Optional.of(existing));
+
+        assertEquals(existing, subject.getOrCreateBook(library, author, "The Hobbit", 0));
+        verify(bookRepository, never()).findByPersonEntityAndNameAndReleaseYear(any(), any(), anyInt());
+        verify(bookRepository, never()).save(any());
+    }
+
+    @Test
+    void getOrCreateBookCreatesNewBook() {
+        PersonEntity author = PersonEntity.builder().name("Tolkien").build();
+        when(bookRepository.findByPersonEntityAndNameAndReleaseYear(author, "The Hobbit", 1937))
+                .thenReturn(Optional.empty());
+
+        BookEntity result = subject.getOrCreateBook(library, author, "The Hobbit", 1937);
+
+        assertEquals("The Hobbit", result.getName());
+        assertEquals(1937, result.getReleaseYear());
+        verify(bookRepository).save(result);
+        verify(serverEventService).createBookFoundEvent(result.getId());
+    }
+
+    @Test
+    void getOrCreateChapterReturnsExistingChapter() {
+        PersonEntity author = PersonEntity.builder().build();
+        BookEntity book = BookEntity.builder().build();
+        ChapterEntity existing = ChapterEntity.builder().number(1).build();
+        when(chapterRepository.findByBookEntityAndNumber(book, 1)).thenReturn(Optional.of(existing));
+
+        assertEquals(existing, subject.getOrCreateChapter(author, book, 1));
+        verify(chapterRepository, never()).save(any());
+        verify(serverEventService, never()).createChapterFoundEvent(any());
+    }
+
+    @Test
+    void getOrCreateChapterCreatesNewChapter() {
+        PersonEntity author = PersonEntity.builder().build();
+        BookEntity book = BookEntity.builder().build();
+        when(chapterRepository.findByBookEntityAndNumber(book, 1)).thenReturn(Optional.empty());
+
+        ChapterEntity result = subject.getOrCreateChapter(author, book, 1);
+
+        assertEquals(1, result.getNumber());
+        verify(chapterRepository).save(result);
+        verify(serverEventService).createChapterFoundEvent(result.getId());
     }
 }

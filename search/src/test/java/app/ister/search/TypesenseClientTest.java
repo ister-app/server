@@ -4,6 +4,7 @@ import app.ister.core.config.LanguageProperties;
 import app.ister.search.config.TypesenseProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -144,5 +145,65 @@ class TypesenseClientTest {
                 .andRespond(withSuccess("[{\"name\": \"media_v1\"}, {\"name\": \"media_v2\"}]", MediaType.APPLICATION_JSON));
 
         assertEquals(List.of("media_v1", "media_v2"), subject.listCollectionNames());
+    }
+
+    @Test
+    void listCollectionNamesReturnsEmptyListOnEmptyBody() {
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("/collections")))
+                .andRespond(withSuccess());
+
+        assertEquals(List.of(), subject.listCollectionNames());
+        server.verify();
+    }
+
+    @Test
+    void upsertAliasPointsAliasAtCollection() {
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("/aliases/media")))
+                .andExpect(method(HttpMethod.PUT))
+                .andExpect(header("X-TYPESENSE-API-KEY", "test-key"))
+                .andExpect(content().string("{\"collection_name\": \"media_v2\"}"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        subject.upsertAlias("media", "media_v2");
+
+        server.verify();
+    }
+
+    @Test
+    void dropCollectionDeletesCollection() {
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("/collections/media_v1")))
+                .andExpect(method(HttpMethod.DELETE))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        subject.dropCollection("media_v1");
+
+        server.verify();
+    }
+
+    @Test
+    void upsertDocumentPostsDocumentToCollection() {
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("/collections/media/documents?action=upsert")))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("\"id\":\"abc\""),
+                        org.hamcrest.Matchers.containsString("\"title\":\"The Matrix\""))))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        subject.upsertDocument("media",
+                SearchDocument.builder().id("abc").type("MOVIE").title("The Matrix").build());
+
+        server.verify();
+    }
+
+    @Test
+    void importDocumentsTolerateFailedLines() {
+        server.expect(anything())
+                .andRespond(withSuccess("{\"success\":true}\n{\"success\":false,\"error\":\"bad\"}", MediaType.TEXT_PLAIN));
+
+        assertDoesNotThrow(() -> subject.importDocuments("media_v1", List.of(
+                SearchDocument.builder().id("1").type("MOVIE").title("One").build(),
+                SearchDocument.builder().id("2").type("SHOW").title("Two").build())));
+
+        server.verify();
     }
 }

@@ -1,15 +1,23 @@
 package app.ister.disk.events.audiofilefound;
 
 import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.BookEntity;
+import app.ister.core.entity.ChapterEntity;
+import app.ister.core.entity.ImageEntity;
+import app.ister.core.entity.NodeEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.TrackEntity;
+import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
+import app.ister.core.enums.ImageType;
 import app.ister.core.enums.LibraryType;
+import app.ister.core.enums.SearchEntityType;
 import app.ister.core.eventdata.AudioFileFoundData;
+import app.ister.core.eventdata.ImageFoundData;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.ImageRepository;
@@ -44,8 +52,10 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -96,6 +106,7 @@ class HandleAudioFileFoundTest {
     private static final UUID DIRECTORY_ID = UUID.randomUUID();
     private static final UUID TRACK_ID = UUID.randomUUID();
     private static final String PATH = "/music/Artist/Album/01 - Track.flac";
+    private static final String CHAPTER_PATH = "/books/Author/Book/001_Chapter.mp3";
 
     @BeforeEach
     void setup() {
@@ -535,6 +546,314 @@ class HandleAudioFileFoundTest {
 
         // HLS cache dir should be deleted
         org.junit.jupiter.api.Assertions.assertFalse(Files.exists(hlsDir));
+    }
+
+    @Test
+    void handleSavesChapterTitleFromTags() {
+        DirectoryEntity directory = DirectoryEntity.builder().build();
+        ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
+
+        UUID mediaFileId = UUID.randomUUID();
+        UUID chapterId = UUID.randomUUID();
+        MediaFileEntity mediaFile = MediaFileEntity.builder().path(CHAPTER_PATH).size(1000L).build();
+        ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
+
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.BOOK).name("Books").build();
+        PersonEntity author = PersonEntity.builder().libraryEntity(library).name("Author").build();
+        BookEntity book = BookEntity.builder().libraryEntity(library).personEntity(author).name("Book").build();
+        ChapterEntity chapter = ChapterEntity.builder().personEntity(author).bookEntity(book).number(1).build();
+        ReflectionTestUtils.setField(chapter, "id", chapterId);
+
+        FFprobe ffprobe = mock(FFprobe.class, RETURNS_SELF);
+        FFprobeResult result = mock(FFprobeResult.class);
+        Format format = mock(Format.class);
+        when(jaffreeMock.getFFPROBE()).thenReturn(ffprobe);
+        when(ffprobe.execute()).thenReturn(result);
+        when(result.getFormat()).thenReturn(format);
+        when(format.getTag("title")).thenReturn("Chapter One");
+
+        when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, CHAPTER_PATH)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any()))
+                .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
+        when(chapterRepositoryMock.findById(chapterId)).thenReturn(Optional.of(chapter));
+
+        subject.handle(AudioFileFoundData.builder()
+                .eventType(EventType.AUDIO_FILE_FOUND)
+                .directoryEntityUUID(DIRECTORY_ID)
+                .chapterEntityUUID(chapterId)
+                .path(CHAPTER_PATH).build());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(MetadataEntity.class);
+        verify(metadataRepositoryMock).save(captor.capture());
+        org.junit.jupiter.api.Assertions.assertEquals("Chapter One", captor.getValue().getTitle());
+        org.junit.jupiter.api.Assertions.assertEquals(chapter, captor.getValue().getChapterEntity());
+    }
+
+    @Test
+    void handleSkipsChapterMetadataWhenChapterNotFound() {
+        DirectoryEntity directory = DirectoryEntity.builder().build();
+        ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
+
+        UUID mediaFileId = UUID.randomUUID();
+        UUID chapterId = UUID.randomUUID();
+        MediaFileEntity mediaFile = MediaFileEntity.builder().path(CHAPTER_PATH).size(1000L).build();
+        ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
+
+        when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, CHAPTER_PATH)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any()))
+                .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
+        when(chapterRepositoryMock.findById(chapterId)).thenReturn(Optional.empty());
+
+        subject.handle(AudioFileFoundData.builder()
+                .eventType(EventType.AUDIO_FILE_FOUND)
+                .directoryEntityUUID(DIRECTORY_ID)
+                .chapterEntityUUID(chapterId)
+                .path(CHAPTER_PATH).build());
+
+        verifyNoInteractions(metadataRepositoryMock);
+        verifyNoInteractions(jaffreeMock);
+    }
+
+    @Test
+    void handleSkipsTrackMetadataWhenTrackNotFound() {
+        DirectoryEntity directory = DirectoryEntity.builder().build();
+        ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
+
+        UUID mediaFileId = UUID.randomUUID();
+        MediaFileEntity mediaFile = MediaFileEntity.builder().path(PATH).size(1000L).build();
+        ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
+
+        when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any()))
+                .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
+        when(trackRepositoryMock.findById(TRACK_ID)).thenReturn(Optional.empty());
+
+        subject.handle(AudioFileFoundData.builder()
+                .eventType(EventType.AUDIO_FILE_FOUND)
+                .directoryEntityUUID(DIRECTORY_ID)
+                .trackEntityUUID(TRACK_ID)
+                .path(PATH).build());
+
+        verifyNoInteractions(metadataRepositoryMock);
+    }
+
+    @Test
+    void handleExtractsEmbeddedAlbumCoverAndSendsImageFound() {
+        NodeEntity node = NodeEntity.builder().name("node1").build();
+        DirectoryEntity directory = DirectoryEntity.builder().name("music-dir").nodeEntity(node).build();
+        ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
+        DirectoryEntity cacheDir = DirectoryEntity.builder().name("node1-cache-directory").path("/cache").build();
+        UUID cacheDirId = UUID.randomUUID();
+        ReflectionTestUtils.setField(cacheDir, "id", cacheDirId);
+
+        UUID mediaFileId = UUID.randomUUID();
+        UUID albumId = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("Artist").build();
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Album").releaseYear(2024).build();
+        ReflectionTestUtils.setField(album, "id", albumId);
+        TrackEntity track = TrackEntity.builder().personEntity(artist).albumEntity(album).number(1).discNumber(1).build();
+
+        MediaFileEntity mediaFile = MediaFileEntity.builder().path(PATH).size(1000L).trackEntity(track).build();
+        ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
+
+        when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any()))
+                .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), true, 180000L));
+        when(imageRepositoryMock.findByAlbumEntityId(albumId)).thenReturn(List.of());
+        when(directoryRepositoryMock.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node))
+                .thenReturn(List.of(cacheDir));
+
+        subject.handle(AudioFileFoundData.builder()
+                .eventType(EventType.AUDIO_FILE_FOUND)
+                .directoryEntityUUID(DIRECTORY_ID)
+                .trackEntityUUID(null)
+                .path(PATH).build());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(ImageFoundData.class);
+        verify(messageSenderMock).sendImageFound(captor.capture(), eq("node1-cache-directory"));
+        org.junit.jupiter.api.Assertions.assertEquals(albumId, captor.getValue().getAlbumEntityId());
+        org.junit.jupiter.api.Assertions.assertNull(captor.getValue().getBookEntityId());
+        org.junit.jupiter.api.Assertions.assertEquals(ImageType.COVER, captor.getValue().getImageType());
+    }
+
+    @Test
+    void handleSkipsCoverArtWhenAlbumAlreadyHasImage() {
+        NodeEntity node = NodeEntity.builder().name("node1").build();
+        DirectoryEntity directory = DirectoryEntity.builder().name("music-dir").nodeEntity(node).build();
+        ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
+
+        UUID mediaFileId = UUID.randomUUID();
+        UUID albumId = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("Artist").build();
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Album").releaseYear(2024).build();
+        ReflectionTestUtils.setField(album, "id", albumId);
+        TrackEntity track = TrackEntity.builder().personEntity(artist).albumEntity(album).number(1).discNumber(1).build();
+
+        MediaFileEntity mediaFile = MediaFileEntity.builder().path(PATH).size(1000L).trackEntity(track).build();
+        ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
+
+        when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any()))
+                .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), true, 180000L));
+        when(imageRepositoryMock.findByAlbumEntityId(albumId))
+                .thenReturn(List.of(ImageEntity.builder().path("/cache/cover.jpg").build()));
+
+        subject.handle(AudioFileFoundData.builder()
+                .eventType(EventType.AUDIO_FILE_FOUND)
+                .directoryEntityUUID(DIRECTORY_ID)
+                .trackEntityUUID(null)
+                .path(PATH).build());
+
+        verifyNoInteractions(audioFileFoundExtractCoverArtMock);
+        verify(messageSenderMock, never()).sendImageFound(any(), any());
+    }
+
+    @Test
+    void handleExtractsEmbeddedBookCoverForChapterFile() {
+        NodeEntity node = NodeEntity.builder().name("node1").build();
+        DirectoryEntity directory = DirectoryEntity.builder().name("books-dir").nodeEntity(node).build();
+        ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
+        DirectoryEntity cacheDir = DirectoryEntity.builder().name("node1-cache-directory").path("/cache").build();
+        ReflectionTestUtils.setField(cacheDir, "id", UUID.randomUUID());
+
+        UUID mediaFileId = UUID.randomUUID();
+        UUID bookId = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.BOOK).name("Books").build();
+        PersonEntity author = PersonEntity.builder().libraryEntity(library).name("Author").build();
+        BookEntity book = BookEntity.builder().libraryEntity(library).personEntity(author).name("Book").build();
+        ReflectionTestUtils.setField(book, "id", bookId);
+        ChapterEntity chapter = ChapterEntity.builder().personEntity(author).bookEntity(book).number(1).build();
+
+        MediaFileEntity mediaFile = MediaFileEntity.builder().path(CHAPTER_PATH).size(1000L).chapterEntity(chapter).build();
+        ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
+
+        when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, CHAPTER_PATH)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any()))
+                .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), true, 180000L));
+        when(imageRepositoryMock.findByBookEntityId(bookId)).thenReturn(List.of());
+        when(directoryRepositoryMock.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node))
+                .thenReturn(List.of(cacheDir));
+
+        subject.handle(AudioFileFoundData.builder()
+                .eventType(EventType.AUDIO_FILE_FOUND)
+                .directoryEntityUUID(DIRECTORY_ID)
+                .chapterEntityUUID(null)
+                .path(CHAPTER_PATH).build());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(ImageFoundData.class);
+        verify(messageSenderMock).sendImageFound(captor.capture(), eq("node1-cache-directory"));
+        org.junit.jupiter.api.Assertions.assertEquals(bookId, captor.getValue().getBookEntityId());
+        org.junit.jupiter.api.Assertions.assertNull(captor.getValue().getAlbumEntityId());
+    }
+
+    @Test
+    void handleDoesNotSendImageFoundWhenCoverExtractionFails() throws IOException {
+        NodeEntity node = NodeEntity.builder().name("node1").build();
+        DirectoryEntity directory = DirectoryEntity.builder().name("music-dir").nodeEntity(node).build();
+        ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
+        DirectoryEntity cacheDir = DirectoryEntity.builder().name("node1-cache-directory").path("/cache").build();
+        ReflectionTestUtils.setField(cacheDir, "id", UUID.randomUUID());
+
+        UUID mediaFileId = UUID.randomUUID();
+        UUID albumId = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("Artist").build();
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Album").releaseYear(2024).build();
+        ReflectionTestUtils.setField(album, "id", albumId);
+        TrackEntity track = TrackEntity.builder().personEntity(artist).albumEntity(album).number(1).discNumber(1).build();
+
+        MediaFileEntity mediaFile = MediaFileEntity.builder().path(PATH).size(1000L).trackEntity(track).build();
+        ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
+
+        when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any()))
+                .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), true, 180000L));
+        when(imageRepositoryMock.findByAlbumEntityId(albumId)).thenReturn(List.of());
+        when(directoryRepositoryMock.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node))
+                .thenReturn(List.of(cacheDir));
+        doThrow(new IllegalStateException("ffmpeg failed"))
+                .when(audioFileFoundExtractCoverArtMock).extract(any(), any(), any());
+
+        subject.handle(AudioFileFoundData.builder()
+                .eventType(EventType.AUDIO_FILE_FOUND)
+                .directoryEntityUUID(DIRECTORY_ID)
+                .trackEntityUUID(null)
+                .path(PATH).build());
+
+        verify(messageSenderMock, never()).sendImageFound(any(), any());
+    }
+
+    @Test
+    void handleAssignsSequentialTrackNumberWhenNoTagAndNoNumber() {
+        DirectoryEntity directory = DirectoryEntity.builder().build();
+        ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
+
+        UUID mediaFileId = UUID.randomUUID();
+        UUID albumId = UUID.randomUUID();
+        UUID correctedTrackId = UUID.randomUUID();
+
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("Artist").build();
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Album").releaseYear(2024).build();
+        ReflectionTestUtils.setField(album, "id", albumId);
+
+        TrackEntity numberlessTrack = TrackEntity.builder().personEntity(artist).albumEntity(album).number(0).discNumber(1)
+                .metadataEntities(new ArrayList<>()).build();
+        ReflectionTestUtils.setField(numberlessTrack, "id", TRACK_ID);
+        TrackEntity correctTrack = TrackEntity.builder().personEntity(artist).albumEntity(album).number(1).discNumber(1)
+                .metadataEntities(new ArrayList<>()).build();
+        ReflectionTestUtils.setField(correctTrack, "id", correctedTrackId);
+
+        MediaFileEntity mediaFile = MediaFileEntity.builder().path(PATH).size(1000L).build();
+        ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
+
+        FFprobe ffprobe = mock(FFprobe.class, RETURNS_SELF);
+        FFprobeResult result = mock(FFprobeResult.class);
+        Format format = mock(Format.class);
+        when(jaffreeMock.getFFPROBE()).thenReturn(ffprobe);
+        when(ffprobe.execute()).thenReturn(result);
+        when(result.getFormat()).thenReturn(format);
+        when(format.getTag(anyString())).thenReturn(null);
+        when(format.getTag("title")).thenReturn("Some Track");
+
+        when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any()))
+                .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
+        when(trackRepositoryMock.findById(TRACK_ID)).thenReturn(Optional.of(numberlessTrack));
+        when(mediaFileRepositoryMock.findByTrackEntity_AlbumEntityId(albumId))
+                .thenReturn(new ArrayList<>(List.of(mediaFile)));
+        when(scannerHelperServiceMock.getOrCreateTrack(artist, album, 1, 1)).thenReturn(correctTrack);
+        when(trackRepositoryMock.findById(correctedTrackId)).thenReturn(Optional.of(correctTrack));
+        when(mediaFileRepositoryMock.existsByTrackEntityId(TRACK_ID)).thenReturn(false);
+
+        subject.handle(AudioFileFoundData.builder()
+                .eventType(EventType.AUDIO_FILE_FOUND)
+                .directoryEntityUUID(DIRECTORY_ID)
+                .trackEntityUUID(TRACK_ID)
+                .path(PATH).build());
+
+        // The file is the first of the album, so it becomes track 1 and the numberless track is dropped.
+        verify(scannerHelperServiceMock).getOrCreateTrack(artist, album, 1, 1);
+        verify(trackRepositoryMock).delete(numberlessTrack);
+        verify(serverEventServiceMock).createSearchDeleteEvent(SearchEntityType.TRACK, TRACK_ID);
     }
 
     @Test

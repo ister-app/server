@@ -75,12 +75,18 @@ class HlsTranscodeServiceTest {
         }
     }
 
+    private static final Stopper NOOP_STOPPER = new Stopper() {
+        @Override public void graceStop() { /* no-op: test double never runs a real process */ }
+        @Override public void forceStop() { /* no-op: test double never runs a real process */ }
+        @Override public void setProcess(Process process) { /* no-op: test double never runs a real process */ }
+    };
+
     private static FFmpegResultFuture completedFFmpegFuture() {
-        return new FFmpegResultFuture(CompletableFuture.completedFuture(null), new Stopper() {
-            @Override public void graceStop() { /* no-op: test double never runs a real process */ }
-            @Override public void forceStop() { /* no-op: test double never runs a real process */ }
-            @Override public void setProcess(Process process) { /* no-op: test double never runs a real process */ }
-        });
+        return new FFmpegResultFuture(CompletableFuture.completedFuture(null), NOOP_STOPPER);
+    }
+
+    private static FFmpegResultFuture neverCompletingFFmpegFuture() {
+        return new FFmpegResultFuture(new CompletableFuture<>(), NOOP_STOPPER);
     }
 
     @SuppressWarnings("unchecked")
@@ -728,5 +734,263 @@ class HlsTranscodeServiceTest {
         service.generateAudioSegment("/test/audio.flac", tempDir.resolve("out.ts"), 0.0, 10.0, 0, AudioQuality.COPY, "flac");
 
         verify(ffmpegMock).executeAsync();
+    }
+
+    @Test
+    void generateVideoSegmentThrowsWhenFfmpegFails() {
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        when(ffmpegMock.executeAsync())
+                .thenReturn(new FFmpegResultFuture(CompletableFuture.failedFuture(new IllegalStateException("boom")), NOOP_STOPPER));
+
+        Path out = tempDir.resolve("out.ts");
+        assertThrows(IllegalStateException.class,
+                () -> service.generateVideoSegment("/test/video.mkv", out, 0.0, 10.0, VideoQuality.COPY));
+    }
+
+    // ========== pass timeouts ==========
+
+    @Test
+    void startVideoPassForceStopsPassThatExceedsTheOverallTimeout() {
+        ReflectionTestUtils.setField(service, "passTimeoutMultiplier", 0.0);
+        ReflectionTestUtils.setField(service, "passTimeoutMinSeconds", 0L);
+        ReflectionTestUtils.setField(service, "passStallTimeoutSeconds", 3600L);
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
+
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        when(ffmpegMock.executeAsync()).thenReturn(neverCompletingFFmpegFuture());
+
+        assertThrows(IllegalStateException.class,
+                () -> service.startVideoPass("/test/video.mkv", tempDir, VideoQuality.Q720P));
+    }
+
+    @Test
+    void startVideoPassKeepsRunningWhileItProducesSegments() throws IOException {
+        // Stall deadline has passed, but a segment is on disk → the pass is healthy and runs on
+        // until the FFmpeg future completes.
+        ReflectionTestUtils.setField(service, "passStallTimeoutSeconds", 0L);
+        Path cacheDir = Files.createDirectories(tempDir.resolve("producing"));
+        Files.writeString(cacheDir.resolve("seg_video_720p_00000.ts"), "data");
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
+
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
+
+        service.startVideoPass("/test/video.mkv", cacheDir, VideoQuality.Q720P);
+
+        assertTrue(service.hasDoneMarker(cacheDir, "seg_video_720p_"));
+    }
+
+    // ========== done markers ==========
+
+    @Test
+    void hasDoneMarkerIsFalseBeforeAPassCompleted() {
+        assertFalse(service.hasDoneMarker(tempDir, "seg_video_720p_"));
+    }
+
+    @Test
+    void startAudioPassWritesDoneMarker() {
+        when(ffprobeService.getKeyframes("/test/audio.mkv")).thenReturn(List.of());
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
+
+        service.startAudioPass("/test/audio.mkv", tempDir, 1, AudioQuality.Q192K, "opus");
+
+        assertTrue(service.hasDoneMarker(tempDir, "seg_audio_1_192k_"));
+    }
+
+    // ========== cache dir failures ==========
+
+    @Test
+    void startVideoPassThrowsWhenCacheDirCannotBeCreated() throws IOException {
+        Path regularFile = tempDir.resolve("not-a-dir");
+        Files.writeString(regularFile, "x");
+        Path impossibleCacheDir = regularFile.resolve("cache");
+
+        assertThrows(IllegalStateException.class,
+                () -> service.startVideoPass("/test/video.mkv", impossibleCacheDir, VideoQuality.Q720P));
+    }
+
+    @Test
+    void startAudioPassThrowsWhenCacheDirCannotBeCreated() throws IOException {
+        Path regularFile = tempDir.resolve("not-a-dir-audio");
+        Files.writeString(regularFile, "x");
+        Path impossibleCacheDir = regularFile.resolve("cache");
+
+        assertThrows(IllegalStateException.class,
+                () -> service.startAudioPass("/test/audio.mkv", impossibleCacheDir, 0, AudioQuality.Q192K, "opus"));
+    }
+
+    // ========== hasActivePassForFile ==========
+
+    @Test
+    void hasActivePassForFileIsTrueWhileAPassIsEncoding() {
+        UUID id = UUID.randomUUID();
+        activeGenerations().put(id + "_video_720p", new CompletableFuture<>());
+
+        assertTrue(service.hasActivePassForFile(id));
+    }
+
+    @Test
+    void hasActivePassForFileIsFalseWhenAllPassesFinished() {
+        UUID id = UUID.randomUUID();
+        activeGenerations().put(id + "_video_720p", CompletableFuture.completedFuture(null));
+
+        assertFalse(service.hasActivePassForFile(id));
+        assertFalse(service.hasActivePassForFile(UUID.randomUUID()));
+    }
+
+    // ========== probe cache seeding ==========
+
+    @Test
+    void seedAudioOnlyKeyframesSkipsTheKeyframeProbe() {
+        service.seedAudioOnlyKeyframes("/test/audio.mp3");
+
+        assertEquals(List.of(), service.getCachedKeyframes("/test/audio.mp3"));
+        verify(ffprobeService, never()).getKeyframes("/test/audio.mp3");
+    }
+
+    @Test
+    void seedDurationSkipsTheDurationProbe() {
+        service.seedDuration("/test/audio.mp3", 42.0);
+
+        assertEquals(42.0, service.getTotalDuration("/test/audio.mp3"));
+        verify(ffprobeService, never()).getTotalDuration("/test/audio.mp3");
+    }
+
+    // ========== stableSegmentOrNull / waitForSegment ==========
+
+    @Test
+    void stableSegmentOrNullForgetsAKnownSegmentThatWasCleanedUp() throws IOException {
+        ReflectionTestUtils.setField(service, "segmentStabilityMs", 0L);
+        Path seg = tempDir.resolve("gone.ts");
+        Files.writeString(seg, "data");
+
+        assertNull(service.stableSegmentOrNull(seg)); // first call records the size sample
+        assertEquals(seg, service.stableSegmentOrNull(seg)); // now memoized as stable
+
+        Files.delete(seg);
+
+        assertNull(service.stableSegmentOrNull(seg));
+    }
+
+    @Test
+    void waitForSegmentReturnsSegmentThatBecomesStableWhilePassIsRunning() throws IOException {
+        ReflectionTestUtils.setField(service, "segmentStabilityMs", 0L);
+        ReflectionTestUtils.setField(service, "segmentTimeoutMs", 5000L);
+        Path seg = tempDir.resolve("running.ts");
+        Files.writeString(seg, "data");
+        String key = "running_video_720p";
+        activeGenerations().put(key, new CompletableFuture<>()); // pass still encoding
+
+        assertEquals(seg, service.waitForSegment(seg, key));
+    }
+
+    // ========== pass admission failures ==========
+
+    @Test
+    void passFailsWhenTheExecutorIsAlreadyShutDown() {
+        service.transcodeExecutor.shutdownNow();
+        String key = "shutdown-file_video_720p";
+
+        service.ensurePassStarted(key, () -> { /* never runs: the pool is gone */ }, true);
+
+        assertTrue(activeGenerations().get(key).isCompletedExceptionally());
+    }
+
+    @Test
+    void backgroundPassIsDroppedWhenAllFileSlotsAreTaken() {
+        ReflectionTestUtils.setField(service, "concurrentFileSlots", new Semaphore(0));
+        Semaphore backgroundBudget = new Semaphore(1);
+        ReflectionTestUtils.setField(service, "backgroundFileBudget", backgroundBudget);
+
+        service.ensurePassStarted("bg-file_video_720p", () -> {
+            throw new AssertionError("dropped background pass must not start FFmpeg");
+        }, true);
+
+        await().atMost(2, TimeUnit.SECONDS)
+                .until(() -> !activeGenerations().containsKey("bg-file_video_720p"));
+        // The background budget is handed back when the file slot could not be acquired.
+        assertEquals(1, backgroundBudget.availablePermits());
+    }
+
+    @Test
+    void startAudioPassAlignsKeyframesWhenReencoding() {
+        when(ffprobeService.getKeyframes("/test/audio.mkv")).thenReturn(List.of(0.0, 5.0, 10.0));
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
+
+        // Non-AAC source with keyframes → the AAC encoder is forced onto the segment cut points.
+        service.startAudioPass("/test/audio.mkv", tempDir, 0, AudioQuality.Q64K, "opus");
+
+        verify(ffmpegMock).executeAsync();
+        assertTrue(service.hasDoneMarker(tempDir, "seg_audio_0_64k_"));
+    }
+
+    @Test
+    void extendKeepUntilSurvivesAnUnwritableCacheRoot() throws IOException {
+        Path regularFile = tempDir.resolve("tmp-root-is-a-file");
+        Files.writeString(regularFile, "x");
+        ReflectionTestUtils.setField(service, "tmpDir", regularFile.toString());
+
+        assertDoesNotThrow(() -> service.extendKeepUntil(UUID.randomUUID(), System.currentTimeMillis() + 60_000));
+    }
+
+    // ========== nice wrapper failures ==========
+
+    @Test
+    void createNiceWrapperReturnsNullWhenNiceProbeFails() {
+        ReflectionTestUtils.setField(service, "backgroundNice", 10);
+        ReflectionTestUtils.setField(service, "nicePath", "/bin/false");
+
+        assertNull(service.createNiceWrapper());
+    }
+
+    @Test
+    void createNiceWrapperReturnsNullWhenNiceBinaryIsMissing() {
+        ReflectionTestUtils.setField(service, "backgroundNice", 10);
+        ReflectionTestUtils.setField(service, "nicePath", tempDir.resolve("no-such-nice").toString());
+
+        assertNull(service.createNiceWrapper());
+    }
+
+    // ========== cleanup edge cases ==========
+
+    @Test
+    void cleanupOldFilesSkipsTheNiceWrapperDirectory() throws IOException {
+        Path wrapperDir = Files.createDirectories(tempDir.resolve("ffmpeg-nice"));
+        Path script = wrapperDir.resolve("ffmpeg");
+        Files.writeString(script, "#!/bin/sh\n");
+        Files.setLastModifiedTime(script, FileTime.from(Instant.now().minus(30, ChronoUnit.DAYS)));
+
+        service.cleanupOldFiles();
+
+        assertTrue(Files.exists(script), "the nice wrapper must survive the cache cleanup");
+    }
+
+    @Test
+    void cleanupOldFilesRemovesDirWithUnreadableKeepUntilFile() throws IOException {
+        Path dir = Files.createDirectories(tempDir.resolve("bad-keep-until-uuid"));
+        Files.writeString(dir.resolve("keep_until"), "not-a-number");
+        Files.writeString(dir.resolve("seg.ts"), "data");
+        try (var files = Files.list(dir)) {
+            files.forEach(p -> {
+                try {
+                    Files.setLastModifiedTime(p, FileTime.from(Instant.now().minus(3, ChronoUnit.HOURS)));
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+        }
+
+        service.cleanupOldFiles();
+
+        assertFalse(Files.exists(dir));
     }
 }
