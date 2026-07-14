@@ -513,6 +513,13 @@ type Book {
     author: Person!
     "Audiobook chapters, in play order; empty when the book only has epub files."
     chapters: [Chapter!]
+    """
+    Where the calling user should continue listening: the chapter they last played, or the next
+    unfinished one when they finished it. Chapters skipped earlier in the book are not revisited.
+    Null when the book has no chapters, was never started, or was listened to the end; start at the
+    first chapter then.
+    """
+    resumeChapter: Chapter
     "Epub files of this book; mediaOverlays = true marks the read-aloud edition."
     epubFiles: [MediaFile!]
     images: [Image!]

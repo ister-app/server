@@ -10,11 +10,11 @@ import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.MediaType;
 import app.ister.core.repository.BookRepository;
-import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.BookResumeService;
 import app.ister.core.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,7 +49,7 @@ class RecentlyWatchedControllerTest {
     private MovieRepository movieRepository;
 
     @Mock
-    private ChapterRepository chapterRepository;
+    private BookResumeService bookResumeService;
 
     @Mock
     private BookRepository bookRepository;
@@ -355,9 +355,9 @@ class RecentlyWatchedControllerTest {
 
     // --- continue listening / reading ---
 
-    /** After finishing a chapter the audiobook resumes at the next one. */
+    /** The audiobook continues at the chapter the resume service picked, on the book it belongs to. */
     @Test
-    void recentlyWatchedReturnsNextUnfinishedChapter() {
+    void recentlyWatchedReturnsTheChapterToResumeAt() {
         UserEntity user = user();
         BookEntity book = BookEntity.builder().name("Dit zijn de namen").build();
         book.setId(UUID.randomUUID());
@@ -366,16 +366,11 @@ class RecentlyWatchedControllerTest {
         ChapterEntity chapter2 = ChapterEntity.builder().number(2).bookEntity(book).build();
         chapter2.setId(UUID.randomUUID());
 
-        WatchStatusEntity finished = status(true, Instant.now());
-        finished.setChapterEntity(chapter1);
-
         when(userService.getOrCreateUser(authentication)).thenReturn(user);
         when(watchStatusRepository.findRecentChaptersAndBookIdsByUserId(user.getId()))
                 .thenReturn(List.<String[]>of(new String[]{chapter1.getId().toString(), book.getId().toString()}));
-        when(chapterRepository.findByBookEntity_Id(eq(book.getId()), any(Sort.class)))
-                .thenReturn(List.of(chapter1, chapter2));
-        when(watchStatusRepository.findByUserEntityExternalIdAndChapterEntityIn(eq("sub-123"),
-                eq(List.of(chapter1, chapter2)), any(Sort.class))).thenReturn(List.of(finished));
+        when(bookResumeService.resume(user, book.getId()))
+                .thenReturn(Optional.of(new BookResumeService.ChapterResume(chapter2, Instant.now())));
 
         List<RecentlyWatched> result = subject.recentlyWatched(authentication);
 
@@ -385,7 +380,7 @@ class RecentlyWatchedControllerTest {
         assertEquals(book, result.getFirst().book());
     }
 
-    /** Finishing the last chapter finishes the audiobook: nothing left to continue. */
+    /** Nothing left to resume — a finished audiobook — drops out of the list. */
     @Test
     void recentlyWatchedDropsAFinishedAudiobook() {
         UserEntity user = user();
@@ -394,15 +389,10 @@ class RecentlyWatchedControllerTest {
         ChapterEntity chapter = ChapterEntity.builder().number(1).bookEntity(book).build();
         chapter.setId(UUID.randomUUID());
 
-        WatchStatusEntity finished = status(true, Instant.now());
-        finished.setChapterEntity(chapter);
-
         when(userService.getOrCreateUser(authentication)).thenReturn(user);
         when(watchStatusRepository.findRecentChaptersAndBookIdsByUserId(user.getId()))
                 .thenReturn(List.<String[]>of(new String[]{chapter.getId().toString(), book.getId().toString()}));
-        when(chapterRepository.findByBookEntity_Id(eq(book.getId()), any(Sort.class))).thenReturn(List.of(chapter));
-        when(watchStatusRepository.findByUserEntityExternalIdAndChapterEntityIn(eq("sub-123"),
-                eq(List.of(chapter)), any(Sort.class))).thenReturn(List.of(finished));
+        when(bookResumeService.resume(user, book.getId())).thenReturn(Optional.empty());
 
         assertTrue(subject.recentlyWatched(authentication).isEmpty());
     }

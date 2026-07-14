@@ -6,14 +6,13 @@ import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PodcastEpisodeEntity;
 import app.ister.core.entity.UserEntity;
-import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.MediaType;
 import app.ister.core.repository.BookRepository;
-import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.BookResumeService;
 import app.ister.core.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,10 +27,8 @@ import java.util.Comparator;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Slf4j
@@ -40,11 +37,11 @@ import java.util.stream.Stream;
 public class RecentlyWatchedController {
     private final EpisodeRepository episodeRepository;
     private final MovieRepository movieRepository;
-    private final ChapterRepository chapterRepository;
     private final BookRepository bookRepository;
     private final PodcastEpisodeRepository podcastEpisodeRepository;
     private final WatchStatusRepository watchStatusRepository;
     private final UserService userService;
+    private final BookResumeService bookResumeService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -70,7 +67,8 @@ public class RecentlyWatchedController {
         List<RecentlyWatched> chapters = watchStatusRepository
                 .findRecentChaptersAndBookIdsByUserId(userEntity.getId())
                 .stream()
-                .flatMap(strings -> getChapterItem(userEntity, UUID.fromString(strings[1]), UUID.fromString(strings[0])).stream())
+                .flatMap(strings -> bookResumeService.resume(userEntity, UUID.fromString(strings[1])).stream())
+                .map(resume -> RecentlyWatched.ofChapter(resume.chapter(), resume.lastPlayed()))
                 .toList();
 
         List<RecentlyWatched> books = watchStatusRepository
@@ -143,41 +141,6 @@ public class RecentlyWatchedController {
                     return getFirstUnwatchedEpisodeFrom(originalEpisode, seasonEpisodes)
                             .map(e -> RecentlyWatched.ofEpisode(e, lastWatched));
                 });
-    }
-
-    /** Continue-listening: the next unfinished chapter of an audiobook, mirroring the episode logic. */
-    private Optional<RecentlyWatched> getChapterItem(UserEntity userEntity, UUID bookId, UUID chapterId) {
-        List<ChapterEntity> bookChapters = chapterRepository.findByBookEntity_Id(bookId, Sort.by("number").ascending());
-        Map<UUID, List<WatchStatusEntity>> statusesByChapterId = watchStatusRepository
-                .findByUserEntityExternalIdAndChapterEntityIn(userEntity.getExternalId(), bookChapters, Sort.by("dateUpdated").descending())
-                .stream()
-                .collect(Collectors.groupingBy(w -> w.getChapterEntity().getId()));
-
-        return bookChapters.stream()
-                .filter(chapter -> chapter.getId().equals(chapterId))
-                .findFirst()
-                .flatMap(originalChapter -> {
-                    List<WatchStatusEntity> statuses = statusesByChapterId.getOrDefault(originalChapter.getId(), List.of());
-                    if (statuses.isEmpty()) {
-                        return Optional.empty();
-                    }
-                    Instant lastWatched = statuses.getFirst().getDateUpdated();
-                    return getFirstUnfinishedChapterFrom(originalChapter, bookChapters, statusesByChapterId)
-                            .map(c -> RecentlyWatched.ofChapter(c, lastWatched));
-                });
-    }
-
-    private Optional<ChapterEntity> getFirstUnfinishedChapterFrom(ChapterEntity chapter, List<ChapterEntity> bookChapters,
-                                                                  Map<UUID, List<WatchStatusEntity>> statusesByChapterId) {
-        List<WatchStatusEntity> statuses = statusesByChapterId.getOrDefault(chapter.getId(), List.of());
-        if (statuses.isEmpty() || !statuses.getFirst().isWatched()) {
-            return Optional.of(chapter);
-        }
-        int indexOfNextOne = bookChapters.indexOf(chapter) + 1;
-        if (bookChapters.size() > indexOfNextOne) {
-            return getFirstUnfinishedChapterFrom(bookChapters.get(indexOfNextOne), bookChapters, statusesByChapterId);
-        }
-        return Optional.empty();
     }
 
     /** Continue-reading: an epub the user started but has not finished. */

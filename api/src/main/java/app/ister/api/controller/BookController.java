@@ -14,6 +14,8 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.BookResumeService;
+import app.ister.core.service.UserService;
 import app.ister.core.service.WatchStatusService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,6 +50,8 @@ public class BookController {
     private final MediaFileRepository mediaFileRepository;
     private final WatchStatusRepository watchStatusRepository;
     private final WatchStatusService watchStatusService;
+    private final BookResumeService bookResumeService;
+    private final UserService userService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -116,6 +120,13 @@ public class BookController {
     @SchemaMapping(typeName = "Book", field = "chapters")
     public List<ChapterEntity> chapters(BookEntity bookEntity) {
         return bookEntity.getChapterEntities();
+    }
+
+    @SchemaMapping(typeName = "Book", field = "resumeChapter")
+    public ChapterEntity resumeChapter(BookEntity bookEntity, Authentication authentication) {
+        return bookResumeService.resume(userService.getOrCreateUser(authentication), bookEntity.getId())
+                .map(BookResumeService.ChapterResume::chapter)
+                .orElse(null);
     }
 
     @SchemaMapping(typeName = "Book", field = "epubFiles")
