@@ -1,0 +1,277 @@
+name: Release
+
+# Every night, if main moved and the last commit built green, cut a release: bump the
+# version, build and push the images under semver tags, tag the commit and publish a
+# GitHub Release with notes built from the commits.
+#
+# The version cycle follows the usual Java/Gradle convention: main always carries a
+# -SNAPSHOT version, and only the tagged release commit carries a clean one. A release is
+# therefore two commits — the release itself, and the bump to the next -SNAPSHOT.
+on:
+  schedule:
+    - cron: '0 2 * * *'   # 02:00 UTC, after Renovate's automerge window
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump (auto = derived from the commits since the last tag)
+        type: choice
+        default: auto
+        options: [auto, patch, minor, major]
+
+# Two releases racing would fight over the tag and over main.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # Cheap pre-flight. It decides whether there is anything to release at all, so the
+  # expensive native build below never starts for a quiet night or a red main.
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read     # gh run list
+    outputs:
+      release: ${{ steps.check.outputs.release }}
+      prev: ${{ steps.check.outputs.prev }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0   # tags and history: both the bump level and the notes come from them
+
+      - name: Is there anything to release, and is it green?
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sha=$(git rev-parse HEAD)
+          prev=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          echo "prev=$prev" >> "$GITHUB_OUTPUT"
+          echo "release=false" >> "$GITHUB_OUTPUT"
+
+          # "New commits" means new *releasable* commits. A release leaves its own two
+          # chore(release) commits on main, so HEAD is never the tag itself — without this,
+          # a quiet night would look like it had something to ship.
+          if [ -n "$prev" ]; then
+            new=$(git log --no-merges --pretty='%s' "${prev}..HEAD" | grep -cvP '^chore\(release\)' || true)
+            if [ "$new" -eq 0 ]; then
+              echo "::notice::no new commits since $prev — nothing to release."
+              exit 0
+            fi
+          fi
+
+          # Both workflows matter. `build.yml` runs the tests, `docker-publish.yml` runs the
+          # nativeCompile — and a green JVM build says nothing about whether the native image
+          # still compiles, which is the artifact we actually ship.
+          for wf in build.yml docker-publish.yml; do
+            ok=$(gh run list --branch main --commit "$sha" --workflow "$wf" \
+                   --json status,conclusion \
+                   --jq '[.[] | select(.status == "completed" and .conclusion == "success")] | length')
+            if [ "$ok" -eq 0 ]; then
+              echo "::notice::$wf has no successful completed run for $sha — not releasing."
+              exit 0
+            fi
+          done
+
+          echo "release=true" >> "$GITHUB_OUTPUT"
+          echo "::notice::$sha is green; releasing (previous tag: ${prev:-none})."
+
+  release:
+    needs: gate
+    if: needs.gate.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # commit the bump, push the tag, create the release
+      packages: write   # push to ghcr
+      id-token: write   # cosign keyless signing
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Work out the release version
+        id: version
+        env:
+          PREV: ${{ needs.gate.outputs.prev }}
+        run: |
+          if [ -z "$PREV" ]; then
+            # The first release. Deliberately not a bump of anything: 1.0.0 is where this
+            # project starts its version line.
+            next=1.0.0
+            bump=initial
+          else
+            bump="${{ inputs.bump || 'auto' }}"
+            if [ "$bump" = auto ]; then
+              log=$(git log --no-merges --pretty='%s%n%b' "${PREV}..HEAD")
+              if grep -qP '^[a-z]+(\(.+\))?!:|^BREAKING[ -]CHANGE' <<<"$log"; then
+                bump=major
+              elif grep -qP '^feat(\(.+\))?:' <<<"$log"; then
+                bump=minor
+              else
+                # Renovate's dependency bumps land here (fix(deps):), as does anything unlabelled.
+                bump=patch
+              fi
+            fi
+            next=$(awk -F. -v b="$bump" '{
+              if (b == "major")      printf "%d.0.0\n", $1 + 1
+              else if (b == "minor") printf "%d.%d.0\n", $1, $2 + 1
+              else                   printf "%d.%d.%d\n", $1, $2, $3 + 1
+            }' <<<"${PREV#v}")
+          fi
+
+          # The next development version. Always a patch above the release: what the next
+          # release actually becomes is decided by its own commits, not by this number.
+          dev=$(awk -F. '{ printf "%d.%d.%d-SNAPSHOT\n", $1, $2, $3 + 1 }' <<<"$next")
+
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "dev=$dev"      >> "$GITHUB_OUTPUT"
+          echo "::notice::releasing v$next ($bump, since ${PREV:-the root commit}); main continues on $dev"
+
+      - name: Set the release version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          sed -i -E "s|^(\tversion = ')[^']*(')|\1${VERSION}\2|" build.gradle
+
+          # A silently non-matching sed would ship the old version under the new tag, and a
+          # release image that reports a -SNAPSHOT version is a bug you only notice months
+          # later, in production, when you are trying to work out what is running.
+          grep -qP "^\tversion = '${VERSION}'$" build.gradle \
+            || { echo "version not written to build.gradle" >&2; exit 1; }
+          ! grep -qP "^\tversion = '.*-SNAPSHOT'" build.gradle \
+            || { echo "release version still carries -SNAPSHOT" >&2; exit 1; }
+          git --no-pager diff build.gradle
+
+      - uses: graalvm/setup-graalvm@cabbb10818fabc989d6dbd508e4846596d20dd2d # v1.6.0
+        with:
+          java-version: '25.0.2'
+          distribution: 'graalvm-community'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Gradle packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
+          restore-keys: ${{ runner.os }}-gradle
+
+      # Rebuilt here rather than retagging the image docker-publish.yml already pushed for
+      # this commit: the project version is baked into the artifact (gradle-git-properties ->
+      # git.build.version -> NodeEntity.version), so the release image has to be compiled
+      # from the release version.
+      - name: Compile the native image
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew nativeCompile
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log into registry ${{ env.REGISTRY }}
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata (server)
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}
+          # The tag does not exist in git yet — it is pushed after the images are, so that a
+          # failed build cannot leave a tag pointing at a release that was never published.
+          # Hence the version is fed in explicitly instead of being read from the ref.
+          tags: |
+            type=semver,pattern={{version}},value=v${{ steps.version.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ steps.version.outputs.version }}
+            type=semver,pattern={{major}},value=v${{ steps.version.outputs.version }}
+          flavor: latest=true
+
+      - name: Build and push the server image
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: Dockerfile.native
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Sign the published server image
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+
+      - name: Extract Docker metadata (migrations)
+        id: meta-migrations
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.REGISTRY }}/ister-app/migrations
+          tags: |
+            type=semver,pattern={{version}},value=v${{ steps.version.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ steps.version.outputs.version }}
+            type=semver,pattern={{major}},value=v${{ steps.version.outputs.version }}
+          flavor: latest=true
+
+      - name: Build and push the migrations image
+        id: build-migrations
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: Dockerfile.migrations
+          push: true
+          tags: ${{ steps.meta-migrations.outputs.tags }}
+          labels: ${{ steps.meta-migrations.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Sign the published migrations image
+        env:
+          TAGS: ${{ steps.meta-migrations.outputs.tags }}
+          DIGEST: ${{ steps.build-migrations.outputs.digest }}
+        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+
+      - name: Generate the release notes
+        run: ./ci/release-notes.sh "${{ steps.version.outputs.version }}" "${{ needs.gate.outputs.prev }}"
+
+      - name: Commit, tag, and open the next development iteration
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          DEV: ${{ steps.version.outputs.dev }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add build.gradle CHANGELOG.md
+          git commit -m "chore(release): v${VERSION}"
+          git tag "v${VERSION}"
+
+          # Back to a snapshot straight away, so main is never sitting on a released version.
+          sed -i -E "s|^(\tversion = ')[^']*(')|\1${DEV}\2|" build.gradle
+          grep -qP "^\tversion = '${DEV}'$" build.gradle \
+            || { echo "dev version not written to build.gradle" >&2; exit 1; }
+          git commit -am "chore(release): prepare ${DEV}"
+
+          # Both commits and the tag in one push. The guard in build.yml / docker-publish.yml
+          # keys off the *last* commit of the push — which is this prepare commit — so both
+          # release commits share the `chore(release):` prefix on purpose.
+          git push origin HEAD:main --follow-tags
+
+      - name: Publish the GitHub Release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --notes-file RELEASE_NOTES.md

@@ -27,7 +27,9 @@ subprojects {
 	}
 
 	group = 'app.ister'
-	version = '0.0.2-SNAPSHOT'
+	// main always carries a -SNAPSHOT; the release workflow strips it on the tagged commit
+	// and puts the next snapshot back. Do not bump this by hand.
+	version = '1.0.0-SNAPSHOT'
 
 	if (project.name == 'server') {
 		apply plugin: 'org.springframework.boot'

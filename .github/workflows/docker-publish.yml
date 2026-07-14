@@ -1,10 +1,11 @@
 name: Docker
 
+# Development images for main: they carry the `main` and `sha-…` tags and report a
+# -SNAPSHOT version. Releases are cut by release.yml, which builds and tags its own images —
+# hence no `release:` trigger here, or the two would race to push the same tags.
 on:
   push:
     branches: [ main ]
-  release:
-    types: [created]
 
 env:
   REGISTRY: ghcr.io
@@ -13,6 +14,9 @@ env:
 jobs:
   build:
 
+    # Skip the two commits release.yml pushes. Without this the release would immediately be
+    # built over by a dev image, and the prepare commit would kick off a pointless native build.
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -88,6 +92,7 @@ jobs:
 
   build-migrations:
 
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

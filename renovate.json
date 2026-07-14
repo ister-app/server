@@ -1,0 +1,44 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits"
+  ],
+  "timezone": "Europe/Amsterdam",
+  "schedule": ["* 0-1 * * *"],
+
+  "semanticCommitType": "fix",
+  "semanticCommitScope": "deps",
+
+  "packageRules": [
+    {
+      "description": "Patch and digest bumps are automerged. They land before the 02:00 release run, so they ship the same night.",
+      "matchUpdateTypes": ["patch", "digest"],
+      "automerge": true
+    },
+    {
+      "description": "GitHub Actions. Grouped, and chore(deps) rather than fix(deps): a bumped action does not change the shipped artifact, so it should not cut a release on its own.",
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions",
+      "semanticCommitType": "chore",
+      "automerge": true
+    },
+    {
+      "description": "Minors of the framework and of the runtime image are real upgrades of the thing we ship. They get a human.",
+      "matchUpdateTypes": ["minor"],
+      "matchPackageNames": [
+        "org.springframework.boot{/,}**",
+        "org.hibernate{/,}**",
+        "org.graalvm{/,}**",
+        "fedora"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "Majors are never automerged. They land on the dependency dashboard and wait for a human.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
+  ]
+}

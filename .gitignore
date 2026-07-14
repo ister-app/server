@@ -48,3 +48,6 @@ typesense-data/
 **/*-local.*
 gradle.properties
 .rabbitmq-erlang-cookie
+
+# Written by ci/release-notes.sh; only CHANGELOG.md is committed.
+RELEASE_NOTES.md

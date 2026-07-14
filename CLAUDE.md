@@ -6,6 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Ister Server** is a media server application (similar to Plex/Jellyfin) built with Spring Boot 4.0.6 and Java 25. It scans media libraries (movies, TV shows, music, books, **and podcasts**), fetches metadata from TMDB, and streams HLS-transcoded media to clients via REST and GraphQL APIs. It supports a **multi-node** deployment where one node transcodes media owned by another.
 
+## Commits & Releases
+
+Commit subjects **must** be [Conventional Commits](https://www.conventionalcommits.org/)
+(`feat(scope): …`, `fix: …`, `chore(deps): …`, `!` or `BREAKING CHANGE:` for breaking). A
+`commit-lint` job fails the PR otherwise, and `.github/workflows/release.yml` derives both the
+version bump and the release notes from them. See `CONTRIBUTING.md`.
+
+Releases are cut nightly and automatically. **Never bump `version` in `build.gradle` by hand**:
+`main` always carries a `-SNAPSHOT`, and only the tagged release commit carries a clean version.
+
 ## Build & Run Commands
 
 ```bash
