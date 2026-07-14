@@ -254,7 +254,12 @@ jobs:
 
           git add build.gradle CHANGELOG.md
           git commit -m "chore(release): v${VERSION}"
-          git tag "v${VERSION}"
+
+          # Annotated on purpose: --follow-tags below pushes annotated tags only, and a
+          # lightweight one would silently stay behind on the runner — main would carry the
+          # release commits while the tag, the GitHub Release, and the next night's
+          # `git describe` all went missing.
+          git tag -a "v${VERSION}" -m "v${VERSION}"
 
           # Back to a snapshot straight away, so main is never sitting on a released version.
           sed -i -E "s|^(\tversion = ')[^']*(')|\1${DEV}\2|" build.gradle
