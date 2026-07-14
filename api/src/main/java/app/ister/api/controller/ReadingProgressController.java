@@ -9,6 +9,7 @@ import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.ContinueWatchingService;
 import app.ister.core.service.UserService;
 import app.ister.core.service.WatchStatusService;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +51,7 @@ public class ReadingProgressController {
     private final MediaFileRepository mediaFileRepository;
     private final WatchStatusRepository watchStatusRepository;
     private final WatchStatusService watchStatusService;
+    private final ContinueWatchingService continueWatchingService;
     private final UserService userService;
 
     /**
@@ -92,6 +94,7 @@ public class ReadingProgressController {
         watchStatus.setReadingProgress(Math.clamp(request.progress(), 0.0, 1.0));
         watchStatus.setWatched(request.progress() >= 0.97);
         watchStatusRepository.save(watchStatus);
+        continueWatchingService.onWatchStatusChanged(watchStatus);
 
         if (request.chapterId() != null && request.positionInMilliseconds() != null) {
             applyListeningPosition(authentication, book, request.chapterId(), request.positionInMilliseconds());
@@ -169,6 +172,7 @@ public class ReadingProgressController {
         if (current == null || !current.getBookEntity().getId().equals(book.getId())) {
             return;
         }
+        WatchStatusEntity currentStatus = null;
         for (ChapterEntity chapter : book.getChapterEntities()) {
             WatchStatusEntity status = watchStatusService.getOrCreateForChapter(authentication, chapter);
             int compared = Integer.compare(chapter.getNumber(), current.getNumber());
@@ -177,11 +181,17 @@ public class ReadingProgressController {
             } else if (compared == 0) {
                 status.setWatched(false);
                 status.setProgressInMilliseconds(Math.max(0, positionInMilliseconds));
+                currentStatus = status;
             } else {
                 status.setWatched(false);
                 status.setProgressInMilliseconds(0);
             }
             watchStatusRepository.save(status);
+        }
+        // One update for the whole batch: the continue-watching entry is keyed by book, and the
+        // chapter the reader is in is the one it should resume with.
+        if (currentStatus != null) {
+            continueWatchingService.onWatchStatusChanged(currentStatus);
         }
     }
 

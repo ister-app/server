@@ -73,6 +73,9 @@ class PlayQueueServiceTest {
     private PodcastPreferenceService podcastPreferenceService;
 
     @Mock
+    private ContinueWatchingService continueWatchingService;
+
+    @Mock
     private Authentication authentication;
 
     private UserEntity user;

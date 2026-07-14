@@ -1,6 +1,7 @@
 package app.ister.core.repository;
 
 import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.ContinueWatchingEntity;
 import app.ister.core.entity.CreditEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
@@ -19,6 +20,7 @@ import app.ister.core.enums.CreditType;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.LibraryType;
+import app.ister.core.enums.MediaType;
 import app.ister.core.enums.StreamCodecType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +33,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -70,6 +75,9 @@ class PostgresRepositoryIntegrationTest {
 
     @Autowired
     private WatchStatusRepository watchStatusRepository;
+
+    @Autowired
+    private ContinueWatchingRepository continueWatchingRepository;
 
     @Autowired
     private MediaFileStreamRepository mediaFileStreamRepository;
@@ -173,7 +181,7 @@ class PostgresRepositoryIntegrationTest {
     }
 
     @Test
-    void findRecentEpisodesAndShowIdsByUserIdReturnsLatestEpisodePerShow() {
+    void findRecentEpisodeEntriesReturnsTheLastPlayedEpisodePerShow() {
         UserEntity user = em.persist(UserEntity.builder().externalId("user-1").build());
         LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.SHOW).name("Shows").build());
         ShowEntity show = em.persist(ShowEntity.builder().libraryEntity(library).name("Show").releaseYear(2020).build());
@@ -186,14 +194,18 @@ class PostgresRepositoryIntegrationTest {
         latest.setProgressInMilliseconds(1000);
         em.persistAndFlush(latest);
 
-        List<String[]> result = watchStatusRepository.findRecentEpisodesAndShowIdsByUserId(user.getId());
+        List<WatchStatusRepository.RecentEntry> result =
+                watchStatusRepository.findRecentEpisodeEntries(user.getId(), Instant.now().minus(Duration.ofDays(150)));
 
-        assertEquals(1, result.size());
-        assertEquals(show.getId().toString(), result.get(0)[1]);
+        assertEquals(1, result.size(), "one entry per show, not per watch status");
+        assertEquals(episode2.getId(), result.get(0).getItemId());
+        assertEquals(show.getId(), result.get(0).getGroupId());
+        assertTrue(result.get(0).getWatched());
+        assertNotNull(result.get(0).getLastWatched());
     }
 
     @Test
-    void findRecentEpisodesWithDateByUserIdIncludesDateColumn() {
+    void findRecentEpisodeEntriesIgnoresHistoryOlderThanTheCutoff() {
         UserEntity user = em.persist(UserEntity.builder().externalId("user-2").build());
         LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.SHOW).name("Shows2").build());
         ShowEntity show = em.persist(ShowEntity.builder().libraryEntity(library).name("Show2").releaseYear(2021).build());
@@ -201,40 +213,72 @@ class PostgresRepositoryIntegrationTest {
         EpisodeEntity episode = em.persist(EpisodeEntity.builder().showEntity(show).seasonEntity(season).number(1).build());
         em.persistAndFlush(watchStatus(user, episode, null));
 
-        List<Object[]> result = watchStatusRepository.findRecentEpisodesWithDateByUserId(user.getId());
-
-        assertEquals(1, result.size());
-        assertEquals(episode.getId().toString(), String.valueOf(result.get(0)[0]));
-        assertNotNull(result.get(0)[2], "date_updated column should be returned");
-        assertEquals(Boolean.TRUE, result.get(0)[3], "watched column should be returned");
+        assertTrue(watchStatusRepository.findRecentEpisodeEntries(user.getId(), Instant.now().plusSeconds(60)).isEmpty());
     }
 
     @Test
-    void findRecentMovieIdsByUserIdReturnsWatchedMovie() {
+    void findNextUnwatchedEpisodeIdCrossesSeasonsAndSkipsWhatIsWatched() {
         UserEntity user = em.persist(UserEntity.builder().externalId("user-3").build());
-        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.MOVIE).name("Movies").build());
-        MovieEntity movie = em.persist(MovieEntity.builder().libraryEntity(library).name("Movie").releaseYear(2020).build());
-        em.persistAndFlush(watchStatus(user, null, movie));
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.SHOW).name("Shows3").build());
+        ShowEntity show = em.persist(ShowEntity.builder().libraryEntity(library).name("Show3").releaseYear(2020).build());
+        SeasonEntity season1 = em.persist(SeasonEntity.builder().showEntity(show).number(1).build());
+        SeasonEntity season2 = em.persist(SeasonEntity.builder().showEntity(show).number(2).build());
+        EpisodeEntity s1e2 = em.persist(EpisodeEntity.builder().showEntity(show).seasonEntity(season1).number(2).build());
+        EpisodeEntity s2e1 = em.persist(EpisodeEntity.builder().showEntity(show).seasonEntity(season2).number(1).build());
+        EpisodeEntity s2e2 = em.persist(EpisodeEntity.builder().showEntity(show).seasonEntity(season2).number(2).build());
+        // The user finished the first episode of season 2 out of order; it must be skipped.
+        em.persistAndFlush(watchStatus(user, s2e1, null));
 
-        List<String> result = watchStatusRepository.findRecentMovieIdsByUserId(user.getId());
-
-        assertEquals(List.of(movie.getId().toString()), result);
+        assertEquals(List.of(s2e2.getId()),
+                episodeRepository.findNextUnwatchedEpisodeId(show.getId(), user.getId(), 1, 2),
+                "the next unwatched episode after s1e2 is s2e2, not the finished s2e1");
+        assertEquals(List.of(s1e2.getId()),
+                episodeRepository.findNextUnwatchedEpisodeId(show.getId(), user.getId(), -1, -1),
+                "from before the first episode, the first unwatched one");
+        assertTrue(episodeRepository.findNextUnwatchedEpisodeId(show.getId(), user.getId(), 2, 2).isEmpty(),
+                "nothing after the last episode");
     }
 
     @Test
-    void findRecentUnwatchedMovieIdsExcludesFullyWatchedMovies() {
+    void continueWatchingUpsertInsertsThenUpdatesAndOnlyMovesLastWatchedForward() {
         UserEntity user = em.persist(UserEntity.builder().externalId("user-4").build());
-        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.MOVIE).name("Movies2").build());
-        MovieEntity watchedMovie = em.persist(MovieEntity.builder().libraryEntity(library).name("Watched").releaseYear(2020).build());
-        MovieEntity halfWatchedMovie = em.persist(MovieEntity.builder().libraryEntity(library).name("HalfWatched").releaseYear(2021).build());
-        em.persist(watchStatus(user, null, watchedMovie)); // helper sets watched = true
-        WatchStatusEntity halfWatched = watchStatus(user, null, halfWatchedMovie);
-        halfWatched.setWatched(false);
-        em.persistAndFlush(halfWatched);
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.SHOW).name("Shows4").build());
+        ShowEntity show = em.persist(ShowEntity.builder().libraryEntity(library).name("Show4").releaseYear(2020).build());
+        SeasonEntity season = em.persist(SeasonEntity.builder().showEntity(show).number(1).build());
+        EpisodeEntity episode1 = em.persist(EpisodeEntity.builder().showEntity(show).seasonEntity(season).number(1).build());
+        EpisodeEntity episode2 = em.persist(EpisodeEntity.builder().showEntity(show).seasonEntity(season).number(2).build());
+        em.flush();
+        // The column is TIMESTAMP(6); comparing against a nanosecond-precision Instant would read the
+        // stored value back as fractionally older than what was written.
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
 
-        List<String> result = watchStatusRepository.findRecentUnwatchedMovieIdsByUserId(user.getId());
+        continueWatchingRepository.upsert(user.getId(), MediaType.EPISODE.name(), show.getId(),
+                episode1.getId(), null, null, null, null, now);
+        continueWatchingRepository.upsert(user.getId(), MediaType.EPISODE.name(), show.getId(),
+                episode2.getId(), null, null, null, null, now.minus(Duration.ofDays(1)));
+        em.clear();
 
-        assertEquals(List.of(halfWatchedMovie.getId().toString()), result);
+        List<ContinueWatchingEntity> entries =
+                continueWatchingRepository.findEntries(user.getId(), now.minus(Duration.ofDays(150)));
+
+        assertEquals(1, entries.size(), "the second upsert must update the entry, not add one");
+        assertEquals(episode2.getId(), entries.get(0).getEpisodeEntity().getId());
+        assertFalse(entries.get(0).getLastWatched().isBefore(now), "an out-of-order write cannot pull the entry back");
+    }
+
+    @Test
+    void findEntriesLeavesOutEntriesWithNothingLeftToResume() {
+        UserEntity user = em.persist(UserEntity.builder().externalId("user-5").build());
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.SHOW).name("Shows5").build());
+        ShowEntity show = em.persist(ShowEntity.builder().libraryEntity(library).name("Show5").releaseYear(2020).build());
+        em.flush();
+
+        continueWatchingRepository.upsert(user.getId(), MediaType.EPISODE.name(), show.getId(),
+                null, null, null, null, null, Instant.now());
+        em.clear();
+
+        assertTrue(continueWatchingRepository
+                .findEntries(user.getId(), Instant.now().minus(Duration.ofDays(150))).isEmpty());
     }
 
     @Test

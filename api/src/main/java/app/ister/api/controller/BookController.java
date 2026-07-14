@@ -15,6 +15,7 @@ import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import app.ister.core.service.BookResumeService;
+import app.ister.core.service.ContinueWatchingService;
 import app.ister.core.service.UserService;
 import app.ister.core.service.WatchStatusService;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +51,7 @@ public class BookController {
     private final MediaFileRepository mediaFileRepository;
     private final WatchStatusRepository watchStatusRepository;
     private final WatchStatusService watchStatusService;
+    private final ContinueWatchingService continueWatchingService;
     private final BookResumeService bookResumeService;
     private final UserService userService;
 
@@ -92,6 +94,7 @@ public class BookController {
         watchStatus.setReadingProgress(Math.clamp(progress, 0.0, 1.0));
         watchStatus.setWatched(progress >= 0.97);
         watchStatusRepository.save(watchStatus);
+        continueWatchingService.onWatchStatusChanged(watchStatus);
         return watchStatus;
     }
 

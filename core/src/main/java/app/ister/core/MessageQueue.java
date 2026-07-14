@@ -28,6 +28,7 @@ public class MessageQueue {
     public static final String APP_ISTER_SERVER_PODCAST_EPISODE_FOUND = "app.ister.server.PodcastEpisodeFound";
     public static final String APP_ISTER_SERVER_PODCAST_REFRESH_REQUESTED = "app.ister.server.PodcastRefreshRequested";
     public static final String APP_ISTER_SERVER_PODCAST_EPISODE_DOWNLOAD_REQUESTED = "app.ister.server.PodcastEpisodeDownloadRequested";
+    public static final String APP_ISTER_SERVER_CONTINUE_WATCHING_REBUILD_REQUESTED = "app.ister.server.ContinueWatchingRebuildRequested";
     public static final String APP_ISTER_SERVER_SEARCH_INDEX_REQUESTED = "app.ister.server.SearchIndexRequested";
     public static final String APP_ISTER_SERVER_SEARCH_REINDEX_REQUESTED = "app.ister.server.SearchReindexRequested";
 

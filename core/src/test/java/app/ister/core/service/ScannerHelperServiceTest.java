@@ -40,6 +40,8 @@ class ScannerHelperServiceTest {
     private ChapterRepository chapterRepository;
     @Mock
     private ServerEventService serverEventService;
+    @Mock
+    private ContinueWatchingService continueWatchingService;
 
     private final LibraryEntity library = LibraryEntity.builder().build();
 

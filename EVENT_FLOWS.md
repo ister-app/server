@@ -207,7 +207,7 @@ flowchart TD
 
     A["PRE_TRANSCODE_RECENTLY_WATCHED\n.{diskName}"]
     A --> PA["HandlePreTranscodeRecentlyWatched\n📦 disk"]
-    PA -->|"half-bekeken + volgende episodes\nkeepUntil=+30min (schuift elke run op)"| B
+    PA -->|"continue-watching-entries per user\n(+ de episode erna) \nkeepUntil=+30min (schuift elke run op)"| B
     PA -->|"bestand zonder geanalyseerde\nstreams → her-analyse"| MFF["MEDIA_FILE_FOUND\n.{dirName}"]
 
     B["TRANSCODE_REQUESTED\n.{dirName}  preTranscode=true/false\nkeepUntilEpochMillis (optioneel)"]
@@ -232,6 +232,10 @@ van segmenten) laat een latere pre-transcode de pass overslaan.
 **Retentie:** de cleanup-taak verwijdert een cache-dir pas als hij ≥2 uur onaangeraakt is én de
 `keep_until`-deadline (hoogste ooit ontvangen `keepUntilEpochMillis`) verstreken is. Prefetch stuurt
 +24 uur; de periodieke pre-transcode stuurt +30 min en ververst dat elke 15 min zolang de regel geldt.
+
+**Werklijst:** wat pre-transcoding warm houdt zijn de continue-watching-entries (zie Flow 6): precies het
+item dat de gebruiker gaat spelen — de onafgemaakte episode/film, of de volgende episode van een serie
+waarvan hij er net één uitkeek — plus de episode dáárna, zodat autoplay niet stilvalt.
 
 ---
 
@@ -260,6 +264,38 @@ flowchart TD
 **Regel:** elke plek die een doorzoekbare entiteit (movie/show/episode/person/album/track) verwijdert,
 moet `serverEventService.createSearchDeleteEvent(...)` aanroepen. Vangnetten: de upsert-handler verwijdert
 het document als de entiteit niet meer bestaat, en `reindexSearch` bouwt de index volledig opnieuw op.
+
+---
+
+## Flow 6: Continue watching (recentlyWatched)
+
+**Trigger A:** playback-heartbeat (`updatePlayQueue`) / lees-voortgang (`updateReadingProgress`,
+`POST /reading-progress`) → `ContinueWatchingService.onWatchStatusChanged` werkt **synchroon, in dezelfde
+transactie**, één rij van `continue_watching` bij. Geen event: cache en waarheid committen samen.
+**Trigger B:** nachtelijke volledige herberekening per user (self-healing + backfill na de V20-migratie).
+**Trigger C:** scanner voegt een nieuwe episode/chapter toe → `recomputeForShow`/`recomputeForBook`.
+
+```mermaid
+flowchart TD
+    HB([updatePlayQueue / updateReadingProgress]) -->|"synchroon, zelfde transactie"| S
+    SC([ScannerHelperService\ngetOrCreateEpisode/Chapter]) -->|"serie was uitgekeken →\nnieuwe episode wordt de target"| S
+
+    Cron([ContinueWatchingRebuildScheduler\n03:30 + backfill bij lege tabel]) -->|per user| E
+    E["CONTINUE_WATCHING_REBUILD_REQUESTED\n(userId)"]
+    E --> H["HandleContinueWatchingRebuildRequested\n📦 worker"]
+    H -->|"rijen weggooien + herberekenen\nuit watch_status_entity"| S
+
+    S["ContinueWatchingService"]
+    S -->|"upsert ON CONFLICT\n(user, entry_type, group_id)"| T[("continue_watching\n1 rij per user per\nshow/film/boek/podcast")]
+    T --> Q([GraphQL recentlyWatched\n1 indexed read])
+    T --> P([PreTranscodeService\nFlow 4])
+```
+
+**Regel:** de target-kolommen zijn allemaal NULL zodra er niets meer te vervolgen valt (serie uit,
+film uitgekeken). De rij blijft staan — anders kan een later gescande episode de serie niet meer laten
+terugkeren in de lijst, en dat is precies wat `recomputeForShow` doet. Elke plek die een watch status
+schrijft **buiten** de heartbeat om moet `onWatchStatusChanged` aanroepen, anders loopt de lijst achter
+tot de nachtelijke rebuild.
 
 ---
 

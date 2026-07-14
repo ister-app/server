@@ -69,4 +69,9 @@ public class QueueConfig {
         return new Queue(APP_ISTER_SERVER_PODCAST_REFRESH_REQUESTED);
     }
 
+    @Bean
+    public Queue queueContinueWatchingRebuildRequested() {
+        return new Queue(APP_ISTER_SERVER_CONTINUE_WATCHING_REBUILD_REQUESTED);
+    }
+
 }

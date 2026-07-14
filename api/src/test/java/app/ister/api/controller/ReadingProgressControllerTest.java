@@ -9,6 +9,7 @@ import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.ContinueWatchingService;
 import app.ister.core.service.UserService;
 import app.ister.core.service.WatchStatusService;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,6 +62,9 @@ class ReadingProgressControllerTest {
 
     @Mock
     private WatchStatusService watchStatusService;
+
+    @Mock
+    private ContinueWatchingService continueWatchingService;
 
     @Mock
     private UserService userService;

@@ -54,6 +54,46 @@ public interface EpisodeRepository extends JpaRepository<EpisodeEntity, UUID> {
     List<UUID> findEpisodeIdsForShowShuffled(@Param("showId") UUID showId, @Param("seed") String seed, @Param("excludeId") UUID excludeId, @Param("limit") int limit, @Param("offset") int offset);
 
     /**
+     * The episode a user should continue a show with: the first episode in play order (season
+     * number, episode number) after the given position that the user has not finished. Returns an
+     * empty list when the user is up to date with the show.
+     *
+     * <p>NOT EXISTS rather than a join on watch_status_entity: an episode can have several watch
+     * rows for one user (one per play queue item), and a join would multiply them.
+     *
+     * @param afterSeason  season number of the episode to search from (exclusive)
+     * @param afterEpisode episode number within that season (exclusive)
+     */
+    @Query(value = """
+            SELECT e.id FROM episode_entity e
+            JOIN season_entity s ON e.season_entity_id = s.id
+            WHERE e.show_entity_id = :showId
+              AND (s.number, e.number) > (:afterSeason, :afterEpisode)
+              AND NOT EXISTS (SELECT 1 FROM watch_status_entity w
+                              WHERE w.episode_entity_id = e.id AND w.user_entity_id = :userId AND w.watched)
+            ORDER BY s.number, e.number, e.id
+            LIMIT 1""", nativeQuery = true)
+    List<UUID> findNextUnwatchedEpisodeId(@Param("showId") UUID showId,
+                                          @Param("userId") UUID userId,
+                                          @Param("afterSeason") int afterSeason,
+                                          @Param("afterEpisode") int afterEpisode);
+
+    /**
+     * The episode that simply follows the given position in play order, watched or not. Used by
+     * pre-transcoding to keep the episode after the one the user is about to play warm as well.
+     */
+    @Query(value = """
+            SELECT e.id FROM episode_entity e
+            JOIN season_entity s ON e.season_entity_id = s.id
+            WHERE e.show_entity_id = :showId
+              AND (s.number, e.number) > (:afterSeason, :afterEpisode)
+            ORDER BY s.number, e.number, e.id
+            LIMIT 1""", nativeQuery = true)
+    List<UUID> findNextEpisodeId(@Param("showId") UUID showId,
+                                 @Param("afterSeason") int afterSeason,
+                                 @Param("afterEpisode") int afterEpisode);
+
+    /**
      * Returns the IDs (UUID) of episodes that have no {@link MetadataEntity} linked to them.
      */
     @Query("SELECT s.id FROM EpisodeEntity s LEFT JOIN s.metadataEntities m " +

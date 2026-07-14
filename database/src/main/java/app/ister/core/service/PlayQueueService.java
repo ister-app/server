@@ -62,6 +62,8 @@ public class PlayQueueService {
 
     private final WatchStatusService watchStatusService;
 
+    private final ContinueWatchingService continueWatchingService;
+
     private final PodcastPreferenceService podcastPreferenceService;
 
     /** Stream settings a client reports via updatePlayQueue; used to prefetch the next item in the same format. */
@@ -80,7 +82,7 @@ public class PlayQueueService {
     // Bound for the shuffle exclusion parameter when there is no start item; matches no row.
     private static final UUID NIL_UUID = new UUID(0, 0);
 
-    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, ChapterRepository chapterRepository, PodcastEpisodeRepository podcastEpisodeRepository, LibraryRepository libraryRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService, PodcastPreferenceService podcastPreferenceService) {
+    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, ChapterRepository chapterRepository, PodcastEpisodeRepository podcastEpisodeRepository, LibraryRepository libraryRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService, ContinueWatchingService continueWatchingService, PodcastPreferenceService podcastPreferenceService) {
         this.playQueueRepository = playQueueRepository;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
@@ -91,6 +93,7 @@ public class PlayQueueService {
         this.userService = userService;
         this.watchStatusRepository = watchStatusRepository;
         this.watchStatusService = watchStatusService;
+        this.continueWatchingService = continueWatchingService;
         this.podcastPreferenceService = podcastPreferenceService;
     }
 
@@ -638,6 +641,9 @@ public class PlayQueueService {
             watchStatusEntity.setWatched(durationIsLessThenOneMinute);
         }
         watchStatusRepository.save(watchStatusEntity);
+        // Keep the user's continue-watching entry in step with the heartbeat: finishing an episode
+        // here is what makes the next one show up in their list.
+        continueWatchingService.onWatchStatusChanged(watchStatusEntity);
     }
 
 }

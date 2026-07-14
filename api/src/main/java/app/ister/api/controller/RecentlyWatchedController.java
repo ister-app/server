@@ -2,46 +2,36 @@ package app.ister.api.controller;
 
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.ChapterEntity;
+import app.ister.core.entity.ContinueWatchingEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PodcastEpisodeEntity;
 import app.ister.core.entity.UserEntity;
-import app.ister.core.enums.MediaType;
-import app.ister.core.repository.BookRepository;
-import app.ister.core.repository.EpisodeRepository;
-import app.ister.core.repository.MovieRepository;
-import app.ister.core.repository.PodcastEpisodeRepository;
-import app.ister.core.repository.WatchStatusRepository;
-import app.ister.core.service.BookResumeService;
+import app.ister.core.service.ContinueWatchingService;
 import app.ister.core.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Sort;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
-import java.util.Comparator;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
-import java.util.stream.Stream;
 
+/**
+ * The "continue watching" list. It is not computed here: {@link ContinueWatchingService} keeps a
+ * precomputed entry per show / movie / book / podcast up to date as the user plays, so this query
+ * is one indexed read plus the batch loading of the media it points at. It used to walk the watch
+ * history and load every episode of every show the user had ever touched, on every call.
+ */
 @Slf4j
 @Controller
 @RequiredArgsConstructor
 public class RecentlyWatchedController {
-    private final EpisodeRepository episodeRepository;
-    private final MovieRepository movieRepository;
-    private final BookRepository bookRepository;
-    private final PodcastEpisodeRepository podcastEpisodeRepository;
-    private final WatchStatusRepository watchStatusRepository;
+    private final ContinueWatchingService continueWatchingService;
     private final UserService userService;
-    private final BookResumeService bookResumeService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -49,59 +39,30 @@ public class RecentlyWatchedController {
         log.debug("Getting recently watched for user: {}", authentication.getName());
         UserEntity userEntity = userService.getOrCreateUser(authentication);
 
-        List<RecentlyWatched> episodes = watchStatusRepository
-                .findRecentEpisodesAndShowIdsByUserId(userEntity.getId())
-                .stream()
-                .flatMap(strings -> getEpisodeItem(UUID.fromString(strings[1]), UUID.fromString(strings[0])).stream())
-                .toList();
-
-        List<RecentlyWatched> movies = watchStatusRepository
-                .findRecentMovieIdsByUserId(userEntity.getId())
-                .stream()
-                .map(id -> movieRepository.findById(UUID.fromString(id)))
-                .flatMap(Optional::stream)
-                .filter(this::isMovieUnwatchedOrRecent)
-                .map(m -> RecentlyWatched.ofMovie(m, movieLastWatched(m)))
-                .toList();
-
-        List<RecentlyWatched> chapters = watchStatusRepository
-                .findRecentChaptersAndBookIdsByUserId(userEntity.getId())
-                .stream()
-                .flatMap(strings -> bookResumeService.resume(userEntity, UUID.fromString(strings[1])).stream())
-                .map(resume -> RecentlyWatched.ofChapter(resume.chapter(), resume.lastPlayed()))
-                .toList();
-
-        List<RecentlyWatched> books = watchStatusRepository
-                .findRecentBookIdsByUserId(userEntity.getId())
-                .stream()
-                .map(id -> bookRepository.findById(UUID.fromString(id)))
-                .flatMap(Optional::stream)
-                .flatMap(book -> getBookReadingItem(userEntity, book).stream())
-                .toList();
-
-        List<RecentlyWatched> podcastEpisodes = watchStatusRepository
-                .findRecentPodcastEpisodeIdsByUserId(userEntity.getId())
-                .stream()
-                .map(id -> podcastEpisodeRepository.findById(UUID.fromString(id)))
-                .flatMap(Optional::stream)
-                .flatMap(episode -> getPodcastEpisodeItem(userEntity, episode).stream())
-                .toList();
-
-        return Stream.of(episodes, movies, chapters, books, podcastEpisodes)
-                .flatMap(List::stream)
-                .sorted(Comparator.comparing(RecentlyWatched::lastWatched).reversed())
+        return continueWatchingService.entriesFor(userEntity.getId()).stream()
+                .flatMap(entry -> toRecentlyWatched(entry).stream())
                 .toList();
     }
 
-    /** Continue-listening: a podcast episode the user started but has not finished. */
-    private Optional<RecentlyWatched> getPodcastEpisodeItem(UserEntity userEntity, PodcastEpisodeEntity episode) {
-        return watchStatusRepository
-                .findByUserEntityExternalIdAndPodcastEpisodeEntityIn(userEntity.getExternalId(), List.of(episode),
-                        Sort.by("dateUpdated").descending())
-                .stream()
-                .findFirst()
-                .filter(status -> !status.isWatched() && status.getProgressInMilliseconds() > 0)
-                .map(status -> RecentlyWatched.ofPodcastEpisode(episode, status.getDateUpdated()));
+    /**
+     * The entries come back ordered, and only the ones with something left to resume. An entry can
+     * still point at nothing when the media it referenced was deleted since — the foreign keys null
+     * the reference out — so those are skipped here; the nightly rebuild drops the rows.
+     */
+    private Optional<RecentlyWatched> toRecentlyWatched(ContinueWatchingEntity entry) {
+        return Optional.ofNullable(switch (entry.getEntryType()) {
+            case EPISODE -> entry.getEpisodeEntity() == null ? null
+                    : RecentlyWatched.ofEpisode(entry.getEpisodeEntity(), entry.getLastWatched());
+            case MOVIE -> entry.getMovieEntity() == null ? null
+                    : RecentlyWatched.ofMovie(entry.getMovieEntity(), entry.getLastWatched());
+            case CHAPTER -> entry.getChapterEntity() == null ? null
+                    : RecentlyWatched.ofChapter(entry.getChapterEntity(), entry.getLastWatched());
+            case BOOK -> entry.getBookEntity() == null ? null
+                    : RecentlyWatched.ofBook(entry.getBookEntity(), entry.getLastWatched());
+            case PODCAST_EPISODE -> entry.getPodcastEpisodeEntity() == null ? null
+                    : RecentlyWatched.ofPodcastEpisode(entry.getPodcastEpisodeEntity(), entry.getLastWatched());
+            case TRACK -> null;
+        });
     }
 
     @SchemaMapping(typeName = "RecentlyWatched", field = "episode")
@@ -127,65 +88,5 @@ public class RecentlyWatchedController {
     @SchemaMapping(typeName = "RecentlyWatched", field = "podcastEpisode")
     public PodcastEpisodeEntity podcastEpisode(RecentlyWatched item) {
         return item.podcastEpisode();
-    }
-
-    private Optional<RecentlyWatched> getEpisodeItem(UUID showId, UUID episodeId) {
-        List<EpisodeEntity> seasonEpisodes = episodeRepository.findByShowEntityId(showId,
-                Sort.by("seasonEntity.number").ascending().and(Sort.by("number").ascending()));
-
-        return seasonEpisodes.stream()
-                .filter(episode -> episode.getId().equals(episodeId))
-                .findFirst()
-                .flatMap(originalEpisode -> {
-                    Instant lastWatched = originalEpisode.getWatchStatusEntities().getFirst().getDateUpdated();
-                    return getFirstUnwatchedEpisodeFrom(originalEpisode, seasonEpisodes)
-                            .map(e -> RecentlyWatched.ofEpisode(e, lastWatched));
-                });
-    }
-
-    /** Continue-reading: an epub the user started but has not finished. */
-    private Optional<RecentlyWatched> getBookReadingItem(UserEntity userEntity, BookEntity book) {
-        return watchStatusRepository.findByUserEntityAndBookEntity(userEntity, book)
-                .filter(status -> !status.isWatched()
-                        && status.getReadingProgress() != null && status.getReadingProgress() > 0)
-                .map(status -> RecentlyWatched.ofBook(book, status.getDateUpdated()));
-    }
-
-    private Optional<EpisodeEntity> getFirstUnwatchedEpisodeFrom(EpisodeEntity episodeEntity, List<EpisodeEntity> seasonEpisodes) {
-        if (!episodeEntity.getWatchStatusEntities().getFirst().isWatched()) {
-            return Optional.of(episodeEntity);
-        }
-        return findNextUnwatchedEpisode(episodeEntity, seasonEpisodes);
-    }
-
-    private Optional<EpisodeEntity> findNextUnwatchedEpisode(EpisodeEntity episodeEntity, List<EpisodeEntity> seasonEpisodes) {
-        int indexOfNextOne = seasonEpisodes.indexOf(episodeEntity) + 1;
-
-        if (seasonEpisodes.size() > indexOfNextOne) {
-            EpisodeEntity nextEpisodeEntity = seasonEpisodes.get(indexOfNextOne);
-            if (isUnwatchedOrOld(nextEpisodeEntity)) {
-                return Optional.of(nextEpisodeEntity);
-            }
-            return findNextUnwatchedEpisode(nextEpisodeEntity, seasonEpisodes);
-        }
-        return Optional.empty();
-    }
-
-    private boolean isUnwatchedOrOld(EpisodeEntity episodeEntity) {
-        return episodeEntity.getWatchStatusEntities().isEmpty()
-                || !episodeEntity.getWatchStatusEntities().getFirst().isWatched()
-                || episodeEntity.getWatchStatusEntities().getFirst().getDateUpdated().isBefore(Instant.now().minus(Duration.ofDays(300)));
-    }
-
-    private boolean isMovieUnwatchedOrRecent(MovieEntity movie) {
-        var statuses = movie.getWatchStatusEntities();
-        return statuses.isEmpty()
-                || !statuses.getFirst().isWatched()
-                || statuses.getFirst().getDateUpdated().isBefore(Instant.now().minus(Duration.ofDays(300)));
-    }
-
-    private Instant movieLastWatched(MovieEntity movie) {
-        var statuses = movie.getWatchStatusEntities();
-        return statuses.isEmpty() ? Instant.EPOCH : statuses.getFirst().getDateUpdated();
     }
 }

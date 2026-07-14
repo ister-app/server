@@ -14,6 +14,7 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.ContinueWatchingService;
 import app.ister.core.service.WatchStatusService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -66,6 +67,9 @@ class BookControllerTest {
 
     @Mock
     private WatchStatusService watchStatusService;
+
+    @Mock
+    private ContinueWatchingService continueWatchingService;
 
     @Mock
     private Authentication authentication;

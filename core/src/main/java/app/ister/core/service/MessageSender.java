@@ -159,6 +159,11 @@ public class MessageSender {
         send(APP_ISTER_SERVER_ANALYZE_DATA, directoryName, data);
     }
 
+    /** Global queue: any worker node may rebuild a user's continue-watching list. */
+    public void sendContinueWatchingRebuildRequested(ContinueWatchingRebuildRequestedData data) {
+        send(APP_ISTER_SERVER_CONTINUE_WATCHING_REBUILD_REQUESTED, data);
+    }
+
     // search module (no suffix; dropped when no search node consumes the queue)
 
     public void sendSearchIndexRequested(SearchIndexRequestedData searchIndexRequestedData) {

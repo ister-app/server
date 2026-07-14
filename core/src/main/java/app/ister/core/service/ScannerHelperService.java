@@ -23,6 +23,7 @@ public class ScannerHelperService {
     private final BookRepository bookRepository;
     private final ChapterRepository chapterRepository;
     private final ServerEventService serverEventService;
+    private final ContinueWatchingService continueWatchingService;
 
     /**
      * Check if the database contains a show wit the given parameters.
@@ -210,6 +211,7 @@ public class ScannerHelperService {
                             .number(chapterNumber).build();
                     chapterRepository.save(chapterEntity);
                     serverEventService.createChapterFoundEvent(chapterEntity.getId());
+                    continueWatchingService.recomputeForBook(bookEntity.getId());
                     return chapterEntity;
                 });
     }
@@ -230,6 +232,9 @@ public class ScannerHelperService {
                             .number(episodeNumber).build();
                     episodeRepository.save(episodeEntity);
                     serverEventService.createEpisodeFoundEvent(episodeEntity.getId());
+                    // A new episode of a show someone had watched to the end puts that show back in
+                    // their continue-watching list, instead of only after the nightly rebuild.
+                    continueWatchingService.recomputeForShow(showEntity.getId());
                     return episodeEntity;
                 });
     }
