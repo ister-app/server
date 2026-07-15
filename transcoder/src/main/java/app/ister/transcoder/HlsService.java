@@ -344,8 +344,15 @@ public class HlsService {
                 mediaFileRepository.findById(mediaFileId).ifPresentOrElse(mediaFile -> {
                     List<TranscodePassRequestedData> pending = pendingPasses(mediaFileId, mediaFile, request);
                     if (pending.isEmpty()) {
-                        preTranscodeRequests.remove(mediaFileId);
-                        log.debug("All pre-transcode passes finished for {}", mediaFileId);
+                        // A pass that is registered but still queued (waiting for a pool thread) counts
+                        // as active, not pending — so an empty list can mean "all remaining passes are
+                        // momentarily in flight", not "all done". Only retire the resume request once no
+                        // pass for the file is still active; otherwise a queued pass that later drops for
+                        // lack of budget would never be pulled back in and the file would stall.
+                        if (!transcodeService.hasActivePassForFile(mediaFileId)) {
+                            preTranscodeRequests.remove(mediaFileId);
+                            log.debug("All pre-transcode passes finished for {}", mediaFileId);
+                        }
                         return;
                     }
                     log.debug("Starting next pre-transcode pass for {} ({} pending)", mediaFileId, pending.size());
