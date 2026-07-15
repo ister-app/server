@@ -21,6 +21,7 @@ public class ScannerHelperService {
     private final AlbumRepository albumRepository;
     private final TrackRepository trackRepository;
     private final BookRepository bookRepository;
+    private final MetadataRepository metadataRepository;
     private final ChapterRepository chapterRepository;
     private final ServerEventService serverEventService;
     private final ContinueWatchingService continueWatchingService;
@@ -194,6 +195,29 @@ public class ScannerHelperService {
                     bookRepository.save(bookEntity);
                     serverEventService.createBookFoundEvent(bookEntity.getId());
                     return bookEntity;
+                });
+    }
+
+    /**
+     * Keep the {@code releaseYear} column in sync with the metadata year when the path carried no
+     * "(YYYY)" suffix (column left at 0). Sorting and the uniqueness constraint use this column,
+     * while {@code BookController.releaseYear} shows the earliest metadata year as a fallback — so
+     * without this the two diverge and a release-year sort of such books is effectively unordered.
+     * Mirrors that fallback (earliest non-null metadata year) and never overrides a path-set year.
+     */
+    public void refreshBookReleaseYear(BookEntity bookEntity) {
+        if (bookEntity.getReleaseYear() > 0) {
+            return;
+        }
+        metadataRepository.findByBookEntityId(bookEntity.getId()).stream()
+                .map(MetadataEntity::getReleased)
+                .filter(java.util.Objects::nonNull)
+                .mapToInt(java.time.LocalDate::getYear)
+                .filter(year -> year > 0)
+                .min()
+                .ifPresent(year -> {
+                    bookEntity.setReleaseYear(year);
+                    bookRepository.save(bookEntity);
                 });
     }
 

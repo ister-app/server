@@ -185,6 +185,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
                         .bookEntity(book)
                         .sourceUri(FILE_URI_PREFIX + path).build());
                 setMetadataFk(directoryEntity, path, saved);
+                scannerHelperService.refreshBookReleaseYear(book);
                 serverEventService.createSearchIndexEvent(SearchEntityType.BOOK, book.getId());
             });
         } catch (java.io.FileNotFoundException _) {
