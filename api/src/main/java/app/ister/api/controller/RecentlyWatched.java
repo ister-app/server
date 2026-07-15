@@ -25,8 +25,14 @@ record RecentlyWatched(MediaType type, EpisodeEntity episode, MovieEntity movie,
         return new RecentlyWatched(MediaType.CHAPTER, null, null, chapter, chapter.getBookEntity(), null, lastWatched);
     }
 
-    static RecentlyWatched ofBook(BookEntity book, Instant lastWatched) {
-        return new RecentlyWatched(MediaType.BOOK, null, null, null, book, null, lastWatched);
+    /**
+     * A book's single continue-watching entry. It can carry a reading target ({@code book}, resume
+     * the epub) and/or a listening target ({@code chapter}, resume the audiobook). When only the
+     * audio slot is set the book is derived from the chapter so the tile still has a title and cover.
+     */
+    static RecentlyWatched ofBook(BookEntity book, ChapterEntity chapter, Instant lastWatched) {
+        BookEntity resolvedBook = book != null ? book : (chapter != null ? chapter.getBookEntity() : null);
+        return new RecentlyWatched(MediaType.BOOK, null, null, chapter, resolvedBook, null, lastWatched);
     }
 
     static RecentlyWatched ofPodcastEpisode(PodcastEpisodeEntity podcastEpisode, Instant lastWatched) {

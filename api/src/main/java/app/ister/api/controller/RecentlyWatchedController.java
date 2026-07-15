@@ -57,8 +57,8 @@ public class RecentlyWatchedController {
                     : RecentlyWatched.ofMovie(entry.getMovieEntity(), entry.getLastWatched());
             case CHAPTER -> entry.getChapterEntity() == null ? null
                     : RecentlyWatched.ofChapter(entry.getChapterEntity(), entry.getLastWatched());
-            case BOOK -> entry.getBookEntity() == null ? null
-                    : RecentlyWatched.ofBook(entry.getBookEntity(), entry.getLastWatched());
+            case BOOK -> (entry.getBookEntity() == null && entry.getChapterEntity() == null) ? null
+                    : RecentlyWatched.ofBook(entry.getBookEntity(), entry.getChapterEntity(), entry.getLastWatched());
             case PODCAST_EPISODE -> entry.getPodcastEpisodeEntity() == null ? null
                     : RecentlyWatched.ofPodcastEpisode(entry.getPodcastEpisodeEntity(), entry.getLastWatched());
             case TRACK -> null;

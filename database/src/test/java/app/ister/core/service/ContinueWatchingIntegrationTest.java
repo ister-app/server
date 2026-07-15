@@ -1,8 +1,11 @@
 package app.ister.core.service;
 
+import app.ister.core.entity.BookEntity;
+import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.ContinueWatchingEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.LibraryEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.PodcastEntity;
 import app.ister.core.entity.PodcastEpisodeEntity;
 import app.ister.core.entity.SeasonEntity;
@@ -175,6 +178,44 @@ class ContinueWatchingIntegrationTest {
         playedPodcast(ep1, true);
         assertEquals(ep2.getId(), onlyEntry().getPodcastEpisodeEntity().getId(),
                 "the next unfinished episode by publish date");
+    }
+
+    /**
+     * A book that is both read (epub) and listened to (audiobook) is a single entry with two
+     * independent slots; writing one must not clear the other.
+     */
+    @Test
+    void aBookReadAndListenedToIsOneEntryWithBothSlots() {
+        LibraryEntity library = em.persist(LibraryEntity.builder()
+                .libraryType(LibraryType.BOOK).name("Books-" + UUID.randomUUID()).build());
+        PersonEntity author = em.persist(PersonEntity.builder().name("Author").build());
+        BookEntity book = em.persist(BookEntity.builder()
+                .libraryEntity(library).personEntity(author).name("Book").releaseYear(2021).build());
+        ChapterEntity chapter1 = em.persist(ChapterEntity.builder()
+                .bookEntity(book).personEntity(author).number(1).build());
+        em.persist(ChapterEntity.builder().bookEntity(book).personEntity(author).number(2).build());
+        em.flush();
+
+        // Listen to chapter 1 (audio slot), then read the epub (reading slot).
+        WatchStatusEntity listening = em.persistAndFlush(WatchStatusEntity.builder()
+                .userEntity(user).playQueueItemId(chapter1.getId()).chapterEntity(chapter1)
+                .progressInMilliseconds(30_000).watched(false).build());
+        subject.onWatchStatusChanged(listening);
+        em.flush();
+        em.clear();
+
+        WatchStatusEntity reading = em.persistAndFlush(WatchStatusEntity.builder()
+                .userEntity(user).playQueueItemId(book.getId()).bookEntity(book)
+                .readingProgress(0.3).watched(false).build());
+        subject.onWatchStatusChanged(reading);
+        em.flush();
+        em.clear();
+
+        ContinueWatchingEntity entry = onlyEntry();
+        assertEquals(MediaType.BOOK, entry.getEntryType());
+        assertEquals(book.getId(), entry.getGroupId(), "one entry for the book, not one per format");
+        assertEquals(chapter1.getId(), entry.getChapterEntity().getId(), "audio slot still set after reading");
+        assertEquals(book.getId(), entry.getBookEntity().getId(), "reading slot set");
     }
 
     private WatchStatusEntity playedPodcast(PodcastEpisodeEntity episode, boolean watched) {

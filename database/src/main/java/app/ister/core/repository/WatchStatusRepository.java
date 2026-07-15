@@ -7,8 +7,8 @@ import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface WatchStatusRepository extends CrudRepository<WatchStatusEntity, UUID> {
+public interface WatchStatusRepository extends JpaRepository<WatchStatusEntity, UUID> {
     Optional<WatchStatusEntity> findByUserEntityAndPlayQueueItemIdAndEpisodeEntity(UserEntity userEntity, UUID playQueueItemId, EpisodeEntity episodeEntity);
 
     List<WatchStatusEntity> findByUserEntityExternalIdAndEpisodeEntity(String userEntityExternalId, EpisodeEntity episodeEntity, Sort sort);
@@ -27,6 +27,9 @@ public interface WatchStatusRepository extends CrudRepository<WatchStatusEntity,
     Optional<WatchStatusEntity> findByUserEntityAndChapterEntity(UserEntity userEntity, ChapterEntity chapterEntity);
 
     List<WatchStatusEntity> findByUserEntityAndChapterEntityBookEntity(UserEntity userEntity, BookEntity bookEntity);
+
+    /** Whether the user has ever listened to (has a chapter watch-status for) any chapter of a book. */
+    boolean existsByUserEntityIdAndChapterEntityBookEntityId(UUID userEntityId, UUID bookEntityId);
 
     /** Reading rows: one per user per book, keyed by the book itself (no play queue). */
     Optional<WatchStatusEntity> findByUserEntityAndBookEntity(UserEntity userEntity, BookEntity bookEntity);

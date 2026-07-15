@@ -15,6 +15,7 @@ import app.ister.core.service.WatchStatusService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -37,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -120,6 +122,24 @@ class ReadingProgressControllerTest {
         WatchStatusEntity later = chapterStatuses.get(chapters.get(2).getId());
         assertFalse(later.isWatched());
         assertEquals(0L, later.getProgressInMilliseconds());
+    }
+
+    /**
+     * The current chapter must be flushed after the others so its {@code dateUpdated} is the newest
+     * of the batch; BookResumeService resumes at the most recently updated chapter, so this is what
+     * makes reading up to a chapter and then listening resume at that chapter rather than a later one.
+     */
+    @Test
+    void theCurrentChapterIsWrittenLastSoListeningResumesThere() {
+        ChapterEntity current = chapters.get(1);
+
+        subject.updateReadingProgress(new ReadingProgressController.ReadingProgressRequest(
+                book.getId(), "epubcfi(/6/4!/4/2)", 0.4, current.getId(), 90_000L, UUID.randomUUID()),
+                authentication);
+
+        InOrder inOrder = inOrder(watchStatusRepository);
+        inOrder.verify(watchStatusRepository).flush();
+        inOrder.verify(watchStatusRepository).saveAndFlush(chapterStatuses.get(current.getId()));
     }
 
     /** A book without an audiobook still stores its reading position. */

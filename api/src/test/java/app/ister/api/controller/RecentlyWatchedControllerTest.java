@@ -97,6 +97,52 @@ class RecentlyWatchedControllerTest {
         assertSame(podcastEpisode, result.get(4).podcastEpisode());
     }
 
+    /** A book is one entry that can resume both the epub and the audiobook. */
+    @Test
+    void aBookEntryCarriesBothReadingAndListeningTargets() {
+        BookEntity book = BookEntity.builder().name("Book").build();
+        book.setId(UUID.randomUUID());
+        ChapterEntity chapter = ChapterEntity.builder().number(2).bookEntity(book).build();
+        chapter.setId(UUID.randomUUID());
+        ContinueWatchingEntity bookEntry = entry(MediaType.BOOK, minutesAgo(1));
+        bookEntry.setBookEntity(book);
+        bookEntry.setChapterEntity(chapter);
+        when(continueWatchingService.entriesFor(user.getId())).thenReturn(List.of(bookEntry));
+
+        RecentlyWatched result = subject.recentlyWatched(authentication).getFirst();
+
+        assertEquals(MediaType.BOOK, result.type());
+        assertSame(book, result.book());
+        assertSame(chapter, result.chapter());
+    }
+
+    /** Only the audiobook was played: the book is derived from the chapter so the tile still has one. */
+    @Test
+    void aBookOnlyListenedToStillCarriesItsBook() {
+        BookEntity book = BookEntity.builder().name("Book").build();
+        book.setId(UUID.randomUUID());
+        ChapterEntity chapter = ChapterEntity.builder().number(2).bookEntity(book).build();
+        chapter.setId(UUID.randomUUID());
+        ContinueWatchingEntity bookEntry = entry(MediaType.BOOK, minutesAgo(1));
+        bookEntry.setChapterEntity(chapter);
+        when(continueWatchingService.entriesFor(user.getId())).thenReturn(List.of(bookEntry));
+
+        RecentlyWatched result = subject.recentlyWatched(authentication).getFirst();
+
+        assertEquals(MediaType.BOOK, result.type());
+        assertSame(chapter, result.chapter());
+        assertSame(book, result.book(), "derived from the chapter");
+    }
+
+    /** A book entry with neither slot set (both formats finished) is left out. */
+    @Test
+    void aBookEntryWithNothingToResumeIsLeftOut() {
+        when(continueWatchingService.entriesFor(user.getId()))
+                .thenReturn(List.of(entry(MediaType.BOOK, minutesAgo(1))));
+
+        assertTrue(subject.recentlyWatched(authentication).isEmpty());
+    }
+
     /** The media was deleted after the entry was written; the foreign key nulled the reference out. */
     @Test
     void entryWhoseMediaIsGoneIsLeftOut() {

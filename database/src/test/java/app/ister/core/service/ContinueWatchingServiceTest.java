@@ -134,6 +134,19 @@ class ContinueWatchingServiceTest {
 
     // ===== Chapters =====
 
+    /** A book is one entry with two slots; a chapter heartbeat writes only the audio slot. */
+    @Test
+    void anUnfinishedChapterResumesItselfInTheAudioSlot() {
+        BookEntity book = book();
+        ChapterEntity chapter = chapter(book, 4);
+
+        WatchStatusEntity status = WatchStatusEntity.builder()
+                .userEntity(user).playQueueItemId(chapter.getId()).chapterEntity(chapter).watched(false).build();
+        subject.onWatchStatusChanged(status);
+
+        verify(continueWatchingRepository).upsertBookAudio(eq(user.getId()), eq(book.getId()), eq(chapter.getId()), any());
+    }
+
     @Test
     void aFinishedChapterHandsOverToTheNextUnfinishedOne() {
         BookEntity book = book();
@@ -146,8 +159,45 @@ class ContinueWatchingServiceTest {
                 .userEntity(user).playQueueItemId(chapter.getId()).chapterEntity(chapter).watched(true).build();
         subject.onWatchStatusChanged(status);
 
-        verify(continueWatchingRepository).upsert(eq(user.getId()), eq(MediaType.CHAPTER.name()), eq(book.getId()),
-                isNull(), isNull(), eq(nextId), isNull(), isNull(), any());
+        verify(continueWatchingRepository).upsertBookAudio(eq(user.getId()), eq(book.getId()), eq(nextId), any());
+    }
+
+    // ===== recomputeForBook: a newly scanned chapter revives a book, but only for listeners =====
+
+    @Test
+    void aNewChapterRevivesTheBookEntryForAListener() {
+        BookEntity book = book();
+        ChapterEntity newChapter = chapter(book, 1);
+        ContinueWatchingEntity exhausted = ContinueWatchingEntity.builder()
+                .userEntity(user).entryType(MediaType.BOOK).groupId(book.getId()).lastWatched(Instant.now()).build();
+        when(continueWatchingRepository.findExhaustedBookEntries(book.getId())).thenReturn(List.of(exhausted));
+        when(watchStatusRepository.existsByUserEntityIdAndChapterEntityBookEntityId(user.getId(), book.getId()))
+                .thenReturn(true);
+        when(chapterRepository.findNextUnfinishedChapterId(book.getId(), user.getId(), -1))
+                .thenReturn(List.of(newChapter.getId()));
+        when(chapterRepository.getReferenceById(newChapter.getId())).thenReturn(newChapter);
+
+        subject.recomputeForBook(book.getId());
+
+        assertEquals(newChapter, exhausted.getChapterEntity());
+        verify(continueWatchingRepository).save(exhausted);
+    }
+
+    /** A book the user only ever read (never listened to) must not gain an audiobook resume. */
+    @Test
+    void aNewChapterLeavesAPureReadersBookAlone() {
+        BookEntity book = book();
+        ContinueWatchingEntity exhausted = ContinueWatchingEntity.builder()
+                .userEntity(user).entryType(MediaType.BOOK).groupId(book.getId()).lastWatched(Instant.now()).build();
+        when(continueWatchingRepository.findExhaustedBookEntries(book.getId())).thenReturn(List.of(exhausted));
+        when(watchStatusRepository.existsByUserEntityIdAndChapterEntityBookEntityId(user.getId(), book.getId()))
+                .thenReturn(false);
+
+        subject.recomputeForBook(book.getId());
+
+        assertNull(exhausted.getChapterEntity());
+        verify(continueWatchingRepository, never()).save(any());
+        verify(chapterRepository, never()).findNextUnfinishedChapterId(any(), any(), anyInt());
     }
 
     // ===== Movies, books, podcasts: the item itself, until it is done =====
@@ -176,7 +226,7 @@ class ContinueWatchingServiceTest {
                 isNull(), eq(movie.getId()), isNull(), isNull(), isNull(), any());
     }
 
-    /** An epub the user opened but never got anywhere in is not something to continue. */
+    /** An epub the user opened but never got anywhere in is not something to continue: empty epub slot. */
     @Test
     void aBookWithoutReadingProgressIsNotSomethingToContinue() {
         BookEntity book = book();
@@ -186,8 +236,20 @@ class ContinueWatchingServiceTest {
 
         subject.onWatchStatusChanged(status);
 
-        verify(continueWatchingRepository).upsert(eq(user.getId()), eq(MediaType.BOOK.name()), eq(book.getId()),
-                isNull(), isNull(), isNull(), isNull(), isNull(), any());
+        verify(continueWatchingRepository).upsertBookEpub(eq(user.getId()), eq(book.getId()), isNull(), any());
+    }
+
+    /** A book being read resumes its epub slot; the audio slot is left untouched. */
+    @Test
+    void aBookBeingReadResumesItsEpubSlot() {
+        BookEntity book = book();
+        WatchStatusEntity status = WatchStatusEntity.builder()
+                .userEntity(user).playQueueItemId(book.getId()).bookEntity(book).watched(false)
+                .readingProgress(0.3).build();
+
+        subject.onWatchStatusChanged(status);
+
+        verify(continueWatchingRepository).upsertBookEpub(eq(user.getId()), eq(book.getId()), eq(book.getId()), any());
     }
 
     /** The entry is keyed by the podcast, so all its episodes collapse to one continue-watching row. */

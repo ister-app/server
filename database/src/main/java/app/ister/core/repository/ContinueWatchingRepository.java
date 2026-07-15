@@ -36,7 +36,7 @@ public interface ContinueWatchingRepository extends JpaRepository<ContinueWatchi
 
     @Query("""
             SELECT c FROM ContinueWatchingEntity c
-            WHERE c.entryType = app.ister.core.enums.MediaType.CHAPTER AND c.groupId = :bookId
+            WHERE c.entryType = app.ister.core.enums.MediaType.BOOK AND c.groupId = :bookId
               AND c.chapterEntity IS NULL""")
     List<ContinueWatchingEntity> findExhaustedBookEntries(@Param("bookId") UUID bookId);
 
@@ -77,4 +77,49 @@ public interface ContinueWatchingRepository extends JpaRepository<ContinueWatchi
                 @Param("bookId") UUID bookId,
                 @Param("podcastEpisodeId") UUID podcastEpisodeId,
                 @Param("lastWatched") Instant lastWatched);
+
+    /**
+     * The audio slot of a book's single {@code BOOK} entry. A book can be both read (epub) and
+     * listened to (chapters); the two are independent progress slots on one row, so unlike the
+     * generic {@link #upsert} this touches <em>only</em> {@code chapter_entity_id} and leaves the
+     * epub slot ({@code book_entity_id}) untouched — otherwise a reading heartbeat would wipe the
+     * listening position and vice versa.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+            INSERT INTO continue_watching (id, date_created, date_updated, user_entity_id, entry_type, group_id,
+                                           episode_entity_id, movie_entity_id, chapter_entity_id, book_entity_id,
+                                           podcast_episode_entity_id, last_watched)
+            VALUES (gen_random_uuid(), now(), now(), :userId, 'BOOK', :bookId,
+                    NULL, NULL, :chapterId, NULL, NULL, :lastWatched)
+            ON CONFLICT (user_entity_id, entry_type, group_id) DO UPDATE SET
+                date_updated = now(),
+                chapter_entity_id = EXCLUDED.chapter_entity_id,
+                last_watched = GREATEST(continue_watching.last_watched, EXCLUDED.last_watched)""",
+            nativeQuery = true)
+    void upsertBookAudio(@Param("userId") UUID userId,
+                         @Param("bookId") UUID bookId,
+                         @Param("chapterId") UUID chapterId,
+                         @Param("lastWatched") Instant lastWatched);
+
+    /**
+     * The epub (reading) slot of a book's single {@code BOOK} entry. Mirror of
+     * {@link #upsertBookAudio}: touches only {@code book_entity_id}, leaving the audio slot intact.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+            INSERT INTO continue_watching (id, date_created, date_updated, user_entity_id, entry_type, group_id,
+                                           episode_entity_id, movie_entity_id, chapter_entity_id, book_entity_id,
+                                           podcast_episode_entity_id, last_watched)
+            VALUES (gen_random_uuid(), now(), now(), :userId, 'BOOK', :bookId,
+                    NULL, NULL, NULL, :bookTargetId, NULL, :lastWatched)
+            ON CONFLICT (user_entity_id, entry_type, group_id) DO UPDATE SET
+                date_updated = now(),
+                book_entity_id = EXCLUDED.book_entity_id,
+                last_watched = GREATEST(continue_watching.last_watched, EXCLUDED.last_watched)""",
+            nativeQuery = true)
+    void upsertBookEpub(@Param("userId") UUID userId,
+                        @Param("bookId") UUID bookId,
+                        @Param("bookTargetId") UUID bookTargetId,
+                        @Param("lastWatched") Instant lastWatched);
 }

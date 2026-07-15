@@ -654,9 +654,9 @@ type RecentlyWatched {
     type: MediaType!
     episode: Episode
     movie: Movie
-    "Next unfinished audiobook chapter (type CHAPTER)."
+    "Next unfinished audiobook chapter. Set on a type BOOK entry when the user was listening (a book resumes reading and/or listening from one entry), or on a legacy type CHAPTER entry."
     chapter: Chapter
-    "Book being read (type BOOK) or the book of the chapter (type CHAPTER)."
+    "The book to resume (type BOOK). Always set for a book entry, even when only its audiobook was played; also the containing book of a legacy CHAPTER entry."
     book: Book
     "Partially played podcast episode (type PODCAST_EPISODE)."
     podcastEpisode: PodcastEpisode

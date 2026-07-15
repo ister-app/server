@@ -165,6 +165,11 @@ public class ReadingProgressController {
      * position, chapters before it count as listened and chapters after it as untouched. The player
      * resumes at the first chapter that is not watched, so without this bookkeeping a switch from
      * reading to listening would drop back to chapter one.
+     *
+     * <p>The current chapter is written and flushed <em>last</em>, so its {@code dateUpdated} is the
+     * newest of the batch. {@link app.ister.core.service.BookResumeService} resumes at the most
+     * recently updated chapter; if the whole batch shared a timestamp it could resume at a later,
+     * reset chapter instead of the one the reader was actually in.
      */
     private void applyListeningPosition(Authentication authentication, BookEntity book,
                                         UUID chapterId, long positionInMilliseconds) {
@@ -176,21 +181,27 @@ public class ReadingProgressController {
         for (ChapterEntity chapter : book.getChapterEntities()) {
             WatchStatusEntity status = watchStatusService.getOrCreateForChapter(authentication, chapter);
             int compared = Integer.compare(chapter.getNumber(), current.getNumber());
-            if (compared < 0) {
-                status.setWatched(true);
-            } else if (compared == 0) {
-                status.setWatched(false);
-                status.setProgressInMilliseconds(Math.max(0, positionInMilliseconds));
+            if (compared == 0) {
+                // Leave the current chapter unchanged for now; it is written after the flush below so
+                // it ends up with the newest timestamp.
                 currentStatus = status;
+            } else if (compared < 0) {
+                status.setWatched(true);
+                watchStatusRepository.save(status);
             } else {
                 status.setWatched(false);
                 status.setProgressInMilliseconds(0);
+                watchStatusRepository.save(status);
             }
-            watchStatusRepository.save(status);
         }
-        // One update for the whole batch: the continue-watching entry is keyed by book, and the
-        // chapter the reader is in is the one it should resume with.
+        watchStatusRepository.flush();
+
         if (currentStatus != null) {
+            currentStatus.setWatched(false);
+            currentStatus.setProgressInMilliseconds(Math.max(0, positionInMilliseconds));
+            watchStatusRepository.saveAndFlush(currentStatus);
+            // One update for the whole batch: the continue-watching entry is keyed by book, and the
+            // chapter the reader is in is the one it should resume with.
             continueWatchingService.onWatchStatusChanged(currentStatus);
         }
     }

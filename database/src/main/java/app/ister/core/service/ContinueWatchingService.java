@@ -157,6 +157,12 @@ public class ContinueWatchingService {
     public void recomputeForBook(UUID bookId) {
         for (ContinueWatchingEntity entry : continueWatchingRepository.findExhaustedBookEntries(bookId)) {
             UUID userId = entry.getUserEntity().getId();
+            // A book's entry is now shared between reading and listening; an empty audio slot can just
+            // mean the user only ever read the epub. Only re-target the audio slot for users who have
+            // actually listened, or a newly scanned chapter would give pure readers an audiobook resume.
+            if (!watchStatusRepository.existsByUserEntityIdAndChapterEntityBookEntityId(userId, bookId)) {
+                continue;
+            }
             firstUnfinishedChapter(bookId, userId).ifPresent(chapterId -> {
                 entry.setChapterEntity(chapterRepository.getReferenceById(chapterId));
                 continueWatchingRepository.save(entry);
@@ -228,9 +234,13 @@ public class ContinueWatchingService {
                 episodeId, null, null, null, null, lastWatched);
     }
 
+    /**
+     * The audio slot of a book's single {@code BOOK} entry. A book that is both read and listened to
+     * shares one entry with two independent slots, so this only touches the chapter target — see
+     * {@link ContinueWatchingRepository#upsertBookAudio}.
+     */
     private void upsertChapter(UserEntity user, UUID bookId, UUID chapterId, Instant lastWatched) {
-        continueWatchingRepository.upsert(user.getId(), MediaType.CHAPTER.name(), bookId,
-                null, null, chapterId, null, null, lastWatched);
+        continueWatchingRepository.upsertBookAudio(user.getId(), bookId, chapterId, lastWatched);
     }
 
     private void upsertMovie(UserEntity user, UUID groupId, UUID movieId, Instant lastWatched) {
@@ -238,9 +248,9 @@ public class ContinueWatchingService {
                 null, movieId, null, null, null, lastWatched);
     }
 
+    /** The epub (reading) slot of a book's single {@code BOOK} entry; mirror of {@link #upsertChapter}. */
     private void upsertBook(UserEntity user, UUID groupId, UUID bookId, Instant lastWatched) {
-        continueWatchingRepository.upsert(user.getId(), MediaType.BOOK.name(), groupId,
-                null, null, null, bookId, null, lastWatched);
+        continueWatchingRepository.upsertBookEpub(user.getId(), groupId, bookId, lastWatched);
     }
 
     private void upsertPodcastEpisode(UserEntity user, UUID groupId, UUID podcastEpisodeId, Instant lastWatched) {
