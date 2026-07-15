@@ -133,18 +133,19 @@ public interface WatchStatusRepository extends CrudRepository<WatchStatusEntity,
             """, nativeQuery = true)
     List<RecentEntry> findRecentBookEntries(@Param("userId") UUID userId, @Param("cutoff") Instant cutoff);
 
+    /** The episode the user last played of every podcast they touched since the cutoff, one row per podcast. */
     @Query(value = """
-            SELECT DISTINCT ON (wse.podcast_episode_entity_id)
+            SELECT DISTINCT ON (pe.podcast_entity_id)
               wse.podcast_episode_entity_id AS "itemId",
-              wse.podcast_episode_entity_id AS "groupId",
+              pe.podcast_entity_id AS "groupId",
               wse.date_updated AS "lastWatched",
               wse.watched AS "watched",
               wse.progress_in_milliseconds AS "progressInMilliseconds",
               wse.reading_progress AS "readingProgress"
             FROM watch_status_entity wse
-            WHERE wse.user_entity_id = :userId AND wse.podcast_episode_entity_id IS NOT NULL
-              AND wse.date_updated >= :cutoff
-            ORDER BY wse.podcast_episode_entity_id, wse.date_updated DESC
+            JOIN podcast_episode_entity pe ON wse.podcast_episode_entity_id = pe.id
+            WHERE wse.user_entity_id = :userId AND wse.date_updated >= :cutoff
+            ORDER BY pe.podcast_entity_id, wse.date_updated DESC
             """, nativeQuery = true)
     List<RecentEntry> findRecentPodcastEpisodeEntries(@Param("userId") UUID userId, @Param("cutoff") Instant cutoff);
 }

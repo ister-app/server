@@ -5,6 +5,7 @@ import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.ContinueWatchingEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
+import app.ister.core.entity.PodcastEntity;
 import app.ister.core.entity.PodcastEpisodeEntity;
 import app.ister.core.entity.SeasonEntity;
 import app.ister.core.entity.ShowEntity;
@@ -14,6 +15,7 @@ import app.ister.core.enums.MediaType;
 import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.ContinueWatchingRepository;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,6 +50,7 @@ class ContinueWatchingServiceTest {
     @Mock private WatchStatusRepository watchStatusRepository;
     @Mock private EpisodeRepository episodeRepository;
     @Mock private ChapterRepository chapterRepository;
+    @Mock private PodcastEpisodeRepository podcastEpisodeRepository;
 
     private final UserEntity user = user();
     private final ShowEntity show = show();
@@ -187,10 +190,11 @@ class ContinueWatchingServiceTest {
                 isNull(), isNull(), isNull(), isNull(), isNull(), any());
     }
 
+    /** The entry is keyed by the podcast, so all its episodes collapse to one continue-watching row. */
     @Test
-    void aPodcastEpisodeInProgressResumesItself() {
-        PodcastEpisodeEntity episode = PodcastEpisodeEntity.builder().guid("guid-1").build();
-        episode.setId(UUID.randomUUID());
+    void aPodcastEpisodeInProgressResumesItselfUnderThePodcast() {
+        PodcastEntity podcast = podcast();
+        PodcastEpisodeEntity episode = podcastEpisode(podcast);
         WatchStatusEntity status = WatchStatusEntity.builder()
                 .userEntity(user).playQueueItemId(UUID.randomUUID()).podcastEpisodeEntity(episode)
                 .watched(false).progressInMilliseconds(120_000).build();
@@ -198,7 +202,39 @@ class ContinueWatchingServiceTest {
         subject.onWatchStatusChanged(status);
 
         verify(continueWatchingRepository).upsert(eq(user.getId()), eq(MediaType.PODCAST_EPISODE.name()),
-                eq(episode.getId()), isNull(), isNull(), isNull(), isNull(), eq(episode.getId()), any());
+                eq(podcast.getId()), isNull(), isNull(), isNull(), isNull(), eq(episode.getId()), any());
+    }
+
+    @Test
+    void aFinishedPodcastEpisodeHandsOverToTheNextUnfinishedOne() {
+        PodcastEntity podcast = podcast();
+        PodcastEpisodeEntity episode = podcastEpisode(podcast);
+        UUID nextId = UUID.randomUUID();
+        when(podcastEpisodeRepository.findNextUnfinishedPodcastEpisodeId(podcast.getId(), user.getId(), episode.getId()))
+                .thenReturn(List.of(nextId));
+        WatchStatusEntity status = WatchStatusEntity.builder()
+                .userEntity(user).playQueueItemId(UUID.randomUUID()).podcastEpisodeEntity(episode)
+                .watched(true).progressInMilliseconds(120_000).build();
+
+        subject.onWatchStatusChanged(status);
+
+        verify(continueWatchingRepository).upsert(eq(user.getId()), eq(MediaType.PODCAST_EPISODE.name()),
+                eq(podcast.getId()), isNull(), isNull(), isNull(), isNull(), eq(nextId), any());
+    }
+
+    /** A 0-progress "just opened" heartbeat must not clobber another episode of the same podcast. */
+    @Test
+    void aPodcastEpisodeNotStartedYetLeavesTheEntryUntouched() {
+        PodcastEntity podcast = podcast();
+        PodcastEpisodeEntity episode = podcastEpisode(podcast);
+        WatchStatusEntity status = WatchStatusEntity.builder()
+                .userEntity(user).playQueueItemId(UUID.randomUUID()).podcastEpisodeEntity(episode)
+                .watched(false).progressInMilliseconds(0).build();
+
+        subject.onWatchStatusChanged(status);
+
+        verify(continueWatchingRepository, never()).upsert(any(), eq(MediaType.PODCAST_EPISODE.name()),
+                any(), any(), any(), any(), any(), any(), any());
     }
 
     // ===== Rebuild =====
@@ -287,6 +323,18 @@ class ContinueWatchingServiceTest {
         BookEntity book = BookEntity.builder().name("Test Book").build();
         book.setId(UUID.randomUUID());
         return book;
+    }
+
+    private static PodcastEntity podcast() {
+        PodcastEntity podcast = PodcastEntity.builder().title("Test Podcast").build();
+        podcast.setId(UUID.randomUUID());
+        return podcast;
+    }
+
+    private static PodcastEpisodeEntity podcastEpisode(PodcastEntity podcast) {
+        PodcastEpisodeEntity episode = PodcastEpisodeEntity.builder().podcastEntity(podcast).guid("guid-1").build();
+        episode.setId(UUID.randomUUID());
+        return episode;
     }
 
     private static MovieEntity movie() {

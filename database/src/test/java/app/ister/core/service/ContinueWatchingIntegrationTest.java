@@ -3,12 +3,16 @@ package app.ister.core.service;
 import app.ister.core.entity.ContinueWatchingEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.LibraryEntity;
+import app.ister.core.entity.PodcastEntity;
+import app.ister.core.entity.PodcastEpisodeEntity;
 import app.ister.core.entity.SeasonEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.MediaType;
+
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -143,6 +147,48 @@ class ContinueWatchingIntegrationTest {
         em.clear();
 
         assertTrue(subject.entriesFor(user.getId()).isEmpty());
+    }
+
+    /** All episodes of a podcast collapse to one entry, and finishing one hands over to the next. */
+    @Test
+    void podcastEpisodesGroupUnderTheirPodcastAndHandOver() {
+        LibraryEntity library = em.persist(LibraryEntity.builder()
+                .libraryType(LibraryType.PODCAST).name("Podcasts-" + UUID.randomUUID()).build());
+        PodcastEntity podcast = em.persist(PodcastEntity.builder()
+                .libraryEntity(library).feedUrl("feed-" + UUID.randomUUID()).title("Pod").build());
+        PodcastEpisodeEntity ep1 = em.persist(PodcastEpisodeEntity.builder()
+                .podcastEntity(podcast).guid("g1").enclosureUrl("http://x/1.mp3")
+                .publishedAt(Instant.parse("2025-01-01T00:00:00Z")).build());
+        PodcastEpisodeEntity ep2 = em.persist(PodcastEpisodeEntity.builder()
+                .podcastEntity(podcast).guid("g2").enclosureUrl("http://x/2.mp3")
+                .publishedAt(Instant.parse("2025-01-08T00:00:00Z")).build());
+        em.flush();
+
+        // Two different episodes of the same podcast, both mid-way through: still one entry.
+        playedPodcast(ep1, false);
+        playedPodcast(ep2, false);
+        ContinueWatchingEntity entry = onlyEntry();
+        assertEquals(podcast.getId(), entry.getGroupId(), "one entry for the podcast, not one per episode");
+        assertEquals(ep2.getId(), entry.getPodcastEpisodeEntity().getId(), "resumes the last one played");
+
+        // Finishing ep1 hands the podcast over to the next unfinished episode by publish date.
+        playedPodcast(ep1, true);
+        assertEquals(ep2.getId(), onlyEntry().getPodcastEpisodeEntity().getId(),
+                "the next unfinished episode by publish date");
+    }
+
+    private WatchStatusEntity playedPodcast(PodcastEpisodeEntity episode, boolean watched) {
+        WatchStatusEntity status = em.persistAndFlush(WatchStatusEntity.builder()
+                .userEntity(user)
+                .playQueueItemId(UUID.randomUUID())
+                .podcastEpisodeEntity(episode)
+                .progressInMilliseconds(120_000)
+                .watched(watched)
+                .build());
+        subject.onWatchStatusChanged(status);
+        em.flush();
+        em.clear();
+        return status;
     }
 
     /** Plays an episode the way the heartbeat does: persist the watch status, then update the cache. */

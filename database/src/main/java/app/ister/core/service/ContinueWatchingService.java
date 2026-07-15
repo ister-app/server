@@ -9,6 +9,7 @@ import app.ister.core.enums.MediaType;
 import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.ContinueWatchingRepository;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import app.ister.core.repository.WatchStatusRepository.RecentEntry;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +49,7 @@ public class ContinueWatchingService {
     private final WatchStatusRepository watchStatusRepository;
     private final EpisodeRepository episodeRepository;
     private final ChapterRepository chapterRepository;
+    private final PodcastEpisodeRepository podcastEpisodeRepository;
 
     /** How far back the continue-watching list looks; older entries are dropped on rebuild. */
     @Value("${app.ister.server.continue-watching.history-days:150}")
@@ -89,8 +91,17 @@ public class ContinueWatchingService {
             UUID bookId = status.getBookEntity().getId();
             upsertBook(user, bookId, startedReading(status) ? bookId : null, lastWatched);
         } else if (status.getPodcastEpisodeEntity() != null) {
-            UUID episodeId = status.getPodcastEpisodeEntity().getId();
-            upsertPodcastEpisode(user, episodeId, startedListening(status) ? episodeId : null, lastWatched);
+            var episode = status.getPodcastEpisodeEntity();
+            UUID podcastId = episode.getPodcastEntity().getId();
+            if (status.isWatched()) {
+                UUID target = nextUnfinishedPodcastEpisode(podcastId, user.getId(), episode.getId()).orElse(null);
+                upsertPodcastEpisode(user, podcastId, target, lastWatched);
+            } else if (startedListening(status)) {
+                upsertPodcastEpisode(user, podcastId, episode.getId(), lastWatched);
+            }
+            // Not started (progress 0) and not watched: nothing to resume yet. Since the entry is now
+            // keyed by podcast, writing a null target here would clobber another episode the user is
+            // mid-way through, so leave any existing entry untouched.
         }
     }
 
@@ -119,8 +130,7 @@ public class ContinueWatchingService {
             upsertBook(user, entry.getGroupId(), started ? entry.getItemId() : null, entry.getLastWatched());
         }
         for (RecentEntry entry : watchStatusRepository.findRecentPodcastEpisodeEntries(userId, cutoff)) {
-            boolean started = !entry.getWatched() && entry.getProgressInMilliseconds() > 0;
-            upsertPodcastEpisode(user, entry.getGroupId(), started ? entry.getItemId() : null, entry.getLastWatched());
+            upsertPodcastEpisode(user, entry.getGroupId(), podcastTarget(userId, entry), entry.getLastWatched());
         }
         log.debug("Rebuilt continue watching for user: {}", userId);
     }
@@ -172,6 +182,18 @@ public class ContinueWatchingService {
         return chapterRepository.findById(entry.getItemId())
                 .flatMap(chapter -> nextUnfinishedChapter(entry.getGroupId(), userId, chapter.getNumber()))
                 .orElse(null);
+    }
+
+    private UUID podcastTarget(UUID userId, RecentEntry entry) {
+        if (entry.getWatched()) {
+            return nextUnfinishedPodcastEpisode(entry.getGroupId(), userId, entry.getItemId()).orElse(null);
+        }
+        return entry.getProgressInMilliseconds() > 0 ? entry.getItemId() : null;
+    }
+
+    private Optional<UUID> nextUnfinishedPodcastEpisode(UUID podcastId, UUID userId, UUID afterEpisodeId) {
+        return podcastEpisodeRepository.findNextUnfinishedPodcastEpisodeId(podcastId, userId, afterEpisodeId)
+                .stream().findFirst();
     }
 
     private Optional<UUID> nextUnwatchedEpisode(UUID showId, UUID userId, int afterSeason, int afterEpisode) {

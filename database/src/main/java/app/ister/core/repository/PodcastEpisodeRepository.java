@@ -43,4 +43,25 @@ public interface PodcastEpisodeRepository extends JpaRepository<PodcastEpisodeEn
             ORDER BY e.published_at ASC NULLS LAST, e.id
             LIMIT :limit OFFSET :offset""", nativeQuery = true)
     List<UUID> findEpisodeIdsForPodcastOrderedAsc(@Param("podcastId") UUID podcastId, @Param("limit") int limit, @Param("offset") int offset);
+
+    /**
+     * The episode a user should continue a podcast with after finishing one: the next episode in
+     * chronological play order (published_at) they have not finished. Empty when there is nothing
+     * newer left to resume. The podcast twin of {@link EpisodeRepository#findNextUnwatchedEpisodeId}
+     * and {@link ChapterRepository#findNextUnfinishedChapterId}; published_at can be null, so it is
+     * coalesced to the epoch to keep the cursor comparison total.
+     */
+    @Query(value = """
+            SELECT e.id FROM podcast_episode_entity e
+            JOIN podcast_episode_entity cur ON cur.id = :afterEpisodeId
+            WHERE e.podcast_entity_id = :podcastId
+              AND (COALESCE(e.published_at, TIMESTAMPTZ 'epoch'), e.id)
+                > (COALESCE(cur.published_at, TIMESTAMPTZ 'epoch'), cur.id)
+              AND NOT EXISTS (SELECT 1 FROM watch_status_entity w
+                              WHERE w.podcast_episode_entity_id = e.id AND w.user_entity_id = :userId AND w.watched)
+            ORDER BY COALESCE(e.published_at, TIMESTAMPTZ 'epoch'), e.id
+            LIMIT 1""", nativeQuery = true)
+    List<UUID> findNextUnfinishedPodcastEpisodeId(@Param("podcastId") UUID podcastId,
+                                                  @Param("userId") UUID userId,
+                                                  @Param("afterEpisodeId") UUID afterEpisodeId);
 }
