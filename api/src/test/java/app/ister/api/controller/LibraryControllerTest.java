@@ -1,14 +1,20 @@
 package app.ister.api.controller;
 
 import app.ister.core.entity.LibraryEntity;
+import app.ister.core.enums.SortingEnum;
+import app.ister.core.enums.SortingOrder;
 import app.ister.core.repository.LibraryRepository;
+import app.ister.core.repository.UserLibraryPreferenceRepository;
+import app.ister.core.service.LibraryPreferenceService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.Authentication;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -21,6 +27,12 @@ class LibraryControllerTest {
 
     @Mock
     private LibraryRepository libraryRepository;
+
+    @Mock
+    private UserLibraryPreferenceRepository userLibraryPreferenceRepository;
+
+    @Mock
+    private LibraryPreferenceService libraryPreferenceService;
 
     @Test
     void librariesReturnsAllFromRepository() {
@@ -41,5 +53,18 @@ class LibraryControllerTest {
         List<LibraryEntity> result = subject.libraries();
 
         assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void setLibrarySortingDelegatesToTheServiceAndReturnsTrue() {
+        Authentication authentication = mock(Authentication.class);
+        UUID libraryId = UUID.randomUUID();
+
+        Boolean result = subject.setLibrarySorting(
+                libraryId, SortingEnum.RELEASE_YEAR, SortingOrder.DESCENDING, authentication);
+
+        assertTrue(result);
+        verify(libraryPreferenceService)
+                .setSorting(authentication, libraryId, SortingEnum.RELEASE_YEAR, SortingOrder.DESCENDING);
     }
 }

@@ -82,6 +82,11 @@ type Mutation {
     the order it was built with. Returns true.
     """
     setPodcastEpisodeOrder(podcastId: ID!, order: SortingOrder!): Boolean!
+    """
+    Sets the calling user's grid sort key and direction for one library. It applies to every client
+    of that user. Returns true.
+    """
+    setLibrarySorting(libraryId: ID!, sorting: SortingEnum!, sortingOrder: SortingOrder!): Boolean!
     "Queues a feed refresh for every active podcast."
     refreshPodcasts: Boolean!
     "Queues a download of the episode's audio to this node's cache directory."
@@ -211,6 +216,7 @@ type ServerActivitySnapshot {
 enum SortingEnum {
     DATE_CREATED
     NAME
+    RELEASE_YEAR
 }
 
 enum SortingOrder {
@@ -372,6 +378,10 @@ type Library {
     id: ID!
     name: String!
     type: LibraryType!
+    "The calling user's grid sort key for this library; NAME when unset."
+    sorting: SortingEnum!
+    "The calling user's grid sort direction for this library; ASCENDING when unset."
+    sortingOrder: SortingOrder!
 }
 
 type MediaFileStream {

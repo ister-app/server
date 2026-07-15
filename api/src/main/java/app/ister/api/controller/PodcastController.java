@@ -64,10 +64,13 @@ public class PodcastController {
             @Argument Optional<UUID> libraryId) {
         Pageable pageable = Paging.pageable(page, size, 20,
                 sorting, SortingEnum.NAME, sortingOrder, SortingOrder.ASCENDING);
-        // Podcasts have a "title" column where the other types have "name".
+        // Podcasts have a "title" column where the other types have "name", and no "releaseYear"
+        // at all — remap both onto "title" so an unsupported sort key degrades gracefully instead
+        // of failing the query. Other keys (e.g. dateCreated) exist on the entity and pass through.
+        java.util.Set<String> titleAliases = java.util.Set.of("name", "releaseYear");
         org.springframework.data.domain.Sort sort = org.springframework.data.domain.Sort.by(
                 pageable.getSort().stream()
-                        .map(order -> "name".equals(order.getProperty())
+                        .map(order -> titleAliases.contains(order.getProperty())
                                 ? order.withProperty("title") : order)
                         .toList());
         Pageable byTitle = org.springframework.data.domain.PageRequest.of(
