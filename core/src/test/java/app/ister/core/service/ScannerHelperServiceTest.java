@@ -39,9 +39,13 @@ class ScannerHelperServiceTest {
     @Mock
     private ChapterRepository chapterRepository;
     @Mock
+    private MetadataRepository metadataRepository;
+    @Mock
     private ServerEventService serverEventService;
     @Mock
     private ContinueWatchingService continueWatchingService;
+    @Mock
+    private BookSeriesService bookSeriesService;
 
     private final LibraryEntity library = LibraryEntity.builder().build();
 
@@ -324,8 +328,8 @@ class ScannerHelperServiceTest {
     @Test
     void getOrCreateBookReturnsExistingBook() {
         PersonEntity author = PersonEntity.builder().name("Tolkien").build();
-        BookEntity existing = BookEntity.builder().name("The Hobbit").releaseYear(1937).build();
-        when(bookRepository.findByPersonEntityAndNameAndReleaseYear(author, "The Hobbit", 1937))
+        BookEntity existing = BookEntity.builder().name("The Hobbit").pathYear(1937).releaseYear(1937).build();
+        when(bookRepository.findByPersonEntityAndNameAndPathYear(author, "The Hobbit", 1937))
                 .thenReturn(Optional.of(existing));
 
         assertEquals(existing, subject.getOrCreateBook(library, author, "The Hobbit", 1937));
@@ -340,27 +344,101 @@ class ScannerHelperServiceTest {
     @Test
     void getOrCreateBookMatchesOnNameAloneWhenTheDirectoryHasNoYear() {
         PersonEntity author = PersonEntity.builder().name("Tolkien").build();
-        BookEntity existing = BookEntity.builder().name("The Hobbit").releaseYear(1937).build();
+        BookEntity existing = BookEntity.builder().name("The Hobbit").pathYear(1937).releaseYear(1937).build();
         when(bookRepository.findFirstByPersonEntityAndNameOrderByDateCreatedAsc(author, "The Hobbit"))
                 .thenReturn(Optional.of(existing));
 
         assertEquals(existing, subject.getOrCreateBook(library, author, "The Hobbit", 0));
-        verify(bookRepository, never()).findByPersonEntityAndNameAndReleaseYear(any(), any(), anyInt());
+        verify(bookRepository, never()).findByPersonEntityAndNameAndPathYear(any(), any(), anyInt());
         verify(bookRepository, never()).save(any());
     }
 
     @Test
     void getOrCreateBookCreatesNewBook() {
         PersonEntity author = PersonEntity.builder().name("Tolkien").build();
-        when(bookRepository.findByPersonEntityAndNameAndReleaseYear(author, "The Hobbit", 1937))
+        when(bookRepository.findByPersonEntityAndNameAndPathYear(author, "The Hobbit", 1937))
+                .thenReturn(Optional.empty());
+        when(bookRepository.findByPersonEntityAndNameAndPathYear(author, "The Hobbit", 0))
                 .thenReturn(Optional.empty());
 
         BookEntity result = subject.getOrCreateBook(library, author, "The Hobbit", 1937);
 
         assertEquals("The Hobbit", result.getName());
+        assertEquals(1937, result.getPathYear());
         assertEquals(1937, result.getReleaseYear());
         verify(bookRepository).save(result);
         verify(serverEventService).createBookFoundEvent(result.getId());
+        verify(bookSeriesService).applyPrefixHeuristic(author);
+    }
+
+    /**
+     * The user added "(YYYY)" to an existing year-less book folder: the row is adopted, not
+     * duplicated, and the path year immediately becomes the display year.
+     */
+    @Test
+    void getOrCreateBookAdoptsTheYearLessRowWhenThePathGainsAYear() {
+        PersonEntity author = PersonEntity.builder().name("Tolkien").build();
+        BookEntity existing = BookEntity.builder().name("The Hobbit").pathYear(0).releaseYear(1954).build();
+        when(bookRepository.findByPersonEntityAndNameAndPathYear(author, "The Hobbit", 1937))
+                .thenReturn(Optional.empty());
+        when(bookRepository.findByPersonEntityAndNameAndPathYear(author, "The Hobbit", 0))
+                .thenReturn(Optional.of(existing));
+
+        assertEquals(existing, subject.getOrCreateBook(library, author, "The Hobbit", 1937));
+        assertEquals(1937, existing.getPathYear());
+        assertEquals(1937, existing.getReleaseYear());
+        verify(serverEventService, never()).createBookFoundEvent(any());
+    }
+
+    @Test
+    void refreshBookReleaseYearPathYearAlwaysWins() {
+        BookEntity book = BookEntity.builder().pathYear(2004).releaseYear(2011).build();
+
+        subject.refreshBookReleaseYear(book);
+
+        assertEquals(2004, book.getReleaseYear());
+        verify(bookRepository).save(book);
+        verifyNoInteractions(metadataRepository);
+    }
+
+    @Test
+    void refreshBookReleaseYearPrefersTheOpenLibraryRowOverLocalRows() {
+        BookEntity book = BookEntity.builder().pathYear(0).releaseYear(2011).build();
+        when(metadataRepository.findByBookEntityId(book.getId())).thenReturn(java.util.List.of(
+                MetadataEntity.builder().sourceUri("file:///books/x.nfo")
+                        .released(java.time.LocalDate.of(2011, 1, 1)).build(),
+                MetadataEntity.builder().sourceUri("openlibrary://works/OL1W")
+                        .released(java.time.LocalDate.of(2004, 1, 1)).build()));
+
+        subject.refreshBookReleaseYear(book);
+
+        assertEquals(2004, book.getReleaseYear());
+        verify(bookRepository).save(book);
+    }
+
+    @Test
+    void refreshBookReleaseYearFallsBackToTheEarliestLocalYear() {
+        BookEntity book = BookEntity.builder().pathYear(0).releaseYear(0).build();
+        when(metadataRepository.findByBookEntityId(book.getId())).thenReturn(java.util.List.of(
+                MetadataEntity.builder().sourceUri("file:///books/x.nfo")
+                        .released(java.time.LocalDate.of(2011, 1, 1)).build(),
+                MetadataEntity.builder().sourceUri("file:///books/x.epub")
+                        .released(java.time.LocalDate.of(2008, 1, 1)).build()));
+
+        subject.refreshBookReleaseYear(book);
+
+        assertEquals(2008, book.getReleaseYear());
+    }
+
+    @Test
+    void refreshBookReleaseYearLeavesTheBookAloneWithoutAnyYearSource() {
+        BookEntity book = BookEntity.builder().pathYear(0).releaseYear(2010).build();
+        when(metadataRepository.findByBookEntityId(book.getId())).thenReturn(java.util.List.of());
+
+        subject.refreshBookReleaseYear(book);
+
+        assertEquals(2010, book.getReleaseYear());
+        verify(bookRepository, never()).save(any());
     }
 
     @Test

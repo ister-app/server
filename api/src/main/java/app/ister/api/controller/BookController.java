@@ -6,6 +6,7 @@ import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.PersonEntity;
+import app.ister.core.entity.SeriesEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
@@ -33,6 +34,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -103,6 +105,22 @@ public class BookController {
         return bookEntity.getPersonEntity();
     }
 
+    /** Clean display title: name with a known series prefix stripped; falls back to the raw name. */
+    @SchemaMapping(typeName = "Book", field = "title")
+    public String title(BookEntity bookEntity) {
+        return bookEntity.getTitle() != null ? bookEntity.getTitle() : bookEntity.getName();
+    }
+
+    @SchemaMapping(typeName = "Book", field = "series")
+    public SeriesEntity series(BookEntity bookEntity) {
+        return bookEntity.getSeriesEntity();
+    }
+
+    @SchemaMapping(typeName = "Book", field = "seriesIndex")
+    public Double seriesIndex(BookEntity bookEntity) {
+        return bookEntity.getSeriesIndex();
+    }
+
     /**
      * The book's own release year is only set when the file/directory name carries a "(YYYY)"
      * suffix; otherwise the year lives in the metadata parsed from the epub, nfo or Open Library.
@@ -137,9 +155,31 @@ public class BookController {
         return mediaFileRepository.findByBookEntityId(bookEntity.getId());
     }
 
+    /**
+     * Deterministic source preference: NFO, then epub, then Open Library. Clients that take the
+     * first row therefore show stable titles/descriptions instead of arbitrary JPA row order.
+     */
     @SchemaMapping(typeName = "Book", field = "metadata")
     public List<MetadataEntity> metadata(BookEntity bookEntity) {
-        return bookEntity.getMetadataEntities();
+        return bookEntity.getMetadataEntities().stream()
+                .sorted(Comparator.comparingInt(BookController::sourceRank)
+                        .thenComparing(MetadataEntity::getDateCreated,
+                                Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+    }
+
+    private static int sourceRank(MetadataEntity metadata) {
+        String sourceUri = metadata.getSourceUri() == null ? "" : metadata.getSourceUri();
+        if (sourceUri.endsWith(".nfo")) {
+            return 0;
+        }
+        if (sourceUri.endsWith(".epub")) {
+            return 1;
+        }
+        if (sourceUri.startsWith("openlibrary://")) {
+            return 2;
+        }
+        return 3;
     }
 
     @BatchMapping(typeName = "Book", field = "images")

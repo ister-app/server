@@ -3,8 +3,13 @@ package app.ister.worker.events.analyzelibraryrequested;
 import app.ister.core.Handle;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.LibraryType;
+import app.ister.core.entity.BookEntity;
+import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.eventdata.AlbumFoundData;
 import app.ister.core.eventdata.AnalyzeLibraryRequestedData;
+import app.ister.core.eventdata.BookFoundData;
+import app.ister.core.eventdata.EpubFileFoundData;
 import app.ister.core.eventdata.PersonFoundData;
 import app.ister.core.eventdata.AudioFileFoundData;
 import app.ister.core.eventdata.EpisodeFoundData;
@@ -12,6 +17,7 @@ import app.ister.core.eventdata.MovieFoundData;
 import app.ister.core.eventdata.ShowFoundData;
 import app.ister.core.eventdata.UpdateImagesRequestedData;
 import app.ister.core.repository.AlbumRepository;
+import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
@@ -19,6 +25,7 @@ import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.ShowRepository;
 import app.ister.core.repository.TrackRepository;
+import app.ister.core.service.BookSeriesService;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.NodeService;
 import lombok.RequiredArgsConstructor;
@@ -27,12 +34,18 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * Handles {@link EventType#ANALYZE_LIBRARY_REQUEST} by:
  * 1. Publishing an update-images event for this node.
- * 2. Publishing "metadata-missing" events for shows, episodes and movies.
+ * 2. Publishing "metadata-missing" events for shows, episodes, movies, persons, albums, tracks
+ *    and books.
  */
 @Service
 @Slf4j
@@ -46,6 +59,8 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
     private final PersonRepository personRepository;
     private final AlbumRepository albumRepository;
     private final TrackRepository trackRepository;
+    private final BookRepository bookRepository;
+    private final BookSeriesService bookSeriesService;
     private final MediaFileRepository mediaFileRepository;
     private final MessageSender messageSender;
     private final NodeService nodeService;
@@ -79,6 +94,58 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
         dispatchMissingMetadataEvents(nodeEntity.getName());
         dispatchMissingPersonMetadataEvents();
         dispatchMissingMusicMetadataEvents(nodeEntity.getName());
+        dispatchMissingBookMetadataEvents();
+    }
+
+    /**
+     * Backfill for books. A plain rescan skips epubs whose media file already exists, so this is
+     * the only path that re-enriches existing books.
+     *
+     * <p>Books without an Open Library metadata row get their epubs re-parsed (EPUB_FILE_FOUND
+     * writes the release date and ISBN, then chains BOOK_FOUND itself — dispatching BOOK_FOUND
+     * directly would race the Open Library lookup against the ISBN being stored). Books without
+     * any epub file (audiobook-only) and books without a cover go straight to BOOK_FOUND. Finally
+     * the series heuristic runs per author, so pre-existing libraries converge without a rescan.
+     */
+    private void dispatchMissingBookMetadataEvents() {
+        Set<UUID> dispatched = new HashSet<>();
+        bookRepository.findBooksWithoutOpenLibraryMetadata(LibraryType.BOOK).forEach(book -> {
+            dispatched.add(book.getId());
+            List<MediaFileEntity> epubs = mediaFileRepository.findByBookEntityId(book.getId()).stream()
+                    .filter(m -> m.getDirectoryEntityId() != null)
+                    .toList();
+            if (epubs.isEmpty()) {
+                sendBookFound(book.getId());
+                return;
+            }
+            epubs.forEach(m -> directoryRepository.findById(m.getDirectoryEntityId())
+                    .ifPresent(dir -> messageSender.sendEpubFileFound(
+                            EpubFileFoundData.builder()
+                                    .eventType(EventType.EPUB_FILE_FOUND)
+                                    .directoryEntityUUID(dir.getId())
+                                    .bookEntityUUID(book.getId())
+                                    .mediaFileEntityUUID(m.getId())
+                                    .path(m.getPath())
+                                    .build(),
+                            dir.getName())));
+        });
+
+        bookRepository.findByLibraryEntity_LibraryTypeAndImageEntitiesIsEmpty(LibraryType.BOOK).stream()
+                .map(BookEntity::getId)
+                .filter(dispatched::add)
+                .forEach(this::sendBookFound);
+
+        bookRepository.findByLibraryEntity_LibraryType(LibraryType.BOOK).stream()
+                .map(BookEntity::getPersonEntity)
+                .collect(Collectors.toMap(PersonEntity::getId, p -> p, (a, b) -> a))
+                .values()
+                .forEach(bookSeriesService::applyPrefixHeuristic);
+        bookSeriesService.cleanupOrphanSeries();
+    }
+
+    private void sendBookFound(UUID bookId) {
+        messageSender.sendBookFound(
+                BookFoundData.builder().eventType(EventType.BOOK_FOUND).bookId(bookId).build());
     }
 
     /**

@@ -44,12 +44,16 @@ public class EpubParser {
             String opfDir = opfEntryName.contains("/")
                     ? opfEntryName.substring(0, opfEntryName.lastIndexOf('/') + 1)
                     : "";
+            Series series = findSeries(opf);
             return Optional.of(new EpubInfo(
                     dcValue(opf, "title"),
                     dcValue(opf, "creator"),
                     dcValue(opf, "language"),
                     dcValue(opf, "description"),
                     parseYear(dcValue(opf, "date")),
+                    findIsbn(opf),
+                    series.name(),
+                    series.index(),
                     findCoverEntry(opf, opfDir),
                     hasMediaOverlays(opf),
                     parseTotalDuration(opf)));
@@ -117,6 +121,110 @@ public class EpubParser {
             return Integer.parseInt(date.substring(0, 4));
         } catch (NumberFormatException _) {
             return 0;
+        }
+    }
+
+    /**
+     * ISBN from dc:identifier: accepted when the opf:scheme (or plain scheme) attribute says ISBN,
+     * the value carries a urn:isbn: prefix, or the normalized value simply is an ISBN-10/13. First
+     * valid one wins.
+     */
+    private String findIsbn(Document opf) {
+        NodeList identifiers = opf.getElementsByTagNameNS(NS_DC, "identifier");
+        for (int i = 0; i < identifiers.getLength(); i++) {
+            Element identifier = (Element) identifiers.item(i);
+            String value = identifier.getTextContent();
+            if (value == null) {
+                continue;
+            }
+            String scheme = identifier.getAttributeNS(NS_OPF, "scheme");
+            if (scheme.isBlank()) {
+                scheme = identifier.getAttribute("scheme");
+            }
+            String normalized = normalizeIsbn(value);
+            boolean claimsIsbn = "isbn".equalsIgnoreCase(scheme)
+                    || value.strip().toLowerCase(java.util.Locale.ROOT).startsWith("urn:isbn:");
+            if (normalized != null && (claimsIsbn || scheme.isBlank())) {
+                return normalized;
+            }
+        }
+        return null;
+    }
+
+    /** Strips urn:isbn:, hyphens and spaces; returns null unless the result looks like an ISBN. */
+    static String normalizeIsbn(String value) {
+        String v = value.strip();
+        if (v.toLowerCase(java.util.Locale.ROOT).startsWith("urn:isbn:")) {
+            v = v.substring("urn:isbn:".length());
+        }
+        v = v.replaceAll("[\\s-]", "");
+        if (v.matches("\\d{13}") || v.matches("\\d{9}[\\dXx]")) {
+            return v.toUpperCase(java.util.Locale.ROOT);
+        }
+        return null;
+    }
+
+    private record Series(String name, Double index) {
+        static final Series NONE = new Series(null, null);
+    }
+
+    /**
+     * Series metadata: EPUB 3 belongs-to-collection (with its group-position refinement) first,
+     * falling back to the calibre meta pair.
+     */
+    private Series findSeries(Document opf) {
+        NodeList metas = opf.getElementsByTagNameNS(NS_OPF, "meta");
+        for (int i = 0; i < metas.getLength(); i++) {
+            Element meta = (Element) metas.item(i);
+            if ("belongs-to-collection".equals(meta.getAttribute("property"))
+                    && meta.getAttribute("refines").isBlank()) {
+                String name = meta.getTextContent();
+                if (name != null && !name.isBlank()) {
+                    Double index = parseIndex(refinesValue(opf, meta.getAttribute("id"), "group-position"));
+                    return new Series(name.strip(), index);
+                }
+            }
+        }
+        String calibreSeries = null;
+        String calibreIndex = null;
+        for (int i = 0; i < metas.getLength(); i++) {
+            Element meta = (Element) metas.item(i);
+            if ("calibre:series".equals(meta.getAttribute("name"))) {
+                calibreSeries = meta.getAttribute("content");
+            } else if ("calibre:series_index".equals(meta.getAttribute("name"))) {
+                calibreIndex = meta.getAttribute("content");
+            }
+        }
+        if (calibreSeries != null && !calibreSeries.isBlank()) {
+            return new Series(calibreSeries.strip(), parseIndex(calibreIndex));
+        }
+        return Series.NONE;
+    }
+
+    /** The text of the meta refining #id with the given property, or null. */
+    private String refinesValue(Document opf, String id, String property) {
+        if (id == null || id.isBlank()) {
+            return null;
+        }
+        NodeList metas = opf.getElementsByTagNameNS(NS_OPF, "meta");
+        for (int i = 0; i < metas.getLength(); i++) {
+            Element meta = (Element) metas.item(i);
+            if (property.equals(meta.getAttribute("property"))
+                    && ("#" + id).equals(meta.getAttribute("refines"))) {
+                return meta.getTextContent();
+            }
+        }
+        return null;
+    }
+
+    private Double parseIndex(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Double.parseDouble(value.strip());
+        } catch (NumberFormatException _) {
+            return null;
         }
     }
 

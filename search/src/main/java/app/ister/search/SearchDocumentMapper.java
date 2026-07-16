@@ -109,11 +109,16 @@ public class SearchDocumentMapper {
 
     public SearchDocument toDocument(BookEntity book) {
         Map<String, MetadataEntity> byLanguage = byLanguage(book.getMetadataEntities());
+        // The clean display title; the series name stays searchable through the context.
+        String title = book.getTitle() != null ? book.getTitle() : book.getName();
+        String context = book.getSeriesEntity() != null
+                ? book.getPersonEntity().getName() + " – " + book.getSeriesEntity().getName()
+                : book.getPersonEntity().getName();
         SearchDocument.Builder builder = SearchDocument.builder()
                 .id(book.getId().toString())
                 .type(SearchEntityType.BOOK.name())
-                .title(book.getName())
-                .context(book.getPersonEntity().getName())
+                .title(title)
+                .context(context)
                 .year(book.getReleaseYear())
                 .libraryId(libraryId(book.getLibraryEntity()));
         addLocalized(builder, byLanguage);

@@ -230,6 +230,28 @@ class BookControllerTest {
         assertEquals(List.of(metadata), subject.metadata(book));
     }
 
+    /** Deterministic source order: nfo, then epub, then Open Library — never raw JPA row order. */
+    @Test
+    void metadataIsOrderedNfoThenEpubThenOpenLibrary() {
+        MetadataEntity openLibrary = MetadataEntity.builder().sourceUri("openlibrary://works/OL1W").build();
+        MetadataEntity epub = MetadataEntity.builder().sourceUri("file:///books/Book.epub").build();
+        MetadataEntity nfo = MetadataEntity.builder().sourceUri("file:///books/Book/album.nfo").build();
+        BookEntity book = BookEntity.builder().name("Dit zijn de namen")
+                .metadataEntities(List.of(openLibrary, epub, nfo)).build();
+
+        assertEquals(List.of(nfo, epub, openLibrary), subject.metadata(book));
+    }
+
+    @Test
+    void titleFallsBackToTheNameWhenNoCleanTitleIsSet() {
+        BookEntity withTitle = BookEntity.builder()
+                .name("De Grijze Jager - De ruïnes van Gorlan").title("De ruïnes van Gorlan").build();
+        BookEntity withoutTitle = BookEntity.builder().name("Night Flight").build();
+
+        assertEquals("De ruïnes van Gorlan", subject.title(withTitle));
+        assertEquals("Night Flight", subject.title(withoutTitle));
+    }
+
     @Test
     void epubFilesAreLookedUpByBookId() {
         BookEntity book = book("Dit zijn de namen");

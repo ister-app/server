@@ -7,6 +7,7 @@ import jakarta.persistence.ManyToOne;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDate;
@@ -60,14 +61,20 @@ public class MetadataEntity extends BaseEntity {
     @ManyToOne
     private PodcastEpisodeEntity podcastEpisodeEntity;
 
+    @Setter
     private String sourceUri;
 
     // https://en.wikipedia.org/wiki/ISO_639-3
+    @Setter
     private String language;
 
+    @Setter
     private String title;
+    @Setter
     @Column(columnDefinition = "text")
     private String description;
+    @Setter
     private LocalDate released;
+    @Setter
     private String genre;
 }

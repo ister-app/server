@@ -49,9 +49,11 @@ public class OpenLibraryService {
     /**
      * @param description the work description, or null
      * @param coverUrl    a large cover image URL, or null
-     * @param firstPublishYear the first publication year, or 0 when unknown
+     * @param firstPublishYear the first publication year across all editions of the work — the
+     *                         original year, also for a translated edition — or 0 when unknown
+     * @param workKey     the Open Library work key (e.g. "/works/OL45804W"), or null
      */
-    public record BookInfo(String description, String coverUrl, int firstPublishYear) {}
+    public record BookInfo(String description, String coverUrl, int firstPublishYear, String workKey) {}
 
     /**
      * @param bios      biography per requested language tag; may be empty
@@ -61,8 +63,19 @@ public class OpenLibraryService {
      */
     public record AuthorInfo(Map<String, String> bios, String photoUrl, Integer birthYear, String sourceKey) {}
 
-    public Optional<BookInfo> getBookInfo(String title, String authorName) {
-        Optional<Map<String, Object>> doc = searchWork(title, authorName);
+    /**
+     * ISBN-first: an ISBN search hit is authoritative (no title verification — a Dutch edition's
+     * ISBN rolls up to the original work, whose English title would never fuzzy-match the local
+     * one). Falls back to the title+author search with normalized-title verification.
+     */
+    public Optional<BookInfo> getBookInfo(String title, String authorName, List<String> isbns) {
+        Optional<Map<String, Object>> doc = isbns.stream()
+                .map(this::searchWorkByIsbn)
+                .flatMap(Optional::stream)
+                .findFirst();
+        if (doc.isEmpty()) {
+            doc = searchWork(title, authorName);
+        }
         if (doc.isEmpty()) {
             return Optional.empty();
         }
@@ -71,11 +84,39 @@ public class OpenLibraryService {
                 ? COVERS_BASE + coverId.longValue() + "-L.jpg"
                 : null;
         int firstPublishYear = work.get("first_publish_year") instanceof Number year ? year.intValue() : 0;
-        String description = work.get("key") instanceof String key ? fetchDescription(key) : null;
+        String workKey = work.get("key") instanceof String key ? key : null;
+        String description = workKey != null ? fetchDescription(workKey) : null;
         if (description == null && coverUrl == null && firstPublishYear == 0) {
             return Optional.empty();
         }
-        return Optional.of(new BookInfo(description, coverUrl, firstPublishYear));
+        return Optional.of(new BookInfo(description, coverUrl, firstPublishYear, workKey));
+    }
+
+    /** The work an edition with this ISBN belongs to, or empty when Open Library doesn't know it. */
+    private Optional<Map<String, Object>> searchWorkByIsbn(String isbn) {
+        try {
+            Thread.sleep(1000);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> response = restClient.get()
+                    .uri(openLibraryBase + "/search.json?q=isbn:{isbn}&limit=1&fields=key,title,cover_i,first_publish_year",
+                            isbn)
+                    .retrieve()
+                    .body(Map.class);
+            if (response != null && response.get("docs") instanceof List<?> docs && !docs.isEmpty()
+                    && docs.getFirst() instanceof Map<?, ?> docMap) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> match = (Map<String, Object>) docMap;
+                return Optional.of(match);
+            }
+            log.debug("No Open Library work for isbn={}", isbn);
+            return Optional.empty();
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+            return Optional.empty();
+        } catch (RestClientException e) {
+            log.warn("Open Library isbn search error for isbn={}: {}", isbn, e.getMessage());
+            return Optional.empty();
+        }
     }
 
     /**

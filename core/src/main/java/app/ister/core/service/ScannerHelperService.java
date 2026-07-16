@@ -25,6 +25,7 @@ public class ScannerHelperService {
     private final ChapterRepository chapterRepository;
     private final ServerEventService serverEventService;
     private final ContinueWatchingService continueWatchingService;
+    private final BookSeriesService bookSeriesService;
 
     /**
      * Check if the database contains a show wit the given parameters.
@@ -173,52 +174,78 @@ public class ScannerHelperService {
 
     /**
      * Check if the database contains a book with the given parameters.
-     * - If it exists return it.
+     * - If it exists (matched on the path-derived name and "(YYYY)" year) return it.
+     * - If the path carries a year but only a year-less row exists, adopt that row: the user added
+     *   "(YYYY)" to an existing book's folder, or the row predates the path-year split.
      * - Else create and return it.
      *
-     * <p>Same matching rules as {@link #getOrCreateAlbum}: the name comes from the epub filename or
-     * the book directory (with any "(karaoke)" suffix already stripped by the path parser), so the
-     * epub, the audiobook folder and a karaoke epub of the same book all converge on one row. A
-     * {@code releaseYear} of 0 means unknown and then the name alone identifies the book.
+     * <p>The name comes from the epub filename or the book directory (with any "(karaoke)" suffix
+     * already stripped by the path parser), so the epub, the audiobook folder and a karaoke epub of
+     * the same book all converge on one row. Identity uses {@code pathYear}, never the display
+     * {@code releaseYear}, so external enrichment can correct the displayed year without breaking
+     * rescan matching. A {@code pathYear} of 0 means unknown and then the name alone identifies the
+     * book.
      */
-    public BookEntity getOrCreateBook(LibraryEntity libraryEntity, PersonEntity personEntity, String bookName, int releaseYear) {
-        Optional<BookEntity> existing = releaseYear > 0
-                ? bookRepository.findByPersonEntityAndNameAndReleaseYear(personEntity, bookName, releaseYear)
+    public BookEntity getOrCreateBook(LibraryEntity libraryEntity, PersonEntity personEntity, String bookName, int pathYear) {
+        Optional<BookEntity> existing = pathYear > 0
+                ? bookRepository.findByPersonEntityAndNameAndPathYear(personEntity, bookName, pathYear)
                 : bookRepository.findFirstByPersonEntityAndNameOrderByDateCreatedAsc(personEntity, bookName);
+        if (existing.isEmpty() && pathYear > 0) {
+            // Adoption: at most one year-less row exists (unique constraint), and a genuinely
+            // different same-name book has its own pathYear > 0 row and is not touched.
+            existing = bookRepository.findByPersonEntityAndNameAndPathYear(personEntity, bookName, 0)
+                    .map(book -> {
+                        book.setPathYear(pathYear);
+                        bookRepository.save(book);
+                        refreshBookReleaseYear(book);
+                        return book;
+                    });
+        }
         return existing
                 .orElseGet(() -> {
                     BookEntity bookEntity = BookEntity.builder()
                             .libraryEntity(libraryEntity)
                             .personEntity(personEntity)
                             .name(bookName)
-                            .releaseYear(releaseYear).build();
+                            .pathYear(pathYear)
+                            .releaseYear(pathYear).build();
                     bookRepository.save(bookEntity);
                     serverEventService.createBookFoundEvent(bookEntity.getId());
+                    // The second book sharing a "Series - " prefix retroactively pulls the first
+                    // one into the series too.
+                    bookSeriesService.applyPrefixHeuristic(personEntity);
                     return bookEntity;
                 });
     }
 
     /**
-     * Keep the {@code releaseYear} column in sync with the metadata year when the path carried no
-     * "(YYYY)" suffix (column left at 0). Sorting and the uniqueness constraint use this column,
-     * while {@code BookController.releaseYear} shows the earliest metadata year as a fallback — so
-     * without this the two diverge and a release-year sort of such books is effectively unordered.
-     * Mirrors that fallback (earliest non-null metadata year) and never overrides a path-set year.
+     * Recompute the display/sort {@code releaseYear} column. Precedence: a "(YYYY)" path year is
+     * deliberate user intent and always wins; otherwise the year of an Open Library metadata row
+     * (the original publication year); otherwise the earliest year of the local (nfo/epub)
+     * metadata rows. Sorting uses this column while {@code BookController.releaseYear} falls back
+     * to the earliest metadata year only when the column is 0 — keeping the column current keeps
+     * the two coherent. Called whenever a metadata row is written for the book.
      */
     public void refreshBookReleaseYear(BookEntity bookEntity) {
-        if (bookEntity.getReleaseYear() > 0) {
-            return;
+        int year = bookEntity.getPathYear() > 0 ? bookEntity.getPathYear() : bestMetadataYear(bookEntity);
+        if (year > 0 && year != bookEntity.getReleaseYear()) {
+            bookEntity.setReleaseYear(year);
+            bookRepository.save(bookEntity);
         }
-        metadataRepository.findByBookEntityId(bookEntity.getId()).stream()
-                .map(MetadataEntity::getReleased)
-                .filter(java.util.Objects::nonNull)
-                .mapToInt(java.time.LocalDate::getYear)
-                .filter(year -> year > 0)
+    }
+
+    private int bestMetadataYear(BookEntity bookEntity) {
+        var metadata = metadataRepository.findByBookEntityId(bookEntity.getId()).stream()
+                .filter(m -> m.getReleased() != null && m.getReleased().getYear() > 0)
+                .toList();
+        return metadata.stream()
+                .filter(m -> m.getSourceUri() != null && m.getSourceUri().startsWith("openlibrary://"))
+                .mapToInt(m -> m.getReleased().getYear())
                 .min()
-                .ifPresent(year -> {
-                    bookEntity.setReleaseYear(year);
-                    bookRepository.save(bookEntity);
-                });
+                .orElseGet(() -> metadata.stream()
+                        .mapToInt(m -> m.getReleased().getYear())
+                        .min()
+                        .orElse(0));
     }
 
     /**

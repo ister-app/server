@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.queryParam;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -61,11 +62,56 @@ class OpenLibraryServiceTest {
                         {"description":{"type":"/type/text","value":"Een roman over een steppestadje."}}
                         """, MediaType.APPLICATION_JSON));
 
-        Optional<OpenLibraryService.BookInfo> result = subject.getBookInfo("Dit zijn de namen", "Tommy Wieringa");
+        Optional<OpenLibraryService.BookInfo> result = subject.getBookInfo("Dit zijn de namen", "Tommy Wieringa", List.of());
 
         assertTrue(result.isPresent());
         assertEquals("Een roman over een steppestadje.", result.get().description());
         assertEquals("https://covers.openlibrary.org/b/id/123-L.jpg", result.get().coverUrl());
+        assertEquals(2012, result.get().firstPublishYear());
+        server.verify();
+    }
+
+    /**
+     * An ISBN hit is authoritative: the Dutch edition's ISBN rolls up to the original work, whose
+     * English title would never fuzzy-match the local Dutch one — so no title check happens.
+     */
+    @Test
+    void isbnSearchWinsWithoutTitleMatching() {
+        server.expect(requestTo(startsWith(SEARCH_ENDPOINT)))
+                .andExpect(method(GET))
+                .andExpect(queryParam("q", "isbn:9789025747855"))
+                .andRespond(withSuccess("""
+                        {"docs":[{"key":"/works/OL1W","title":"The Ruins of Gorlan","cover_i":5,"first_publish_year":2004}]}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(WORK_ENDPOINT))
+                .andRespond(withSuccess("{\"description\":\"The original work.\"}", MediaType.APPLICATION_JSON));
+
+        Optional<OpenLibraryService.BookInfo> result = subject.getBookInfo(
+                "De Grijze Jager - De ruïnes van Gorlan", "John Flanagan", List.of("9789025747855"));
+
+        assertTrue(result.isPresent());
+        assertEquals(2004, result.get().firstPublishYear());
+        assertEquals("/works/OL1W", result.get().workKey());
+        server.verify();
+    }
+
+    @Test
+    void unknownIsbnFallsBackToTitleAndAuthorSearch() {
+        server.expect(requestTo(startsWith(SEARCH_ENDPOINT)))
+                .andExpect(queryParam("q", "isbn:9789999999999"))
+                .andRespond(withSuccess("{\"docs\":[]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(SEARCH_ENDPOINT)))
+                .andExpect(queryParam("title", "Dit%20zijn%20de%20namen"))
+                .andRespond(withSuccess("""
+                        {"docs":[{"key":"/works/OL1W","title":"Dit zijn de namen","first_publish_year":2012}]}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(WORK_ENDPOINT))
+                .andRespond(withSuccess("{\"description\":\"x\"}", MediaType.APPLICATION_JSON));
+
+        Optional<OpenLibraryService.BookInfo> result = subject.getBookInfo(
+                "Dit zijn de namen", "Tommy Wieringa", List.of("9789999999999"));
+
+        assertTrue(result.isPresent());
         assertEquals(2012, result.get().firstPublishYear());
         server.verify();
     }
@@ -79,7 +125,7 @@ class OpenLibraryServiceTest {
         server.expect(requestTo(WORK_ENDPOINT))
                 .andRespond(withSuccess("{\"description\":\"Plain description.\"}", MediaType.APPLICATION_JSON));
 
-        Optional<OpenLibraryService.BookInfo> result = subject.getBookInfo("Dit zijn de namen", "Tommy Wieringa");
+        Optional<OpenLibraryService.BookInfo> result = subject.getBookInfo("Dit zijn de namen", "Tommy Wieringa", List.of());
 
         assertTrue(result.isPresent());
         assertEquals("Plain description.", result.get().description());
@@ -93,7 +139,7 @@ class OpenLibraryServiceTest {
                         {"docs":[{"key":"/works/OL9W","title":"A completely different book"}]}
                         """, MediaType.APPLICATION_JSON));
 
-        assertTrue(subject.getBookInfo("Dit zijn de namen", "Tommy Wieringa").isEmpty());
+        assertTrue(subject.getBookInfo("Dit zijn de namen", "Tommy Wieringa", List.of()).isEmpty());
         server.verify();
     }
 
@@ -106,7 +152,7 @@ class OpenLibraryServiceTest {
         server.expect(requestTo(WORK_ENDPOINT))
                 .andRespond(withSuccess("{\"description\":\"x\"}", MediaType.APPLICATION_JSON));
 
-        assertTrue(subject.getBookInfo("Dit zijn de namen", "Tommy Wieringa").isPresent());
+        assertTrue(subject.getBookInfo("Dit zijn de namen", "Tommy Wieringa", List.of()).isPresent());
     }
 
     @Test
@@ -114,7 +160,7 @@ class OpenLibraryServiceTest {
         server.expect(requestTo(startsWith(SEARCH_ENDPOINT)))
                 .andRespond(withSuccess("{\"docs\":[]}", MediaType.APPLICATION_JSON));
 
-        assertTrue(subject.getBookInfo("Unknown", "Nobody").isEmpty());
+        assertTrue(subject.getBookInfo("Unknown", "Nobody", List.of()).isEmpty());
     }
 
     @Test
@@ -122,7 +168,7 @@ class OpenLibraryServiceTest {
         server.expect(requestTo(startsWith(SEARCH_ENDPOINT)))
                 .andRespond(withServerError());
 
-        assertTrue(subject.getBookInfo("Dit zijn de namen", "Tommy Wieringa").isEmpty());
+        assertTrue(subject.getBookInfo("Dit zijn de namen", "Tommy Wieringa", List.of()).isEmpty());
     }
 
     @Test
@@ -134,7 +180,7 @@ class OpenLibraryServiceTest {
         server.expect(requestTo(WORK_ENDPOINT))
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
-        assertTrue(subject.getBookInfo("Dit zijn de namen", "Tommy Wieringa").isEmpty());
+        assertTrue(subject.getBookInfo("Dit zijn de namen", "Tommy Wieringa", List.of()).isEmpty());
     }
 
     // ========== getAuthorInfo ==========

@@ -20,7 +20,9 @@ import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MetadataRepository;
+import app.ister.core.service.BookSeriesService;
 import app.ister.core.service.MessageSender;
+import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
 import app.ister.disk.epub.EpubInfo;
 import app.ister.disk.epub.EpubParser;
@@ -73,6 +75,10 @@ class HandleEpubFileFoundTest {
     private MessageSender messageSender;
     @Mock
     private ServerEventService serverEventService;
+    @Mock
+    private ScannerHelperService scannerHelperService;
+    @Mock
+    private BookSeriesService bookSeriesService;
 
     @InjectMocks
     private HandleEpubFileFound subject;
@@ -133,7 +139,8 @@ class HandleEpubFileFoundTest {
     }
 
     private EpubInfo info(String coverEntry, boolean mediaOverlays, long duration) {
-        return new EpubInfo("Book Title", "Author", "nl", "A description", 2020, coverEntry, mediaOverlays, duration);
+        return new EpubInfo("Book Title", "Author", "nl", "A description", 2020, null, null, null,
+                coverEntry, mediaOverlays, duration);
     }
 
     @Test
@@ -194,25 +201,85 @@ class HandleEpubFileFoundTest {
         // The epub's own language (nl) is stored as ISO-639-3.
         assertEquals("nld", saved.getValue().getLanguage());
         assertEquals("file://" + EPUB_PATH, saved.getValue().getSourceUri());
+        // The epub's dc:date year is persisted, so it can drive the display year.
+        assertEquals(java.time.LocalDate.of(2020, 1, 1), saved.getValue().getReleased());
+        verify(scannerHelperService).refreshBookReleaseYear(book);
         verify(serverEventService).createSearchIndexEvent(SearchEntityType.BOOK, bookId);
     }
 
+    /**
+     * A row from another source (the nfo) never blocks the epub row — they coexist, keyed on
+     * sourceUri; display preference between them is the API's ordering concern.
+     */
     @Test
-    void keepsExistingMetadataForSameLanguage() {
+    void addsTheEpubRowAlongsideAnNfoRow() {
         when(epubParser.parse(Path.of(EPUB_PATH))).thenReturn(Optional.of(info(null, false, 0)));
         when(metadataRepository.findByBookEntityId(bookId))
-                .thenReturn(List.of(MetadataEntity.builder().bookEntity(book).language("nld").title("Existing").build()));
+                .thenReturn(List.of(MetadataEntity.builder().bookEntity(book)
+                        .sourceUri("file:///books/Author/Book/album.nfo").title("Existing").build()));
 
         subject.handle(event());
 
-        verify(metadataRepository, never()).save(any(MetadataEntity.class));
-        verifyNoInteractions(serverEventService);
+        ArgumentCaptor<MetadataEntity> saved = ArgumentCaptor.forClass(MetadataEntity.class);
+        verify(metadataRepository).save(saved.capture());
+        assertEquals("file://" + EPUB_PATH, saved.getValue().getSourceUri());
+        assertEquals("Book Title", saved.getValue().getTitle());
+    }
+
+    /** Re-parsing the same epub updates its row in place instead of duplicating it. */
+    @Test
+    void reparsingTheSameEpubUpdatesItsOwnRow() {
+        when(epubParser.parse(Path.of(EPUB_PATH))).thenReturn(Optional.of(info(null, false, 0)));
+        MetadataEntity own = MetadataEntity.builder().bookEntity(book)
+                .sourceUri("file://" + EPUB_PATH).title("Stale title").build();
+        when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of(own));
+
+        subject.handle(event());
+
+        verify(metadataRepository).save(own);
+        assertEquals("Book Title", own.getTitle());
+        assertEquals(java.time.LocalDate.of(2020, 1, 1), own.getReleased());
+    }
+
+    @Test
+    void storesTheIsbnAndChainsBookFoundWhenItIsNew() {
+        when(epubParser.parse(Path.of(EPUB_PATH))).thenReturn(Optional.of(
+                new EpubInfo("T", "A", "nl", "D", 0, "9789025747855", null, null, null, false, 0)));
+        when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of());
+
+        subject.handle(event());
+
+        assertEquals("9789025747855", mediaFile.getIsbn());
+        verify(serverEventService).createBookFoundEvent(bookId);
+    }
+
+    @Test
+    void doesNotChainBookFoundWhenTheIsbnIsUnchanged() {
+        mediaFile.setIsbn("9789025747855");
+        when(epubParser.parse(Path.of(EPUB_PATH))).thenReturn(Optional.of(
+                new EpubInfo("T", "A", "nl", "D", 0, "9789025747855", null, null, null, false, 0)));
+        when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of());
+
+        subject.handle(event());
+
+        verify(serverEventService, never()).createBookFoundEvent(any());
+    }
+
+    @Test
+    void assignsTheSeriesFromEpubMetadata() {
+        when(epubParser.parse(Path.of(EPUB_PATH))).thenReturn(Optional.of(
+                new EpubInfo("T", "A", "nl", "D", 0, null, "De Grijze Jager", 1.0, null, false, 0)));
+        when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of());
+
+        subject.handle(event());
+
+        verify(bookSeriesService).assignFromEpub(book, "De Grijze Jager", 1.0);
     }
 
     @Test
     void skipsMetadataWhenEpubHasNoTitleOrDescription() {
         when(epubParser.parse(Path.of(EPUB_PATH)))
-                .thenReturn(Optional.of(new EpubInfo(null, null, "en", null, 0, null, false, 0)));
+                .thenReturn(Optional.of(new EpubInfo(null, null, "en", null, 0, null, null, null, null, false, 0)));
 
         subject.handle(event());
 
@@ -285,7 +352,7 @@ class HandleEpubFileFoundTest {
     @Test
     void unparseableLanguageBecomesNullLanguage() {
         when(epubParser.parse(Path.of(EPUB_PATH)))
-                .thenReturn(Optional.of(new EpubInfo("T", "A", "  ", "D", 0, null, false, 0)));
+                .thenReturn(Optional.of(new EpubInfo("T", "A", "  ", "D", 0, null, null, null, null, false, 0)));
         when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of());
 
         subject.handle(event());

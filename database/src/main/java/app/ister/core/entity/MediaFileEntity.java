@@ -62,4 +62,10 @@ public class MediaFileEntity extends FileFromPathEntity {
      * Detected from the epub contents, never from the filename. Null for non-epub files.
      */
     private Boolean mediaOverlays;
+
+    /**
+     * ISBN from the epub OPF (dc:identifier), normalized to bare ISBN-10/13. Used for exact
+     * Open Library matching — a translated edition's ISBN resolves to the original work.
+     */
+    private String isbn;
 }

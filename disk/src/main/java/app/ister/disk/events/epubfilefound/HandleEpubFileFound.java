@@ -16,7 +16,9 @@ import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MetadataRepository;
+import app.ister.core.service.BookSeriesService;
 import app.ister.core.service.MessageSender;
+import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
 import app.ister.disk.epub.EpubInfo;
 import app.ister.disk.epub.EpubParser;
@@ -28,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.time.LocalDate;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -56,6 +59,8 @@ public class HandleEpubFileFound implements Handle<EpubFileFoundData> {
     private final EpubParser epubParser;
     private final MessageSender messageSender;
     private final ServerEventService serverEventService;
+    private final ScannerHelperService scannerHelperService;
+    private final BookSeriesService bookSeriesService;
 
     @Override
     public EventType handles() {
@@ -89,35 +94,47 @@ public class HandleEpubFileFound implements Handle<EpubFileFoundData> {
         if (info.durationInMilliseconds() > 0) {
             entity.setDurationInMilliseconds(info.durationInMilliseconds());
         }
+        boolean isbnIsNew = info.isbn() != null && !info.isbn().equals(entity.getIsbn());
+        if (info.isbn() != null) {
+            entity.setIsbn(info.isbn());
+        }
         mediaFileRepository.save(entity);
 
         saveBookMetadata(book.get(), info, messageData.getPath());
+        bookSeriesService.assignFromEpub(book.get(), info.seriesName(), info.seriesIndex());
         extractCover(directoryEntity, book.get(), info, messageData.getPath());
+
+        if (isbnIsNew) {
+            // Let Open Library re-match with the exact ISBN — a translated edition's ISBN resolves
+            // to the original work and its first publication year. No loop: BOOK_FOUND never
+            // dispatches EPUB_FILE_FOUND.
+            serverEventService.createBookFoundEvent(book.get().getId());
+        }
     }
 
     /**
-     * The OPF metadata is stored in the epub's own language. Existing metadata rows for that
-     * language are kept (nfo or a richer epub may already have filled them); Open Library
-     * enrichment fills the other configured languages.
+     * One metadata row per source file, keyed on sourceUri: re-parsing the same epub updates the
+     * row in place, and it coexists with the nfo row and the Open Library row — display preference
+     * between them is an ordering concern of the API, not of the writers.
      */
     private void saveBookMetadata(BookEntity book, EpubInfo info, String path) {
-        if (info.title() == null && info.description() == null) {
+        if (info.title() == null && info.description() == null && info.releaseYear() <= 0) {
             return;
         }
-        String iso3Language = toIso3(info.language());
-        List<MetadataEntity> existing = metadataRepository.findByBookEntityId(book.getId());
-        boolean hasLanguage = existing.stream()
-                .anyMatch(metadata -> iso3Language == null || iso3Language.equals(metadata.getLanguage()));
-        if (hasLanguage && !existing.isEmpty()) {
-            return;
-        }
-        metadataRepository.save(MetadataEntity.builder()
-                .title(info.title())
-                .description(info.description())
-                .language(iso3Language)
-                .bookEntity(book)
-                .sourceUri(FILE_URI_SCHEME + path)
-                .build());
+        String sourceUri = FILE_URI_SCHEME + path;
+        MetadataEntity metadata = metadataRepository.findByBookEntityId(book.getId()).stream()
+                .filter(existing -> sourceUri.equals(existing.getSourceUri()))
+                .findFirst()
+                .orElseGet(() -> MetadataEntity.builder()
+                        .bookEntity(book)
+                        .sourceUri(sourceUri)
+                        .build());
+        metadata.setTitle(info.title());
+        metadata.setDescription(info.description());
+        metadata.setLanguage(toIso3(info.language()));
+        metadata.setReleased(info.releaseYear() > 0 ? LocalDate.of(info.releaseYear(), 1, 1) : null);
+        metadataRepository.save(metadata);
+        scannerHelperService.refreshBookReleaseYear(book);
         serverEventService.createSearchIndexEvent(SearchEntityType.BOOK, book.getId());
     }
 

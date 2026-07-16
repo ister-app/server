@@ -158,6 +158,113 @@ class EpubParserTest {
         assertTrue(parser.parse(notAnEpub).isEmpty());
     }
 
+    // ===== ISBN =====
+
+    @Test
+    void parsesAnUrnIsbnIdentifier() throws IOException {
+        String metadata = "<dc:identifier xmlns:dc=\"http://purl.org/dc/elements/1.1/\">urn:isbn:978-90-257-4785-5</dc:identifier>";
+        Optional<EpubInfo> info = parser.parse(writeEpub(opf(metadata, "")));
+
+        assertEquals("9789025747855", info.orElseThrow().isbn());
+    }
+
+    @Test
+    void parsesAnOpfSchemeIsbnIdentifier() throws IOException {
+        String metadata = """
+                <dc:identifier xmlns:dc="http://purl.org/dc/elements/1.1/"
+                               xmlns:opf="http://www.idpf.org/2007/opf"
+                               opf:scheme="ISBN">90-257-4785-X</dc:identifier>
+                """;
+        Optional<EpubInfo> info = parser.parse(writeEpub(opf(metadata, "")));
+
+        assertEquals("902574785X", info.orElseThrow().isbn());
+    }
+
+    @Test
+    void parsesAPlainSchemeAttributeAndBareIsbnText() throws IOException {
+        String metadata = "<dc:identifier xmlns:dc=\"http://purl.org/dc/elements/1.1/\" scheme=\"isbn\">9789025747855</dc:identifier>";
+        Optional<EpubInfo> info = parser.parse(writeEpub(opf(metadata, "")));
+
+        assertEquals("9789025747855", info.orElseThrow().isbn());
+    }
+
+    /** A schemeless identifier counts only when its text already looks like an ISBN. */
+    @Test
+    void schemelessIdentifierThatIsNoIsbnGivesNull() throws IOException {
+        // The fixture's own uid identifier is "urn:isbn:123" — too short to be an ISBN.
+        Optional<EpubInfo> info = parser.parse(writeEpub(opf(
+                "<dc:identifier xmlns:dc=\"http://purl.org/dc/elements/1.1/\">uuid:1234-5678</dc:identifier>", "")));
+
+        assertEquals(null, info.orElseThrow().isbn());
+    }
+
+    @Test
+    void normalizesIsbnValues() {
+        assertEquals("9789025747855", EpubParser.normalizeIsbn("urn:isbn:978 90 257 47855"));
+        assertEquals("902574785X", EpubParser.normalizeIsbn("90-257-4785-x"));
+        assertEquals(null, EpubParser.normalizeIsbn("123"));
+        assertEquals(null, EpubParser.normalizeIsbn("not-an-isbn"));
+    }
+
+    // ===== Series =====
+
+    @Test
+    void parsesEpub3BelongsToCollectionWithGroupPosition() throws IOException {
+        String metadata = """
+                <meta property="belongs-to-collection" id="c01">De Grijze Jager</meta>
+                <meta refines="#c01" property="collection-type">series</meta>
+                <meta refines="#c01" property="group-position">3</meta>
+                """;
+        Optional<EpubInfo> info = parser.parse(writeEpub(opf(metadata, "")));
+
+        assertEquals("De Grijze Jager", info.orElseThrow().seriesName());
+        assertEquals(3.0, info.get().seriesIndex());
+    }
+
+    @Test
+    void parsesCalibreSeriesMetas() throws IOException {
+        String metadata = """
+                <meta name="calibre:series" content="De Grijze Jager"/>
+                <meta name="calibre:series_index" content="1.5"/>
+                """;
+        Optional<EpubInfo> info = parser.parse(writeEpub(opf(metadata, "")));
+
+        assertEquals("De Grijze Jager", info.orElseThrow().seriesName());
+        assertEquals(1.5, info.get().seriesIndex());
+    }
+
+    @Test
+    void epub3SeriesWinsOverCalibreSeries() throws IOException {
+        String metadata = """
+                <meta property="belongs-to-collection" id="c01">Ranger's Apprentice</meta>
+                <meta name="calibre:series" content="De Grijze Jager"/>
+                """;
+        Optional<EpubInfo> info = parser.parse(writeEpub(opf(metadata, "")));
+
+        assertEquals("Ranger's Apprentice", info.orElseThrow().seriesName());
+        assertEquals(null, info.get().seriesIndex());
+    }
+
+    @Test
+    void unparseableSeriesIndexKeepsTheSeriesName() throws IOException {
+        String metadata = """
+                <meta name="calibre:series" content="De Grijze Jager"/>
+                <meta name="calibre:series_index" content="one"/>
+                """;
+        Optional<EpubInfo> info = parser.parse(writeEpub(opf(metadata, "")));
+
+        assertEquals("De Grijze Jager", info.orElseThrow().seriesName());
+        assertEquals(null, info.get().seriesIndex());
+    }
+
+    @Test
+    void epubWithoutSeriesMetadataGivesNulls() throws IOException {
+        Optional<EpubInfo> info = parser.parse(writeEpub(opf("", "")));
+
+        assertEquals(null, info.orElseThrow().seriesName());
+        assertEquals(null, info.get().seriesIndex());
+    }
+
     @Test
     void parsesClockValues() {
         assertEquals(6317, EpubParser.parseClockValue("6.317s"));

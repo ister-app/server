@@ -1,21 +1,28 @@
 package app.ister.worker.events.analyzelibraryrequested;
 
+import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.DirectoryEntity;
+import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.NodeEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.AnalyzeLibraryRequestedData;
+import app.ister.core.eventdata.BookFoundData;
+import app.ister.core.eventdata.EpubFileFoundData;
 import app.ister.core.eventdata.PersonFoundData;
 import app.ister.core.eventdata.UpdateImagesRequestedData;
 import app.ister.core.repository.AlbumRepository;
+import app.ister.core.repository.BookRepository;
+import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.ShowRepository;
 import app.ister.core.repository.TrackRepository;
+import app.ister.core.service.BookSeriesService;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.NodeService;
 import org.junit.jupiter.api.Test;
@@ -71,6 +78,15 @@ class AnalyzeLibraryRequestedHandleTest {
 
     @Mock
     private TrackRepository trackRepository;
+
+    @Mock
+    private BookRepository bookRepository;
+
+    @Mock
+    private MediaFileRepository mediaFileRepository;
+
+    @Mock
+    private BookSeriesService bookSeriesService;
 
     @Test
     void handles() {
@@ -138,6 +154,64 @@ class AnalyzeLibraryRequestedHandleTest {
         verify(messageSender, never()).sendPersonFound(any(), anyString());
         assertEquals(List.of(artist.getId(), author.getId()),
                 captor.getAllValues().stream().map(PersonFoundData::getPersonId).toList());
+    }
+
+    @Test
+    void handleReparsesTheEpubsOfBooksWithoutOpenLibraryMetadata() {
+        NodeEntity nodeEntity = NodeEntity.builder().name("TestServer").build();
+        DirectoryEntity dir = DirectoryEntity.builder()
+                .id(UUID.randomUUID()).name("books-dir").directoryType(DirectoryType.LIBRARY).build();
+        BookEntity book = BookEntity.builder().id(UUID.randomUUID())
+                .personEntity(PersonEntity.builder().id(UUID.randomUUID()).name("Author").build())
+                .name("Book").build();
+        MediaFileEntity epub = MediaFileEntity.builder().path("/books/Author/Book.epub").size(1L).build();
+        epub.setId(UUID.randomUUID());
+        epub.setDirectoryEntityId(dir.getId());
+
+        when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(nodeEntity);
+        when(bookRepository.findBooksWithoutOpenLibraryMetadata(LibraryType.BOOK)).thenReturn(List.of(book));
+        when(mediaFileRepository.findByBookEntityId(book.getId())).thenReturn(List.of(epub));
+        when(directoryRepository.findById(dir.getId())).thenReturn(java.util.Optional.of(dir));
+
+        subject.handle(AnalyzeLibraryRequestedData.builder().eventType(EventType.ANALYZE_LIBRARY_REQUEST).build());
+
+        // The epub re-parse chains BOOK_FOUND itself, after storing the ISBN — a direct BOOK_FOUND
+        // would race the Open Library lookup against the ISBN write.
+        ArgumentCaptor<EpubFileFoundData> captor = ArgumentCaptor.forClass(EpubFileFoundData.class);
+        verify(messageSender).sendEpubFileFound(captor.capture(), eq("books-dir"));
+        assertEquals(book.getId(), captor.getValue().getBookEntityUUID());
+        assertEquals(epub.getId(), captor.getValue().getMediaFileEntityUUID());
+        verify(messageSender, never()).sendBookFound(any());
+        verify(bookSeriesService).cleanupOrphanSeries();
+    }
+
+    @Test
+    void handleSendsBookFoundForAudiobookOnlyAndCoverlessBooks() {
+        NodeEntity nodeEntity = NodeEntity.builder().name("TestServer").build();
+        PersonEntity author = PersonEntity.builder().id(UUID.randomUUID()).name("Author").build();
+        BookEntity audiobookOnly = BookEntity.builder().id(UUID.randomUUID())
+                .personEntity(author).name("Audiobook").build();
+        BookEntity coverless = BookEntity.builder().id(UUID.randomUUID())
+                .personEntity(author).name("Coverless").build();
+
+        when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(nodeEntity);
+        when(bookRepository.findBooksWithoutOpenLibraryMetadata(LibraryType.BOOK))
+                .thenReturn(List.of(audiobookOnly));
+        when(mediaFileRepository.findByBookEntityId(audiobookOnly.getId())).thenReturn(List.of());
+        // The coverless book appears in both queries; it must be dispatched only once.
+        when(bookRepository.findByLibraryEntity_LibraryTypeAndImageEntitiesIsEmpty(LibraryType.BOOK))
+                .thenReturn(List.of(audiobookOnly, coverless));
+        when(bookRepository.findByLibraryEntity_LibraryType(LibraryType.BOOK))
+                .thenReturn(List.of(audiobookOnly, coverless));
+
+        subject.handle(AnalyzeLibraryRequestedData.builder().eventType(EventType.ANALYZE_LIBRARY_REQUEST).build());
+
+        ArgumentCaptor<BookFoundData> captor = ArgumentCaptor.forClass(BookFoundData.class);
+        verify(messageSender, times(2)).sendBookFound(captor.capture());
+        assertEquals(List.of(audiobookOnly.getId(), coverless.getId()),
+                captor.getAllValues().stream().map(BookFoundData::getBookId).toList());
+        // One distinct author over both books: the series heuristic runs once for them.
+        verify(bookSeriesService, times(1)).applyPrefixHeuristic(author);
     }
 
     @Test

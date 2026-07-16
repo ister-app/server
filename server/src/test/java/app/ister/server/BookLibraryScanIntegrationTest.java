@@ -102,6 +102,50 @@ class BookLibraryScanIntegrationTest {
         Path authorDir = Path.of(System.getProperty("java.io.tmpdir"), "ister-book-it", "media", "Owl (1950)");
         Files.createDirectories(authorDir);
         writeEpub(authorDir.resolve("Night Flight (2015).epub"));
+
+        // A second author with two books sharing a "Series - Title" prefix: the first carries
+        // calibre series metadata (epub source), the second has none (path-prefix heuristic).
+        Path seriesAuthorDir = Path.of(System.getProperty("java.io.tmpdir"), "ister-book-it", "media", "Falcon");
+        Files.createDirectories(seriesAuthorDir);
+        writeSeriesEpub(seriesAuthorDir.resolve("Sky Rangers - First Flight.epub"),
+                "Sky Rangers - First Flight",
+                "<meta name=\"calibre:series\" content=\"Sky Rangers\"/>"
+                        + "<meta name=\"calibre:series_index\" content=\"1.0\"/>");
+        writeSeriesEpub(seriesAuthorDir.resolve("Sky Rangers - Second Flight.epub"),
+                "Sky Rangers - Second Flight", "");
+    }
+
+    private static void writeSeriesEpub(Path epub, String title, String seriesMetadata) throws IOException {
+        String container = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+                  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+                </container>
+                """;
+        String opf = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">
+                  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                    <dc:identifier id="uid">urn:uuid:%s</dc:identifier>
+                    <dc:title>%s</dc:title>
+                    <dc:creator>Falcon</dc:creator>
+                    <dc:language>en</dc:language>
+                    <dc:date>2008-01-01</dc:date>
+                    <dc:description>A series book.</dc:description>
+                    %s
+                  </metadata>
+                  <manifest>
+                    <item id="c1" href="chapter_1.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine><itemref idref="c1"/></spine>
+                </package>
+                """.formatted(title, title, seriesMetadata);
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(epub))) {
+            put(zip, "mimetype", "application/epub+zip");
+            put(zip, "META-INF/container.xml", container);
+            put(zip, "OEBPS/content.opf", opf);
+            put(zip, "OEBPS/chapter_1.xhtml", CHAPTER_XHTML);
+        }
     }
 
     /** Minimal EPUB 3 with a SMIL media overlay; overlay detection must come from this content. */
@@ -170,11 +214,13 @@ class BookLibraryScanIntegrationTest {
         // The scan runs through RabbitMQ: FILE_SCAN_REQUESTED → EpubScanner → EPUB_FILE_FOUND.
         Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> {
             List<BookEntity> books = bookRepository.findAll();
-            assertEquals(1, books.size(), "the epub should have created exactly one book");
+            assertEquals(3, books.size(), "the three epubs should have created three books");
         });
 
-        BookEntity book = bookRepository.findAll().getFirst();
+        BookEntity book = bookRepository.findAll().stream()
+                .filter(b -> "Night Flight".equals(b.getName())).findFirst().orElseThrow();
         assertEquals("Night Flight", book.getName());
+        assertEquals(2015, book.getPathYear(), "the year from the \"(YYYY)\" suffix is scanner identity");
         assertEquals(2015, book.getReleaseYear());
         var author = personRepository.findById(book.getPersonEntity().getId()).orElseThrow();
         assertEquals("Owl", author.getName());
@@ -197,6 +243,24 @@ class BookLibraryScanIntegrationTest {
         assertEquals("Night Flight", metadata.getTitle());
         assertEquals("An integration test book.", metadata.getDescription());
         assertEquals("eng", metadata.getLanguage());
+        assertEquals(java.time.LocalDate.of(2015, 1, 1), metadata.getReleased(),
+                "the epub's dc:date year must be persisted");
+
+        // Series: the calibre-tagged epub assigns book one; the prefix heuristic pulls in book
+        // two. Both end up under one series with the prefix stripped from their display title.
+        Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+            BookEntity first = bookRepository.findAll().stream()
+                    .filter(b -> "Sky Rangers - First Flight".equals(b.getName())).findFirst().orElseThrow();
+            BookEntity second = bookRepository.findAll().stream()
+                    .filter(b -> "Sky Rangers - Second Flight".equals(b.getName())).findFirst().orElseThrow();
+            assertNotNull(first.getSeriesEntity(), "epub series metadata must link the series");
+            assertNotNull(second.getSeriesEntity(), "the prefix heuristic must link the sibling");
+            assertEquals("Sky Rangers", first.getSeriesEntity().getName());
+            assertEquals(first.getSeriesEntity().getId(), second.getSeriesEntity().getId());
+            assertEquals("First Flight", first.getTitle());
+            assertEquals("Second Flight", second.getTitle());
+            assertEquals(1.0, first.getSeriesIndex());
+        });
 
         // Lazy reading: fetch one chapter file from inside the epub over HTTP.
         MediaFileEntity epubFile = mediaFileRepository.findByBookEntityId(book.getId()).getFirst();

@@ -2,6 +2,7 @@ package app.ister.worker.events.bookfound;
 
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.ImageEntity;
+import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.enums.EventType;
@@ -10,7 +11,9 @@ import app.ister.core.enums.SearchEntityType;
 import app.ister.core.eventdata.BookFoundData;
 import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.ImageRepository;
+import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MetadataRepository;
+import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
 import app.ister.worker.events.openlibrary.OpenLibraryService;
 import app.ister.worker.events.tmdbmetadata.ImageDownloadService;
@@ -24,7 +27,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
 import java.time.LocalDate;
-import java.time.Month;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -58,6 +61,9 @@ class HandleBookFoundTest {
     private MetadataRepository metadataRepository;
 
     @Mock
+    private MediaFileRepository mediaFileRepository;
+
+    @Mock
     private OpenLibraryService openLibraryService;
 
     @Mock
@@ -65,6 +71,9 @@ class HandleBookFoundTest {
 
     @Mock
     private ServerEventService serverEventService;
+
+    @Mock
+    private ScannerHelperService scannerHelperService;
 
     private final UUID bookId = UUID.randomUUID();
     private final BookEntity book = BookEntity.builder()
@@ -76,6 +85,10 @@ class HandleBookFoundTest {
             .eventType(EventType.BOOK_FOUND)
             .bookId(bookId)
             .build();
+
+    private OpenLibraryService.BookInfo info(String description, String coverUrl, int year) {
+        return new OpenLibraryService.BookInfo(description, coverUrl, year, "/works/OL1W");
+    }
 
     @Test
     void handles() {
@@ -107,10 +120,12 @@ class HandleBookFoundTest {
     }
 
     @Test
-    void handleDoesNothingWhenCoverAndDescriptionAlreadyPresent() {
+    void handleDoesNothingWhenDescriptionCoverAndOpenLibraryYearArePresent() {
         when(bookRepository.findById(bookId)).thenReturn(Optional.of(book));
-        when(metadataRepository.findByBookEntityId(bookId))
-                .thenReturn(List.of(MetadataEntity.builder().description("Already there").build()));
+        when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of(
+                MetadataEntity.builder().description("Already there").sourceUri("file:///b.epub").build(),
+                MetadataEntity.builder().sourceUri("openlibrary://works/OL1W")
+                        .released(LocalDate.of(1937, 1, 1)).build()));
         when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
 
         subject.handle(data);
@@ -119,12 +134,35 @@ class HandleBookFoundTest {
         verify(metadataRepository, never()).save(any());
     }
 
+    /** Description and cover exist, but the original-year backfill still has to run. */
+    @Test
+    void handleStillRunsWhenOnlyTheOpenLibraryYearIsMissing() {
+        when(bookRepository.findById(bookId)).thenReturn(Optional.of(book));
+        when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of(
+                MetadataEntity.builder().description("Local").sourceUri("file:///b.nfo")
+                        .released(LocalDate.of(2011, 1, 1)).build()));
+        when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
+        when(mediaFileRepository.findByBookEntityId(bookId)).thenReturn(List.of());
+        when(openLibraryService.getBookInfo("The Hobbit", "J.R.R. Tolkien", List.of()))
+                .thenReturn(Optional.of(info(null, null, 1937)));
+
+        subject.handle(data);
+
+        ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
+        verify(metadataRepository).save(captor.capture());
+        assertEquals("openlibrary://works/OL1W", captor.getValue().getSourceUri());
+        assertEquals(LocalDate.of(1937, 1, 1), captor.getValue().getReleased());
+        verify(scannerHelperService).refreshBookReleaseYear(book);
+    }
+
     @Test
     void handleDoesNothingWhenOpenLibraryHasNoMatch() {
         when(bookRepository.findById(bookId)).thenReturn(Optional.of(book));
         when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of());
         when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of());
-        when(openLibraryService.getBookInfo("The Hobbit", "J.R.R. Tolkien")).thenReturn(Optional.empty());
+        when(mediaFileRepository.findByBookEntityId(bookId)).thenReturn(List.of());
+        when(openLibraryService.getBookInfo("The Hobbit", "J.R.R. Tolkien", List.of()))
+                .thenReturn(Optional.empty());
 
         subject.handle(data);
 
@@ -133,12 +171,30 @@ class HandleBookFoundTest {
     }
 
     @Test
-    void handleDownloadsCoverAndSavesDescription() throws IOException {
+    void handlePassesTheEpubIsbnsToOpenLibrary() {
+        MediaFileEntity epub = MediaFileEntity.builder().path("/b.epub").size(1L).build();
+        epub.setIsbn("9789025747855");
+        MediaFileEntity epubWithoutIsbn = MediaFileEntity.builder().path("/c.epub").size(1L).build();
         when(bookRepository.findById(bookId)).thenReturn(Optional.of(book));
         when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of());
         when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of());
-        when(openLibraryService.getBookInfo("The Hobbit", "J.R.R. Tolkien"))
-                .thenReturn(Optional.of(new OpenLibraryService.BookInfo("A hobbit goes on an adventure.", COVER_URL, 1937)));
+        when(mediaFileRepository.findByBookEntityId(bookId)).thenReturn(List.of(epub, epubWithoutIsbn));
+        when(openLibraryService.getBookInfo("The Hobbit", "J.R.R. Tolkien", List.of("9789025747855")))
+                .thenReturn(Optional.empty());
+
+        subject.handle(data);
+
+        verify(openLibraryService).getBookInfo("The Hobbit", "J.R.R. Tolkien", List.of("9789025747855"));
+    }
+
+    @Test
+    void handleDownloadsCoverAndSavesItsOwnMetadataRow() throws IOException {
+        when(bookRepository.findById(bookId)).thenReturn(Optional.of(book));
+        when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of());
+        when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of());
+        when(mediaFileRepository.findByBookEntityId(bookId)).thenReturn(List.of());
+        when(openLibraryService.getBookInfo("The Hobbit", "J.R.R. Tolkien", List.of()))
+                .thenReturn(Optional.of(info("A hobbit goes on an adventure.", COVER_URL, 1937)));
 
         subject.handle(data);
 
@@ -151,17 +207,63 @@ class HandleBookFoundTest {
         MetadataEntity saved = captor.getValue();
         assertEquals("A hobbit goes on an adventure.", saved.getDescription());
         assertEquals(book, saved.getBookEntity());
-        assertEquals("openlibrary://book/The Hobbit", saved.getSourceUri());
+        assertEquals("openlibrary://works/OL1W", saved.getSourceUri());
+        assertEquals(LocalDate.of(1937, 1, 1), saved.getReleased());
+        assertEquals("eng", saved.getLanguage());
         verify(serverEventService).createSearchIndexEvent(SearchEntityType.BOOK, bookId);
     }
 
+    /** Local nfo/epub rows are never deleted or rewritten; Open Library upserts its own row. */
     @Test
-    void handleSwallowsCoverDownloadFailureAndStillSavesDescription() throws IOException {
+    void handleNeverTouchesLocalMetadataRows() {
+        MetadataEntity localRow = MetadataEntity.builder()
+                .title("The Hobbit").sourceUri("file:///books/The Hobbit/album.nfo").build();
+        when(bookRepository.findById(bookId)).thenReturn(Optional.of(book));
+        when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of(localRow));
+        when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
+        when(mediaFileRepository.findByBookEntityId(bookId)).thenReturn(List.of());
+        when(openLibraryService.getBookInfo("The Hobbit", "J.R.R. Tolkien", List.of()))
+                .thenReturn(Optional.of(info("Open Library description", null, 1937)));
+
+        subject.handle(data);
+
+        verify(metadataRepository, never()).deleteAll(any());
+        verify(metadataRepository, never()).delete(any());
+        // Only the Open Library row is written; the local nfo row keeps its own data untouched.
+        ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
+        verify(metadataRepository).save(captor.capture());
+        assertEquals("openlibrary://works/OL1W", captor.getValue().getSourceUri());
+        assertEquals("file:///books/The Hobbit/album.nfo", localRow.getSourceUri());
+        assertEquals(null, localRow.getDescription());
+    }
+
+    /** A second run updates the existing openlibrary:// row instead of adding another. */
+    @Test
+    void handleUpsertsItsOwnRowOnASecondRun() {
+        MetadataEntity olRow = MetadataEntity.builder()
+                .sourceUri("openlibrary://works/OL1W").language("eng").build();
+        when(bookRepository.findById(bookId)).thenReturn(Optional.of(book));
+        when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of(olRow));
+        when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
+        when(mediaFileRepository.findByBookEntityId(bookId)).thenReturn(List.of());
+        when(openLibraryService.getBookInfo("The Hobbit", "J.R.R. Tolkien", List.of()))
+                .thenReturn(Optional.of(info("A description", null, 1937)));
+
+        subject.handle(data);
+
+        verify(metadataRepository).save(olRow);
+        assertEquals("A description", olRow.getDescription());
+        assertEquals(LocalDate.of(1937, 1, 1), olRow.getReleased());
+    }
+
+    @Test
+    void handleSwallowsCoverDownloadFailureAndStillSavesMetadata() throws IOException {
         when(bookRepository.findById(bookId)).thenReturn(Optional.of(book));
         when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of());
         when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of());
-        when(openLibraryService.getBookInfo("The Hobbit", "J.R.R. Tolkien"))
-                .thenReturn(Optional.of(new OpenLibraryService.BookInfo("A description", COVER_URL, 1937)));
+        when(mediaFileRepository.findByBookEntityId(bookId)).thenReturn(List.of());
+        when(openLibraryService.getBookInfo("The Hobbit", "J.R.R. Tolkien", List.of()))
+                .thenReturn(Optional.of(info("A description", COVER_URL, 1937)));
         doThrow(new IOException("download failed"))
                 .when(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), anyString(), any());
 
@@ -175,8 +277,9 @@ class HandleBookFoundTest {
         when(bookRepository.findById(bookId)).thenReturn(Optional.of(book));
         when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of());
         when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
-        when(openLibraryService.getBookInfo("The Hobbit", "J.R.R. Tolkien"))
-                .thenReturn(Optional.of(new OpenLibraryService.BookInfo("A description", COVER_URL, 1937)));
+        when(mediaFileRepository.findByBookEntityId(bookId)).thenReturn(List.of());
+        when(openLibraryService.getBookInfo("The Hobbit", "J.R.R. Tolkien", List.of()))
+                .thenReturn(Optional.of(info("A description", COVER_URL, 1937)));
 
         subject.handle(data);
 
@@ -184,64 +287,20 @@ class HandleBookFoundTest {
         verify(metadataRepository).save(any(MetadataEntity.class));
     }
 
+    /** An unknown first-publish year leaves released null, so a later analyze retries it. */
     @Test
-    void handleSkipsDescriptionWhenAlreadyPresent() throws IOException {
-        when(bookRepository.findById(bookId)).thenReturn(Optional.of(book));
-        when(metadataRepository.findByBookEntityId(bookId))
-                .thenReturn(List.of(MetadataEntity.builder().description("Already there").build()));
-        when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of());
-        when(openLibraryService.getBookInfo("The Hobbit", "J.R.R. Tolkien"))
-                .thenReturn(Optional.of(new OpenLibraryService.BookInfo("A description", COVER_URL, 1937)));
-
-        subject.handle(data);
-
-        verify(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), anyString(), any());
-        verify(metadataRepository, never()).save(any());
-        verifyNoInteractions(serverEventService);
-    }
-
-    @Test
-    void handleMergesDescriptionIntoExistingMetadataWithoutDescription() {
-        MetadataEntity existing = MetadataEntity.builder()
-                .title("The Hobbit")
-                .released(LocalDate.of(1937, Month.SEPTEMBER, 21))
-                .genre("Fantasy")
-                .language("eng")
-                .sourceUri("opf://book")
-                .build();
-        when(bookRepository.findById(bookId)).thenReturn(Optional.of(book));
-        when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of(existing));
-        when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
-        when(openLibraryService.getBookInfo("The Hobbit", "J.R.R. Tolkien"))
-                .thenReturn(Optional.of(new OpenLibraryService.BookInfo("Open Library description", null, 1937)));
-
-        subject.handle(data);
-
-        verify(metadataRepository).deleteAll(List.of(existing));
-        ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
-        verify(metadataRepository).save(captor.capture());
-        MetadataEntity saved = captor.getValue();
-        assertEquals("The Hobbit", saved.getTitle());
-        assertEquals("Open Library description", saved.getDescription());
-        assertEquals(LocalDate.of(1937, Month.SEPTEMBER, 21), saved.getReleased());
-        assertEquals("Fantasy", saved.getGenre());
-        assertEquals("eng", saved.getLanguage());
-        assertEquals("opf://book", saved.getSourceUri());
-        assertEquals(book, saved.getBookEntity());
-        verify(serverEventService).createSearchIndexEvent(SearchEntityType.BOOK, bookId);
-    }
-
-    @Test
-    void handleDoesNotDownloadCoverWhenOpenLibraryHasNone() throws IOException {
-        when(bookRepository.findById(bookId)).thenReturn(Optional.of(book));
+    void handleLeavesReleasedNullWhenOpenLibraryHasNoYear() {
+        lenient().when(bookRepository.findById(bookId)).thenReturn(Optional.of(book));
         when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of());
         when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of());
-        when(openLibraryService.getBookInfo("The Hobbit", "J.R.R. Tolkien"))
-                .thenReturn(Optional.of(new OpenLibraryService.BookInfo(null, null, 1937)));
+        when(mediaFileRepository.findByBookEntityId(bookId)).thenReturn(List.of());
+        when(openLibraryService.getBookInfo("The Hobbit", "J.R.R. Tolkien", List.of()))
+                .thenReturn(Optional.of(info("A description", null, 0)));
 
         subject.handle(data);
 
-        verify(imageDownloadService, never()).downloadAndSave(anyString(), any(), anyString(), anyString(), any());
-        verify(metadataRepository, never()).save(any());
+        ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
+        verify(metadataRepository).save(captor.capture());
+        assertEquals(null, captor.getValue().getReleased());
     }
 }
