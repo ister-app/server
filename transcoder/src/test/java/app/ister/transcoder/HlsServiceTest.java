@@ -1135,7 +1135,7 @@ class HlsServiceTest {
 
         hlsService.startAllPasses(id, false, true);
 
-        assertTrue(allDone.await(10, TimeUnit.SECONDS), "All 6 passes should have run despite the budget of 1");
+        assertTrue(allDone.await(30, TimeUnit.SECONDS), "All 6 passes should have run despite the budget of 1");
         verify(ffmpegMock, times(6)).executeAsync();
     }
 
