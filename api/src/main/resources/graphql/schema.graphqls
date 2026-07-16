@@ -372,6 +372,8 @@ type MediaFile {
     mediaOverlays: Boolean
     "For comic volumes: the cbz image count or pdf page count. Null for other files."
     pageCount: Int
+    "The file format taken from the path extension, uppercased (EPUB, CBZ, PDF, MKV, ...). Null when the path has no extension."
+    format: String
 }
 
 type Directory {
