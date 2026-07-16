@@ -8,6 +8,7 @@ import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.FileScanRequestedData;
 import app.ister.core.service.MessageSender;
 import app.ister.disk.scanner.scanners.AudioScanner;
+import app.ister.disk.scanner.scanners.ComicScanner;
 import app.ister.disk.scanner.scanners.EpubScanner;
 import app.ister.disk.scanner.scanners.ImageScanner;
 import app.ister.disk.scanner.scanners.MediaFileScanner;
@@ -56,6 +57,9 @@ class ScannerSimpleFileVisitorTest {
     private EpubScanner epubScanner;
 
     @Mock
+    private ComicScanner comicScanner;
+
+    @Mock
     private BasicFileAttributes basicFileAttributes;
 
     private FileSystem fileSystem;
@@ -96,7 +100,7 @@ class ScannerSimpleFileVisitorTest {
         when(nfoScanner.analyzable(path, false, 0)).thenReturn(false);
         when(subtitleScanner.analyzable(path, false, 0)).thenReturn(true);
 
-        var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner));
+        var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner, comicScanner));
 
         assertEquals(FileVisitResult.CONTINUE, subject.visitFile(path, basicFileAttributes));
 
@@ -170,7 +174,7 @@ class ScannerSimpleFileVisitorTest {
 
     private AnalyzerSimpleFileVisitor visitor(DirectoryEntity directory) {
         return new AnalyzerSimpleFileVisitor(directory, scannedCache, messageSender,
-                new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner));
+                new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner, comicScanner));
     }
 
     private DirectoryEntity libraryDirectory(LibraryType libraryType, String path) {
@@ -243,7 +247,7 @@ class ScannerSimpleFileVisitorTest {
         @Test
         void theRootDirWillReturnContinue() {
             Path resourceFilePath = fileSystem.getPath("/disk/show");
-            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner));
+            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner, comicScanner));
 
             var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
 
@@ -253,7 +257,7 @@ class ScannerSimpleFileVisitorTest {
         @Test
         void dotDirsWillBeSkipped() {
             Path resourceFilePath = fileSystem.getPath("/disk/show/.tmp");
-            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner));
+            var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner, comicScanner));
 
             var result = subject.preVisitDirectory(resourceFilePath, basicFileAttributes);
 

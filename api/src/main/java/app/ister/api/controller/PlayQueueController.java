@@ -167,7 +167,7 @@ public class PlayQueueController {
             case TRACK -> mediaFileRepository.findByTrackEntityId(mediaId);
             case CHAPTER -> mediaFileRepository.findByChapterEntityId(mediaId);
             case PODCAST_EPISODE -> mediaFileRepository.findByPodcastEpisodeEntityId(mediaId);
-            case BOOK -> List.of();
+            case BOOK, COMIC -> List.of();
         };
         return files.stream()
                 .map(MediaFileEntity::getDurationInMilliseconds)
@@ -198,7 +198,7 @@ public class PlayQueueController {
                     : podcastEpisodeRepository.findById(item.getPodcastEpisodeEntityId())
                             .map(this::podcastEpisodeArtwork)
                             .orElse(List.of());
-            case BOOK -> List.of();
+            case BOOK, COMIC -> List.of();
         };
         return images.stream().filter(image -> image.getType() == ImageType.COVER).findFirst()
                 .or(() -> images.stream().findFirst())
@@ -235,7 +235,7 @@ public class PlayQueueController {
             case TRACK -> item.getTrackEntityId();
             case CHAPTER -> item.getChapterEntityId();
             case PODCAST_EPISODE -> item.getPodcastEpisodeEntityId();
-            case BOOK -> null;
+            case BOOK, COMIC -> null;
         };
     }
 
@@ -269,7 +269,7 @@ public class PlayQueueController {
                                     .findFirst()
                                     .orElse(episode.getPodcastEntity().getTitle()))
                             .orElse(null);
-            case BOOK -> null;
+            case BOOK, COMIC -> null;
         };
     }
 

@@ -30,7 +30,8 @@ public class DiskQueueConfig {
                 APP_ISTER_SERVER_ANALYZE_DATA,
                 APP_ISTER_SERVER_PRE_TRANSCODE_RECENTLY_WATCHED,
                 APP_ISTER_SERVER_AUDIO_FILE_FOUND,
-                APP_ISTER_SERVER_EPUB_FILE_FOUND
+                APP_ISTER_SERVER_EPUB_FILE_FOUND,
+                APP_ISTER_SERVER_COMIC_FILE_FOUND
         );
         String cacheDirName = nodeName + "-cache-directory";
         List<Queue> nodeQueues = List.of(

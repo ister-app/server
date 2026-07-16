@@ -37,6 +37,8 @@ public class ImageFoundData extends MessageData {
     @Nullable
     private UUID bookEntityId;
     @Nullable
+    private UUID seriesEntityId;
+    @Nullable
     private UUID podcastEntityId;
 
     public static ImageFoundData fromImageEntity(ImageEntity imageEntity) {
@@ -54,6 +56,7 @@ public class ImageFoundData extends MessageData {
                 .personEntityId(imageEntity.getPersonEntity() == null ? imageEntity.getPersonEntityId() : imageEntity.getPersonEntity().getId())
                 .albumEntityId(imageEntity.getAlbumEntity() == null ? imageEntity.getAlbumEntityId() : imageEntity.getAlbumEntity().getId())
                 .bookEntityId(imageEntity.getBookEntity() == null ? imageEntity.getBookEntityId() : imageEntity.getBookEntity().getId())
+                .seriesEntityId(imageEntity.getSeriesEntity() == null ? imageEntity.getSeriesEntityId() : imageEntity.getSeriesEntity().getId())
                 .podcastEntityId(imageEntity.getPodcastEntity() == null ? imageEntity.getPodcastEntityId() : imageEntity.getPodcastEntity().getId())
                 .build();
     }

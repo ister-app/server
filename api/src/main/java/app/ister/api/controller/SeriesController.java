@@ -2,12 +2,18 @@ package app.ister.api.controller;
 
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.ImageEntity;
+import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.SeriesEntity;
 import app.ister.core.enums.ImageType;
+import app.ister.core.enums.SortingEnum;
+import app.ister.core.enums.SortingOrder;
 import app.ister.core.repository.ImageRepository;
+import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.SeriesRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
@@ -23,11 +29,39 @@ import java.util.UUID;
 public class SeriesController {
     private final SeriesRepository seriesRepository;
     private final ImageRepository imageRepository;
+    private final MetadataRepository metadataRepository;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
     public Optional<SeriesEntity> seriesById(@Argument UUID id) {
         return seriesRepository.findById(id);
+    }
+
+    /** The browse grid of a COMIC library: series, not loose volumes. */
+    @PreAuthorize("hasRole('user')")
+    @QueryMapping
+    public Page<SeriesEntity> series(
+            @Argument Optional<Integer> page,
+            @Argument Optional<Integer> size,
+            @Argument Optional<SortingEnum> sorting,
+            @Argument Optional<SortingOrder> sortingOrder,
+            @Argument Optional<UUID> libraryId) {
+        Pageable pageable = Paging.pageable(page, size, 20,
+                sorting, SortingEnum.NAME, sortingOrder, SortingOrder.ASCENDING);
+        if (libraryId.isPresent()) {
+            return seriesRepository.findByLibraryEntityId(libraryId.get(), pageable);
+        }
+        return seriesRepository.findAll(pageable);
+    }
+
+    @SchemaMapping(typeName = "Series", field = "metadata")
+    public List<MetadataEntity> metadata(SeriesEntity seriesEntity) {
+        return metadataRepository.findBySeriesEntityId(seriesEntity.getId());
+    }
+
+    @SchemaMapping(typeName = "Series", field = "images")
+    public List<ImageEntity> images(SeriesEntity seriesEntity) {
+        return imageRepository.findBySeriesEntityId(seriesEntity.getId());
     }
 
     @SchemaMapping(typeName = "Series", field = "author")
@@ -41,13 +75,16 @@ public class SeriesController {
         return seriesEntity.getBookEntities();
     }
 
-    /** A series has no artwork of its own; the first book's cover represents it. */
+    /** The series' own artwork (folder.jpg, wiki thumbnail) wins; else the first book's cover. */
     @SchemaMapping(typeName = "Series", field = "cover")
     public ImageEntity cover(SeriesEntity seriesEntity) {
-        return seriesEntity.getBookEntities().stream()
+        Optional<ImageEntity> own = imageRepository.findBySeriesEntityId(seriesEntity.getId()).stream()
+                .filter(image -> image.getType() == ImageType.COVER)
+                .findFirst();
+        return own.orElseGet(() -> seriesEntity.getBookEntities().stream()
                 .flatMap(book -> imageRepository.findByBookEntityId(book.getId()).stream())
                 .filter(image -> image.getType() == ImageType.COVER)
                 .findFirst()
-                .orElse(null);
+                .orElse(null));
     }
 }

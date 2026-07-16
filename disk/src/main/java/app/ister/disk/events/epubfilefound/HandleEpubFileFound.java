@@ -104,7 +104,9 @@ public class HandleEpubFileFound implements Handle<EpubFileFoundData> {
         bookSeriesService.assignFromEpub(book.get(), info.seriesName(), info.seriesIndex());
         extractCover(directoryEntity, book.get(), info, messageData.getPath());
 
-        if (isbnIsNew) {
+        // Comic volumes (no author) skip Open Library: BOOK_FOUND is a book-database lookup, and
+        // the comic's series gets its metadata from Wikipedia via COMIC_SERIES_FOUND instead.
+        if (isbnIsNew && book.get().getPersonEntity() != null) {
             // Let Open Library re-match with the exact ISBN — a translated edition's ISBN resolves
             // to the original work and its first publication year. No loop: BOOK_FOUND never
             // dispatches EPUB_FILE_FOUND.

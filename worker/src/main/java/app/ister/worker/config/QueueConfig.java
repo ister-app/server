@@ -65,6 +65,11 @@ public class QueueConfig {
     }
 
     @Bean
+    public Queue queueComicSeriesFound() {
+        return new Queue(APP_ISTER_SERVER_COMIC_SERIES_FOUND);
+    }
+
+    @Bean
     public Queue queuePodcastRefreshRequested() {
         return new Queue(APP_ISTER_SERVER_PODCAST_REFRESH_REQUESTED);
     }

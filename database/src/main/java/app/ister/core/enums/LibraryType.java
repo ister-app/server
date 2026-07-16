@@ -6,4 +6,6 @@ public enum LibraryType {
     MUSIC,
     BOOK,
     PODCAST,
+    /** Comics (pdf/cbz/epub); series-first layout: one directory per series. */
+    COMIC,
 }

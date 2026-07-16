@@ -1,6 +1,7 @@
 package app.ister.disk.scanner;
 
 import app.ister.disk.scanner.scanners.AudioScanner;
+import app.ister.disk.scanner.scanners.ComicScanner;
 import app.ister.disk.scanner.scanners.EpubScanner;
 import app.ister.disk.scanner.scanners.ImageScanner;
 import app.ister.disk.scanner.scanners.MediaFileScanner;
@@ -13,4 +14,5 @@ record Scanners(
         NfoScanner nfo,
         SubtitleScanner subtitle,
         AudioScanner audio,
-        EpubScanner epub) {}
+        EpubScanner epub,
+        ComicScanner comic) {}

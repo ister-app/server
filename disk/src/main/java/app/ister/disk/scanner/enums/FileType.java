@@ -7,5 +7,7 @@ public enum FileType {
     NFO,
     SUBTITLE,
     AUDIO,
-    EPUB
+    EPUB,
+    /** A comic volume file (cbz, pdf or epub); the ComicScanner picks the follow-up event. */
+    COMIC
 }

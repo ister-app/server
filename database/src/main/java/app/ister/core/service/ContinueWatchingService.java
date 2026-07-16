@@ -1,11 +1,14 @@
 package app.ister.core.service;
 
+import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.ContinueWatchingEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
+import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.MediaType;
+import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.ContinueWatchingRepository;
 import app.ister.core.repository.EpisodeRepository;
@@ -49,6 +52,7 @@ public class ContinueWatchingService {
     private final WatchStatusRepository watchStatusRepository;
     private final EpisodeRepository episodeRepository;
     private final ChapterRepository chapterRepository;
+    private final BookRepository bookRepository;
     private final PodcastEpisodeRepository podcastEpisodeRepository;
 
     /** How far back the continue-watching list looks; older entries are dropped on rebuild. */
@@ -88,8 +92,22 @@ public class ContinueWatchingService {
             UUID movieId = status.getMovieEntity().getId();
             upsertMovie(user, movieId, status.isWatched() ? null : movieId, lastWatched);
         } else if (status.getBookEntity() != null) {
-            UUID bookId = status.getBookEntity().getId();
-            upsertBook(user, bookId, startedReading(status) ? bookId : null, lastWatched);
+            BookEntity book = status.getBookEntity();
+            if (isComicVolume(book)) {
+                UUID seriesId = book.getSeriesEntity().getId();
+                if (status.isWatched()) {
+                    UUID target = nextUnfinishedVolume(seriesId, user.getId(),
+                            book.getSeriesIndex(), book.getName()).orElse(null);
+                    upsertComicVolume(user, seriesId, target, lastWatched);
+                } else if (startedReading(status)) {
+                    upsertComicVolume(user, seriesId, book.getId(), lastWatched);
+                }
+                // Not started and not finished: leave any existing entry alone — the entry is
+                // keyed per series, so a null target would clobber another volume in progress.
+            } else {
+                UUID bookId = book.getId();
+                upsertBook(user, bookId, startedReading(status) ? bookId : null, lastWatched);
+            }
         } else if (status.getPodcastEpisodeEntity() != null) {
             var episode = status.getPodcastEpisodeEntity();
             UUID podcastId = episode.getPodcastEntity().getId();
@@ -129,6 +147,9 @@ public class ContinueWatchingService {
             boolean started = !entry.getWatched() && entry.getReadingProgress() != null && entry.getReadingProgress() > 0;
             upsertBook(user, entry.getGroupId(), started ? entry.getItemId() : null, entry.getLastWatched());
         }
+        for (RecentEntry entry : watchStatusRepository.findRecentComicEntries(userId, cutoff)) {
+            upsertComicVolume(user, entry.getGroupId(), comicTarget(userId, entry), entry.getLastWatched());
+        }
         for (RecentEntry entry : watchStatusRepository.findRecentPodcastEpisodeEntries(userId, cutoff)) {
             upsertPodcastEpisode(user, entry.getGroupId(), podcastTarget(userId, entry), entry.getLastWatched());
         }
@@ -148,6 +169,19 @@ public class ContinueWatchingService {
                 entry.setEpisodeEntity(episodeRepository.getReferenceById(episodeId));
                 continueWatchingRepository.save(entry);
                 log.debug("Show {} continues for user {} with new episode {}", showId, userId, episodeId);
+            });
+        }
+    }
+
+    /** The comic twin of {@link #recomputeForShow}: a new volume revives a finished series. */
+    @Transactional
+    public void recomputeForComicSeries(UUID seriesId) {
+        for (ContinueWatchingEntity entry : continueWatchingRepository.findExhaustedComicEntries(seriesId)) {
+            UUID userId = entry.getUserEntity().getId();
+            firstUnfinishedVolume(seriesId, userId).ifPresent(volumeId -> {
+                entry.setBookEntity(bookRepository.getReferenceById(volumeId));
+                continueWatchingRepository.save(entry);
+                log.debug("Comic series {} continues for user {} with new volume {}", seriesId, userId, volumeId);
             });
         }
     }
@@ -195,6 +229,44 @@ public class ContinueWatchingService {
             return nextUnfinishedPodcastEpisode(entry.getGroupId(), userId, entry.getItemId()).orElse(null);
         }
         return entry.getProgressInMilliseconds() > 0 ? entry.getItemId() : null;
+    }
+
+    private UUID comicTarget(UUID userId, RecentEntry entry) {
+        if (entry.getWatched()) {
+            return bookRepository.findById(entry.getItemId())
+                    .flatMap(volume -> nextUnfinishedVolume(entry.getGroupId(), userId,
+                            volume.getSeriesIndex(), volume.getName()))
+                    .orElse(null);
+        }
+        boolean started = entry.getReadingProgress() != null && entry.getReadingProgress() > 0;
+        return started ? entry.getItemId() : null;
+    }
+
+    /**
+     * The next unfinished volume after the given series position. The position is decomposed for
+     * the row-comparison in the query: volumes with a seriesIndex come first (rank 0), unknown
+     * positions last (rank 1), ties broken by name.
+     */
+    private Optional<UUID> nextUnfinishedVolume(UUID seriesId, UUID userId, Double afterIndex, String afterName) {
+        int nullRank = afterIndex == null ? 1 : 0;
+        return bookRepository.findNextUnfinishedVolumeId(seriesId, userId, nullRank,
+                        afterIndex == null ? 0d : afterIndex, afterName == null ? "" : afterName)
+                .stream().findFirst();
+    }
+
+    private Optional<UUID> firstUnfinishedVolume(UUID seriesId, UUID userId) {
+        return bookRepository.findNextUnfinishedVolumeId(seriesId, userId, -1, 0d, "")
+                .stream().findFirst();
+    }
+
+    private static boolean isComicVolume(BookEntity book) {
+        return book.getSeriesEntity() != null
+                && book.getLibraryEntity().getLibraryType() == LibraryType.COMIC;
+    }
+
+    private void upsertComicVolume(UserEntity user, UUID seriesId, UUID volumeId, Instant lastWatched) {
+        continueWatchingRepository.upsert(user.getId(), MediaType.COMIC.name(), seriesId,
+                null, null, null, volumeId, null, lastWatched);
     }
 
     private Optional<UUID> nextUnfinishedPodcastEpisode(UUID podcastId, UUID userId, UUID afterEpisodeId) {

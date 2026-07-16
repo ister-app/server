@@ -40,6 +40,13 @@ public interface ContinueWatchingRepository extends JpaRepository<ContinueWatchi
               AND c.chapterEntity IS NULL""")
     List<ContinueWatchingEntity> findExhaustedBookEntries(@Param("bookId") UUID bookId);
 
+    /** Comic series entries whose user finished every volume; re-evaluated on a new volume. */
+    @Query("""
+            SELECT c FROM ContinueWatchingEntity c
+            WHERE c.entryType = app.ister.core.enums.MediaType.COMIC AND c.groupId = :seriesId
+              AND c.bookEntity IS NULL""")
+    List<ContinueWatchingEntity> findExhaustedComicEntries(@Param("seriesId") UUID seriesId);
+
     void deleteByUserEntityId(UUID userId);
 
     /**

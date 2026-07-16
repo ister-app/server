@@ -68,4 +68,10 @@ public class MediaFileEntity extends FileFromPathEntity {
      * Open Library matching — a translated edition's ISBN resolves to the original work.
      */
     private String isbn;
+
+    /**
+     * Page count of a comic volume: image entries in a cbz, or the PDF page count. Null for
+     * non-comic files.
+     */
+    private Integer pageCount;
 }

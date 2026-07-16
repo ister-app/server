@@ -67,6 +67,11 @@ public class HandleBookFound implements Handle<BookFoundData> {
     @Override
     public void handle(BookFoundData data) {
         bookRepository.findById(data.getBookId()).ifPresent(book -> {
+            if (book.getPersonEntity() == null) {
+                // A comic volume: Open Library is a book database and BOOK_FOUND should never
+                // fire for comics; the series-level Wikipedia enrichment covers them.
+                return;
+            }
             String authorName = book.getPersonEntity().getName();
             String bookName = book.getName();
 

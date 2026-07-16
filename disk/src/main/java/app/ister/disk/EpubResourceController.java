@@ -2,6 +2,8 @@ package app.ister.disk;
 
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.repository.MediaFileRepository;
+import app.ister.disk.http.ByteRanges;
+import app.ister.disk.http.ByteRanges.Range;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -15,7 +17,6 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
@@ -108,7 +109,7 @@ public class EpubResourceController {
             }
 
             long size = entry.getSize();
-            Range range = parseRange(rangeHeader, size);
+            Range range = ByteRanges.parseRange(rangeHeader, size);
             ResponseEntity.BodyBuilder response = ResponseEntity
                     .status(range != null ? HttpStatus.PARTIAL_CONTENT : HttpStatus.OK)
                     .eTag(etag)
@@ -146,67 +147,10 @@ public class EpubResourceController {
                     // getInputStream decompresses transparently, so skipping works for STORED
                     // and DEFLATED entries alike; for STORED entries the skip is nearly free.
                     try (zipFile; InputStream in = zipFile.getInputStream(entry)) {
-                        skipFully(in, range.start());
-                        copy(in, output, length);
+                        ByteRanges.skipFully(in, range.start());
+                        ByteRanges.copy(in, output, length);
                     }
                 });
-    }
-
-    private record Range(long start, long end) {
-    }
-
-    /** Parses a single bytes range ("bytes=a-b", "bytes=a-", "bytes=-suffix"); null = no/invalid range. */
-    private static Range parseRange(String header, long size) {
-        if (header == null || !header.startsWith("bytes=") || header.contains(",") || size <= 0) {
-            return null;
-        }
-        String spec = header.substring("bytes=".length()).trim();
-        int dash = spec.indexOf('-');
-        if (dash < 0) {
-            return null;
-        }
-        try {
-            String startPart = spec.substring(0, dash).trim();
-            String endPart = spec.substring(dash + 1).trim();
-            if (startPart.isEmpty()) {
-                long suffix = Long.parseLong(endPart);
-                if (suffix <= 0) return null;
-                return new Range(Math.max(0, size - suffix), size - 1);
-            }
-            long start = Long.parseLong(startPart);
-            long end = endPart.isEmpty() ? size - 1 : Math.min(Long.parseLong(endPart), size - 1);
-            if (start > end || start >= size) return null;
-            return new Range(start, end);
-        } catch (NumberFormatException _) {
-            return null;
-        }
-    }
-
-    private static void skipFully(InputStream in, long toSkip) throws IOException {
-        long remaining = toSkip;
-        while (remaining > 0) {
-            long skipped = in.skip(remaining);
-            if (skipped <= 0) {
-                if (in.read() == -1) {
-                    return;
-                }
-                skipped = 1;
-            }
-            remaining -= skipped;
-        }
-    }
-
-    private static void copy(InputStream in, OutputStream out, long length) throws IOException {
-        byte[] buffer = new byte[8192];
-        long remaining = length;
-        while (remaining > 0) {
-            int read = in.read(buffer, 0, (int) Math.min(buffer.length, remaining));
-            if (read == -1) {
-                return;
-            }
-            out.write(buffer, 0, read);
-            remaining -= read;
-        }
     }
 
     /** Rejects traversal and normalizes a leading slash from the {*entryPath} capture. */

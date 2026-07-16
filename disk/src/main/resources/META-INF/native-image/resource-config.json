@@ -2,6 +2,12 @@
   "resources": [
     {
       "pattern": "disk.*\\.properties"
+    },
+    {
+      "pattern": "org/apache/pdfbox/resources/.*"
+    },
+    {
+      "pattern": "org/apache/fontbox/.*"
     }
   ]
 }

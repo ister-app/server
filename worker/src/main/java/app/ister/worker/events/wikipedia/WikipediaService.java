@@ -10,6 +10,7 @@ import org.springframework.web.client.RestClientException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static app.ister.worker.events.musicbrainz.MusicBrainzService.namesMatch;
 import static app.ister.worker.events.musicbrainz.MusicBrainzService.normalizeTitle;
@@ -26,6 +27,20 @@ public class WikipediaService {
 
     /** Wikidata id of "human", the P31 (instance of) value every person carries. */
     private static final String HUMAN = "Q5";
+    /**
+     * P31 values a comic/manga series item may carry. Extend when a legitimate series type turns
+     * out to be missing; a candidate matching none of these is rejected (never fall back to an
+     * arbitrary entity — a series name search also returns the TV show, the film and the game).
+     */
+    private static final Set<String> COMIC_SERIES_TYPES = Set.of(
+            "Q14406742",  // comic book series
+            "Q21198342",  // manga series
+            "Q74262765",  // comic series
+            "Q725377",    // graphic novel
+            "Q838795",    // comic strip
+            "Q1004",      // comics
+            "Q8274"       // manga
+    );
     private static final int MAX_CANDIDATES = 3;
 
     /** Per-language bios plus the first available thumbnail (image fallback). Either may be empty/null. */
@@ -74,6 +89,25 @@ public class WikipediaService {
             }
         }
         log.debug("No matching Wikidata person found for name={}", name);
+        return Content.EMPTY;
+    }
+
+    /**
+     * Multilingual description (and thumbnail) for a comic/manga series known only by name: the
+     * first Wikidata candidate that is typed as a comic series and whose label matches wins.
+     */
+    public Content fetchContentForSeries(String name, List<String> languageTags) {
+        if (name == null || languageTags == null || languageTags.isEmpty()) {
+            return Content.EMPTY;
+        }
+        String wanted = normalizeTitle(name);
+        for (String candidateId : searchEntityIds(name, languageTags.getFirst())) {
+            Map<String, Object> entity = fetchWikidataEntity(candidateId);
+            if (isComicSeries(entity, candidateId) && labelMatches(entity, candidateId, wanted, languageTags)) {
+                return contentOf(entity, candidateId, languageTags);
+            }
+        }
+        log.debug("No matching Wikidata comic series found for name={}", name);
         return Content.EMPTY;
     }
 
@@ -137,6 +171,20 @@ public class WikipediaService {
                 && snak.get("datavalue") instanceof Map<?, ?> value
                 && value.get("value") instanceof Map<?, ?> item
                 && HUMAN.equals(item.get("id")));
+    }
+
+    /** True when the entity's P31 says it is a comic/manga series (or close enough — see the set). */
+    private boolean isComicSeries(Map<String, Object> wikidata, String wikidataId) {
+        Object claims = entityField(wikidata, wikidataId, "claims");
+        if (!(claims instanceof Map<?, ?> claimMap) || !(claimMap.get("P31") instanceof List<?> instanceOf)) {
+            return false;
+        }
+        return instanceOf.stream().anyMatch(claim -> claim instanceof Map<?, ?> c
+                && c.get("mainsnak") instanceof Map<?, ?> snak
+                && snak.get("datavalue") instanceof Map<?, ?> value
+                && value.get("value") instanceof Map<?, ?> item
+                && item.get("id") instanceof String id
+                && COMIC_SERIES_TYPES.contains(id));
     }
 
     /** Guards against a same-named different person: the entity's label in one of our languages must

@@ -124,6 +124,19 @@ public class ImageEntity extends FileFromPathEntity {
 
     @Getter(onMethod = @__(@JsonBackReference))
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "series_entity_id", referencedColumnName = "id", insertable = false, updatable = false)
+    private SeriesEntity seriesEntity;
+
+    @Column(name = "series_entity_id")
+    private UUID seriesEntityId;
+
+    public void setSeriesEntity(SeriesEntity seriesEntity) {
+        this.seriesEntity = seriesEntity;
+        this.seriesEntityId = (seriesEntity != null) ? seriesEntity.getId() : null;
+    }
+
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "podcast_entity_id", referencedColumnName = "id", insertable = false, updatable = false)
     private PodcastEntity podcastEntity;
 

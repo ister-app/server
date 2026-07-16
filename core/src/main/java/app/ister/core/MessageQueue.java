@@ -24,6 +24,8 @@ public class MessageQueue {
     public static final String APP_ISTER_SERVER_BOOK_FOUND = "app.ister.server.BookFound";
     public static final String APP_ISTER_SERVER_CHAPTER_FOUND = "app.ister.server.ChapterFound";
     public static final String APP_ISTER_SERVER_EPUB_FILE_FOUND = "app.ister.server.EpubFileFound";
+    public static final String APP_ISTER_SERVER_COMIC_FILE_FOUND = "app.ister.server.ComicFileFound";
+    public static final String APP_ISTER_SERVER_COMIC_SERIES_FOUND = "app.ister.server.ComicSeriesFound";
     public static final String APP_ISTER_SERVER_PODCAST_FOUND = "app.ister.server.PodcastFound";
     public static final String APP_ISTER_SERVER_PODCAST_EPISODE_FOUND = "app.ister.server.PodcastEpisodeFound";
     public static final String APP_ISTER_SERVER_PODCAST_REFRESH_REQUESTED = "app.ister.server.PodcastRefreshRequested";

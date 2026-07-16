@@ -9,9 +9,13 @@ import app.ister.core.entity.PodcastEntity;
 import app.ister.core.entity.PodcastEpisodeEntity;
 import app.ister.core.entity.SeasonEntity;
 import app.ister.core.entity.ShowEntity;
+import app.ister.core.entity.LibraryEntity;
+import app.ister.core.entity.SeriesEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
+import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.MediaType;
+import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.ContinueWatchingRepository;
 import app.ister.core.repository.EpisodeRepository;
@@ -50,6 +54,7 @@ class ContinueWatchingServiceTest {
     @Mock private WatchStatusRepository watchStatusRepository;
     @Mock private EpisodeRepository episodeRepository;
     @Mock private ChapterRepository chapterRepository;
+    @Mock private BookRepository bookRepository;
     @Mock private PodcastEpisodeRepository podcastEpisodeRepository;
 
     private final UserEntity user = user();
@@ -252,6 +257,74 @@ class ContinueWatchingServiceTest {
         verify(continueWatchingRepository).upsertBookEpub(eq(user.getId()), eq(book.getId()), eq(book.getId()), any());
     }
 
+    // ===== Comics =====
+
+    /** A comic volume in progress resumes itself, keyed per series. */
+    @Test
+    void aComicVolumeBeingReadResumesItselfUnderItsSeries() {
+        BookEntity volume = comicVolume(3.0);
+        WatchStatusEntity status = WatchStatusEntity.builder()
+                .userEntity(user).playQueueItemId(volume.getId()).bookEntity(volume).watched(false)
+                .readingProgress(0.4).build();
+
+        subject.onWatchStatusChanged(status);
+
+        verify(continueWatchingRepository).upsert(eq(user.getId()), eq(MediaType.COMIC.name()),
+                eq(volume.getSeriesEntity().getId()), isNull(), isNull(), isNull(),
+                eq(volume.getId()), isNull(), any());
+    }
+
+    /** A finished volume hands over to the next unfinished one in series order. */
+    @Test
+    void aFinishedComicVolumeHandsOverToTheNextVolume() {
+        BookEntity volume = comicVolume(3.0);
+        UUID nextId = UUID.randomUUID();
+        when(bookRepository.findNextUnfinishedVolumeId(volume.getSeriesEntity().getId(), user.getId(),
+                0, 3.0, volume.getName())).thenReturn(List.of(nextId));
+        WatchStatusEntity status = WatchStatusEntity.builder()
+                .userEntity(user).playQueueItemId(volume.getId()).bookEntity(volume).watched(true)
+                .readingProgress(1.0).build();
+
+        subject.onWatchStatusChanged(status);
+
+        verify(continueWatchingRepository).upsert(eq(user.getId()), eq(MediaType.COMIC.name()),
+                eq(volume.getSeriesEntity().getId()), isNull(), isNull(), isNull(),
+                eq(nextId), isNull(), any());
+    }
+
+    /** An opened-but-unread volume must not clobber another volume in progress in the series. */
+    @Test
+    void anUnstartedComicVolumeLeavesTheSeriesEntryAlone() {
+        BookEntity volume = comicVolume(3.0);
+        WatchStatusEntity status = WatchStatusEntity.builder()
+                .userEntity(user).playQueueItemId(volume.getId()).bookEntity(volume).watched(false)
+                .readingProgress(0.0).build();
+
+        subject.onWatchStatusChanged(status);
+
+        verify(continueWatchingRepository, never()).upsert(any(), eq(MediaType.COMIC.name()),
+                any(), any(), any(), any(), any(), any(), any());
+    }
+
+    /** A new volume revives the series entry of users who had finished everything. */
+    @Test
+    void recomputeForComicSeriesTargetsTheFirstUnfinishedVolume() {
+        UUID seriesId = UUID.randomUUID();
+        UUID volumeId = UUID.randomUUID();
+        ContinueWatchingEntity entry = new ContinueWatchingEntity();
+        ReflectionTestUtils.setField(entry, "userEntity", user);
+        when(continueWatchingRepository.findExhaustedComicEntries(seriesId)).thenReturn(List.of(entry));
+        when(bookRepository.findNextUnfinishedVolumeId(seriesId, user.getId(), -1, 0d, ""))
+                .thenReturn(List.of(volumeId));
+        BookEntity volumeRef = book();
+        when(bookRepository.getReferenceById(volumeId)).thenReturn(volumeRef);
+
+        subject.recomputeForComicSeries(seriesId);
+
+        assertEquals(volumeRef, entry.getBookEntity());
+        verify(continueWatchingRepository).save(entry);
+    }
+
     /** The entry is keyed by the podcast, so all its episodes collapse to one continue-watching row. */
     @Test
     void aPodcastEpisodeInProgressResumesItselfUnderThePodcast() {
@@ -385,6 +458,17 @@ class ContinueWatchingServiceTest {
         BookEntity book = BookEntity.builder().name("Test Book").build();
         book.setId(UUID.randomUUID());
         return book;
+    }
+
+    private static BookEntity comicVolume(Double seriesIndex) {
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.COMIC).name("Comics").build();
+        SeriesEntity series = SeriesEntity.builder().libraryEntity(library).name("Test Series").build();
+        series.setId(UUID.randomUUID());
+        BookEntity volume = BookEntity.builder()
+                .libraryEntity(library).seriesEntity(series)
+                .name("test_vol" + seriesIndex).seriesIndex(seriesIndex).build();
+        volume.setId(UUID.randomUUID());
+        return volume;
     }
 
     private static PodcastEntity podcast() {

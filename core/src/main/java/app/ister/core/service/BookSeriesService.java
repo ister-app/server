@@ -59,6 +59,11 @@ public class BookSeriesService {
         if (seriesName == null || seriesName.isBlank()) {
             return;
         }
+        if (book.getPersonEntity() == null) {
+            // A comic volume: its series comes from the series directory, not from epub metadata,
+            // and book series are keyed per author.
+            return;
+        }
         SeriesEntity series = getOrCreateSeries(book.getLibraryEntity(), book.getPersonEntity(), seriesName.strip());
         book.setSeriesEntity(series);
         book.setSeriesIndex(seriesIndex);

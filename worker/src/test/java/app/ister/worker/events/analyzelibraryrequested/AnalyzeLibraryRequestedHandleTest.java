@@ -20,6 +20,7 @@ import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
+import app.ister.core.repository.SeriesRepository;
 import app.ister.core.repository.ShowRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.BookSeriesService;
@@ -81,6 +82,9 @@ class AnalyzeLibraryRequestedHandleTest {
 
     @Mock
     private BookRepository bookRepository;
+
+    @Mock
+    private SeriesRepository seriesRepository;
 
     @Mock
     private MediaFileRepository mediaFileRepository;

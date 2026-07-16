@@ -58,6 +58,8 @@ public interface ImageRepository extends CrudRepository<ImageEntity, UUID> {
 
     List<ImageEntity> findByBookEntityId(UUID bookEntityId);
 
+    List<ImageEntity> findBySeriesEntityId(UUID seriesEntityId);
+
     List<ImageEntity> findByPodcastEntityId(UUID podcastEntityId);
 
     List<ImageEntity> findByPodcastEpisodeEntityId(UUID podcastEpisodeEntityId);

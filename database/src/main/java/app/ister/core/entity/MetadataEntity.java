@@ -61,6 +61,11 @@ public class MetadataEntity extends BaseEntity {
     @ManyToOne
     private PodcastEpisodeEntity podcastEpisodeEntity;
 
+    /** Series-level metadata (comic series description from Wikipedia). */
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne
+    private SeriesEntity seriesEntity;
+
     @Setter
     private String sourceUri;
 

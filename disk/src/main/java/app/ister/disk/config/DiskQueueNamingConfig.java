@@ -109,6 +109,14 @@ public class DiskQueueNamingConfig {
         ).toArray(String[]::new);
     }
 
+    public String[] getComicFileFoundQueues() {
+        return Stream.concat(
+                config.getDirectories().stream()
+                        .map(dir -> APP_ISTER_SERVER_COMIC_FILE_FOUND + "." + dir.getName()),
+                Stream.of(APP_ISTER_SERVER_COMIC_FILE_FOUND + "." + cacheDirName())
+        ).toArray(String[]::new);
+    }
+
     public String getPodcastEpisodeDownloadRequestedQueue() {
         return APP_ISTER_SERVER_PODCAST_EPISODE_DOWNLOAD_REQUESTED + "." + cacheDirName();
     }

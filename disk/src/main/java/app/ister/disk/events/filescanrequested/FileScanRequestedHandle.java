@@ -27,8 +27,9 @@ public class FileScanRequestedHandle implements Handle<FileScanRequestedData> {
     private final SubtitleScanner subtitleScanner;
     private final AudioScanner audioScanner;
     private final EpubScanner epubScanner;
+    private final ComicScanner comicScanner;
 
-    public FileScanRequestedHandle(DirectoryRepository directoryRepository, MediaFileScanner mediaFileScanner, ImageScanner imageScanner, NfoScanner nfoScanner, SubtitleScanner subtitleScanner, AudioScanner audioScanner, EpubScanner epubScanner) {
+    public FileScanRequestedHandle(DirectoryRepository directoryRepository, MediaFileScanner mediaFileScanner, ImageScanner imageScanner, NfoScanner nfoScanner, SubtitleScanner subtitleScanner, AudioScanner audioScanner, EpubScanner epubScanner, ComicScanner comicScanner) {
         this.directoryRepository = directoryRepository;
         this.mediaFileScanner = mediaFileScanner;
         this.imageScanner = imageScanner;
@@ -36,6 +37,7 @@ public class FileScanRequestedHandle implements Handle<FileScanRequestedData> {
         this.subtitleScanner = subtitleScanner;
         this.audioScanner = audioScanner;
         this.epubScanner = epubScanner;
+        this.comicScanner = comicScanner;
     }
 
     @RabbitListener(queues = "#{@diskQueueNamingConfig.getFileScanRequestedQueues()}")
@@ -56,19 +58,24 @@ public class FileScanRequestedHandle implements Handle<FileScanRequestedData> {
                 ? directoryEntity.getLibraryEntity().getLibraryType() : null;
         boolean isMusic = libraryType == LibraryType.MUSIC;
         boolean isBook = libraryType == LibraryType.BOOK;
+        boolean isComic = libraryType == LibraryType.COMIC;
+        boolean directoryScoped = isMusic || isBook || isComic;
         List<Scanner> scanners;
         if (isMusic) {
             scanners = List.of(audioScanner, imageScanner, nfoScanner);
         } else if (isBook) {
             scanners = List.of(epubScanner, audioScanner, imageScanner, nfoScanner);
+        } else if (isComic) {
+            scanners = List.of(comicScanner, imageScanner);
         } else {
             scanners = List.of(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner);
         }
         for (Scanner scanner : scanners) {
-            boolean canAnalyze = isMusic || isBook
+            boolean canAnalyze = directoryScoped
                     ? switch (scanner) {
                         case AudioScanner s -> s.analyzable(messageData.getPath(), messageData.getRegularFile(), directoryEntity);
                         case EpubScanner s -> s.analyzable(messageData.getPath(), messageData.getRegularFile(), directoryEntity);
+                        case ComicScanner s -> s.analyzable(messageData.getPath(), messageData.getRegularFile(), directoryEntity);
                         case ImageScanner s -> s.analyzable(messageData.getPath(), messageData.getRegularFile(), messageData.getSize(), directoryEntity);
                         case NfoScanner s -> s.analyzable(messageData.getPath(), messageData.getRegularFile(), messageData.getSize(), directoryEntity);
                         default -> scanner.analyzable(messageData.getPath(), messageData.getRegularFile(), messageData.getSize());

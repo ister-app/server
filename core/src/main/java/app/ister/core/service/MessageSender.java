@@ -136,6 +136,14 @@ public class MessageSender {
         send(APP_ISTER_SERVER_EPUB_FILE_FOUND, directoryName, epubFileFoundData);
     }
 
+    public void sendComicFileFound(ComicFileFoundData comicFileFoundData, String directoryName) {
+        send(APP_ISTER_SERVER_COMIC_FILE_FOUND, directoryName, comicFileFoundData);
+    }
+
+    public void sendComicSeriesFound(ComicSeriesFoundData comicSeriesFoundData) {
+        send(APP_ISTER_SERVER_COMIC_SERIES_FOUND, comicSeriesFoundData);
+    }
+
     public void sendPodcastFound(PodcastFoundData podcastFoundData) {
         send(APP_ISTER_SERVER_PODCAST_FOUND, podcastFoundData);
     }

@@ -7,6 +7,7 @@ import app.ister.core.eventdata.FileScanRequestedData;
 import app.ister.core.service.MessageSender;
 import app.ister.disk.scanner.enums.DirType;
 import app.ister.disk.scanner.scanners.AudioScanner;
+import app.ister.disk.scanner.scanners.ComicScanner;
 import app.ister.disk.scanner.scanners.EpubScanner;
 import app.ister.disk.scanner.scanners.ImageScanner;
 import app.ister.disk.scanner.scanners.NfoScanner;
@@ -66,6 +67,11 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
             return List.of(DirType.ARTIST, DirType.ALBUM).contains(bookPath.getDirType())
                     ? FileVisitResult.CONTINUE : FileVisitResult.SKIP_SUBTREE;
         }
+        if (libraryTypeIs(LibraryType.COMIC)) {
+            ComicPathObject comicPath = new ComicPathObject(directoryEntity.getPath(), dir.toString());
+            return comicPath.getDirType() == DirType.SERIES
+                    ? FileVisitResult.CONTINUE : FileVisitResult.SKIP_SUBTREE;
+        }
         return List.of(DirType.SHOW, DirType.SEASON).contains(new PathObject(dir.toString()).getDirType())
                 ? FileVisitResult.CONTINUE : FileVisitResult.SKIP_SUBTREE;
     }
@@ -79,19 +85,23 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
     public FileVisitResult visitFile(Path path, BasicFileAttributes basicFileAttributes) {
         boolean isMusic = libraryTypeIs(LibraryType.MUSIC);
         boolean isBook = libraryTypeIs(LibraryType.BOOK);
+        boolean isComic = libraryTypeIs(LibraryType.COMIC);
+        boolean directoryScoped = isMusic || isBook || isComic;
         List<Scanner> scannerList;
         if (isMusic) {
             scannerList = List.of(scanners.audio(), scanners.image(), scanners.nfo());
         } else if (isBook) {
             scannerList = List.of(scanners.epub(), scanners.audio(), scanners.image(), scanners.nfo());
+        } else if (isComic) {
+            scannerList = List.of(scanners.comic(), scanners.image());
         } else {
             scannerList = List.of(scanners.mediaFile(), scanners.image(), scanners.nfo(), scanners.subtitle());
         }
         for (Scanner scanner : scannerList) {
-            boolean canAnalyze = isMusic || isBook
+            boolean canAnalyze = directoryScoped
                     ? directoryScopedAnalyzable(scanner, path, basicFileAttributes)
                     : scanner.analyzable(path, basicFileAttributes.isRegularFile(), basicFileAttributes.size());
-            boolean alreadyScanned = (isMusic || isBook) && scanner instanceof AudioScanner
+            boolean alreadyScanned = directoryScoped && scanner instanceof AudioScanner
                     ? scannedCache.foundMusicAudioPath(path.toString())
                     : scannedCache.foundPath(path.toString());
             if (canAnalyze && !alreadyScanned) {
@@ -116,6 +126,9 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
             return s.analyzable(path, regular, directoryEntity);
         }
         if (scanner instanceof EpubScanner s) {
+            return s.analyzable(path, regular, directoryEntity);
+        }
+        if (scanner instanceof ComicScanner s) {
             return s.analyzable(path, regular, directoryEntity);
         }
         if (scanner instanceof ImageScanner s) {

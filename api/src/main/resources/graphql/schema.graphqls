@@ -25,6 +25,8 @@ type Query {
     books(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, authorId: ID, libraryId: ID): BookPage
     bookById(id: ID): Book
     seriesById(id: ID): Series
+    "Series of a (comic) library: the browse grid for COMIC libraries lists series, not volumes."
+    series(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): SeriesPage
     chapterById(id: ID): Chapter
     podcasts(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): PodcastPage
     podcastById(id: ID): Podcast
@@ -231,6 +233,8 @@ enum LibraryType {
     MUSIC
     BOOK
     PODCAST
+    "Comics (pdf/cbz/epub); series-first layout: one directory per series."
+    COMIC
 }
 
 enum MediaType {
@@ -243,6 +247,8 @@ enum MediaType {
     BOOK
     "A podcast episode; streams like a track once downloaded."
     PODCAST_EPISODE
+    "A comic volume being read; grouped per series in recently watched."
+    COMIC
 }
 
 enum RatingMediaType {
@@ -364,6 +370,8 @@ type MediaFile {
     directory: Directory!
     "For epub files: true when the epub has EPUB 3 media overlays (read-aloud audio). Null for other files."
     mediaOverlays: Boolean
+    "For comic volumes: the cbz image count or pdf page count. Null for other files."
+    pageCount: Int
 }
 
 type Directory {
@@ -524,7 +532,8 @@ type Book {
     "Clean display title: name with a known '{series} - '/'{series}: ' prefix stripped; falls back to name."
     title: String!
     releaseYear: Int!
-    author: Person!
+    "The author; null for comic volumes (comics are series-first and carry no author)."
+    author: Person
     "The series this book belongs to, or null for a standalone book."
     series: Series
     "Position within the series (calibre allows fractions like 1.5), or null when unknown."
@@ -570,11 +579,26 @@ type BookPage {
 type Series {
     id: ID!
     name: String!
-    author: Person!
-    "Books in series order: seriesIndex ascending, unknown positions last."
+    "The author; null for comic series."
+    author: Person
+    "Start year from the \"(YYYY)\" suffix on a comic series directory; 0 = unknown."
+    startYear: Int!
+    "Books/volumes in series order: seriesIndex ascending, unknown positions last."
     books: [Book!]!
-    "Cover of the first book in the series; series have no artwork of their own."
+    "Series-level metadata (comic series description per language)."
+    metadata: [Metadata!]
+    "Series-level artwork (folder.jpg or a wiki thumbnail)."
+    images: [Image!]
+    "The series' own artwork when present, else the cover of the first book/volume."
     cover: Image
+}
+
+type SeriesPage {
+    content: [Series!]!
+    totalPages: Int!
+    totalElements: Int!
+    number: Int!
+    size: Int!
 }
 
 type Podcast {

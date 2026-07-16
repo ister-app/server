@@ -6,6 +6,7 @@ import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.SeriesEntity;
 import app.ister.core.enums.ImageType;
 import app.ister.core.repository.ImageRepository;
+import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.SeriesRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +35,9 @@ class SeriesControllerTest {
     @Mock
     private ImageRepository imageRepository;
 
+    @Mock
+    private MetadataRepository metadataRepository;
+
     private final PersonEntity author = PersonEntity.builder().id(UUID.randomUUID()).name("John Flanagan").build();
 
     private BookEntity book() {
@@ -59,27 +63,54 @@ class SeriesControllerTest {
         assertEquals(books, subject.books(series));
     }
 
-    /** A series has no artwork of its own: the first book with a COVER image represents it. */
+    /** Without own artwork, the first book with a COVER image represents the series. */
     @Test
-    void coverIsTheFirstBooksCover() {
+    void coverFallsBackToTheFirstBooksCover() {
         BookEntity first = book();
         BookEntity second = book();
-        SeriesEntity series = SeriesEntity.builder().name("S").bookEntities(List.of(first, second)).build();
+        SeriesEntity series = SeriesEntity.builder().id(UUID.randomUUID())
+                .name("S").bookEntities(List.of(first, second)).build();
         ImageEntity background = ImageEntity.builder().type(ImageType.BACKGROUND).build();
         ImageEntity cover = ImageEntity.builder().type(ImageType.COVER).build();
+        when(imageRepository.findBySeriesEntityId(series.getId())).thenReturn(List.of());
         when(imageRepository.findByBookEntityId(first.getId())).thenReturn(List.of(background));
         when(imageRepository.findByBookEntityId(second.getId())).thenReturn(List.of(cover));
 
         assertEquals(cover, subject.cover(series));
     }
 
+    /** A comic series' own artwork (folder.jpg / wiki thumbnail) wins over volume covers. */
+    @Test
+    void ownSeriesArtworkWinsOverVolumeCovers() {
+        BookEntity volume = book();
+        SeriesEntity series = SeriesEntity.builder().id(UUID.randomUUID())
+                .name("S").bookEntities(List.of(volume)).build();
+        ImageEntity own = ImageEntity.builder().type(ImageType.COVER).build();
+        when(imageRepository.findBySeriesEntityId(series.getId())).thenReturn(List.of(own));
+
+        assertEquals(own, subject.cover(series));
+    }
+
     @Test
     void coverIsNullWhenNoBookHasOne() {
         BookEntity only = book();
-        SeriesEntity series = SeriesEntity.builder().name("S").bookEntities(List.of(only)).build();
+        SeriesEntity series = SeriesEntity.builder().id(UUID.randomUUID())
+                .name("S").bookEntities(List.of(only)).build();
+        when(imageRepository.findBySeriesEntityId(series.getId())).thenReturn(List.of());
         when(imageRepository.findByBookEntityId(only.getId())).thenReturn(List.of());
 
         assertNull(subject.cover(series));
+    }
+
+    @Test
+    void seriesQueryFiltersByLibrary() {
+        UUID libraryId = UUID.randomUUID();
+        SeriesEntity series = SeriesEntity.builder().name("De Grijze Jager").build();
+        when(seriesRepository.findByLibraryEntityId(org.mockito.ArgumentMatchers.eq(libraryId), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(series)));
+
+        assertEquals(List.of(series), subject.series(Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.of(libraryId)).getContent());
     }
 
     @Test

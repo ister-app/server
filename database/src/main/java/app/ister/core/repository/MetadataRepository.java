@@ -24,6 +24,8 @@ public interface MetadataRepository extends JpaRepository<MetadataEntity, UUID> 
 
     List<MetadataEntity> findByBookEntityId(UUID bookId);
 
+    List<MetadataEntity> findBySeriesEntityId(UUID seriesId);
+
     List<MetadataEntity> findByChapterEntityId(UUID chapterId);
 
     List<MetadataEntity> findByPodcastEntityId(UUID podcastId);

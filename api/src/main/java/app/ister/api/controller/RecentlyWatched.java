@@ -38,4 +38,9 @@ record RecentlyWatched(MediaType type, EpisodeEntity episode, MovieEntity movie,
     static RecentlyWatched ofPodcastEpisode(PodcastEpisodeEntity podcastEpisode, Instant lastWatched) {
         return new RecentlyWatched(MediaType.PODCAST_EPISODE, null, null, null, null, podcastEpisode, lastWatched);
     }
+
+    /** A comic series' entry: {@code book} is the volume to resume or start next. */
+    static RecentlyWatched ofComic(BookEntity volume, Instant lastWatched) {
+        return new RecentlyWatched(MediaType.COMIC, null, null, null, volume, null, lastWatched);
+    }
 }

@@ -17,6 +17,9 @@ import org.springframework.stereotype.Component;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Component
 public class SearchDocumentMapper {
@@ -111,9 +114,12 @@ public class SearchDocumentMapper {
         Map<String, MetadataEntity> byLanguage = byLanguage(book.getMetadataEntities());
         // The clean display title; the series name stays searchable through the context.
         String title = book.getTitle() != null ? book.getTitle() : book.getName();
-        String context = book.getSeriesEntity() != null
-                ? book.getPersonEntity().getName() + " – " + book.getSeriesEntity().getName()
-                : book.getPersonEntity().getName();
+        // Comic volumes have no author: the series alone is the context.
+        String context = Stream.of(
+                        book.getPersonEntity() == null ? null : book.getPersonEntity().getName(),
+                        book.getSeriesEntity() == null ? null : book.getSeriesEntity().getName())
+                .filter(Objects::nonNull)
+                .collect(Collectors.joining(" – "));
         SearchDocument.Builder builder = SearchDocument.builder()
                 .id(book.getId().toString())
                 .type(SearchEntityType.BOOK.name())

@@ -9,5 +9,10 @@ public enum MediaType {
     /** An epub being read; never streamed, only used for watch status and recently-watched. */
     BOOK,
     /** A podcast episode; streams like a track once downloaded to the cache directory. */
-    PODCAST_EPISODE
+    PODCAST_EPISODE,
+    /**
+     * A comic volume being read; never streamed. Used for watch status and continue-watching,
+     * where entries are grouped per comic series.
+     */
+    COMIC
 }

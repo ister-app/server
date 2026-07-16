@@ -120,7 +120,11 @@ public interface WatchStatusRepository extends JpaRepository<WatchStatusEntity, 
             """, nativeQuery = true)
     List<RecentEntry> findRecentMovieEntries(@Param("userId") UUID userId, @Param("cutoff") Instant cutoff);
 
-    /** Books the user read in (reading rows: book_entity_id set, no chapter). */
+    /**
+     * Books the user read in (reading rows: book_entity_id set, no chapter). Comic volumes are
+     * excluded — they group per series in {@link #findRecentComicEntries}, and one volume must
+     * never produce both a BOOK and a COMIC entry.
+     */
     @Query(value = """
             SELECT DISTINCT ON (wse.book_entity_id)
               wse.book_entity_id AS "itemId",
@@ -130,11 +134,31 @@ public interface WatchStatusRepository extends JpaRepository<WatchStatusEntity, 
               wse.progress_in_milliseconds AS "progressInMilliseconds",
               wse.reading_progress AS "readingProgress"
             FROM watch_status_entity wse
-            WHERE wse.user_entity_id = :userId AND wse.book_entity_id IS NOT NULL
-              AND wse.date_updated >= :cutoff
+            JOIN book_entity b ON wse.book_entity_id = b.id
+            JOIN library_entity l ON b.library_entity_id = l.id
+            WHERE wse.user_entity_id = :userId AND wse.date_updated >= :cutoff
+              AND l.library_type <> 'COMIC'
             ORDER BY wse.book_entity_id, wse.date_updated DESC
             """, nativeQuery = true)
     List<RecentEntry> findRecentBookEntries(@Param("userId") UUID userId, @Param("cutoff") Instant cutoff);
+
+    /** The comic volume the user last read of every series they touched, one row per series. */
+    @Query(value = """
+            SELECT DISTINCT ON (b.series_entity_id)
+              wse.book_entity_id AS "itemId",
+              b.series_entity_id AS "groupId",
+              wse.date_updated AS "lastWatched",
+              wse.watched AS "watched",
+              wse.progress_in_milliseconds AS "progressInMilliseconds",
+              wse.reading_progress AS "readingProgress"
+            FROM watch_status_entity wse
+            JOIN book_entity b ON wse.book_entity_id = b.id
+            JOIN library_entity l ON b.library_entity_id = l.id
+            WHERE wse.user_entity_id = :userId AND wse.date_updated >= :cutoff
+              AND l.library_type = 'COMIC' AND b.series_entity_id IS NOT NULL
+            ORDER BY b.series_entity_id, wse.date_updated DESC
+            """, nativeQuery = true)
+    List<RecentEntry> findRecentComicEntries(@Param("userId") UUID userId, @Param("cutoff") Instant cutoff);
 
     /** The episode the user last played of every podcast they touched since the cutoff, one row per podcast. */
     @Query(value = """

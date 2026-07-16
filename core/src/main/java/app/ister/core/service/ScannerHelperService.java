@@ -1,6 +1,7 @@
 package app.ister.core.service;
 
 import app.ister.core.entity.*;
+import app.ister.core.enums.SearchEntityType;
 import app.ister.core.repository.*;
 
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ public class ScannerHelperService {
     private final AlbumRepository albumRepository;
     private final TrackRepository trackRepository;
     private final BookRepository bookRepository;
+    private final SeriesRepository seriesRepository;
     private final MetadataRepository metadataRepository;
     private final ChapterRepository chapterRepository;
     private final ServerEventService serverEventService;
@@ -246,6 +248,51 @@ public class ScannerHelperService {
                         .mapToInt(m -> m.getReleased().getYear())
                         .min()
                         .orElse(0));
+    }
+
+    /**
+     * A comic series from a COMIC library's series directory. No author: identity is the library
+     * plus the directory name and its "(YYYY)" year. On create the worker enriches it via
+     * COMIC_SERIES_FOUND (Wikipedia description + thumbnail).
+     */
+    public SeriesEntity getOrCreateComicSeries(LibraryEntity libraryEntity, String seriesName, int startYear) {
+        return seriesRepository.findByLibraryEntityAndNameAndStartYear(libraryEntity, seriesName, startYear)
+                .orElseGet(() -> {
+                    SeriesEntity seriesEntity = SeriesEntity.builder()
+                            .libraryEntity(libraryEntity)
+                            .name(seriesName)
+                            .startYear(startYear)
+                            .build();
+                    seriesRepository.save(seriesEntity);
+                    serverEventService.createComicSeriesFoundEvent(seriesEntity.getId());
+                    return seriesEntity;
+                });
+    }
+
+    /**
+     * A comic volume: a BookEntity without author, scoped by its series. Deliberately separate
+     * from {@link #getOrCreateBook}: that fires BOOK_FOUND (Open Library — wrong for comics) and
+     * runs the book series-prefix heuristic. Multiple formats of one volume (pdf/cbz/epub with
+     * the same basename) converge on one row via the name.
+     */
+    public BookEntity getOrCreateComicVolume(LibraryEntity libraryEntity, SeriesEntity seriesEntity,
+                                             String volumeName, int pathYear, Double seriesIndex, String title) {
+        return bookRepository.findBySeriesEntityAndNameAndPathYear(seriesEntity, volumeName, pathYear)
+                .orElseGet(() -> {
+                    BookEntity bookEntity = BookEntity.builder()
+                            .libraryEntity(libraryEntity)
+                            .seriesEntity(seriesEntity)
+                            .name(volumeName)
+                            .title(title)
+                            .seriesIndex(seriesIndex)
+                            .pathYear(pathYear)
+                            .releaseYear(pathYear).build();
+                    bookRepository.save(bookEntity);
+                    serverEventService.createSearchIndexEvent(SearchEntityType.BOOK, bookEntity.getId());
+                    // A new volume puts a finished series back in continue-watching.
+                    continueWatchingService.recomputeForComicSeries(seriesEntity.getId());
+                    return bookEntity;
+                });
     }
 
     /**

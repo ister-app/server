@@ -38,6 +38,59 @@ class WikipediaServiceTest {
         ReflectionTestUtils.setField(subject, "restClient", builder.build());
     }
 
+    // ===== fetchContentForSeries =====
+
+    @Test
+    void findsAComicSeriesByNameAndTypeCheck() {
+        server.expect(requestTo(startsWith(WIKIDATA_API)))
+                .andRespond(withSuccess("{\"search\":[{\"id\":\"Q11\"}]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(WIKIDATA_ENDPOINT + "Q11.json"))
+                .andRespond(withSuccess("""
+                        {"entities":{"Q11":{
+                          "claims":{"P31":[{"mainsnak":{"datavalue":{"value":{"id":"Q21198342"}}}}]},
+                          "labels":{"en":{"value":"Attack on Titan"}},
+                          "sitelinks":{"enwiki":{"title":"Attack on Titan"}}}}}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(EN_SUMMARY + "Attack%20on%20Titan"))
+                .andRespond(withSuccess("""
+                        {"extract":"A manga series.","thumbnail":{"source":"https://wiki/aot.jpg"}}
+                        """, MediaType.APPLICATION_JSON));
+
+        WikipediaService.Content content = subject.fetchContentForSeries("Attack on Titan", List.of("en"));
+
+        assertEquals("A manga series.", content.bios().get("en"));
+        assertEquals("https://wiki/aot.jpg", content.thumbnail());
+        server.verify();
+    }
+
+    /** A series-name search also finds the TV show or a same-named human; only series types pass. */
+    @Test
+    void rejectsANonSeriesEntityWithTheSameName() {
+        server.expect(requestTo(startsWith(WIKIDATA_API)))
+                .andRespond(withSuccess("{\"search\":[{\"id\":\"Q12\"}]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(WIKIDATA_ENDPOINT + "Q12.json"))
+                .andRespond(withSuccess("""
+                        {"entities":{"Q12":{
+                          "claims":{"P31":[{"mainsnak":{"datavalue":{"value":{"id":"Q5"}}}}]},
+                          "labels":{"en":{"value":"Attack on Titan"}},
+                          "sitelinks":{"enwiki":{"title":"Attack on Titan"}}}}}
+                        """, MediaType.APPLICATION_JSON));
+
+        WikipediaService.Content content = subject.fetchContentForSeries("Attack on Titan", List.of("en"));
+
+        assertTrue(content.bios().isEmpty());
+        assertNull(content.thumbnail());
+        server.verify();
+    }
+
+    @Test
+    void seriesSearchWithoutResultsIsEmpty() {
+        server.expect(requestTo(startsWith(WIKIDATA_API)))
+                .andRespond(withSuccess("{\"search\":[]}", MediaType.APPLICATION_JSON));
+
+        assertTrue(subject.fetchContentForSeries("Unknown Series", List.of("en")).bios().isEmpty());
+    }
+
     @Test
     void returnsABioPerLanguageAndTheFirstThumbnail() {
         server.expect(requestTo(WIKIDATA_ENDPOINT + "Q1.json"))

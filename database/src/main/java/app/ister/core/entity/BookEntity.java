@@ -25,7 +25,12 @@ public class BookEntity extends BaseEntity {
     @ManyToOne(optional = false)
     private LibraryEntity libraryEntity;
 
-    @ManyToOne(optional = false)
+    /**
+     * The author. NULL for comic volumes (COMIC libraries are series-first, the path carries no
+     * author); comic identity is then {@code (seriesEntity, name, pathYear)} — guarded by a
+     * partial unique index in V23 instead of the person-keyed unique constraint.
+     */
+    @ManyToOne
     private PersonEntity personEntity;
 
     /**

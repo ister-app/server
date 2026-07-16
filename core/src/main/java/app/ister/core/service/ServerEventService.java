@@ -64,6 +64,13 @@ public class ServerEventService {
         createSearchIndexEvent(SearchEntityType.BOOK, bookId);
     }
 
+    public void createComicSeriesFoundEvent(UUID seriesId) {
+        messageSender.sendComicSeriesFound(ComicSeriesFoundData.builder()
+                .eventType(EventType.COMIC_SERIES_FOUND)
+                .seriesId(seriesId)
+                .build());
+    }
+
     public void createChapterFoundEvent(UUID chapterId) {
         messageSender.sendChapterFound(ChapterFoundData.builder()
                 .eventType(EventType.CHAPTER_FOUND)

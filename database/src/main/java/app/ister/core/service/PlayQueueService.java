@@ -391,6 +391,7 @@ public class PlayQueueService {
                     case SHOW -> throw new IllegalArgumentException("Show libraries cannot be shuffled; shuffle a single show instead");
                     case BOOK -> throw new IllegalArgumentException("Book libraries cannot be shuffled; play a single book instead");
                     case PODCAST -> throw new IllegalArgumentException("Podcast libraries cannot be shuffled; play a single podcast instead");
+                    case COMIC -> throw new IllegalArgumentException("Comic libraries cannot be played; comics are read, not streamed");
                 };
             }
         };
@@ -489,6 +490,7 @@ public class PlayQueueService {
             case CHAPTER -> chapterRepository.existsById(mediaId);
             case PODCAST_EPISODE -> podcastEpisodeRepository.existsById(mediaId);
             case BOOK -> throw new IllegalArgumentException("Books cannot be added to a play queue; add their chapters instead");
+            case COMIC -> throw new IllegalArgumentException("Comics cannot be added to a play queue; they are read, not streamed");
         };
         if (!exists) {
             throw new IllegalArgumentException("Media item not found");

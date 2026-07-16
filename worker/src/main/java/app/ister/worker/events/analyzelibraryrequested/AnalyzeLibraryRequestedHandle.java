@@ -4,11 +4,14 @@ import app.ister.core.Handle;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.entity.BookEntity;
+import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.eventdata.AlbumFoundData;
 import app.ister.core.eventdata.AnalyzeLibraryRequestedData;
 import app.ister.core.eventdata.BookFoundData;
+import app.ister.core.eventdata.ComicFileFoundData;
+import app.ister.core.eventdata.ComicSeriesFoundData;
 import app.ister.core.eventdata.EpubFileFoundData;
 import app.ister.core.eventdata.PersonFoundData;
 import app.ister.core.eventdata.AudioFileFoundData;
@@ -23,6 +26,7 @@ import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MovieRepository;
+import app.ister.core.repository.SeriesRepository;
 import app.ister.core.repository.ShowRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.BookSeriesService;
@@ -60,6 +64,7 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
     private final AlbumRepository albumRepository;
     private final TrackRepository trackRepository;
     private final BookRepository bookRepository;
+    private final SeriesRepository seriesRepository;
     private final BookSeriesService bookSeriesService;
     private final MediaFileRepository mediaFileRepository;
     private final MessageSender messageSender;
@@ -95,6 +100,46 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
         dispatchMissingPersonMetadataEvents();
         dispatchMissingMusicMetadataEvents(nodeEntity.getName());
         dispatchMissingBookMetadataEvents();
+        dispatchMissingComicMetadataEvents();
+    }
+
+    /**
+     * Backfill for comics: series without metadata retry the Wikipedia lookup, and volumes without
+     * a cover get their cbz/pdf files re-parsed (which also re-extracts page counts and embedded
+     * ComicInfo.xml). Epub volumes re-enter through EPUB_FILE_FOUND like books do.
+     */
+    private void dispatchMissingComicMetadataEvents() {
+        seriesRepository.findByLibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(LibraryType.COMIC)
+                .forEach(series -> messageSender.sendComicSeriesFound(ComicSeriesFoundData.builder()
+                        .eventType(EventType.COMIC_SERIES_FOUND)
+                        .seriesId(series.getId())
+                        .build()));
+
+        bookRepository.findByLibraryEntity_LibraryTypeAndImageEntitiesIsEmpty(LibraryType.COMIC)
+                .forEach(volume -> mediaFileRepository.findByBookEntityId(volume.getId()).stream()
+                        .filter(m -> m.getDirectoryEntityId() != null)
+                        .forEach(m -> directoryRepository.findById(m.getDirectoryEntityId())
+                                .ifPresent(dir -> sendComicVolumeFileEvent(dir, volume.getId(), m))));
+    }
+
+    private void sendComicVolumeFileEvent(DirectoryEntity dir, UUID volumeId, MediaFileEntity mediaFile) {
+        if (mediaFile.getPath().toLowerCase().endsWith(".epub")) {
+            messageSender.sendEpubFileFound(EpubFileFoundData.builder()
+                    .eventType(EventType.EPUB_FILE_FOUND)
+                    .directoryEntityUUID(dir.getId())
+                    .bookEntityUUID(volumeId)
+                    .mediaFileEntityUUID(mediaFile.getId())
+                    .path(mediaFile.getPath())
+                    .build(), dir.getName());
+        } else {
+            messageSender.sendComicFileFound(ComicFileFoundData.builder()
+                    .eventType(EventType.COMIC_FILE_FOUND)
+                    .directoryEntityUUID(dir.getId())
+                    .bookEntityUUID(volumeId)
+                    .mediaFileEntityUUID(mediaFile.getId())
+                    .path(mediaFile.getPath())
+                    .build(), dir.getName());
+        }
     }
 
     /**

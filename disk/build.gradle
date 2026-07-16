@@ -19,6 +19,9 @@ dependencies {
     // Blurhash
     implementation libs.blurhash
 
+    // PDF page count + comic cover rendering (page 1)
+    implementation libs.pdfbox
+
     // Project Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'

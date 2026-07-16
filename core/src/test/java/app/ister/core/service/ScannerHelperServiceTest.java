@@ -37,6 +37,8 @@ class ScannerHelperServiceTest {
     @Mock
     private BookRepository bookRepository;
     @Mock
+    private SeriesRepository seriesRepository;
+    @Mock
     private ChapterRepository chapterRepository;
     @Mock
     private MetadataRepository metadataRepository;
@@ -439,6 +441,64 @@ class ScannerHelperServiceTest {
 
         assertEquals(2010, book.getReleaseYear());
         verify(bookRepository, never()).save(any());
+    }
+
+    // ===== Comics =====
+
+    @Test
+    void getOrCreateComicSeriesCreatesAndFiresTheWorkerEvent() {
+        when(seriesRepository.findByLibraryEntityAndNameAndStartYear(library, "Attack on Titan", 2009))
+                .thenReturn(Optional.empty());
+
+        SeriesEntity result = subject.getOrCreateComicSeries(library, "Attack on Titan", 2009);
+
+        assertEquals("Attack on Titan", result.getName());
+        assertEquals(2009, result.getStartYear());
+        verify(seriesRepository).save(result);
+        verify(serverEventService).createComicSeriesFoundEvent(result.getId());
+    }
+
+    @Test
+    void getOrCreateComicSeriesReturnsTheExistingSeries() {
+        SeriesEntity existing = SeriesEntity.builder().name("Attack on Titan").startYear(2009).build();
+        when(seriesRepository.findByLibraryEntityAndNameAndStartYear(library, "Attack on Titan", 2009))
+                .thenReturn(Optional.of(existing));
+
+        assertEquals(existing, subject.getOrCreateComicSeries(library, "Attack on Titan", 2009));
+        verify(seriesRepository, never()).save(any());
+        verify(serverEventService, never()).createComicSeriesFoundEvent(any());
+    }
+
+    /** A comic volume has no author and never fires BOOK_FOUND (Open Library is for books). */
+    @Test
+    void getOrCreateComicVolumeCreatesAnAuthorlessVolume() {
+        SeriesEntity series = SeriesEntity.builder().name("Attack on Titan").build();
+        when(bookRepository.findBySeriesEntityAndNameAndPathYear(series, "attackontitan_vol27", 0))
+                .thenReturn(Optional.empty());
+
+        BookEntity result = subject.getOrCreateComicVolume(library, series, "attackontitan_vol27", 0, 27.0, "Volume 27");
+
+        assertEquals("attackontitan_vol27", result.getName());
+        assertEquals("Volume 27", result.getTitle());
+        assertEquals(27.0, result.getSeriesIndex());
+        org.junit.jupiter.api.Assertions.assertNull(result.getPersonEntity());
+        verify(bookRepository).save(result);
+        verify(serverEventService, never()).createBookFoundEvent(any());
+        verify(continueWatchingService).recomputeForComicSeries(series.getId());
+        verify(bookSeriesService, never()).applyPrefixHeuristic(any());
+    }
+
+    /** pdf, cbz and epub of one volume share the identity name and converge on one row. */
+    @Test
+    void getOrCreateComicVolumeReturnsTheExistingVolume() {
+        SeriesEntity series = SeriesEntity.builder().name("Attack on Titan").build();
+        BookEntity existing = BookEntity.builder().seriesEntity(series).name("attackontitan_vol27").build();
+        when(bookRepository.findBySeriesEntityAndNameAndPathYear(series, "attackontitan_vol27", 0))
+                .thenReturn(Optional.of(existing));
+
+        assertEquals(existing, subject.getOrCreateComicVolume(library, series, "attackontitan_vol27", 0, 27.0, "Volume 27"));
+        verify(bookRepository, never()).save(any());
+        verify(continueWatchingService, never()).recomputeForComicSeries(any());
     }
 
     @Test

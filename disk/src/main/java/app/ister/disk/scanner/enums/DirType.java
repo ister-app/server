@@ -7,5 +7,7 @@ public enum DirType {
     SEASON,
     EPISODE,
     ARTIST,
-    ALBUM
+    ALBUM,
+    /** A comic series directory (COMIC libraries are series-first). */
+    SERIES
 }

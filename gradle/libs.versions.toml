@@ -4,8 +4,10 @@
 jaffree = "2024.08.29"
 blurhash = "1.1.0"
 jimfs = "1.3.1"
+pdfbox = "3.0.5"
 
 [libraries]
 jaffree = { module = "com.github.kokorin.jaffree:jaffree", version.ref = "jaffree" }
 blurhash = { module = "app.ister:blurhash", version.ref = "blurhash" }
 jimfs = { module = "com.google.jimfs:jimfs", version.ref = "jimfs" }
+pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }

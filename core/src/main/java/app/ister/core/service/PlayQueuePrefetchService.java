@@ -133,7 +133,7 @@ public class PlayQueuePrefetchService {
                     .map(ChapterEntity::getMediaFileEntities).orElse(List.of());
             case PODCAST_EPISODE -> podcastEpisodeRepository.findById(item.getPodcastEpisodeEntityId())
                     .map(PodcastEpisodeEntity::getMediaFileEntities).orElse(List.of());
-            case BOOK -> List.of();
+            case BOOK, COMIC -> List.of();
         };
     }
 

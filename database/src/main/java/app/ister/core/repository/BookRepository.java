@@ -2,11 +2,13 @@ package app.ister.core.repository;
 
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.PersonEntity;
+import app.ister.core.entity.SeriesEntity;
 import app.ister.core.enums.LibraryType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +16,31 @@ import java.util.UUID;
 
 public interface BookRepository extends JpaRepository<BookEntity, UUID> {
     Optional<BookEntity> findByPersonEntityAndNameAndPathYear(PersonEntity personEntity, String name, int pathYear);
+
+    /** Comic volume identity: comics have no author, so the series scopes the name. */
+    Optional<BookEntity> findBySeriesEntityAndNameAndPathYear(SeriesEntity seriesEntity, String name, int pathYear);
+
+    /**
+     * The comic volume to continue a series with after finishing one: the first volume in series
+     * order (seriesIndex ascending, unknown positions last, then name) after the given position
+     * that the user has not finished. Mirrors EpisodeRepository.findNextUnwatchedEpisodeId. The
+     * position is passed pre-decomposed: nullRank 0 = the finished volume had a seriesIndex,
+     * 1 = it had none, -1 = before the first volume.
+     */
+    @Query(value = """
+            SELECT b.id FROM book_entity b
+            WHERE b.series_entity_id = :seriesId
+              AND (CASE WHEN b.series_index IS NULL THEN 1 ELSE 0 END, COALESCE(b.series_index, 0), b.name)
+                  > (:afterNullRank, :afterIndex, :afterName)
+              AND NOT EXISTS (SELECT 1 FROM watch_status_entity w
+                              WHERE w.book_entity_id = b.id AND w.user_entity_id = :userId AND w.watched)
+            ORDER BY b.series_index ASC NULLS LAST, b.name ASC
+            LIMIT 1""", nativeQuery = true)
+    List<UUID> findNextUnfinishedVolumeId(@Param("seriesId") UUID seriesId,
+                                          @Param("userId") UUID userId,
+                                          @Param("afterNullRank") int afterNullRank,
+                                          @Param("afterIndex") double afterIndex,
+                                          @Param("afterName") String afterName);
 
     /**
      * Used when the book file or directory carries no "(YYYY)" suffix: the year is then unknown

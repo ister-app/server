@@ -15,6 +15,7 @@ import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.utils.Jaffree;
 import app.ister.disk.scanner.BookPathObject;
+import app.ister.disk.scanner.ComicPathObject;
 import app.ister.disk.scanner.MusicPathObject;
 import app.ister.disk.scanner.PathObject;
 import app.ister.disk.scanner.enums.DirType;
@@ -63,6 +64,10 @@ public class ImageScanner implements Scanner {
             BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), path.toString());
             return bookPath.getFileType().equals(FileType.IMAGE);
         }
+        if (isComicLibrary(directoryEntity)) {
+            ComicPathObject comicPath = new ComicPathObject(directoryEntity.getPath(), path.toString());
+            return comicPath.getFileType().equals(FileType.IMAGE);
+        }
         return analyzable(path, isRegularFile, size);
     }
 
@@ -88,6 +93,8 @@ public class ImageScanner implements Scanner {
             linkToMusicLibraryEntity(imageEntity, directoryEntity, path);
         } else if (isBookLibrary(directoryEntity)) {
             linkToBookLibraryEntity(imageEntity, directoryEntity, path);
+        } else if (isComicLibrary(directoryEntity)) {
+            linkToComicLibraryEntity(imageEntity, directoryEntity, path);
         } else {
             linkToVideoLibraryEntity(imageEntity, new PathObject(path.toString()), directoryEntity);
         }
@@ -119,6 +126,21 @@ public class ImageScanner implements Scanner {
     private boolean isBookLibrary(DirectoryEntity directoryEntity) {
         return directoryEntity.getLibraryEntity() != null
                 && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.BOOK;
+    }
+
+    private boolean isComicLibrary(DirectoryEntity directoryEntity) {
+        return directoryEntity.getLibraryEntity() != null
+                && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.COMIC;
+    }
+
+    /** Artwork inside a comic series directory (cover.jpg/folder.jpg) belongs to the series. */
+    private void linkToComicLibraryEntity(ImageEntity.ImageEntityBuilder<?, ?> imageEntity,
+                                          DirectoryEntity directoryEntity, Path path) {
+        ComicPathObject comicPath = new ComicPathObject(directoryEntity.getPath(), path.toString());
+        if (comicPath.getDirType() == DirType.SERIES && comicPath.getSeriesName() != null) {
+            imageEntity.seriesEntity(scannerHelperService.getOrCreateComicSeries(
+                    directoryEntity.getLibraryEntity(), comicPath.getSeriesName(), comicPath.getStartYear()));
+        }
     }
 
     private void linkToBookLibraryEntity(ImageEntity.ImageEntityBuilder<?, ?> imageEntity,
