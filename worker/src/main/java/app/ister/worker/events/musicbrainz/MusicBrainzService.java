@@ -19,9 +19,6 @@ import java.util.Optional;
 @Component
 public class MusicBrainzService {
 
-    private static final String MUSICBRAINZ_BASE = "https://musicbrainz.org/ws/2";
-    private static final String COVER_ART_BASE = "https://coverartarchive.org/release";
-    private static final String COVER_ART_RELEASE_GROUP_BASE = "https://coverartarchive.org/release-group";
     private static final int IMAGE_WIDTH = 1000;
     private static final String ARTIST_QUERY_PREFIX = "artist:";
     private static final int MAX_ATTEMPTS = 3;
@@ -30,14 +27,27 @@ public class MusicBrainzService {
 
     /** Base URL for downloadable Wikimedia Commons files (Special:FilePath). */
     private final String commonsFilepathBase;
+    /** Configurable so CI can point them at a mock server. */
+    private final String musicBrainzBase;
+    private final String coverArtBase;
+    private final String coverArtReleaseGroupBase;
     private final WikipediaService wikipediaService;
     private final RestClient restClient;
 
     public MusicBrainzService(
             @Value("${app.ister.worker.musicbrainz.commons-filepath-base:https://commons.wikimedia.org/wiki/Special:FilePath/}")
             String commonsFilepathBase,
+            @Value("${app.ister.worker.musicbrainz.base:https://musicbrainz.org/ws/2}")
+            String musicBrainzBase,
+            @Value("${app.ister.worker.musicbrainz.coverart-release-base:https://coverartarchive.org/release}")
+            String coverArtBase,
+            @Value("${app.ister.worker.musicbrainz.coverart-release-group-base:https://coverartarchive.org/release-group}")
+            String coverArtReleaseGroupBase,
             WikipediaService wikipediaService) {
         this.commonsFilepathBase = commonsFilepathBase;
+        this.musicBrainzBase = musicBrainzBase;
+        this.coverArtBase = coverArtBase;
+        this.coverArtReleaseGroupBase = coverArtReleaseGroupBase;
         this.wikipediaService = wikipediaService;
         this.restClient = MetadataRestClients.json();
     }
@@ -72,13 +82,13 @@ public class MusicBrainzService {
                 "/release-group?query={query}&fmt=json&limit=5", "release-groups",
                 query, artistName, normalizedAlbum);
         if (releaseGroupId.isPresent()) {
-            return releaseGroupId.map(id -> COVER_ART_RELEASE_GROUP_BASE + "/" + id + "/front");
+            return releaseGroupId.map(id -> coverArtReleaseGroupBase + "/" + id + "/front");
         }
         // Fall back to a specific release match.
         return findMatchingId(
                 "/release?query={query}&fmt=json&limit=5", "releases",
                 query, artistName, normalizedAlbum)
-                .map(id -> COVER_ART_BASE + "/" + id + "/front");
+                .map(id -> coverArtBase + "/" + id + "/front");
     }
 
     /**
@@ -94,7 +104,7 @@ public class MusicBrainzService {
                 Thread.sleep(1000);
                 @SuppressWarnings("unchecked")
                 Map<String, Object> response = restClient.get()
-                        .uri(MUSICBRAINZ_BASE + uriTemplate, query)
+                        .uri(musicBrainzBase + uriTemplate, query)
                         .retrieve()
                         .body(Map.class);
                 if (response == null) {
@@ -270,7 +280,7 @@ public class MusicBrainzService {
                 Thread.sleep(1000);
                 @SuppressWarnings("unchecked")
                 Map<String, Object> response = restClient.get()
-                        .uri(MUSICBRAINZ_BASE + uriTemplate, pathArg)
+                        .uri(musicBrainzBase + uriTemplate, pathArg)
                         .retrieve()
                         .body(Map.class);
                 return response == null ? Map.of() : response;
@@ -296,7 +306,7 @@ public class MusicBrainzService {
             String query = ARTIST_QUERY_PREFIX + encode(artistName) + " AND releasegroup:" + encode(albumName);
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restClient.get()
-                    .uri(MUSICBRAINZ_BASE + "/release-group?query={query}&fmt=json&limit=1&inc=annotation", query)
+                    .uri(musicBrainzBase + "/release-group?query={query}&fmt=json&limit=1&inc=annotation", query)
                     .retrieve()
                     .body(Map.class);
 

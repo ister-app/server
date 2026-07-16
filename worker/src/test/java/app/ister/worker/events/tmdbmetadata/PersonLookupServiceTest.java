@@ -47,7 +47,7 @@ class PersonLookupServiceTest {
 
     @BeforeEach
     void setUp() {
-        subject = new PersonLookupService(personRepository, imageRepository, imageDownloadService, tmdbClient, serverEventServiceMock, transactionManager);
+        subject = new PersonLookupService(personRepository, imageRepository, imageDownloadService, tmdbClient, new TmdbImageBase("https://image.tmdb.org/t/p/original"), serverEventServiceMock, transactionManager);
     }
 
     @Test

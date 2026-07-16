@@ -35,7 +35,7 @@ class EpisodeMetadataTest {
 
     @BeforeEach
     void setUp() {
-        subject = new EpisodeMetadata(tmdbClientMock, new TmdbResultSelector());
+        subject = new EpisodeMetadata(tmdbClientMock, new TmdbResultSelector(), new TmdbImageBase("https://image.tmdb.org/t/p/original"));
     }
 
     @Test

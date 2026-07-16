@@ -39,8 +39,8 @@ class OpenLibraryServiceTest {
 
     @BeforeEach
     void setUp() {
-        WikipediaService wikipediaService = new WikipediaService(WIKIDATA_ENDPOINT, WIKIDATA_API);
-        subject = new OpenLibraryService("https://openlibrary.org", wikipediaService);
+        WikipediaService wikipediaService = new WikipediaService(WIKIDATA_ENDPOINT, WIKIDATA_API, "https://{lang}.wikipedia.org/api/rest_v1/page/summary/{title}");
+        subject = new OpenLibraryService("https://openlibrary.org", "https://covers.openlibrary.org/b/id/", "https://covers.openlibrary.org/a/olid/", wikipediaService);
         // Both services build their own RestClient in the constructor; rebind them to one mock
         // server so no real network calls are made.
         RestClient.Builder builder = RestClient.builder();

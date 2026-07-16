@@ -52,15 +52,20 @@ public class WikipediaService {
 
     private final String wikidataEntityBase;
     private final String wikidataApiBase;
+    /** URI template with {lang} and {title} placeholders; configurable so CI can mock it. */
+    private final String summaryTemplate;
     private final RestClient restClient;
 
     public WikipediaService(
             @Value("${app.ister.worker.wikidata.entity-base:https://www.wikidata.org/wiki/Special:EntityData/}")
             String wikidataEntityBase,
             @Value("${app.ister.worker.wikidata.api-base:https://www.wikidata.org/w/api.php}")
-            String wikidataApiBase) {
+            String wikidataApiBase,
+            @Value("${app.ister.worker.wikipedia.summary-template:https://{lang}.wikipedia.org/api/rest_v1/page/summary/{title}}")
+            String summaryTemplate) {
         this.wikidataEntityBase = wikidataEntityBase;
         this.wikidataApiBase = wikidataApiBase;
+        this.summaryTemplate = summaryTemplate;
         this.restClient = MetadataRestClients.json();
     }
 
@@ -251,7 +256,7 @@ public class WikipediaService {
             Thread.sleep(500);
             @SuppressWarnings("unchecked")
             Map<String, Object> summary = restClient.get()
-                    .uri("https://{lang}.wikipedia.org/api/rest_v1/page/summary/{title}", languageTag, pageTitle)
+                    .uri(summaryTemplate, languageTag, pageTitle)
                     .retrieve()
                     .body(Map.class);
             if (summary == null) {

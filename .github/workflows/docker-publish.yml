@@ -1,8 +1,9 @@
 name: Docker
 
-# Development images for main: they carry the `main` and `sha-…` tags and report a
-# -SNAPSHOT version. Releases are cut by release.yml, which builds and tags its own images —
-# hence no `release:` trigger here, or the two would race to push the same tags.
+# Development images for main: they carry the `main` tag plus the project's -SNAPSHOT
+# version (e.g. `1.1.1-SNAPSHOT`) as a tag, so downstream e2e (the player repo) can pin a
+# server version by name. Releases are cut by release.yml, which builds and tags its own
+# images — hence no `release:` trigger here, or the two would race to push the same tags.
 on:
   push:
     branches: [ main ]
@@ -65,11 +66,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Read the project version
+        id: project
+        # main always carries a -SNAPSHOT version in build.gradle; release.yml strips it
+        # on the tagged commit. Grep rather than `gradlew properties`: no JVM start-up.
+        run: |
+          version=$(grep -oP "^\s*version = '\K[^']+" build.gradle)
+          [ -n "$version" ] || { echo "::error::could not read version from build.gradle"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Besides the mutable branch tag, tag with the project version (1.2.3-SNAPSHOT),
+          # so downstream e2e (the player repo) can pin a server version by name.
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=raw,value=${{ steps.project.outputs.version }}
 
       - name: Build and push Docker image
         id: build-and-push
@@ -123,6 +139,12 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/ister-app/migrations
+          # Same version tag as the server image, so the pair stays in lockstep when a
+          # deployment pins by version.
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=raw,value=${{ steps.project.outputs.version }}
 
       - name: Build and push migrations Docker image
         id: build-and-push-migrations

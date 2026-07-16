@@ -33,7 +33,7 @@ class ShowMetadataTest {
 
     @BeforeEach
     void setUp() {
-        subject = new ShowMetadata(tmdbClientMock, new TmdbResultSelector());
+        subject = new ShowMetadata(tmdbClientMock, new TmdbResultSelector(), new TmdbImageBase("https://image.tmdb.org/t/p/original"));
     }
 
     @Test

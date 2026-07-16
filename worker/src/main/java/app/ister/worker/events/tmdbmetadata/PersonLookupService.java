@@ -35,12 +35,11 @@ import java.io.IOException;
 @Slf4j
 @Service
 public class PersonLookupService {
-    private static final String IMAGE_BASE = "https://image.tmdb.org/t/p/original";
-
     private final PersonRepository personRepository;
     private final ImageRepository imageRepository;
     private final ImageDownloadService imageDownloadService;
     private final TmdbClient tmdbClient;
+    private final TmdbImageBase tmdbImageBase;
     private final ServerEventService serverEventService;
     private final TransactionTemplate newTransaction;
 
@@ -48,12 +47,14 @@ public class PersonLookupService {
                                ImageRepository imageRepository,
                                ImageDownloadService imageDownloadService,
                                TmdbClient tmdbClient,
+                               TmdbImageBase tmdbImageBase,
                                ServerEventService serverEventService,
                                PlatformTransactionManager transactionManager) {
         this.personRepository = personRepository;
         this.imageRepository = imageRepository;
         this.imageDownloadService = imageDownloadService;
         this.tmdbClient = tmdbClient;
+        this.tmdbImageBase = tmdbImageBase;
         this.serverEventService = serverEventService;
         this.newTransaction = new TransactionTemplate(transactionManager);
         this.newTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -123,7 +124,7 @@ public class PersonLookupService {
             return;
         }
         try {
-            imageDownloadService.downloadAndSave(IMAGE_BASE + profilePath, ImageType.COVER, "eng",
+            imageDownloadService.downloadAndSave(tmdbImageBase.url(profilePath), ImageType.COVER, "eng",
                     "TMDB://" + profilePath,
                     new ImageSave.MediaEntityRef(null, null, null, person, null));
         } catch (IOException e) {

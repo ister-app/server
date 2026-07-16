@@ -25,6 +25,7 @@ import java.util.Optional;
 public class EpisodeMetadata {
     private final TmdbClient tmdbClient;
     private final TmdbResultSelector resultSelector;
+    private final TmdbImageBase tmdbImageBase;
 
     /**
      * The movie database will give a default name if none is specified, for example "Episode 1".
@@ -34,9 +35,10 @@ public class EpisodeMetadata {
             "en", "Episode %d",
             "nl", "Aflevering %d");
 
-    public EpisodeMetadata(TmdbClient tmdbClient, TmdbResultSelector resultSelector) {
+    public EpisodeMetadata(TmdbClient tmdbClient, TmdbResultSelector resultSelector, TmdbImageBase tmdbImageBase) {
         this.tmdbClient = tmdbClient;
         this.resultSelector = resultSelector;
+        this.tmdbImageBase = tmdbImageBase;
     }
 
     public Optional<TMDBResult> getMetadata(String showName, int releaseYear, int seasonNumber, int episodeNumber, String language) throws FeignException {
@@ -69,7 +71,7 @@ public class EpisodeMetadata {
                     .tmdbId(episode.getId())
                     .seriesTmdbId(tvSeriesResultsPage.getId())
                     .description(episode.getOverview().trim().isEmpty() ? null : episode.getOverview())
-                    .backgroundUrl(episode.getStillPath() == null ? null : "https://image.tmdb.org/t/p/original" + episode.getStillPath())
+                    .backgroundUrl(episode.getStillPath() == null ? null : tmdbImageBase.url(episode.getStillPath()))
                     .build());
         } else {
             log.debug("Couldn't find Episode {} {} {}", seasonNumber, episodeNumber, language);

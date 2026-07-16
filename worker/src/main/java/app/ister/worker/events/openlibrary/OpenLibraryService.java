@@ -27,21 +27,26 @@ import static app.ister.worker.events.musicbrainz.MusicBrainzService.normalizeTi
 @Component
 public class OpenLibraryService {
 
-    private static final String COVERS_BASE = "https://covers.openlibrary.org/b/id/";
-    private static final String AUTHOR_PHOTO_BASE = "https://covers.openlibrary.org/a/olid/";
     /** Language tag of the provider's own free-text prose (Open Library bios are English). */
     private static final String ENGLISH = "en";
     /** Open Library birth dates are free text ("5 September 1929", "1929-09-05", "c. 1929"). */
     private static final Pattern YEAR = Pattern.compile("\\d{4}");
 
     private final String openLibraryBase;
+    /** Configurable so CI can point them at a mock server. */
+    private final String coversBase;
+    private final String authorPhotoBase;
     private final WikipediaService wikipediaService;
     private final RestClient restClient;
 
     public OpenLibraryService(
             @Value("${app.ister.worker.openlibrary.base:https://openlibrary.org}") String openLibraryBase,
+            @Value("${app.ister.worker.openlibrary.covers-base:https://covers.openlibrary.org/b/id/}") String coversBase,
+            @Value("${app.ister.worker.openlibrary.author-photo-base:https://covers.openlibrary.org/a/olid/}") String authorPhotoBase,
             WikipediaService wikipediaService) {
         this.openLibraryBase = openLibraryBase;
+        this.coversBase = coversBase;
+        this.authorPhotoBase = authorPhotoBase;
         this.wikipediaService = wikipediaService;
         this.restClient = MetadataRestClients.json();
     }
@@ -81,7 +86,7 @@ public class OpenLibraryService {
         }
         Map<String, Object> work = doc.get();
         String coverUrl = work.get("cover_i") instanceof Number coverId
-                ? COVERS_BASE + coverId.longValue() + "-L.jpg"
+                ? coversBase + coverId.longValue() + "-L.jpg"
                 : null;
         int firstPublishYear = work.get("first_publish_year") instanceof Number year ? year.intValue() : 0;
         String workKey = work.get("key") instanceof String key ? key : null;
@@ -149,7 +154,7 @@ public class OpenLibraryService {
             bios.putIfAbsent(ENGLISH, openLibraryBio);
         }
 
-        String photoUrl = hasPhoto(author) ? AUTHOR_PHOTO_BASE + authorKey + "-L.jpg" : wiki.thumbnail();
+        String photoUrl = hasPhoto(author) ? authorPhotoBase + authorKey + "-L.jpg" : wiki.thumbnail();
         Integer birthYear = parseYear(author.get("birth_date"));
 
         if (bios.isEmpty() && photoUrl == null && birthYear == null) {

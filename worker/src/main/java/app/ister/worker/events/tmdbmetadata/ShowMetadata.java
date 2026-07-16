@@ -26,6 +26,7 @@ import java.util.Optional;
 public class ShowMetadata {
     private final TmdbClient tmdbClient;
     private final TmdbResultSelector resultSelector;
+    private final TmdbImageBase tmdbImageBase;
 
     public Optional<TMDBResult> getMetadata(String name, int releaseYear, String language) {
         log.debug("Starting task executing.");
@@ -47,8 +48,8 @@ public class ShowMetadata {
                     .sourceUri("TMDB://" + tvSeries1.getId())
                     .tmdbId(tvSeries1.getId())
                     .description(tvSeries1.getOverview().trim().isEmpty() ? null : tvSeries1.getOverview())
-                    .posterUrl(tvSeries1.getPosterPath() == null ? null : "https://image.tmdb.org/t/p/original" + tvSeries1.getPosterPath())
-                    .backgroundUrl(tvSeries1.getBackdropPath() == null ? null : "https://image.tmdb.org/t/p/original" + tvSeries1.getBackdropPath())
+                    .posterUrl(tvSeries1.getPosterPath() == null ? null : tmdbImageBase.url(tvSeries1.getPosterPath()))
+                    .backgroundUrl(tvSeries1.getBackdropPath() == null ? null : tmdbImageBase.url(tvSeries1.getBackdropPath()))
                     .build());
         } else {
             log.debug("Couldn't find Show {} {} {}", tvSeriesResultsPage.getName(), tvSeriesResultsPage.getFirstAirDate(), language);

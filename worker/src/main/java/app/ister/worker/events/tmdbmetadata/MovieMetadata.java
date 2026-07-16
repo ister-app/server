@@ -26,6 +26,7 @@ import java.util.Optional;
 public class MovieMetadata {
     private final TmdbClient tmdbClient;
     private final TmdbResultSelector resultSelector;
+    private final TmdbImageBase tmdbImageBase;
 
     public Optional<TMDBResult> getMetadata(String name, int releaseYear, String language) {
         log.debug("Starting task executing.");
@@ -47,8 +48,8 @@ public class MovieMetadata {
                     .sourceUri("TMDB://" + movieDb.getId())
                     .tmdbId(movieDb.getId())
                     .description(movieDb.getOverview().trim().isEmpty() ? null : movieDb.getOverview())
-                    .posterUrl(movieDb.getPosterPath() == null ? null : "https://image.tmdb.org/t/p/original" + movieDb.getPosterPath())
-                    .backgroundUrl(movieDb.getBackdropPath() == null ? null : "https://image.tmdb.org/t/p/original" + movieDb.getBackdropPath())
+                    .posterUrl(movieDb.getPosterPath() == null ? null : tmdbImageBase.url(movieDb.getPosterPath()))
+                    .backgroundUrl(movieDb.getBackdropPath() == null ? null : tmdbImageBase.url(movieDb.getBackdropPath()))
                     .build());
         } else {
             log.debug("Couldn't find Movie {} {} {}", movieResultsPage.getTitle(), movieResultsPage.getReleaseDate(), language);
