@@ -60,6 +60,7 @@ Everything is env-overridable; the most important settings:
 | Libraries | `app.ister.disk.libraries[n].*`, `app.ister.disk.directories[n].*` | see `disk/src/main/resources/disk.properties` |
 | Transcoder | `app.ister.transcoder.hls.*` | hwaccel (`vaapi`/`nvdec`), concurrency, timeouts |
 | Continue watching | `CONTINUE_WATCHING_HISTORY_DAYS`, `CONTINUE_WATCHING_REBUILD_CRON` | how far back the continue-watching list looks (default 150 days), and when the nightly rebuild of that list runs. It also drives what pre-transcoding keeps warm. |
+| External metadata endpoints | `spring.cloud.openfeign.client.config.tmdb.url`, `app.ister.worker.tmdb.image-base`, `app.ister.worker.musicbrainz.base` / `.coverart-release-base` / `.coverart-release-group-base` / `.commons-filepath-base`, `app.ister.worker.openlibrary.base` / `.covers-base` / `.author-photo-base`, `app.ister.worker.wikidata.entity-base` / `.api-base`, `app.ister.worker.wikipedia.summary-template`, `app.ister.api.podcast.itunes-base` | every external source the workers call; defaults are the real services. The chart's CI points them all at one WireMock pod (`chart/ci/mock-external.yaml`) so e2e runs offline and deterministically |
 
 ## Multi-node
 
@@ -126,6 +127,12 @@ reachable. To run them locally with rootless podman:
 systemctl --user start podman.socket
 DOCKER_HOST=unix:///run/user/$UID/podman/podman.sock ./gradlew test
 ```
+
+Beyond the module tests, the [chart repo](https://github.com/ister-app/chart) runs a full
+end-to-end suite against a kind deployment of this server: scanning every library type,
+metadata enrichment against mocked external sources, HLS streaming with a real transcode,
+epub serving, search and watch status — plus the player repo's Flutter integration tests on
+top of the same deployment. See the chart README under "CI".
 
 ## Create a test video
 

@@ -181,6 +181,14 @@ Essential runtime config:
 - TMDB API key: `app.ister.server.tmdb.api-key`
 - Supported languages (app-wide): `app.ister.languages` / `ISTER_LANGUAGES` (ISO-639-1 tags, default `en,nl`) — drives TMDB fetch + search indexing, see README "Languages"
 - OAuth2/OIDC: `OIDC_URL` env var
+- External metadata endpoints: every base URL the workers call (TMDB api + image host, MusicBrainz,
+  Cover Art Archive, Commons, Open Library + covers, Wikidata, the Wikipedia summary template,
+  iTunes) is a property with the real service as default — see README "Configuration". Keep new
+  external calls behind such a property: the chart's e2e serves them all from one WireMock pod and
+  fails on any dead-lettered event, so a hardcoded URL breaks that CI.
+- Docker images: `docker-publish.yml` tags every main push with the gradle project version
+  (e.g. `1.1.1-SNAPSHOT`, greppable from build.gradle) next to `main`; server and migrations get
+  the same tag so downstream pins stay in lockstep. Releases get clean semver tags via release.yml.
 
 Config is bound through `@ConfigurationProperties` classes, not scattered `@Value`s: `LanguageProperties`,
 `AppIsterServerConfig` (disk), `WorkerDiskConfig`, `TranscoderDirectoryConfig`/`TranscoderDisksConfig`,
