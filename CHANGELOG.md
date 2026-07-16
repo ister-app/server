@@ -1,5 +1,31 @@
 # Changelog
 
+## server v1.1.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `1.1.0` |
+| `ghcr.io/ister-app/migrations` | `1.1.0` |
+
+### Features
+
+- feat(continue-watching): one entry per book across epub and audiobook ([`5f2bb38`](https://github.com/ister-app/server/commit/5f2bb38))
+- feat: add release-year sorting and per-library sort persistence ([`db1aa58`](https://github.com/ister-app/server/commit/db1aa58))
+
+### Fixes
+
+- fix(books): sync release_year column from metadata so sorting matches display ([`2f12093`](https://github.com/ister-app/server/commit/2f12093))
+- fix(transcoder): keep pre-transcode resume alive while passes are queued ([`7a0fe26`](https://github.com/ister-app/server/commit/7a0fe26))
+- fix(continue-watching): group podcast entries by podcast, not per episode ([`86e5b11`](https://github.com/ister-app/server/commit/86e5b11))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:1.1.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v1.0.0...v1.1.0
+
 ## server v1.0.0
 
 | Image | Tag |
