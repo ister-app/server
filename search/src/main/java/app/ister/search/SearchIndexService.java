@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.client.HttpClientErrorException;
 
 import java.util.List;
 import java.util.Optional;
@@ -74,7 +75,15 @@ public class SearchIndexService {
     public void upsert(SearchEntityType entityType, UUID entityId) {
         Optional<SearchDocument> document = loadDocument(entityType, entityId);
         if (document.isPresent()) {
-            typesenseClient.upsertDocument(properties.getCollection(), document.get());
+            try {
+                typesenseClient.upsertDocument(properties.getCollection(), document.get());
+            } catch (HttpClientErrorException.NotFound _) {
+                // The collection does not exist: Typesense was unreachable when the startup
+                // initializer ran (or lost its non-persistent volume). Without this, every
+                // index event 404s and dead-letters until someone runs a manual reindex.
+                ensureCollection();
+                typesenseClient.upsertDocument(properties.getCollection(), document.get());
+            }
         } else {
             // Entity is gone (e.g. deleted between event and handling): remove any stale document.
             typesenseClient.deleteDocument(properties.getCollection(), entityId.toString());
