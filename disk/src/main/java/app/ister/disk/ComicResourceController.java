@@ -14,9 +14,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import javax.imageio.ImageIO;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -95,11 +101,18 @@ public class ComicResourceController {
                 pages));
     }
 
-    /** One cbz page image by index, in the natural-sorted reading order of the manifest. */
+    /**
+     * One cbz page image by index, in the natural-sorted reading order of the manifest.
+     *
+     * <p>With {@code ?width=} the image is downscaled server-side (for thumbnail strips); the
+     * requested width is bucketed to {@link #WIDTH_BUCKETS} so the immutable cache stays bounded.
+     * Scaling is best-effort: when decoding or AWT is unavailable the original page is served.
+     */
     @GetMapping("/comic/{mediaFileId}/page/{index}")
     public ResponseEntity<StreamingResponseBody> page(
             @PathVariable UUID mediaFileId,
             @PathVariable int index,
+            @RequestParam(required = false) Integer width,
             @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) throws IOException {
         Optional<MediaFileEntity> mediaFile = comicMediaFile(mediaFileId);
         if (mediaFile.isEmpty() || !"cbz".equals(extensionOf(mediaFile.get().getPath()))) {
@@ -114,6 +127,7 @@ public class ComicResourceController {
             return ResponseEntity.notFound().build();
         }
         String entryName = pages.get(index);
+        Integer targetWidth = bucketWidth(width);
 
         ZipFile zipFile = new ZipFile(path.toFile());
         try {
@@ -122,10 +136,24 @@ public class ComicResourceController {
                 zipFile.close();
                 return ResponseEntity.notFound().build();
             }
-            String etag = "\"%s-%d\"".formatted(Long.toHexString(entry.getCrc()), entry.getSize());
+            String etag = targetWidth == null
+                    ? "\"%s-%d\"".formatted(Long.toHexString(entry.getCrc()), entry.getSize())
+                    : "\"%s-%d-w%d\"".formatted(Long.toHexString(entry.getCrc()), entry.getSize(), targetWidth);
             if (etag.equals(ifNoneMatch)) {
                 zipFile.close();
                 return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
+            }
+            if (targetWidth != null) {
+                byte[] scaled = scaleToJpeg(zipFile, entry, targetWidth);
+                if (scaled != null) {
+                    zipFile.close();
+                    return ResponseEntity.ok()
+                            .eTag(etag)
+                            .header(HttpHeaders.CACHE_CONTROL, "private, max-age=31536000, immutable")
+                            .contentType(MediaType.IMAGE_JPEG)
+                            .contentLength(scaled.length)
+                            .body(output -> output.write(scaled));
+                }
             }
             return ResponseEntity.ok()
                     .eTag(etag)
@@ -140,6 +168,54 @@ public class ComicResourceController {
         } catch (RuntimeException e) {
             zipFile.close();
             throw e;
+        }
+    }
+
+    /** Allowed downscale widths; a requested width snaps to the smallest bucket that covers it. */
+    private static final int[] WIDTH_BUCKETS = {240, 480};
+
+    private static Integer bucketWidth(Integer width) {
+        if (width == null || width <= 0) {
+            return null;
+        }
+        for (int bucket : WIDTH_BUCKETS) {
+            if (width <= bucket) {
+                return bucket;
+            }
+        }
+        return WIDTH_BUCKETS[WIDTH_BUCKETS.length - 1];
+    }
+
+    /**
+     * The entry downscaled to {@code targetWidth} as jpeg bytes, or null when the source is
+     * already narrower or scaling is unavailable (undecodable image, native image without AWT) —
+     * the caller then streams the original.
+     */
+    private byte[] scaleToJpeg(ZipFile zipFile, ZipEntry entry, int targetWidth) {
+        try (InputStream in = zipFile.getInputStream(entry)) {
+            BufferedImage source = ImageIO.read(in);
+            if (source == null || source.getWidth() <= targetWidth) {
+                return null;
+            }
+            int targetHeight = Math.max(1, Math.round(source.getHeight() * (targetWidth / (float) source.getWidth())));
+            BufferedImage scaled = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
+            Graphics2D graphics = scaled.createGraphics();
+            try {
+                graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                graphics.drawImage(source, 0, 0, targetWidth, targetHeight, java.awt.Color.WHITE, null);
+            } finally {
+                graphics.dispose();
+            }
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            if (!ImageIO.write(scaled, "jpg", out)) {
+                return null;
+            }
+            return out.toByteArray();
+        } catch (Throwable t) {
+            // Throwable on purpose: a native image without AWT throws LinkageError/
+            // ExceptionInInitializerError, and a broken page must degrade to the original bytes.
+            log.warn("Could not downscale comic page {}: {}", entry.getName(), t.toString());
+            return null;
         }
     }
 
