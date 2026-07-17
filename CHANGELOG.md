@@ -1,5 +1,47 @@
 # Changelog
 
+## server v2.0.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.0.0` |
+| `ghcr.io/ister-app/migrations` | `2.0.0` |
+
+### Breaking changes
+
+- refactor(reader)!: remove server-hosted epub reader web app ([`5ecd324`](https://github.com/ister-app/server/commit/5ecd324))
+
+### Features
+
+- feat(worker): make external metadata endpoints configurable ([`369094f`](https://github.com/ister-app/server/commit/369094f))
+- feat(disk): server-side downscale for comic page images (?width=) ([`eec0d86`](https://github.com/ister-app/server/commit/eec0d86))
+- feat(api): expose MediaFile.format so clients stop sniffing extensions ([`fa80490`](https://github.com/ister-app/server/commit/fa80490))
+- feat(comics): COMIC library type with series-first layout, cbz/pdf/epub volumes and comic reader endpoints ([`35bbf0b`](https://github.com/ister-app/server/commit/35bbf0b))
+- feat(books): reliable metadata via ISBN-first Open Library, series support and clean titles ([`9b88e32`](https://github.com/ister-app/server/commit/9b88e32))
+
+### Fixes
+
+- fix(comics): close the page ZipFile on every path ([`beb4ea3`](https://github.com/ister-app/server/commit/beb4ea3))
+- fix(core): publish entity events after the transaction commits ([`5d16f19`](https://github.com/ister-app/server/commit/5d16f19))
+- fix(search): recreate a missing collection on upsert instead of dead-lettering ([`81bab63`](https://github.com/ister-app/server/commit/81bab63))
+
+### Other
+
+- test(transcoder): fix the delayed-mock compile error and tune the delay ([`386b60d`](https://github.com/ister-app/server/commit/386b60d))
+- test(transcoder): let mocked passes complete asynchronously in the hand-off test ([`7793bde`](https://github.com/ister-app/server/commit/7793bde))
+- test(server): make the library-scan integration tests robust on slow runners ([`cd09af1`](https://github.com/ister-app/server/commit/cd09af1))
+- test(transcoder): widen the pass-chain await for slow CI runners ([`12e62d1`](https://github.com/ister-app/server/commit/12e62d1))
+- ci: fix the version image tag — lowercase, and set it in both jobs ([`f53379c`](https://github.com/ister-app/server/commit/f53379c))
+- docs: document external endpoints, image version tags and the chart e2e ([`ebe3543`](https://github.com/ister-app/server/commit/ebe3543))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.0.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v1.1.0...v2.0.0
+
 ## server v1.1.0
 
 | Image | Tag |
