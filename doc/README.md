@@ -4,8 +4,8 @@ This directory holds the documentation for the Ister media server.
 
 ## Contents
 
-- `admin/en/` — the administrator guide in English (7 chapters: installation, configuration,
-  libraries, multi-node, search, maintenance)
+- `admin/en/` — the administrator guide in English (8 chapters: installation, configuration,
+  libraries, multi-node, search, maintenance, naming conventions)
 - `admin/nl/` — de beheerdershandleiding in het Nederlands (same chapters, translated/adapted)
 - `architecture/en/` and `architecture/nl/` — developer-facing architecture documentation
   (modules, event system, scanning, media types & metadata, transcoding, continue watching,

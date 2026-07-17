@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Documentation (`doc/`)
 
 Structured documentation lives under `doc/`, mirroring the player repo's setup: `doc/admin/{en,nl}/`
-(operator guide, 7 numbered chapters) and `doc/architecture/{en,nl}/` (developer docs, 9 numbered
+(operator guide, 8 numbered chapters) and `doc/architecture/{en,nl}/` (developer docs, 9 numbered
 chapters), plus `doc/architecture/diagrams/` (hand-authored mermaid, English only, shared by both
 locales). Root `EVENT_FLOWS.md` is only a pointer stub to it now.
 

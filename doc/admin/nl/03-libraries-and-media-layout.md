@@ -32,6 +32,9 @@ start uit deze configuratie aangemaakt of bijgewerkt.
 
 ## Verwachte indeling per type
 
+Dit is de korte versie; [hoofdstuk 7](07-naming-conventions.md) is de volledige naamreferentie
+(exacte patronen, geaccepteerde extensies, speciale bestanden en veelgemaakte fouten).
+
 **Series** — `Show Name (year)/Season NN/sNNeNN.mkv`:
 
 ```

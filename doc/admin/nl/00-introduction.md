@@ -51,3 +51,4 @@ een fractie van een seconde en bevat geen JVM. Normaal gesproken pull je gewoon
 4. [Multi-node](04-multi-node.md) — een cluster draaien
 5. [Zoeken (Typesense)](05-search-typesense.md) — full-text zoeken inschakelen en onderhouden
 6. [Onderhoud en probleemoplossing](06-maintenance-and-troubleshooting.md) — geplande taken, back-up, monitoring
+7. [Naamconventies](07-naming-conventions.md) — de exacte map- en bestandsnaamregels per librarytype

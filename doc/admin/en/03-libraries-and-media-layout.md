@@ -32,6 +32,9 @@ every startup.
 
 ## Expected layout per type
 
+This is the short version; [chapter 7](07-naming-conventions.md) is the full naming reference
+(exact patterns, accepted extensions, special files, and common mistakes).
+
 **Shows** — `Show Name (year)/Season NN/sNNeNN.mkv`:
 
 ```

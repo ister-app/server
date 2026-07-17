@@ -51,3 +51,4 @@ building it yourself is covered in [Installation](01-installation.md).
 4. [Multi-node](04-multi-node.md) — running a cluster
 5. [Search (Typesense)](05-search-typesense.md) — enabling and maintaining full-text search
 6. [Maintenance and troubleshooting](06-maintenance-and-troubleshooting.md) — scheduled jobs, backup, monitoring
+7. [Naming conventions](07-naming-conventions.md) — the exact directory and file naming rules per library type
