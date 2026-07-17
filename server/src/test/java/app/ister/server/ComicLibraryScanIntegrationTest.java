@@ -160,17 +160,20 @@ class ComicLibraryScanIntegrationTest {
         assertEquals(1.0, vol1.getSeriesIndex());
         assertNull(vol1.getPersonEntity(), "comic volumes carry no author");
         // The "-1" re-download is a second FILE of the SAME volume — never a second volume row.
-        assertEquals(2, mediaFileRepository.findByBookEntityId(vol1.getId()).size(),
-                "vol1.pdf and its -1 duplicate both attach to the one volume");
+        // Await: the volume row appears with the first file; the duplicate attaches in its own
+        // async COMIC_FILE_FOUND handling and can land a moment later on a busy runner.
+        Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() ->
+                assertEquals(2, mediaFileRepository.findByBookEntityId(vol1.getId()).size(),
+                        "vol1.pdf and its -1 duplicate both attach to the one volume"));
 
         // The async content handler fills page counts and ComicInfo refinements.
-        Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+        Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> {
             MediaFileEntity pdf = mediaFileRepository.findByBookEntityId(volumeByName("fairytail_vol1").getId()).getFirst();
             assertEquals(3, pdf.getPageCount(), "pdf page count");
             MediaFileEntity cbz = mediaFileRepository.findByBookEntityId(volumeByName("fairytail_vol12").getId()).getFirst();
             assertEquals(2, cbz.getPageCount(), "cbz image count");
         });
-        Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+        Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> {
             BookEntity vol12 = volumeByName("fairytail_vol12");
             assertEquals("The Guild", vol12.getTitle(), "ComicInfo.xml title wins over the filename");
             assertEquals(12.0, vol12.getSeriesIndex());

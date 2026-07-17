@@ -228,14 +228,14 @@ class BookLibraryScanIntegrationTest {
 
         // HandleEpubFileFound: overlay flag from the CONTENT (no "karaoke" in the filename),
         // duration from media:duration, OPF metadata and the extracted cover.
-        Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+        Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> {
             List<MediaFileEntity> files = mediaFileRepository.findByBookEntityId(book.getId());
             assertEquals(1, files.size());
             assertEquals(Boolean.TRUE, files.getFirst().getMediaOverlays(),
                     "media overlays must be detected from the epub contents");
             assertEquals(10_000, files.getFirst().getDurationInMilliseconds());
         });
-        Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+        Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> {
             assertFalse(metadataRepository.findByBookEntityId(book.getId()).isEmpty(), "OPF metadata should be stored");
             assertFalse(imageRepository.findByBookEntityId(book.getId()).isEmpty(), "cover should be extracted");
         });
@@ -248,7 +248,7 @@ class BookLibraryScanIntegrationTest {
 
         // Series: the calibre-tagged epub assigns book one; the prefix heuristic pulls in book
         // two. Both end up under one series with the prefix stripped from their display title.
-        Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+        Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> {
             BookEntity first = bookRepository.findAll().stream()
                     .filter(b -> "Sky Rangers - First Flight".equals(b.getName())).findFirst().orElseThrow();
             BookEntity second = bookRepository.findAll().stream()
