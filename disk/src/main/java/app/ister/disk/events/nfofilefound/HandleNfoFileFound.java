@@ -24,6 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.FileNotFoundException;
+import java.util.List;
+import java.util.function.Supplier;
 
 @Service
 @Transactional
@@ -91,12 +93,13 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
         try {
             Parser.parseArtist(path).ifPresent(parsed -> {
                 String title = parsed.getName() != null ? parsed.getName() : musicPath.getArtistName();
-                var saved = metadataRepository.save(MetadataEntity.builder()
-                        .title(title)
-                        .description(parsed.getBiography())
-                        .genre(parsed.getGenre())
-                        .personEntity(artist)
-                        .sourceUri(FILE_URI_PREFIX + path).build());
+                String sourceUri = FILE_URI_PREFIX + path;
+                var metadata = metadataForSource(metadataRepository.findByPersonEntityId(artist.getId()), sourceUri,
+                        () -> MetadataEntity.builder().personEntity(artist).sourceUri(sourceUri).build());
+                metadata.setTitle(title);
+                metadata.setDescription(parsed.getBiography());
+                metadata.setGenre(parsed.getGenre());
+                var saved = metadataRepository.save(metadata);
                 setMetadataFk(directoryEntity, path, saved);
                 serverEventService.createSearchIndexEvent(SearchEntityType.PERSON, artist.getId());
             });
@@ -119,13 +122,14 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
                 } else {
                     released = null;
                 }
-                var saved = metadataRepository.save(MetadataEntity.builder()
-                        .title(title)
-                        .description(parsed.getReview())
-                        .released(released)
-                        .genre(parsed.getGenre())
-                        .albumEntity(album)
-                        .sourceUri(FILE_URI_PREFIX + path).build());
+                String sourceUri = FILE_URI_PREFIX + path;
+                var metadata = metadataForSource(metadataRepository.findByAlbumEntityId(album.getId()), sourceUri,
+                        () -> MetadataEntity.builder().albumEntity(album).sourceUri(sourceUri).build());
+                metadata.setTitle(title);
+                metadata.setDescription(parsed.getReview());
+                metadata.setReleased(released);
+                metadata.setGenre(parsed.getGenre());
+                var saved = metadataRepository.save(metadata);
                 setMetadataFk(directoryEntity, path, saved);
                 serverEventService.createSearchIndexEvent(SearchEntityType.ALBUM, album.getId());
             });
@@ -149,12 +153,13 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
         try {
             Parser.parseArtist(path).ifPresent(parsed -> {
                 String title = parsed.getName() != null ? parsed.getName() : bookPath.getAuthorName();
-                var saved = metadataRepository.save(MetadataEntity.builder()
-                        .title(title)
-                        .description(parsed.getBiography())
-                        .genre(parsed.getGenre())
-                        .personEntity(author)
-                        .sourceUri(FILE_URI_PREFIX + path).build());
+                String sourceUri = FILE_URI_PREFIX + path;
+                var metadata = metadataForSource(metadataRepository.findByPersonEntityId(author.getId()), sourceUri,
+                        () -> MetadataEntity.builder().personEntity(author).sourceUri(sourceUri).build());
+                metadata.setTitle(title);
+                metadata.setDescription(parsed.getBiography());
+                metadata.setGenre(parsed.getGenre());
+                var saved = metadataRepository.save(metadata);
                 setMetadataFk(directoryEntity, path, saved);
                 serverEventService.createSearchIndexEvent(SearchEntityType.PERSON, author.getId());
             });
@@ -177,13 +182,14 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
                 } else {
                     released = null;
                 }
-                var saved = metadataRepository.save(MetadataEntity.builder()
-                        .title(title)
-                        .description(parsed.getReview())
-                        .released(released)
-                        .genre(parsed.getGenre())
-                        .bookEntity(book)
-                        .sourceUri(FILE_URI_PREFIX + path).build());
+                String sourceUri = FILE_URI_PREFIX + path;
+                var metadata = metadataForSource(metadataRepository.findByBookEntityId(book.getId()), sourceUri,
+                        () -> MetadataEntity.builder().bookEntity(book).sourceUri(sourceUri).build());
+                metadata.setTitle(title);
+                metadata.setDescription(parsed.getReview());
+                metadata.setReleased(released);
+                metadata.setGenre(parsed.getGenre());
+                var saved = metadataRepository.save(metadata);
                 setMetadataFk(directoryEntity, path, saved);
                 scannerHelperService.refreshBookReleaseYear(book);
                 serverEventService.createSearchIndexEvent(SearchEntityType.BOOK, book.getId());
@@ -197,12 +203,13 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
         var movie = scannerHelperService.getOrCreateMovie(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear());
         try {
             Parser.parseMovie(path).ifPresent(parsed -> {
-                var saved = metadataRepository.save(MetadataEntity.builder()
-                        .title(parsed.getTitle())
-                        .description(parsed.getPlot())
-                        .released(parsed.getPremiered())
-                        .movieEntity(movie)
-                        .sourceUri(FILE_URI_PREFIX + path).build());
+                String sourceUri = FILE_URI_PREFIX + path;
+                var metadata = metadataForSource(metadataRepository.findByMovieEntityId(movie.getId()), sourceUri,
+                        () -> MetadataEntity.builder().movieEntity(movie).sourceUri(sourceUri).build());
+                metadata.setTitle(parsed.getTitle());
+                metadata.setDescription(parsed.getPlot());
+                metadata.setReleased(parsed.getPremiered());
+                var saved = metadataRepository.save(metadata);
                 setMetadataFk(directoryEntity, path, saved);
                 serverEventService.createSearchIndexEvent(SearchEntityType.MOVIE, movie.getId());
             });
@@ -215,12 +222,13 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
         var show = scannerHelperService.getOrCreateShow(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear());
         try {
             Parser.parseShow(path).ifPresent(parsed -> {
-                var saved = metadataRepository.save(MetadataEntity.builder()
-                        .title(parsed.getTitle())
-                        .description(parsed.getPlot())
-                        .released(parsed.getPremiered())
-                        .showEntity(show)
-                        .sourceUri(FILE_URI_PREFIX + path).build());
+                String sourceUri = FILE_URI_PREFIX + path;
+                var metadata = metadataForSource(metadataRepository.findByShowEntityId(show.getId()), sourceUri,
+                        () -> MetadataEntity.builder().showEntity(show).sourceUri(sourceUri).build());
+                metadata.setTitle(parsed.getTitle());
+                metadata.setDescription(parsed.getPlot());
+                metadata.setReleased(parsed.getPremiered());
+                var saved = metadataRepository.save(metadata);
                 setMetadataFk(directoryEntity, path, saved);
                 serverEventService.createSearchIndexEvent(SearchEntityType.SHOW, show.getId());
             });
@@ -233,18 +241,30 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
         var episode = scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear(), pathObject.getSeason(), pathObject.getEpisode());
         try {
             Parser.parseEpisode(path).ifPresent(parsed -> {
-                var saved = metadataRepository.save(MetadataEntity.builder()
-                        .title(parsed.getTitle())
-                        .description(parsed.getPlot())
-                        .released(parsed.getAired())
-                        .episodeEntity(episode)
-                        .sourceUri(FILE_URI_PREFIX + path).build());
+                String sourceUri = FILE_URI_PREFIX + path;
+                var metadata = metadataForSource(metadataRepository.findByEpisodeEntityId(episode.getId()), sourceUri,
+                        () -> MetadataEntity.builder().episodeEntity(episode).sourceUri(sourceUri).build());
+                metadata.setTitle(parsed.getTitle());
+                metadata.setDescription(parsed.getPlot());
+                metadata.setReleased(parsed.getAired());
+                var saved = metadataRepository.save(metadata);
                 setMetadataFk(directoryEntity, path, saved);
                 serverEventService.createSearchIndexEvent(SearchEntityType.EPISODE, episode.getId());
             });
         } catch (FileNotFoundException _) {
             log.error(NFO_PARSE_ERROR, path);
         }
+    }
+
+    /**
+     * One metadata row per nfo file, keyed on sourceUri: re-parsing the same nfo updates the row
+     * in place instead of stacking duplicates (same contract as the epub metadata writer).
+     */
+    private MetadataEntity metadataForSource(List<MetadataEntity> existingRows, String sourceUri, Supplier<MetadataEntity> newRow) {
+        return existingRows.stream()
+                .filter(existing -> sourceUri.equals(existing.getSourceUri()))
+                .findFirst()
+                .orElseGet(newRow);
     }
 
     private void setMetadataFk(DirectoryEntity directoryEntity, String path, MetadataEntity saved) {
