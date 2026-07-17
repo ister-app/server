@@ -129,24 +129,23 @@ public class ComicResourceController {
         String entryName = pages.get(index);
         Integer targetWidth = bucketWidth(width);
 
-        ZipFile zipFile = new ZipFile(path.toFile());
-        try {
+        // Pages are small (at most a few MB), so buffering the entry keeps the ZipFile inside a
+        // plain try-with-resources. Streaming it would mean closing the zip in the response-body
+        // lambda — leaked whenever Spring never runs that lambda (client gone before writing).
+        try (ZipFile zipFile = new ZipFile(path.toFile())) {
             ZipEntry entry = zipFile.getEntry(entryName);
             if (entry == null) {
-                zipFile.close();
                 return ResponseEntity.notFound().build();
             }
             String etag = targetWidth == null
                     ? "\"%s-%d\"".formatted(Long.toHexString(entry.getCrc()), entry.getSize())
                     : "\"%s-%d-w%d\"".formatted(Long.toHexString(entry.getCrc()), entry.getSize(), targetWidth);
             if (etag.equals(ifNoneMatch)) {
-                zipFile.close();
                 return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
             }
             if (targetWidth != null) {
                 byte[] scaled = scaleToJpeg(zipFile, entry, targetWidth);
                 if (scaled != null) {
-                    zipFile.close();
                     return ResponseEntity.ok()
                             .eTag(etag)
                             .header(HttpHeaders.CACHE_CONTROL, "private, max-age=31536000, immutable")
@@ -155,19 +154,16 @@ public class ComicResourceController {
                             .body(output -> output.write(scaled));
                 }
             }
+            byte[] bytes;
+            try (InputStream in = zipFile.getInputStream(entry)) {
+                bytes = in.readAllBytes();
+            }
             return ResponseEntity.ok()
                     .eTag(etag)
                     .header(HttpHeaders.CACHE_CONTROL, "private, max-age=31536000, immutable")
                     .contentType(PAGE_CONTENT_TYPES.getOrDefault(extensionOf(entryName), MediaType.APPLICATION_OCTET_STREAM))
-                    .contentLength(entry.getSize())
-                    .body(output -> {
-                        try (zipFile; InputStream in = zipFile.getInputStream(entry)) {
-                            in.transferTo(output);
-                        }
-                    });
-        } catch (RuntimeException e) {
-            zipFile.close();
-            throw e;
+                    .contentLength(bytes.length)
+                    .body(output -> output.write(bytes));
         }
     }
 
