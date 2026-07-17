@@ -1,5 +1,32 @@
 # Changelog
 
+## server v2.1.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.1.0` |
+| `ghcr.io/ister-app/migrations` | `2.1.0` |
+
+### Features
+
+- feat(worker): fill a book's series position and original year from Wikidata ([`561f83f`](https://github.com/ister-app/server/commit/561f83f))
+
+### Fixes
+
+- fix(disk): stop nfo re-scans from duplicating metadata rows ([`8fee996`](https://github.com/ister-app/server/commit/8fee996))
+
+### Other
+
+- docs: add bilingual admin and architecture documentation under doc/ ([`679bafb`](https://github.com/ister-app/server/commit/679bafb))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.1.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.0.1...v2.1.0
+
 ## server v2.0.1
 
 | Image | Tag |
