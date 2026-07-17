@@ -53,10 +53,16 @@ public class HandlePodcastEpisodeDownloadRequested implements Handle<PodcastEpis
     private final NodeService nodeService;
     private final MessageSender messageSender;
 
-    /** Follows redirects (podcast hosts wrap enclosures in tracking redirects), also http→https. */
+    /**
+     * Redirects are followed manually in {@link #download}: podcast enclosures sit behind chains of
+     * tracking redirects that regularly exceed the JDK client's 5-hop limit (after which it just
+     * returns the last 302), and may hop from https to http, which {@code Redirect.NORMAL} refuses.
+     */
     private final HttpClient httpClient = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NORMAL)
+            .followRedirects(HttpClient.Redirect.NEVER)
             .build();
+
+    private static final int MAX_REDIRECTS = 10;
 
     @Override
     public EventType handles() {
@@ -114,12 +120,21 @@ public class HandlePodcastEpisodeDownloadRequested implements Handle<PodcastEpis
     private void download(PodcastEpisodeEntity episode, Path target) {
         try {
             Files.createDirectories(target.getParent());
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(episode.getEnclosureUrl()))
-                    .header("User-Agent", "IsterServer/1.0 (info@ister.app)")
-                    .GET()
-                    .build();
-            HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            URI uri = URI.create(episode.getEnclosureUrl());
+            HttpResponse<InputStream> response = get(uri);
+            int hops = 0;
+            while (isRedirect(response.statusCode()) && hops < MAX_REDIRECTS) {
+                Optional<String> location = response.headers().firstValue("Location");
+                try (InputStream body = response.body()) {
+                    body.transferTo(OutputStreamDiscard.INSTANCE);
+                }
+                if (location.isEmpty()) {
+                    break; // a redirect without Location falls through to the status check below
+                }
+                uri = uri.resolve(location.get());
+                response = get(uri);
+                hops++;
+            }
             String contentType = response.headers().firstValue("Content-Type").orElse("");
             if (response.statusCode() != 200 || contentType.toLowerCase(Locale.ROOT).startsWith("text/html")) {
                 try (InputStream body = response.body()) {
@@ -138,6 +153,19 @@ public class HandlePodcastEpisodeDownloadRequested implements Handle<PodcastEpis
             Thread.currentThread().interrupt();
             throw new EventHandlingException("Download interrupted for " + episode.getEnclosureUrl(), e);
         }
+    }
+
+    private HttpResponse<InputStream> get(URI uri) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(uri)
+                .header("User-Agent", "IsterServer/1.0 (info@ister.app)")
+                .GET()
+                .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+    }
+
+    private static boolean isRedirect(int status) {
+        return status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
     }
 
     /** File extension from the enclosure URL path, falling back to the MIME type, then mp3. */

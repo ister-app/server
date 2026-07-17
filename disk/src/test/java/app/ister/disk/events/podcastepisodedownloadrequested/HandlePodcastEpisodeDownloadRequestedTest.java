@@ -88,6 +88,19 @@ class HandlePodcastEpisodeDownloadRequestedTest {
         });
         httpServer.createContext("/error.mp3", exchange ->
                 respond(exchange, 200, "text/html", "<html>blocked</html>".getBytes(StandardCharsets.UTF_8)));
+        // A 7-hop tracking chain: longer than the JDK HttpClient's own 5-redirect limit.
+        httpServer.createContext("/chain/", exchange -> {
+            int hop = Integer.parseInt(exchange.getRequestURI().getPath().substring("/chain/".length()));
+            exchange.getResponseHeaders().set("Location",
+                    hop >= 7 ? baseUrl + "/episode.mp3" : baseUrl + "/chain/" + (hop + 1));
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+        });
+        httpServer.createContext("/loop", exchange -> {
+            exchange.getResponseHeaders().set("Location", baseUrl + "/loop");
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+        });
         httpServer.start();
         baseUrl = "http://127.0.0.1:" + httpServer.getAddress().getPort();
     }
@@ -177,6 +190,27 @@ class HandlePodcastEpisodeDownloadRequestedTest {
         subject.handle(event());
 
         assertTrue(Files.exists(cachePath.resolve("podcasts").resolve(episode.getId() + ".mp3")));
+    }
+
+    @Test
+    void followsRedirectChainsLongerThanTheJdkLimit() throws IOException {
+        episode.setEnclosureUrl(baseUrl + "/chain/1");
+
+        subject.handle(event());
+
+        Path expected = cachePath.resolve("podcasts").resolve(episode.getId() + ".mp3");
+        assertTrue(Files.exists(expected));
+        assertArrayEquals(AUDIO, Files.readAllBytes(expected));
+    }
+
+    @Test
+    void endlessRedirectLoopIsRejected() {
+        episode.setEnclosureUrl(baseUrl + "/loop");
+        var event = event();
+
+        EventHandlingException e = assertThrows(EventHandlingException.class, () -> subject.handle(event));
+        assertTrue(e.getMessage().contains("status=302"));
+        verify(mediaFileRepository, never()).save(any());
     }
 
     @Test
