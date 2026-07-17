@@ -4,7 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Ister Server** is a media server application (similar to Plex/Jellyfin) built with Spring Boot 4.0.6 and Java 25. It scans media libraries (movies, TV shows, music, books, **and podcasts**), fetches metadata from TMDB, and streams HLS-transcoded media to clients via REST and GraphQL APIs. It supports a **multi-node** deployment where one node transcodes media owned by another.
+**Ister Server** is a media server application (similar to Plex/Jellyfin) built with Spring Boot 4.0.6 and Java 25. It scans media libraries (movies, TV shows, music, books, comics, **and podcasts**), fetches metadata from TMDB, and streams HLS-transcoded media to clients via REST and GraphQL APIs. It supports a **multi-node** deployment where one node transcodes media owned by another.
+
+## Documentation (`doc/`)
+
+Structured documentation lives under `doc/`, mirroring the player repo's setup: `doc/admin/{en,nl}/`
+(operator guide, 7 numbered chapters) and `doc/architecture/{en,nl}/` (developer docs, 9 numbered
+chapters), plus `doc/architecture/diagrams/` (hand-authored mermaid, English only, shared by both
+locales). Root `EVENT_FLOWS.md` is only a pointer stub to it now.
+
+Rules when touching `doc/`:
+- **EN/NL parity is CI-enforced**: `en/` and `nl/` must carry the same filenames, and any content
+  change must be applied to both languages (the NL chapters are adaptations, not machine output).
+- `ci/build-docs.sh --check` validates parity, relative links and mermaid fences (the `docs` job in
+  `build.yml` runs it on every PR); without `--check` it packages `server-docs-<version>.zip`, which
+  `release.yml` attaches to each GitHub release. The zip is gitignored.
+- Plain markdown, no front-matter, relative links only; chapters are `NN-name.md`.
+- A behavior change in the server that is described in `doc/` should update the affected chapters
+  in the same PR.
 
 ## Commits & Releases
 
@@ -49,7 +66,7 @@ There is no separate formatter/linter: quality gating is SonarCloud (`org.sonarq
 as part of `check`. Integration tests are not a separate source set or task — they run under `test`
 and pull PostgreSQL via Testcontainers.
 
-Schema is Flyway, `database/src/main/resources/db/migration/V<n>__<name>.sql` (latest: `V20`).
+Schema is Flyway, `database/src/main/resources/db/migration/V<n>__<name>.sql` (latest: `V23`).
 Migrations are forward-only and also shipped as `Dockerfile.migrations`; never edit an applied one.
 
 ## Module Structure
@@ -59,8 +76,8 @@ server/       - Spring Boot entry point (@SpringBootApplication, scanBasePackage
 core/         - Shared infra: Handle<T> interface, MessageQueue base names, MessageSender, eventdata DTOs, Jaffree utils
 database/     - JPA entities, repositories, and the EventType enum (NB: same package "app.ister.core.*" as core — split package)
 api/          - REST controllers + GraphQL schema/resolvers
-disk/         - File system scanning, startup tasks, media-file/image/subtitle/nfo/audio event handlers
-worker/       - Async job handlers: metadata fetch (TMDB) for movie/show/episode, (MusicBrainz) for person/album
+disk/         - File system scanning, startup tasks, media-file/image/subtitle/nfo/audio/epub/comic event handlers
+worker/       - Async job handlers: metadata fetch — TMDB (movie/show/episode), MusicBrainz (person/album), Open Library (book), Wikipedia/Wikidata (bios, comic series), podcast feeds
 search/       - Optional Typesense full-text search: index event handlers + query service (package app.ister.search)
 transcoder/   - FFmpeg-based HLS transcoding via Jaffree library
 ```
@@ -82,10 +99,10 @@ All significant work is done asynchronously through RabbitMQ message queues. The
 2. `Handle<T>` implementation in `disk/`, `worker/`, or `transcoder/` receives message → processes → may send further events
 
 **Two enums, do not confuse them:**
-- `EventType` (in `database/.../enums/EventType.java`) is the logical message type. `Handle.handles()` returns an `EventType`, and `listener()` rejects a message whose `eventType` doesn't match. This is the source of truth for "what kinds of events exist" (29 values).
+- `EventType` (in `database/.../enums/EventType.java`) is the logical message type. `Handle.handles()` returns an `EventType`, and `listener()` rejects a message whose `eventType` doesn't match. This is the source of truth for "what kinds of events exist" (31 values).
 - `MessageQueue` (in `core/.../MessageQueue.java`) holds the queue **base names** (`app.ister.server.<event>`). `MessageSender` maps an event to its queue.
 
-**Event categories** (see `EVENT_FLOWS.md` for full per-flow mermaid diagrams — keep it as the canonical reference):
+**Event categories** (see `doc/architecture/diagrams/` and `doc/architecture/en/01-event-system.md` for the per-flow mermaid diagrams and the full handler reference — keep those as the canonical reference; any change to `doc/` must be applied to both the `en/` and `nl/` chapters, CI checks the parity):
 - `FILE_SCAN_REQUESTED`, `NEW_DIRECTORIES_SCAN_REQUEST` — disk scanning
 - `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `IMAGE_FOUND`, `SUBTITLE_FILE_FOUND`, `NFO_FILE_FOUND` — file-type-specific processing
 - `MOVIE_FOUND`, `SHOW_FOUND`, `EPISODE_FOUND`, `PERSON_FOUND`, `ALBUM_FOUND`, `TRACK_FOUND`, `BOOK_FOUND`, `CHAPTER_FOUND`, `EPUB_FILE_FOUND`, `PODCAST_FOUND`, `PODCAST_EPISODE_FOUND` — metadata fetching from TMDB (incl. cast credits) / MusicBrainz / Open Library (books) / tag or OPF parsing. TMDB details are fetched **once per configured language** (movie/show/episode handlers loop over `LanguageProperties.tags()`), producing one `MetadataEntity` row per language (`MetadataEntity.language` stored as ISO-639-3). A `PersonEntity` is both a music artist and an actor; TMDB cast members are deduplicated on exact name + birth year. A `CreditEntity` links a person to exactly one of movie/show/episode; the GraphQL `Credit` type exposes those back-references (`movie`/`show`/`episode`, batch-resolved in `CreditController`) so a person's filmography is queryable via `personById { credits { movie/show/episode } }`. **Books** (`LibraryType.BOOK`, structure `Author/Book.epub` + `Author/Book/NNN_Chapter.mp3`): one `BookEntity` per logical book (author = `PersonEntity`), formats are attachments — epubs link via `MediaFileEntity.bookEntity`, audiobook mp3s via `ChapterEntity` (streams over the same audio-only HLS path as tracks). `MediaFileEntity.mediaOverlays` marks EPUB 3 read-aloud epubs, detected from the epub CONTENTS (SMIL in the OPF manifest, parsed by `disk/.../epub/EpubParser`), never from the filename. Epubs are read lazily by the client's epub reader through `GET /epub/{mediaFileId}/resource/{entry}` (Range/ETag support, stream-token or cookie auth); reading position is a `WatchStatusEntity` with `readingLocation` (epubcfi) + `readingProgress`, synced via the `updateReadingProgress` mutation or `POST /reading-progress`. **Podcasts** (`LibraryType.PODCAST`) are the first FEED-based library type: no library directory; `subscribePodcast(feedUrl)` + an hourly `PodcastRefreshScheduler` drive `PODCAST_REFRESH_REQUESTED` → worker `RssFeedParser` (conditional GET, guid dedup, max 500 items) → episode rows; the newest N (`app.ister.worker.podcast.auto-download-count`, default 3) are downloaded to `{cache}/podcasts/` via `PODCAST_EPISODE_DOWNLOAD_REQUESTED` (cache-directory-scoped queue) and then flow through the normal `AUDIO_FILE_FOUND` → HLS pipeline; older episodes download on demand (`downloadPodcastEpisode` mutation). The daily cache cleanup also expires podcast downloads (`podcast-retention-days`, default 30) unless someone is mid-episode. Directory search uses the free iTunes Search API (`ItunesSearchService`, api module).

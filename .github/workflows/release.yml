@@ -244,6 +244,9 @@ jobs:
       - name: Generate the release notes
         run: ./ci/release-notes.sh "${{ steps.version.outputs.version }}" "${{ needs.gate.outputs.prev }}"
 
+      - name: Build the documentation zip
+        run: ./ci/build-docs.sh "${{ steps.version.outputs.version }}"
+
       - name: Commit, tag, and open the next development iteration
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -279,4 +282,5 @@ jobs:
         run: |
           gh release create "v${VERSION}" \
             --title "v${VERSION}" \
-            --notes-file RELEASE_NOTES.md
+            --notes-file RELEASE_NOTES.md \
+            "server-docs-${VERSION}.zip"

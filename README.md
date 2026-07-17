@@ -8,8 +8,9 @@ cluster: one node can transcode media that lives on another node's disks.
 ## Architecture at a glance
 
 Gradle multi-module project; all significant work flows through RabbitMQ events
-(see [EVENT_FLOWS.md](EVENT_FLOWS.md) for per-flow diagrams and [CLAUDE.md](CLAUDE.md) for a
-deeper tour):
+(see the [documentation](doc/README.md) — per-flow diagrams and developer chapters under
+[doc/architecture/](doc/architecture/en/00-overview.md), an operator guide under
+[doc/admin/](doc/admin/en/00-introduction.md)):
 
 | Module | Responsibility |
 | --- | --- |

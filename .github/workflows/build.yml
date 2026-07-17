@@ -30,6 +30,17 @@ jobs:
           fi
           echo "all commit subjects follow the convention"
 
+  # Keeps doc/ shippable: EN/NL chapter parity, working relative links, balanced mermaid
+  # fences. release.yml packages the same directory into the release zip, so a breakage
+  # caught here is one that would otherwise surface during a release.
+  docs:
+    name: Docs validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Validate the documentation
+        run: ci/build-docs.sh --check
+
   build:
     name: Build and analyze
     # The two commits release.yml pushes are version bookkeeping; they were already built green

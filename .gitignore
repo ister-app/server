@@ -51,3 +51,6 @@ gradle.properties
 
 # Written by ci/release-notes.sh; only CHANGELOG.md is committed.
 RELEASE_NOTES.md
+
+# Written by ci/build-docs.sh; the release workflow attaches it to the GitHub release.
+server-docs-*.zip
