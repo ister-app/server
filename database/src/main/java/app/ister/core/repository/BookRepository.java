@@ -71,4 +71,19 @@ public interface BookRepository extends JpaRepository<BookEntity, UUID> {
               and not exists (select m from MetadataEntity m
                               where m.bookEntity = b and m.sourceUri like 'openlibrary://%')""")
     List<BookEntity> findBooksWithoutOpenLibraryMetadata(LibraryType libraryType);
+
+    /**
+     * Series books the Wikidata enrichment could still improve: the series position is unknown, or
+     * the original publication year has not been resolved yet. The analyze backfill re-dispatches
+     * these; a book Wikidata simply does not know stays in this set and is retried per analyze,
+     * mirroring the Open Library behaviour above.
+     */
+    @Query("""
+            select b from BookEntity b
+            where b.libraryEntity.libraryType = :libraryType
+              and b.seriesEntity is not null
+              and (b.seriesIndex is null
+                   or not exists (select m from MetadataEntity m
+                                  where m.bookEntity = b and m.sourceUri like 'wikidata://%'))""")
+    List<BookEntity> findSeriesBooksMissingWikidataInfo(LibraryType libraryType);
 }

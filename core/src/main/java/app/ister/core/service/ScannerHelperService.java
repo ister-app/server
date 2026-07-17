@@ -8,7 +8,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 
 @Service
 @Slf4j
@@ -222,8 +224,9 @@ public class ScannerHelperService {
 
     /**
      * Recompute the display/sort {@code releaseYear} column. Precedence: a "(YYYY)" path year is
-     * deliberate user intent and always wins; otherwise the year of an Open Library metadata row
-     * (the original publication year); otherwise the earliest year of the local (nfo/epub)
+     * deliberate user intent and always wins; otherwise the Wikidata year (the original edition —
+     * Open Library often matches a translated work and reports the translation's year); otherwise
+     * the Open Library year; otherwise the earliest year of the local (nfo/epub)
      * metadata rows. Sorting uses this column while {@code BookController.releaseYear} falls back
      * to the earliest metadata year only when the column is 0 — keeping the column current keeps
      * the two coherent. Called whenever a metadata row is written for the book.
@@ -240,14 +243,19 @@ public class ScannerHelperService {
         var metadata = metadataRepository.findByBookEntityId(bookEntity.getId()).stream()
                 .filter(m -> m.getReleased() != null && m.getReleased().getYear() > 0)
                 .toList();
+        return yearFromSource(metadata, "wikidata://")
+                .orElseGet(() -> yearFromSource(metadata, "openlibrary://")
+                        .orElseGet(() -> metadata.stream()
+                                .mapToInt(m -> m.getReleased().getYear())
+                                .min()
+                                .orElse(0)));
+    }
+
+    private OptionalInt yearFromSource(List<MetadataEntity> metadata, String sourceUriPrefix) {
         return metadata.stream()
-                .filter(m -> m.getSourceUri() != null && m.getSourceUri().startsWith("openlibrary://"))
+                .filter(m -> m.getSourceUri() != null && m.getSourceUri().startsWith(sourceUriPrefix))
                 .mapToInt(m -> m.getReleased().getYear())
-                .min()
-                .orElseGet(() -> metadata.stream()
-                        .mapToInt(m -> m.getReleased().getYear())
-                        .min()
-                        .orElse(0));
+                .min();
     }
 
     /**

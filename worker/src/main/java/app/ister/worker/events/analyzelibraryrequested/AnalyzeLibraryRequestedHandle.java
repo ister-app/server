@@ -180,6 +180,13 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
                 .filter(dispatched::add)
                 .forEach(this::sendBookFound);
 
+        // Series books with an unknown position or unresolved original year retry the Wikidata
+        // lookup (the BOOK_FOUND handler runs it after the Open Library part).
+        bookRepository.findSeriesBooksMissingWikidataInfo(LibraryType.BOOK).stream()
+                .map(BookEntity::getId)
+                .filter(dispatched::add)
+                .forEach(this::sendBookFound);
+
         bookRepository.findByLibraryEntity_LibraryType(LibraryType.BOOK).stream()
                 .map(BookEntity::getPersonEntity)
                 .collect(Collectors.toMap(PersonEntity::getId, p -> p, (a, b) -> a))

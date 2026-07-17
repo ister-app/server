@@ -14,9 +14,11 @@ import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
+import app.ister.core.config.LanguageProperties;
 import app.ister.worker.events.openlibrary.OpenLibraryService;
 import app.ister.worker.events.tmdbmetadata.ImageDownloadService;
 import app.ister.worker.events.tmdbmetadata.ImageSave;
+import app.ister.worker.events.wikipedia.WikidataBookSeriesService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -43,6 +45,7 @@ import static app.ister.core.MessageQueue.APP_ISTER_SERVER_BOOK_FOUND;
 public class HandleBookFound implements Handle<BookFoundData> {
 
     private static final String OPEN_LIBRARY_URI_PREFIX = "openlibrary://";
+    private static final String WIKIDATA_URI_PREFIX = "wikidata://";
 
     private final BookRepository bookRepository;
     private final ImageRepository imageRepository;
@@ -52,6 +55,8 @@ public class HandleBookFound implements Handle<BookFoundData> {
     private final ImageDownloadService imageDownloadService;
     private final ServerEventService serverEventService;
     private final ScannerHelperService scannerHelperService;
+    private final WikidataBookSeriesService wikidataBookSeriesService;
+    private final LanguageProperties languageProperties;
 
     @Override
     public EventType handles() {
@@ -81,23 +86,71 @@ public class HandleBookFound implements Handle<BookFoundData> {
             boolean hasCover = !imageRepository.findByBookEntityId(book.getId()).isEmpty();
             boolean hasOpenLibraryYear = existingMetadata.stream()
                     .anyMatch(m -> isOpenLibraryRow(m) && m.getReleased() != null);
-            if (hasDescription && hasCover && hasOpenLibraryYear) {
+            boolean hasWikidataYear = existingMetadata.stream()
+                    .anyMatch(m -> isWikidataRow(m) && m.getReleased() != null);
+            // Wikidata is only consulted for series books: it fills a missing series position and
+            // the original (untranslated) publication year, which the Open Library match — often a
+            // translated edition's work — gets wrong.
+            boolean wantsWikidata = book.getSeriesEntity() != null
+                    && (book.getSeriesIndex() == null || !hasWikidataYear);
+            if (hasDescription && hasCover && hasOpenLibraryYear && !wantsWikidata) {
                 return;
             }
 
-            List<String> isbns = mediaFileRepository.findByBookEntityId(book.getId()).stream()
-                    .map(MediaFileEntity::getIsbn)
-                    .filter(Objects::nonNull)
-                    .distinct()
-                    .toList();
+            if (!hasDescription || !hasCover || !hasOpenLibraryYear) {
+                List<String> isbns = mediaFileRepository.findByBookEntityId(book.getId()).stream()
+                        .map(MediaFileEntity::getIsbn)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .toList();
 
-            openLibraryService.getBookInfo(bookName, authorName, isbns).ifPresentOrElse(info -> {
-                if (!hasCover && info.coverUrl() != null) {
-                    downloadCover(book, info.coverUrl());
-                }
-                saveOpenLibraryMetadata(book, existingMetadata, info);
-            }, () -> log.debug("No Open Library match for author={} book={}", authorName, bookName));
+                openLibraryService.getBookInfo(bookName, authorName, isbns).ifPresentOrElse(info -> {
+                    if (!hasCover && info.coverUrl() != null) {
+                        downloadCover(book, info.coverUrl());
+                    }
+                    saveOpenLibraryMetadata(book, existingMetadata, info);
+                }, () -> log.debug("No Open Library match for author={} book={}", authorName, bookName));
+            }
+
+            if (wantsWikidata) {
+                enrichFromWikidata(book, existingMetadata);
+            }
         });
+    }
+
+    /**
+     * Series position and original publication year from Wikidata. The index is only adopted when
+     * the book has none — epub series metadata stays authoritative. The year is written as the
+     * book's single wikidata:// metadata row, which
+     * {@link ScannerHelperService#refreshBookReleaseYear} prefers over the Open Library year.
+     */
+    private void enrichFromWikidata(BookEntity book, List<MetadataEntity> existingMetadata) {
+        String title = book.getTitle() != null ? book.getTitle() : book.getName();
+        wikidataBookSeriesService
+                .findBookInSeries(title, book.getSeriesEntity().getName(), languageProperties.tags())
+                .ifPresent(info -> {
+                    if (book.getSeriesIndex() == null && info.seriesIndex() != null) {
+                        book.setSeriesIndex(info.seriesIndex());
+                        bookRepository.save(book);
+                    }
+                    if (info.firstPublicationYear() != null) {
+                        MetadataEntity metadata = existingMetadata.stream()
+                                .filter(this::isWikidataRow)
+                                .findFirst()
+                                .orElseGet(() -> MetadataEntity.builder()
+                                        .bookEntity(book)
+                                        .build());
+                        metadata.setSourceUri(WIKIDATA_URI_PREFIX + info.wikidataId());
+                        metadata.setReleased(LocalDate.of(info.firstPublicationYear(), 1, 1));
+                        metadataRepository.save(metadata);
+                        scannerHelperService.refreshBookReleaseYear(book);
+                    }
+                    serverEventService.createSearchIndexEvent(SearchEntityType.BOOK, book.getId());
+                });
+    }
+
+    private boolean isWikidataRow(MetadataEntity metadata) {
+        return metadata.getSourceUri() != null && metadata.getSourceUri().startsWith(WIKIDATA_URI_PREFIX);
     }
 
     private boolean isOpenLibraryRow(MetadataEntity metadata) {

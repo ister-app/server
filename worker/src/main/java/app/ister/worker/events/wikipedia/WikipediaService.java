@@ -136,7 +136,7 @@ public class WikipediaService {
     }
 
     /** Ids of the top Wikidata items for a name, best match first. */
-    private List<String> searchEntityIds(String name, String languageTag) {
+    List<String> searchEntityIds(String name, String languageTag) {
         try {
             Thread.sleep(500);
             @SuppressWarnings("unchecked")
@@ -194,8 +194,8 @@ public class WikipediaService {
 
     /** Guards against a same-named different person: the entity's label in one of our languages must
      * equal the name we searched for. */
-    private boolean labelMatches(Map<String, Object> wikidata, String wikidataId, String wantedName,
-                                 List<String> languageTags) {
+    boolean labelMatches(Map<String, Object> wikidata, String wikidataId, String wantedName,
+                         List<String> languageTags) {
         if (!(entityField(wikidata, wikidataId, "labels") instanceof Map<?, ?> labels)) {
             return false;
         }
@@ -209,7 +209,7 @@ public class WikipediaService {
      * merged id answers with the document keyed by the <em>target</em> id, so looking only under the
      * id we asked for would silently return nothing for every person whose item has been merged.
      */
-    private Object entityField(Map<String, Object> wikidata, String wikidataId, String field) {
+    Object entityField(Map<String, Object> wikidata, String wikidataId, String field) {
         if (!(wikidata.get("entities") instanceof Map<?, ?> entities) || entities.isEmpty()) {
             return null;
         }
@@ -221,7 +221,7 @@ public class WikipediaService {
     }
 
     /** Wikidata entity document, or an empty map when the fetch failed or the body was null. */
-    private Map<String, Object> fetchWikidataEntity(String wikidataId) {
+    Map<String, Object> fetchWikidataEntity(String wikidataId) {
         try {
             Thread.sleep(500);
             @SuppressWarnings("unchecked")

@@ -13,16 +13,20 @@ import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MetadataRepository;
+import app.ister.core.config.LanguageProperties;
+import app.ister.core.entity.SeriesEntity;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
 import app.ister.worker.events.openlibrary.OpenLibraryService;
 import app.ister.worker.events.tmdbmetadata.ImageDownloadService;
 import app.ister.worker.events.tmdbmetadata.ImageSave;
+import app.ister.worker.events.wikipedia.WikidataBookSeriesService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
@@ -74,6 +78,12 @@ class HandleBookFoundTest {
 
     @Mock
     private ScannerHelperService scannerHelperService;
+
+    @Mock
+    private WikidataBookSeriesService wikidataBookSeriesService;
+
+    @Spy
+    private LanguageProperties languageProperties = new LanguageProperties();
 
     private final UUID bookId = UUID.randomUUID();
     private final BookEntity book = BookEntity.builder()
@@ -285,6 +295,102 @@ class HandleBookFoundTest {
 
         verify(imageDownloadService, never()).downloadAndSave(anyString(), any(), anyString(), anyString(), any());
         verify(metadataRepository).save(any(MetadataEntity.class));
+    }
+
+    private BookEntity seriesBook(Double seriesIndex) {
+        return BookEntity.builder()
+                .id(bookId)
+                .name("De Grijze Jager - Losgeld voor Erak")
+                .title("Losgeld voor Erak")
+                .seriesIndex(seriesIndex)
+                .seriesEntity(SeriesEntity.builder().name("De Grijze Jager").build())
+                .personEntity(PersonEntity.builder().name("John Flanagan").build())
+                .build();
+    }
+
+    private List<MetadataEntity> completeMetadata() {
+        return List.of(
+                MetadataEntity.builder().description("Already there").sourceUri("file:///b.epub").build(),
+                MetadataEntity.builder().sourceUri("openlibrary://works/OL1W")
+                        .released(LocalDate.of(2009, 1, 1)).build());
+    }
+
+    /** A series book with an unknown position still consults Wikidata when Open Library is done. */
+    @Test
+    void handleFillsSeriesIndexAndOriginalYearFromWikidata() {
+        BookEntity bookInSeries = seriesBook(null);
+        when(bookRepository.findById(bookId)).thenReturn(Optional.of(bookInSeries));
+        when(metadataRepository.findByBookEntityId(bookId)).thenReturn(completeMetadata());
+        when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
+        when(wikidataBookSeriesService.findBookInSeries("Losgeld voor Erak", "De Grijze Jager", List.of("en", "nl")))
+                .thenReturn(Optional.of(new WikidataBookSeriesService.BookSeriesInfo("Q3497559", 7.0, 2007)));
+
+        subject.handle(data);
+
+        assertEquals(7.0, bookInSeries.getSeriesIndex());
+        verify(bookRepository).save(bookInSeries);
+        ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
+        verify(metadataRepository).save(captor.capture());
+        assertEquals("wikidata://Q3497559", captor.getValue().getSourceUri());
+        assertEquals(LocalDate.of(2007, 1, 1), captor.getValue().getReleased());
+        verify(scannerHelperService).refreshBookReleaseYear(bookInSeries);
+        verify(serverEventService).createSearchIndexEvent(SearchEntityType.BOOK, bookId);
+        verifyNoInteractions(openLibraryService);
+    }
+
+    /** The epub-provided index is authoritative: Wikidata only contributes the original year. */
+    @Test
+    void handleNeverOverwritesAnExistingSeriesIndex() {
+        BookEntity bookInSeries = seriesBook(7.0);
+        when(bookRepository.findById(bookId)).thenReturn(Optional.of(bookInSeries));
+        when(metadataRepository.findByBookEntityId(bookId)).thenReturn(completeMetadata());
+        when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
+        when(wikidataBookSeriesService.findBookInSeries("Losgeld voor Erak", "De Grijze Jager", List.of("en", "nl")))
+                .thenReturn(Optional.of(new WikidataBookSeriesService.BookSeriesInfo("Q3497559", 8.0, 2007)));
+
+        subject.handle(data);
+
+        assertEquals(7.0, bookInSeries.getSeriesIndex());
+        verify(bookRepository, never()).save(any());
+        ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
+        verify(metadataRepository).save(captor.capture());
+        assertEquals("wikidata://Q3497559", captor.getValue().getSourceUri());
+    }
+
+    /** A resolved wikidata:// year row makes the whole handler a no-op for a complete series book. */
+    @Test
+    void handleDoesNothingWhenWikidataYearAndIndexArePresent() {
+        BookEntity bookInSeries = seriesBook(7.0);
+        when(bookRepository.findById(bookId)).thenReturn(Optional.of(bookInSeries));
+        when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of(
+                MetadataEntity.builder().description("Already there").sourceUri("file:///b.epub").build(),
+                MetadataEntity.builder().sourceUri("openlibrary://works/OL1W")
+                        .released(LocalDate.of(2009, 1, 1)).build(),
+                MetadataEntity.builder().sourceUri("wikidata://Q3497559")
+                        .released(LocalDate.of(2007, 1, 1)).build()));
+        when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
+
+        subject.handle(data);
+
+        verifyNoInteractions(openLibraryService, wikidataBookSeriesService, serverEventService);
+        verify(metadataRepository, never()).save(any());
+    }
+
+    /** No Wikidata match: nothing is written, and the next analyze retries. */
+    @Test
+    void handleLeavesTheBookAloneOnAWikidataMiss() {
+        BookEntity bookInSeries = seriesBook(null);
+        when(bookRepository.findById(bookId)).thenReturn(Optional.of(bookInSeries));
+        when(metadataRepository.findByBookEntityId(bookId)).thenReturn(completeMetadata());
+        when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
+        when(wikidataBookSeriesService.findBookInSeries("Losgeld voor Erak", "De Grijze Jager", List.of("en", "nl")))
+                .thenReturn(Optional.empty());
+
+        subject.handle(data);
+
+        assertEquals(null, bookInSeries.getSeriesIndex());
+        verify(metadataRepository, never()).save(any());
+        verifyNoInteractions(serverEventService);
     }
 
     /** An unknown first-publish year leaves released null, so a later analyze retries it. */
