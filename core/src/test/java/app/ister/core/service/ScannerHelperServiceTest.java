@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -447,15 +448,34 @@ class ScannerHelperServiceTest {
 
     @Test
     void getOrCreateComicSeriesCreatesAndFiresTheWorkerEvent() {
+        SeriesEntity created = SeriesEntity.builder()
+                .libraryEntity(library).name("Attack on Titan").startYear(2009).build();
+        created.setId(UUID.randomUUID());
+        // Not there before the insert-ignore, there after it.
         when(seriesRepository.findByLibraryEntityAndNameAndStartYear(library, "Attack on Titan", 2009))
-                .thenReturn(Optional.empty());
+                .thenReturn(Optional.empty(), Optional.of(created));
+        when(seriesRepository.insertComicSeriesIfAbsent(any(), any(), eq("Attack on Titan"), eq(2009)))
+                .thenReturn(1);
 
         SeriesEntity result = subject.getOrCreateComicSeries(library, "Attack on Titan", 2009);
 
-        assertEquals("Attack on Titan", result.getName());
-        assertEquals(2009, result.getStartYear());
-        verify(seriesRepository).save(result);
-        verify(serverEventService).createComicSeriesFoundEvent(result.getId());
+        assertEquals(created, result);
+        verify(serverEventService).createComicSeriesFoundEvent(created.getId());
+    }
+
+    /** The consumer that loses the insert race re-reads the winner's row and fires no event. */
+    @Test
+    void getOrCreateComicSeriesLostRaceReturnsTheWinnersRowWithoutEvent() {
+        SeriesEntity winner = SeriesEntity.builder()
+                .libraryEntity(library).name("Attack on Titan").startYear(2009).build();
+        winner.setId(UUID.randomUUID());
+        when(seriesRepository.findByLibraryEntityAndNameAndStartYear(library, "Attack on Titan", 2009))
+                .thenReturn(Optional.empty(), Optional.of(winner));
+        when(seriesRepository.insertComicSeriesIfAbsent(any(), any(), eq("Attack on Titan"), eq(2009)))
+                .thenReturn(0);
+
+        assertEquals(winner, subject.getOrCreateComicSeries(library, "Attack on Titan", 2009));
+        verify(serverEventService, never()).createComicSeriesFoundEvent(any());
     }
 
     @Test
@@ -465,7 +485,7 @@ class ScannerHelperServiceTest {
                 .thenReturn(Optional.of(existing));
 
         assertEquals(existing, subject.getOrCreateComicSeries(library, "Attack on Titan", 2009));
-        verify(seriesRepository, never()).save(any());
+        verify(seriesRepository, never()).insertComicSeriesIfAbsent(any(), any(), any(), anyInt());
         verify(serverEventService, never()).createComicSeriesFoundEvent(any());
     }
 
@@ -473,19 +493,42 @@ class ScannerHelperServiceTest {
     @Test
     void getOrCreateComicVolumeCreatesAnAuthorlessVolume() {
         SeriesEntity series = SeriesEntity.builder().name("Attack on Titan").build();
+        series.setId(UUID.randomUUID());
+        BookEntity created = BookEntity.builder()
+                .seriesEntity(series).name("attackontitan_vol27").title("Volume 27").seriesIndex(27.0).build();
+        created.setId(UUID.randomUUID());
+        // Not there before the insert-ignore, there after it.
         when(bookRepository.findBySeriesEntityAndNameAndPathYear(series, "attackontitan_vol27", 0))
-                .thenReturn(Optional.empty());
+                .thenReturn(Optional.empty(), Optional.of(created));
+        when(bookRepository.insertComicVolumeIfAbsent(any(), any(), eq(series.getId()),
+                eq("attackontitan_vol27"), eq("Volume 27"), eq(27.0), eq(0), eq(0)))
+                .thenReturn(1);
 
         BookEntity result = subject.getOrCreateComicVolume(library, series, "attackontitan_vol27", 0, 27.0, "Volume 27");
 
-        assertEquals("attackontitan_vol27", result.getName());
-        assertEquals("Volume 27", result.getTitle());
-        assertEquals(27.0, result.getSeriesIndex());
+        assertEquals(created, result);
         org.junit.jupiter.api.Assertions.assertNull(result.getPersonEntity());
-        verify(bookRepository).save(result);
         verify(serverEventService, never()).createBookFoundEvent(any());
         verify(continueWatchingService).recomputeForComicSeries(series.getId());
         verify(bookSeriesService, never()).applyPrefixHeuristic(any());
+    }
+
+    /** The consumer that loses the volume insert race re-reads the winner's row, no side effects. */
+    @Test
+    void getOrCreateComicVolumeLostRaceReturnsTheWinnersRowWithoutSideEffects() {
+        SeriesEntity series = SeriesEntity.builder().name("Attack on Titan").build();
+        series.setId(UUID.randomUUID());
+        BookEntity winner = BookEntity.builder().seriesEntity(series).name("attackontitan_vol27").build();
+        winner.setId(UUID.randomUUID());
+        when(bookRepository.findBySeriesEntityAndNameAndPathYear(series, "attackontitan_vol27", 0))
+                .thenReturn(Optional.empty(), Optional.of(winner));
+        when(bookRepository.insertComicVolumeIfAbsent(any(), any(), eq(series.getId()),
+                eq("attackontitan_vol27"), eq("Volume 27"), eq(27.0), eq(0), eq(0)))
+                .thenReturn(0);
+
+        assertEquals(winner, subject.getOrCreateComicVolume(library, series, "attackontitan_vol27", 0, 27.0, "Volume 27"));
+        verify(serverEventService, never()).createSearchIndexEvent(any(), any());
+        verify(continueWatchingService, never()).recomputeForComicSeries(any());
     }
 
     /** pdf, cbz and epub of one volume share the identity name and converge on one row. */
@@ -497,7 +540,7 @@ class ScannerHelperServiceTest {
                 .thenReturn(Optional.of(existing));
 
         assertEquals(existing, subject.getOrCreateComicVolume(library, series, "attackontitan_vol27", 0, 27.0, "Volume 27"));
-        verify(bookRepository, never()).save(any());
+        verify(bookRepository, never()).insertComicVolumeIfAbsent(any(), any(), any(), any(), any(), any(), anyInt(), anyInt());
         verify(continueWatchingService, never()).recomputeForComicSeries(any());
     }
 

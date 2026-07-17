@@ -12,6 +12,7 @@ import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.NodeEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.SeasonEntity;
+import app.ister.core.entity.SeriesEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.entity.UserEntity;
@@ -97,6 +98,12 @@ class PostgresRepositoryIntegrationTest {
     @Autowired
     private RatingRepository ratingRepository;
 
+    @Autowired
+    private SeriesRepository seriesRepository;
+
+    @Autowired
+    private BookRepository bookRepository;
+
     /**
      * The blur-hash sweep walks a directory in chunks, resuming from the last id of the previous
      * chunk. Note that PostgreSQL orders {@code uuid} as unsigned bytes while
@@ -170,6 +177,36 @@ class PostgresRepositoryIntegrationTest {
         ImageEntity image = ImageEntity.builder().type(ImageType.COVER).path(path).blurHash(blurHash).build();
         image.setDirectoryEntity(directory);
         em.persist(image);
+    }
+
+    /**
+     * The comic insert-ignore upserts target the partial unique indexes of V23
+     * ({@code ... WHERE person_entity_id IS NULL}) — syntax only a real PostgreSQL can validate.
+     * First insert reports 1 (created), the racing duplicate reports 0 and leaves the row alone.
+     */
+    @Test
+    void comicInsertIgnoreUpsertsReportInsertedVersusLostRace() {
+        LibraryEntity library = em.persist(LibraryEntity.builder()
+                .name("comics").libraryType(LibraryType.COMIC).build());
+        em.flush();
+
+        UUID seriesId = UUID.randomUUID();
+        assertEquals(1, seriesRepository.insertComicSeriesIfAbsent(seriesId, library.getId(), "Attack on Titan", 2009));
+        assertEquals(0, seriesRepository.insertComicSeriesIfAbsent(
+                UUID.randomUUID(), library.getId(), "Attack on Titan", 2009), "duplicate must be a no-op");
+        assertEquals(seriesId, seriesRepository
+                .findByLibraryEntityAndNameAndStartYear(library, "Attack on Titan", 2009)
+                .orElseThrow().getId(), "the first insert's row must survive the lost race");
+
+        SeriesEntity series = seriesRepository.findById(seriesId).orElseThrow();
+        UUID volumeId = UUID.randomUUID();
+        assertEquals(1, bookRepository.insertComicVolumeIfAbsent(
+                volumeId, library.getId(), seriesId, "aot_vol27", "Volume 27", 27.0, 0, 0));
+        assertEquals(0, bookRepository.insertComicVolumeIfAbsent(
+                UUID.randomUUID(), library.getId(), seriesId, "aot_vol27", "Volume 27", 27.0, 0, 0));
+        assertEquals(volumeId, bookRepository
+                .findBySeriesEntityAndNameAndPathYear(series, "aot_vol27", 0)
+                .orElseThrow().getId());
     }
 
     @Test

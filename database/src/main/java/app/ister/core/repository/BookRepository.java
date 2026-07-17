@@ -7,6 +7,7 @@ import app.ister.core.enums.LibraryType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -19,6 +20,28 @@ public interface BookRepository extends JpaRepository<BookEntity, UUID> {
 
     /** Comic volume identity: comics have no author, so the series scopes the name. */
     Optional<BookEntity> findBySeriesEntityAndNameAndPathYear(SeriesEntity seriesEntity, String name, int pathYear);
+
+    /**
+     * Race-safe comic volume create: multiple formats of one volume (pdf/cbz/epub with the same
+     * basename) are scanned by parallel consumers, so a find-then-save loses and poisons the whole
+     * transaction on the {@code book_entity_comic_identity} unique index. Returns 1 when this call
+     * inserted the row, 0 when a concurrent transaction beat it to it.
+     */
+    @Modifying
+    @Query(value = """
+            INSERT INTO book_entity (id, date_created, date_updated, library_entity_id, series_entity_id,
+                                     name, title, series_index, path_year, release_year)
+            VALUES (:id, now(), now(), :libraryId, :seriesId, :name, :title, :seriesIndex, :pathYear, :releaseYear)
+            ON CONFLICT (series_entity_id, name, path_year) WHERE person_entity_id IS NULL DO NOTHING
+            """, nativeQuery = true)
+    int insertComicVolumeIfAbsent(@Param("id") UUID id,
+                                  @Param("libraryId") UUID libraryId,
+                                  @Param("seriesId") UUID seriesId,
+                                  @Param("name") String name,
+                                  @Param("title") String title,
+                                  @Param("seriesIndex") Double seriesIndex,
+                                  @Param("pathYear") int pathYear,
+                                  @Param("releaseYear") int releaseYear);
 
     /**
      * The comic volume to continue a series with after finishing one: the first volume in series

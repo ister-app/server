@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -264,17 +265,25 @@ public class ScannerHelperService {
      * COMIC_SERIES_FOUND (Wikipedia description + thumbnail).
      */
     public SeriesEntity getOrCreateComicSeries(LibraryEntity libraryEntity, String seriesName, int startYear) {
-        return seriesRepository.findByLibraryEntityAndNameAndStartYear(libraryEntity, seriesName, startYear)
-                .orElseGet(() -> {
-                    SeriesEntity seriesEntity = SeriesEntity.builder()
-                            .libraryEntity(libraryEntity)
-                            .name(seriesName)
-                            .startYear(startYear)
-                            .build();
-                    seriesRepository.save(seriesEntity);
-                    serverEventService.createComicSeriesFoundEvent(seriesEntity.getId());
-                    return seriesEntity;
-                });
+        Optional<SeriesEntity> existing =
+                seriesRepository.findByLibraryEntityAndNameAndStartYear(libraryEntity, seriesName, startYear);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        // A native insert-ignore rather than save(): parallel consumers scanning one series
+        // directory race on series_entity_comic_identity, and a constraint violation would poison
+        // the surrounding transaction. The loser re-reads the winner's row; only the winner emits
+        // COMIC_SERIES_FOUND.
+        boolean inserted = seriesRepository.insertComicSeriesIfAbsent(
+                UUID.randomUUID(), libraryEntity.getId(), seriesName, startYear) == 1;
+        SeriesEntity seriesEntity = seriesRepository
+                .findByLibraryEntityAndNameAndStartYear(libraryEntity, seriesName, startYear)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Comic series vanished right after upsert: " + seriesName + " (" + startYear + ")"));
+        if (inserted) {
+            serverEventService.createComicSeriesFoundEvent(seriesEntity.getId());
+        }
+        return seriesEntity;
     }
 
     /**
@@ -285,22 +294,26 @@ public class ScannerHelperService {
      */
     public BookEntity getOrCreateComicVolume(LibraryEntity libraryEntity, SeriesEntity seriesEntity,
                                              String volumeName, int pathYear, Double seriesIndex, String title) {
-        return bookRepository.findBySeriesEntityAndNameAndPathYear(seriesEntity, volumeName, pathYear)
-                .orElseGet(() -> {
-                    BookEntity bookEntity = BookEntity.builder()
-                            .libraryEntity(libraryEntity)
-                            .seriesEntity(seriesEntity)
-                            .name(volumeName)
-                            .title(title)
-                            .seriesIndex(seriesIndex)
-                            .pathYear(pathYear)
-                            .releaseYear(pathYear).build();
-                    bookRepository.save(bookEntity);
-                    serverEventService.createSearchIndexEvent(SearchEntityType.BOOK, bookEntity.getId());
-                    // A new volume puts a finished series back in continue-watching.
-                    continueWatchingService.recomputeForComicSeries(seriesEntity.getId());
-                    return bookEntity;
-                });
+        Optional<BookEntity> existing =
+                bookRepository.findBySeriesEntityAndNameAndPathYear(seriesEntity, volumeName, pathYear);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        // Insert-ignore for the same reason as getOrCreateComicSeries: the pdf/cbz/epub formats of
+        // one volume are scanned by parallel consumers racing on book_entity_comic_identity.
+        boolean inserted = bookRepository.insertComicVolumeIfAbsent(
+                UUID.randomUUID(), libraryEntity.getId(), seriesEntity.getId(),
+                volumeName, title, seriesIndex, pathYear, pathYear) == 1;
+        BookEntity bookEntity = bookRepository
+                .findBySeriesEntityAndNameAndPathYear(seriesEntity, volumeName, pathYear)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Comic volume vanished right after upsert: " + volumeName + " (" + pathYear + ")"));
+        if (inserted) {
+            serverEventService.createSearchIndexEvent(SearchEntityType.BOOK, bookEntity.getId());
+            // A new volume puts a finished series back in continue-watching.
+            continueWatchingService.recomputeForComicSeries(seriesEntity.getId());
+        }
+        return bookEntity;
     }
 
     /**
