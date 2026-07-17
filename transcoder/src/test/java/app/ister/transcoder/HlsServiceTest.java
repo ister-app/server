@@ -121,6 +121,19 @@ class HlsServiceTest {
         return new FFmpegResultFuture(CompletableFuture.completedFuture(null), NOOP_STOPPER);
     }
 
+    /**
+     * Completes shortly after being returned. An instantly-completed future can run its
+     * completion (which hands the background-pass budget to the next dropped pass) before the
+     * other passes even registered themselves for resume, killing the hand-off chain — a race
+     * that cannot happen with real multi-minute ffmpeg passes, but that flaked this suite on
+     * slow CI runners.
+     */
+    private static FFmpegResultFuture delayedFFmpegFuture() {
+        CompletableFuture<FFmpegResult> future = new CompletableFuture<>();
+        CompletableFuture.delayedExecutor(250, TimeUnit.MILLISECONDS).execute(() -> future.complete(null));
+        return new FFmpegResultFuture(future, NOOP_STOPPER);
+    }
+
     private static void writeIfAbsent(Path file, String content) throws IOException {
         try {
             Files.writeString(file, content, StandardOpenOption.CREATE_NEW);
@@ -1130,7 +1143,9 @@ class HlsServiceTest {
         CountDownLatch allDone = new CountDownLatch(6);
         doAnswer(inv -> {
             allDone.countDown();
-            return completedFFmpegFuture();
+            // Delayed on purpose — see delayedFFmpegFuture: an instant completion can hand the
+            // budget over before the other passes registered for resume, stranding the chain.
+            return delayedFFmpegFuture();
         }).when(ffmpegMock).executeAsync();
 
         hlsService.startAllPasses(id, false, true);
