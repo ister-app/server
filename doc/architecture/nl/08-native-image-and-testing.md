@@ -15,6 +15,15 @@ en dat legt beperkingen op aan hoe je code schrijft:
   in het native image, niet in JVM-runs.
 - Een properties-bestand dat via `spring.config.import` geïmporteerd wordt heeft een entry nodig in
   de `resource-config.json` van zijn module (zie `search/src/main/resources/META-INF/native-image/`).
+- **AWT werkt in het native image, maar alleen met handmatig aangeleverde JNI-hints.** PDFBox
+  raakt AWT zelfs voor een simpele paginatelling (de statische init van `PDDocument` warmt het
+  kleursubsysteem op), en de AWT-native-libraries van de JDK zoeken klassen, velden en methodes op
+  via JNI op runtime — elk daarvan moet in `disk/.../native-image/jni-config.json` staan, anders
+  faalt de lookup en sneuvelt de class-initializer voor de rest van het procesleven. De
+  charset-vlag `-H:+AddAllCharsets` (server `build.gradle`) hoort bij hetzelfde verhaal: PDFBox'
+  `BaseParser` wil Windows-1252, dat het image standaard weglaat. De gegenereerde `libawt*.so`-
+  bestanden komen naast de binary terecht in `build/native/nativeCompile` en reizen mee
+  (`Dockerfile.native` kopieert de hele map).
 
 ## Databaseschema-discipline
 

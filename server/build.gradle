@@ -53,6 +53,8 @@ graalvmNative {
             javaLauncher = javaToolchains.launcherFor {
                 languageVersion = JavaLanguageVersion.of(25)
             }
+            // PDFBox needs Windows-1252 (BaseParser), which the native image drops by default.
+            buildArgs.add("-H:+AddAllCharsets")
         }
     }
 }
