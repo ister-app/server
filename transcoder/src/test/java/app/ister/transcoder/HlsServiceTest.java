@@ -24,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
+import com.github.kokorin.jaffree.ffmpeg.FFmpegResult;
 import com.github.kokorin.jaffree.ffmpeg.FFmpegResultFuture;
 import com.github.kokorin.jaffree.ffmpeg.Input;
 import com.github.kokorin.jaffree.ffmpeg.Output;
@@ -126,11 +127,12 @@ class HlsServiceTest {
      * completion (which hands the background-pass budget to the next dropped pass) before the
      * other passes even registered themselves for resume, killing the hand-off chain — a race
      * that cannot happen with real multi-minute ffmpeg passes, but that flaked this suite on
-     * slow CI runners.
+     * slow CI runners. The delay must stay well below the 250ms pass poll, or the poll's
+     * stall check force-stops the pass and the hand-off never fires at all.
      */
     private static FFmpegResultFuture delayedFFmpegFuture() {
         CompletableFuture<FFmpegResult> future = new CompletableFuture<>();
-        CompletableFuture.delayedExecutor(250, TimeUnit.MILLISECONDS).execute(() -> future.complete(null));
+        CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS).execute(() -> future.complete(null));
         return new FFmpegResultFuture(future, NOOP_STOPPER);
     }
 
