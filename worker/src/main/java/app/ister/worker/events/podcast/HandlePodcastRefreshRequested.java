@@ -24,10 +24,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 
 import static app.ister.core.MessageQueue.APP_ISTER_SERVER_PODCAST_REFRESH_REQUESTED;
 
@@ -105,6 +109,10 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
             podcast.setLastRefreshedAt(Instant.now());
             if (feed.notModified()) {
                 podcastRepository.save(podcast);
+                // Still request the auto-downloads: a download that was missed earlier (e.g.
+                // its request raced this handler's commit) would otherwise never recover as
+                // long as the feed's etag stays the same.
+                requestAutoDownloads(podcast);
                 return;
             }
             podcast.setFeedEtag(feed.etag());
@@ -182,16 +190,38 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
         requestAutoDownloads(podcast);
     }
 
-    /** Newest N episodes of the feed get downloaded up-front; older ones download on demand. */
+    /**
+     * Newest N episodes of the feed get downloaded up-front; older ones download on demand.
+     *
+     * <p>Published after commit: this handler is transactional, and the download consumer looks
+     * the episode up by id and SKIPS (no retry) when it is missing — so a request consumed
+     * before this transaction's episode rows are visible silently loses the download until the
+     * next scheduled refresh.
+     */
     private void requestAutoDownloads(PodcastEntity podcast) {
-        podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(podcast.getId(), autoDownloadCount, 0).stream()
+        List<UUID> episodeIds = podcastEpisodeRepository
+                .findEpisodeIdsForPodcastOrdered(podcast.getId(), autoDownloadCount, 0).stream()
                 .filter(episodeId -> !mediaFileRepository.existsByPodcastEpisodeEntityId(episodeId))
-                .forEach(episodeId -> messageSender.sendPodcastEpisodeDownloadRequested(
-                        PodcastEpisodeDownloadRequestedData.builder()
-                                .eventType(EventType.PODCAST_EPISODE_DOWNLOAD_REQUESTED)
-                                .podcastEpisodeId(episodeId)
-                                .build(),
-                        cacheDirectoryName()));
+                .toList();
+        if (episodeIds.isEmpty()) {
+            return;
+        }
+        Runnable publish = () -> episodeIds.forEach(episodeId -> messageSender.sendPodcastEpisodeDownloadRequested(
+                PodcastEpisodeDownloadRequestedData.builder()
+                        .eventType(EventType.PODCAST_EPISODE_DOWNLOAD_REQUESTED)
+                        .podcastEpisodeId(episodeId)
+                        .build(),
+                cacheDirectoryName()));
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    publish.run();
+                }
+            });
+        } else {
+            publish.run();
+        }
     }
 
     /** The cache directory of the node running this handler (see StartupTasks naming). */
