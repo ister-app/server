@@ -1,5 +1,24 @@
 # Changelog
 
+## server v2.0.1
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.0.1` |
+| `ghcr.io/ister-app/migrations` | `2.0.1` |
+
+### Fixes
+
+- fix(podcast): stop losing the initial episode downloads ([`873750b`](https://github.com/ister-app/server/commit/873750b))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.0.1
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.0.0...v2.0.1
+
 ## server v2.0.0
 
 | Image | Tag |
