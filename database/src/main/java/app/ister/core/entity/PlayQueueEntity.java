@@ -1,6 +1,7 @@
 package app.ister.core.entity;
 
 import app.ister.core.enums.PlayQueueSourceType;
+import app.ister.core.enums.RemoteControlScope;
 import app.ister.core.enums.SubtitleFormat;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -66,4 +67,9 @@ public class PlayQueueEntity extends BaseEntity {
     @OneToMany(cascade = {CascadeType.ALL}, mappedBy = "playQueueEntity", orphanRemoval = true)
     @OrderBy("position ASC")
     private List<PlayQueueItemEntity> items;
+
+    // Per-session remote-control override; null means fall back to the owner's account-level
+    // control scope. An ALLOWLIST override uses this session's own PlayQueueControlGrantEntity list.
+    @Enumerated(EnumType.STRING)
+    private RemoteControlScope controlScopeOverride;
 }

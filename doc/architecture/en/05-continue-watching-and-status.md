@@ -63,4 +63,33 @@ Two invariants before touching this code:
 Handlers here do **no database access** — RabbitMQ listener threads have no Hibernate session
 ([chapter 1](01-event-system.md)); everything they touch is in-memory registry state.
 
+### Session sharing & privacy
+
+Now-playing visibility and remote control are owner-controlled (`PlaybackSharingService`, modelled on
+`LibraryAccessService`: a per-owner config cached ~15s, invalidated by the sharing mutations). Two
+scopes, stored in `user_sharing_settings` with per-capability allowlists in `user_sharing_grant`
+(VIEW / CONTROL):
+
+- **Now-playing** defaults to `EVERYONE` (preserving the original all-sessions-visible behaviour);
+  it can be set to `PRIVATE` or an `ALLOWLIST` of users.
+- **Remote control** defaults to `PRIVATE` (owner only) — a deliberate tightening of the old
+  "any user controls any session" party mode. It can be `EVERYONE`, an `ALLOWLIST`, or
+  `SAME_AS_NOW_PLAYING`. It can also be overridden **per session** (`setSessionSharing` writes
+  `play_queue_entity.control_scope_override` plus the session's own `play_queue_control_grant` list).
+
+Enforcement points, all **deny-as-not-found** (never a 403):
+
+- `ServerStatusController.nowPlaying`/`serverActivitySnapshot` filter the session list per viewer with
+  `canView`, and stamp each surviving session with a per-viewer `controllable` flag (`canControl`).
+  The now-playing sink still emits on the RabbitMQ listener thread, so the subscription resolver hops
+  onto `Schedulers.boundedElastic()` before the (cached) sharing lookups — the listener thread stays
+  DB-free. The per-session override + allowlist ride along in `PlaybackStatusData`, embedded on the
+  heartbeat request thread (which has a Hibernate session), so the resolver never re-reads the queue.
+- `PlaybackCommandController.sendPlaybackCommand` and `PlayQueueService.getPlayQueue`/`getEditableQueue`
+  gate on `canControl`; a denied caller gets a dropped command / empty Optional. The owner always
+  passes both checks.
+
+`shareableUsers` exposes a non-admin, name-only user list so a normal user can populate an allowlist
+(the `users` query stays admin-only).
+
 

@@ -93,6 +93,9 @@ class PlayQueueControllerTest {
     private app.ister.core.status.PlaybackCommandService playbackCommandService;
 
     @Mock
+    private app.ister.core.repository.PlayQueueControlGrantRepository playQueueControlGrantRepository;
+
+    @Mock
     private Authentication authentication;
 
     private PlayQueueEntity buildQueueWithUser() {
@@ -225,7 +228,8 @@ class PlayQueueControllerTest {
         subject.updatePlayQueue(id, 5000L, itemId, null, PlayState.PAUSED, authentication);
 
         verify(playbackStatusService).publishHeartbeat(queue.getId(), itemId,
-                queue.getUserEntity().getId(), "sub-123", "test-user", null, null, null, null, null, 5000L, PlayState.PAUSED);
+                queue.getUserEntity().getId(), "sub-123", "test-user", null, null, null, null, null, 5000L, PlayState.PAUSED,
+                null, java.util.List.of());
     }
 
     @Test
@@ -247,7 +251,7 @@ class PlayQueueControllerTest {
 
         // The now-playing feed still gets the fresh progress/state, from registry data.
         verify(playbackStatusService).publishHeartbeat(id, itemId, userId, "sub-123", "test-user",
-                MediaType.EPISODE, null, null, null, null, 7000L, PlayState.PAUSED);
+                MediaType.EPISODE, null, null, null, null, 7000L, PlayState.PAUSED, null, null);
         verifyNoInteractions(playQueuePrefetchService);
     }
 
@@ -546,7 +550,7 @@ class PlayQueueControllerTest {
 
         verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
                 eq("test-user"), eq(MediaType.MOVIE), eq(movie.getId()), eq("Heat"), eq(120_000L),
-                eq(cover.getId()), eq(1000L), eq(PlayState.PLAYING));
+                eq(cover.getId()), eq(1000L), eq(PlayState.PLAYING), isNull(), eq(java.util.List.of()));
     }
 
     /** An episode without a still of its own borrows the show's image. */
@@ -572,7 +576,7 @@ class PlayQueueControllerTest {
         // No COVER among the images, so the first image is used.
         verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
                 eq("test-user"), eq(MediaType.EPISODE), eq(episode.getId()), eq("The Wire S01E02"),
-                isNull(), eq(showImage.getId()), eq(1000L), eq(PlayState.PLAYING));
+                isNull(), eq(showImage.getId()), eq(1000L), eq(PlayState.PLAYING), isNull(), eq(java.util.List.of()));
     }
 
     @Test
@@ -597,7 +601,7 @@ class PlayQueueControllerTest {
 
         verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
                 eq("test-user"), eq(MediaType.TRACK), eq(track.getId()), eq("Idioteque"), eq(240_000L),
-                eq(cover.getId()), eq(1000L), eq(PlayState.PLAYING));
+                eq(cover.getId()), eq(1000L), eq(PlayState.PLAYING), isNull(), eq(java.util.List.of()));
     }
 
     /** A chapter without metadata is named after its book. */
@@ -620,7 +624,8 @@ class PlayQueueControllerTest {
 
         verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
                 eq("test-user"), eq(MediaType.CHAPTER), eq(chapter.getId()),
-                eq("Dit zijn de namen – chapter 4"), isNull(), isNull(), eq(1000L), eq(PlayState.PLAYING));
+                eq("Dit zijn de namen – chapter 4"), isNull(), isNull(), eq(1000L), eq(PlayState.PLAYING),
+                isNull(), eq(java.util.List.of()));
     }
 
     /** An episode the feed gave no image gets the podcast cover, and its title falls back to the podcast. */
@@ -648,7 +653,8 @@ class PlayQueueControllerTest {
 
         verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
                 eq("test-user"), eq(MediaType.PODCAST_EPISODE), eq(episode.getId()), eq("Serial"),
-                eq(3_600_000L), eq(podcastCover.getId()), eq(1000L), eq(PlayState.PLAYING));
+                eq(3_600_000L), eq(podcastCover.getId()), eq(1000L), eq(PlayState.PLAYING),
+                isNull(), eq(java.util.List.of()));
     }
 
     /** An epub is not playable, so it carries no media id, title, duration or artwork. */
@@ -661,7 +667,7 @@ class PlayQueueControllerTest {
 
         verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
                 eq("test-user"), eq(MediaType.BOOK), isNull(), isNull(), isNull(), isNull(),
-                eq(1000L), eq(PlayState.PLAYING));
+                eq(1000L), eq(PlayState.PLAYING), isNull(), eq(java.util.List.of()));
         verifyNoInteractions(mediaFileRepository, imageRepository);
     }
 
@@ -678,7 +684,8 @@ class PlayQueueControllerTest {
         subject.updatePlayQueue(id, 1000L, itemId, null, PlayState.PLAYING, authentication);
 
         verify(playbackStatusService).publishHeartbeat(queue.getId(), itemId, queue.getUserEntity().getId(),
-                "sub-123", "test-user", null, null, null, null, null, 1000L, PlayState.PLAYING);
+                "sub-123", "test-user", null, null, null, null, null, 1000L, PlayState.PLAYING,
+                null, java.util.List.of());
     }
 
     // --- PlayQueueItem schema mappings for the audio types ---

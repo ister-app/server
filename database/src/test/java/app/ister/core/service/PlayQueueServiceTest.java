@@ -86,6 +86,12 @@ class PlayQueueServiceTest {
     private LibraryAccessService libraryAccessService;
 
     @Mock
+    private PlaybackSharingService playbackSharingService;
+
+    @Mock
+    private PlayQueueControlGrantRepository playQueueControlGrantRepository;
+
+    @Mock
     private Authentication authentication;
 
     private UserEntity user;
@@ -93,6 +99,10 @@ class PlayQueueServiceTest {
     @BeforeEach
     void setUp() {
         user = UserEntity.builder().id(UUID.randomUUID()).build();
+        // Reads and edits now resolve the caller (for the remote-control gate); default the gate
+        // open so the mechanics tests behave as before. Permission tests stub these explicitly.
+        lenient().when(userService.getOrCreateUser(authentication)).thenReturn(user);
+        lenient().when(playbackSharingService.canControl(any(), any(), any(), any())).thenReturn(true);
     }
 
     /**
@@ -157,7 +167,7 @@ class PlayQueueServiceTest {
     }
 
     @Test
-    void getPlayQueueReturnsOtherUsersQueueForPartyMode() {
+    void getPlayQueueReturnsOtherUsersQueueWhenControllable() {
         mockUser();
         PlayQueueEntity queue = PlayQueueEntity.builder()
                 .id(UUID.randomUUID())
@@ -170,6 +180,37 @@ class PlayQueueServiceTest {
         Optional<PlayQueueEntity> result = subject.getPlayQueue(queue.getId(), authentication);
 
         assertTrue(result.isPresent());
+    }
+
+    @Test
+    void getPlayQueueHidesOtherUsersQueueWhenNotControllable() {
+        mockUser();
+        PlayQueueEntity queue = PlayQueueEntity.builder()
+                .id(UUID.randomUUID())
+                .userEntity(UserEntity.builder().id(UUID.randomUUID()).build())
+                .sourceExhausted(true)
+                .items(new ArrayList<>())
+                .build();
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        // A caller who may not control this session gets not-found, never the queue.
+        when(playbackSharingService.canControl(any(), any(), any(), any())).thenReturn(false);
+
+        assertTrue(subject.getPlayQueue(queue.getId(), authentication).isEmpty());
+    }
+
+    @Test
+    void editingAQueueYouMayNotControlIsRejectedAsNotFound() {
+        mockUser();
+        PlayQueueEntity queue = PlayQueueEntity.builder()
+                .id(UUID.randomUUID())
+                .userEntity(UserEntity.builder().id(UUID.randomUUID()).build())
+                .items(new ArrayList<>())
+                .build();
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        when(playbackSharingService.canControl(any(), any(), any(), any())).thenReturn(false);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> subject.removePlayQueueItem(queue.getId(), UUID.randomUUID(), authentication));
     }
 
     @Test

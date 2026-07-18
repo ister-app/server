@@ -2,12 +2,14 @@ package app.ister.core.status;
 
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayState;
+import app.ister.core.enums.RemoteControlScope;
 import app.ister.core.eventdata.PlaybackStatusData;
 import app.ister.core.service.MessageSender;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -31,7 +33,8 @@ public class PlaybackStatusService {
     public void publishHeartbeat(UUID playQueueId, UUID playQueueItemId, UUID userId, String userExternalId,
                                  String userName, MediaType mediaType, UUID mediaId, String title,
                                  Long durationInMilliseconds, UUID artworkImageId,
-                                 long progressInMilliseconds, PlayState playState) {
+                                 long progressInMilliseconds, PlayState playState,
+                                 RemoteControlScope controlScopeOverride, List<UUID> controlAllowedUserIds) {
         messageSender.sendStatus(PlaybackStatusData.builder()
                 .playQueueId(playQueueId)
                 .playQueueItemId(playQueueItemId)
@@ -47,6 +50,8 @@ public class PlaybackStatusService {
                 .playState(playState == null ? PlayState.PLAYING : playState)
                 .nodeName(nodeName)
                 .timestamp(Instant.now())
+                .controlScopeOverride(controlScopeOverride)
+                .controlAllowedUserIds(controlAllowedUserIds)
                 .build());
     }
 }

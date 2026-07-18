@@ -20,13 +20,15 @@ public record PlaybackSession(
         long progressInMilliseconds,
         PlayState playState,
         String nodeName,
-        String updatedAt) {
+        String updatedAt,
+        /** Whether the requesting user may remote-control this session (computed per viewer). */
+        boolean controllable) {
 
-    public static PlaybackSession from(PlaybackStatusData data) {
+    public static PlaybackSession from(PlaybackStatusData data, boolean controllable) {
         return new PlaybackSession(data.getPlayQueueId(), data.getPlayQueueItemId(), data.getUserId(),
                 data.getUserName(), data.getMediaType(), data.getMediaId(), data.getTitle(),
                 data.getDurationInMilliseconds(), data.getArtworkImageId(),
                 data.getProgressInMilliseconds(), data.getPlayState(), data.getNodeName(),
-                String.valueOf(data.getTimestamp()));
+                String.valueOf(data.getTimestamp()), controllable);
     }
 }

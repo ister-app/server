@@ -9,10 +9,12 @@ import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayQueueSourceType;
+import app.ister.core.enums.RemoteControlScope;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.enums.SubtitleFormat;
 import app.ister.core.entity.ChapterEntity;
 import app.ister.core.repository.ChapterRepository;
+import app.ister.core.repository.PlayQueueControlGrantRepository;
 import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.LibraryRepository;
@@ -31,8 +33,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -86,7 +90,11 @@ public class PlayQueueService {
 
     private final MediaLibraryResolver mediaLibraryResolver;
 
-    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, ChapterRepository chapterRepository, PodcastEpisodeRepository podcastEpisodeRepository, LibraryRepository libraryRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService, ContinueWatchingService continueWatchingService, PodcastPreferenceService podcastPreferenceService, LibraryAccessService libraryAccessService, MediaLibraryResolver mediaLibraryResolver) {
+    private final PlaybackSharingService playbackSharingService;
+
+    private final PlayQueueControlGrantRepository playQueueControlGrantRepository;
+
+    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, ChapterRepository chapterRepository, PodcastEpisodeRepository podcastEpisodeRepository, LibraryRepository libraryRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService, ContinueWatchingService continueWatchingService, PodcastPreferenceService podcastPreferenceService, LibraryAccessService libraryAccessService, MediaLibraryResolver mediaLibraryResolver, PlaybackSharingService playbackSharingService, PlayQueueControlGrantRepository playQueueControlGrantRepository) {
         this.playQueueRepository = playQueueRepository;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
@@ -101,16 +109,23 @@ public class PlayQueueService {
         this.podcastPreferenceService = podcastPreferenceService;
         this.libraryAccessService = libraryAccessService;
         this.mediaLibraryResolver = mediaLibraryResolver;
+        this.playbackSharingService = playbackSharingService;
+        this.playQueueControlGrantRepository = playQueueControlGrantRepository;
     }
 
     /**
-     * Readable by any authenticated user (not just the owner): remote-control ("party
-     * mode") clients render another user's queue from this.
+     * Readable by the owner and by users allowed to remote-control the session ("party mode"),
+     * so a permitted controller can render another user's queue. A caller without control
+     * permission gets an empty Optional (not-found), never another user's queue.
      */
     @Transactional
     public Optional<PlayQueueEntity> getPlayQueue(UUID id, Authentication authentication) {
         Optional<PlayQueueEntity> playQueueEntityOptional = playQueueRepository.findById(id)
-                .filter(queue -> canAccessSource(queue.getSourceType(), queue.getSourceId(), authentication));
+                .filter(queue -> canAccessSource(queue.getSourceType(), queue.getSourceId(), authentication))
+                // Rendering a queue is only for the owner and users allowed to remote-control it;
+                // a plain now-playing viewer has no business opening the remote UI. Deny reads as
+                // not-found (empty Optional), consistent with the library-access model.
+                .filter(queue -> canControl(queue, authentication));
         playQueueEntityOptional.ifPresent(this::maybeExtend);
         return playQueueEntityOptional;
     }
@@ -229,7 +244,7 @@ public class PlayQueueService {
     @Transactional
     public PlayQueueEntity movePlayQueueItem(UUID playQueueId, UUID playQueueItemId, UUID afterItemId, Authentication authentication) {
         log.debug("Moving play queue item {} in queue {}", playQueueItemId, playQueueId);
-        PlayQueueEntity queue = getEditableQueue(playQueueId);
+        PlayQueueEntity queue = getEditableQueue(playQueueId, authentication);
         if (playQueueItemId.equals(afterItemId)) {
             throw new IllegalArgumentException("Cannot move an item after itself");
         }
@@ -254,7 +269,7 @@ public class PlayQueueService {
     @Transactional
     public PlayQueueEntity removePlayQueueItem(UUID playQueueId, UUID playQueueItemId, Authentication authentication) {
         log.debug("Removing play queue item {} from queue {}", playQueueItemId, playQueueId);
-        PlayQueueEntity queue = getEditableQueue(playQueueId);
+        PlayQueueEntity queue = getEditableQueue(playQueueId, authentication);
         List<PlayQueueItemEntity> items = queue.getItems();
         int index = -1;
         for (int i = 0; i < items.size(); i++) {
@@ -293,7 +308,7 @@ public class PlayQueueService {
     @Transactional
     public PlayQueueEntity addPlayQueueItem(UUID playQueueId, MediaType mediaType, UUID mediaId, UUID afterItemId, Authentication authentication) {
         log.debug("Adding {} {} to queue {}", mediaType, mediaId, playQueueId);
-        PlayQueueEntity queue = getEditableQueue(playQueueId);
+        PlayQueueEntity queue = getEditableQueue(playQueueId, authentication);
         validateMediaExists(mediaType, mediaId);
 
         BigDecimal position;
@@ -589,14 +604,28 @@ public class PlayQueueService {
     }
 
     /**
-     * Queue edits (add/move/remove) are deliberately not ownership-checked: remote
-     * control ("party mode") lets any authenticated user edit any queue. The heartbeat
-     * (updatePlayQueue) stays owner-only — it writes the caller's watch status and
-     * defines the session identity.
+     * Queue edits (add/move/remove) are gated by remote-control permission: the owner and any
+     * user the owner (or the session's per-session override) allows to control the session may
+     * edit its queue. A caller without that permission is treated as if the queue did not exist —
+     * the same not-found behaviour {@link #getPlayQueue} gives a denied reader.
      */
-    private PlayQueueEntity getEditableQueue(UUID playQueueId) {
-        return playQueueRepository.findById(playQueueId)
+    private PlayQueueEntity getEditableQueue(UUID playQueueId, Authentication authentication) {
+        PlayQueueEntity queue = playQueueRepository.findById(playQueueId)
                 .orElseThrow(() -> new IllegalArgumentException("Play queue not found"));
+        if (!canControl(queue, authentication)) {
+            throw new IllegalArgumentException("Play queue not found");
+        }
+        return queue;
+    }
+
+    /** Whether the caller may remote-control this session, honouring the per-session override. */
+    private boolean canControl(PlayQueueEntity queue, Authentication authentication) {
+        UUID viewerId = userService.getOrCreateUser(authentication).getId();
+        UUID ownerId = queue.getUserEntity().getId();
+        Set<UUID> sessionAllowed = queue.getControlScopeOverride() == RemoteControlScope.ALLOWLIST
+                ? new HashSet<>(playQueueControlGrantRepository.findGranteeIdsByPlayQueueId(queue.getId()))
+                : Set.of();
+        return playbackSharingService.canControl(viewerId, ownerId, queue.getControlScopeOverride(), sessionAllowed);
     }
 
     private void checkOwnership(PlayQueueEntity queue, Authentication authentication) {

@@ -8,6 +8,9 @@ import app.ister.core.eventdata.EventFailureStatusData;
 import app.ister.core.eventdata.NodeActivityStatusData;
 import app.ister.core.eventdata.PlaybackStatusData;
 import app.ister.core.eventdata.QueueStatsStatusData;
+import app.ister.core.entity.UserEntity;
+import app.ister.core.service.PlaybackSharingService;
+import app.ister.core.service.UserService;
 import app.ister.core.status.NodeActivityRegistry;
 import app.ister.core.status.PlaybackSessionRegistry;
 import app.ister.core.status.QueueStatsRegistry;
@@ -15,13 +18,21 @@ import app.ister.core.status.RecentFailuresBuffer;
 import app.ister.core.status.ServerStatusBroadcaster;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.core.Authentication;
+import reactor.test.StepVerifier;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class ServerStatusControllerTest {
 
@@ -30,7 +41,11 @@ class ServerStatusControllerTest {
     private QueueStatsRegistry queueStatsRegistry;
     private RecentFailuresBuffer recentFailuresBuffer;
     private PlaybackSessionRegistry playbackSessionRegistry;
+    private PlaybackSharingService playbackSharingService;
+    private UserService userService;
     private ServerStatusController controller;
+    private final Authentication authentication = mock(Authentication.class);
+    private final UUID viewerId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
@@ -39,14 +54,24 @@ class ServerStatusControllerTest {
         queueStatsRegistry = new QueueStatsRegistry();
         recentFailuresBuffer = new RecentFailuresBuffer();
         playbackSessionRegistry = new PlaybackSessionRegistry();
+        playbackSharingService = mock(PlaybackSharingService.class);
+        userService = mock(UserService.class);
+        when(userService.getOrCreateUser(authentication)).thenReturn(UserEntity.builder().id(viewerId).build());
+        // Default the visibility gate open; the filtering test overrides it per owner.
+        lenient().when(playbackSharingService.canView(any(), any())).thenReturn(true);
+        lenient().when(playbackSharingService.canControl(any(), any(), any(), any())).thenReturn(true);
         controller = new ServerStatusController(broadcaster, nodeActivityRegistry, queueStatsRegistry,
-                recentFailuresBuffer, playbackSessionRegistry);
+                recentFailuresBuffer, playbackSessionRegistry, playbackSharingService, userService);
     }
 
     private static PlaybackStatusData playback(UUID playQueueId) {
+        return playback(playQueueId, UUID.randomUUID());
+    }
+
+    private static PlaybackStatusData playback(UUID playQueueId, UUID userId) {
         return PlaybackStatusData.builder()
                 .playQueueId(playQueueId)
-                .userId(UUID.randomUUID())
+                .userId(userId)
                 .userName("user")
                 .playState(PlayState.PLAYING)
                 .nodeName("node-a")
@@ -82,26 +107,49 @@ class ServerStatusControllerTest {
         playbackSessionRegistry.update(playback(first));
         broadcaster.emitNowPlaying(playbackSessionRegistry.snapshot());
 
-        List<List<PlaybackSession>> received = new CopyOnWriteArrayList<>();
-        controller.nowPlaying().subscribe(received::add);
-
-        UUID second = UUID.randomUUID();
-        playbackSessionRegistry.update(playback(second));
-        broadcaster.emitNowPlaying(playbackSessionRegistry.snapshot());
-
-        assertEquals(2, received.size());
-        assertEquals(1, received.get(0).size());
-        assertEquals(first, received.get(0).getFirst().playQueueId());
-        assertEquals(2, received.get(1).size());
+        StepVerifier.create(controller.nowPlaying(authentication))
+                .assertNext(sessions -> {
+                    assertEquals(1, sessions.size());
+                    assertEquals(first, sessions.getFirst().playQueueId());
+                })
+                .then(() -> {
+                    playbackSessionRegistry.update(playback(UUID.randomUUID()));
+                    broadcaster.emitNowPlaying(playbackSessionRegistry.snapshot());
+                })
+                .assertNext(sessions -> assertEquals(2, sessions.size()))
+                .thenCancel()
+                .verify(Duration.ofSeconds(5));
     }
 
     @Test
     void nowPlayingEmitsEmptyListToSubscriberOnFreshNode() {
-        List<List<PlaybackSession>> received = new CopyOnWriteArrayList<>();
-        controller.nowPlaying().subscribe(received::add);
+        StepVerifier.create(controller.nowPlaying(authentication))
+                .assertNext(sessions -> assertTrue(sessions.isEmpty()))
+                .thenCancel()
+                .verify(Duration.ofSeconds(5));
+    }
 
-        assertEquals(1, received.size());
-        assertTrue(received.getFirst().isEmpty());
+    @Test
+    void nowPlayingHidesSessionsTheViewerMayNotSeeAndStampsControllable() {
+        UUID visibleOwner = UUID.randomUUID();
+        UUID hiddenOwner = UUID.randomUUID();
+        when(playbackSharingService.canView(viewerId, visibleOwner)).thenReturn(true);
+        when(playbackSharingService.canView(viewerId, hiddenOwner)).thenReturn(false);
+        when(playbackSharingService.canControl(eq(viewerId), eq(visibleOwner), any(), any())).thenReturn(false);
+
+        UUID visibleQueue = UUID.randomUUID();
+        playbackSessionRegistry.update(playback(visibleQueue, visibleOwner));
+        playbackSessionRegistry.update(playback(UUID.randomUUID(), hiddenOwner));
+        broadcaster.emitNowPlaying(playbackSessionRegistry.snapshot());
+
+        StepVerifier.create(controller.nowPlaying(authentication))
+                .assertNext(sessions -> {
+                    assertEquals(1, sessions.size());
+                    assertEquals(visibleQueue, sessions.getFirst().playQueueId());
+                    assertFalse(sessions.getFirst().controllable());
+                })
+                .thenCancel()
+                .verify(Duration.ofSeconds(5));
     }
 
     @Test
@@ -126,7 +174,7 @@ class ServerStatusControllerTest {
                 .timestamp(Instant.now()).queue("q").errorMessage("boom").build());
         playbackSessionRegistry.update(playback(UUID.randomUUID()));
 
-        ServerActivitySnapshot snapshot = controller.serverActivitySnapshot();
+        ServerActivitySnapshot snapshot = controller.serverActivitySnapshot(authentication);
 
         assertEquals(1, snapshot.nodes().size());
         assertEquals(1, snapshot.queueStats().size());

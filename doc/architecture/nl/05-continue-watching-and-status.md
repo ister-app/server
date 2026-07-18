@@ -66,3 +66,34 @@ Twee invarianten voordat je aan deze code komt:
 Handlers hier doen **geen database-toegang** — RabbitMQ-listener-threads hebben geen
 Hibernate-sessie ([hoofdstuk 1](01-event-system.md)); alles wat ze aanraken is in-memory
 registry-state.
+
+### Sessies delen & privacy
+
+Zichtbaarheid van now-playing en afstandsbediening staan onder controle van de eigenaar
+(`PlaybackSharingService`, gemodelleerd op `LibraryAccessService`: een per-eigenaar-config die ~15s
+gecachet wordt en door de sharing-mutaties wordt geïnvalideerd). Twee scopes, opgeslagen in
+`user_sharing_settings` met per-capability-allowlists in `user_sharing_grant` (VIEW / CONTROL):
+
+- **Now-playing** staat standaard op `EVERYONE` (behoudt het oorspronkelijke gedrag waarbij alle
+  sessies zichtbaar waren); instelbaar op `PRIVATE` of een `ALLOWLIST` van gebruikers.
+- **Afstandsbediening** staat standaard op `PRIVATE` (alleen de eigenaar) — een bewuste aanscherping
+  van de oude party-modus waarin elke gebruiker elke sessie kon bedienen. Kan `EVERYONE`, een
+  `ALLOWLIST` of `SAME_AS_NOW_PLAYING` zijn. Ook **per sessie** te overrulen (`setSessionSharing`
+  schrijft `play_queue_entity.control_scope_override` plus de eigen `play_queue_control_grant`-lijst
+  van die sessie).
+
+Handhavingspunten, allemaal **deny-as-not-found** (nooit een 403):
+
+- `ServerStatusController.nowPlaying`/`serverActivitySnapshot` filteren de sessielijst per kijker met
+  `canView` en stempelen elke overgebleven sessie met een per-kijker-`controllable`-vlag
+  (`canControl`). De now-playing-sink emit nog steeds op de RabbitMQ-listener-thread, dus de
+  subscription-resolver stapt over naar `Schedulers.boundedElastic()` vóór de (gecachete)
+  sharing-lookups — de listener-thread blijft DB-vrij. De per-sessie-override + allowlist reizen mee
+  in `PlaybackStatusData`, ingebed op de heartbeat-request-thread (die wél een Hibernate-sessie heeft),
+  zodat de resolver de queue nooit opnieuw hoeft te lezen.
+- `PlaybackCommandController.sendPlaybackCommand` en
+  `PlayQueueService.getPlayQueue`/`getEditableQueue` toetsen op `canControl`; een geweigerde aanroeper
+  krijgt een genegeerd commando / lege Optional. De eigenaar passeert altijd beide controles.
+
+`shareableUsers` levert een niet-admin, alleen-naam-gebruikerslijst zodat een gewone gebruiker een
+allowlist kan vullen (de `users`-query blijft admin-only).

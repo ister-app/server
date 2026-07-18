@@ -14,9 +14,11 @@ import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayState;
+import app.ister.core.enums.RemoteControlScope;
 import app.ister.core.entity.PodcastEpisodeEntity;
 import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.PlayQueueControlGrantRepository;
 import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
@@ -71,6 +73,8 @@ public class PlayQueueController {
     private final PlaybackSessionRegistry playbackSessionRegistry;
 
     private final PlaybackCommandService playbackCommandService;
+
+    private final PlayQueueControlGrantRepository playQueueControlGrantRepository;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -128,7 +132,8 @@ public class PlayQueueController {
                         playQueueId, last.getPlayQueueItemId(), last.getUserId(), last.getUserExternalId(),
                         last.getUserName(), last.getMediaType(), last.getMediaId(), last.getTitle(),
                         last.getDurationInMilliseconds(), last.getArtworkImageId(),
-                        progressInMilliseconds, playState));
+                        progressInMilliseconds, playState,
+                        last.getControlScopeOverride(), last.getControlAllowedUserIds()));
     }
 
     /**
@@ -140,6 +145,12 @@ public class PlayQueueController {
         Optional<PlayQueueItemEntity> item = Optional.ofNullable(queue.getItems()).orElse(List.of()).stream()
                 .filter(candidate -> candidate.getId().equals(playQueueItemId))
                 .findFirst();
+        // The per-session control allowlist only matters when the override is ALLOWLIST; embed it
+        // so the now-playing filter can decide controllability without touching the DB.
+        RemoteControlScope controlScopeOverride = queue.getControlScopeOverride();
+        List<UUID> controlAllowedUserIds = controlScopeOverride == RemoteControlScope.ALLOWLIST
+                ? playQueueControlGrantRepository.findGranteeIdsByPlayQueueId(queue.getId())
+                : List.of();
         playbackStatusService.publishHeartbeat(
                 queue.getId(),
                 playQueueItemId,
@@ -152,7 +163,9 @@ public class PlayQueueController {
                 item.map(this::durationOf).orElse(null),
                 item.map(this::artworkOf).orElse(null),
                 progressInMilliseconds,
-                playState);
+                playState,
+                controlScopeOverride,
+                controlAllowedUserIds);
     }
 
     /** Duration of the playing item's media file; the longest one wins if there are several. */
@@ -300,6 +313,11 @@ public class PlayQueueController {
     @SchemaMapping(typeName = "PlayQueue", field = "currentItemId")
     public UUID currentItemId(PlayQueueEntity playQueueEntity) {
         return playQueueEntity.getCurrentItem();
+    }
+
+    @SchemaMapping(typeName = "PlayQueue", field = "controlAllowedUserIds")
+    public List<UUID> controlAllowedUserIds(PlayQueueEntity playQueueEntity) {
+        return playQueueControlGrantRepository.findGranteeIdsByPlayQueueId(playQueueEntity.getId());
     }
 
     // Return only the 10 items that precede the current item, the current item itself, and the 10 items that follow it (max 21 items).

@@ -45,6 +45,10 @@ type Query {
     me: Me!
     "Every user that logged in at least once. Admin only."
     users: [User!]!
+    "The calling user's playback-session sharing preferences (defaults when never saved)."
+    playbackSharingSettings: PlaybackSharingSettings!
+    "Users the caller can pick for a sharing allowlist: id + display name only, excluding the caller."
+    shareableUsers: [ShareableUser!]!
     "External metadata/image providers actually in use on this server, for attribution display."
     attributions: [Attribution!]!
 }
@@ -159,6 +163,14 @@ type Mutation {
     Idempotent: granting twice or revoking a grant that does not exist is fine. Returns true.
     """
     setUserLibraryAccess(userId: ID!, libraryId: ID!, granted: Boolean!): Boolean!
+    "Saves the calling user's playback-session sharing preferences (scopes + allowlists)."
+    updatePlaybackSharingSettings(input: PlaybackSharingSettingsInput!): PlaybackSharingSettings!
+    """
+    Overrides remote-control sharing for one of the caller's own sessions (owner only).
+    controlScope null clears the override (fall back to the account default); allowedUserIds is the
+    session's own control allowlist, used when controlScope is ALLOWLIST. Returns true.
+    """
+    setSessionSharing(playQueueId: ID!, controlScope: RemoteControlScope, allowedUserIds: [ID!]): Boolean!
 }
 
 type Subscription {
@@ -257,6 +269,8 @@ type PlaybackSession {
     "The node the client sends its updates to."
     nodeName: String!
     updatedAt: String!
+    "Whether the requesting user may remote-control this session (computed per viewer)."
+    controllable: Boolean!
 }
 
 type ServerActivitySnapshot {
@@ -523,6 +537,46 @@ type PlayQueue {
     "True when the source has no more items to append; the visible queue is the whole queue."
     sourceExhausted: Boolean!
     playQueueItems: [PlayQueueItem!]
+    "Per-session remote-control override; null means the owner's account-level control scope applies."
+    controlScopeOverride: RemoteControlScope
+    "Grantee ids of this session's own control allowlist (used when controlScopeOverride is ALLOWLIST)."
+    controlAllowedUserIds: [ID!]!
+}
+
+"Who may see a user's now-playing sessions."
+enum SharingScope {
+    EVERYONE
+    ALLOWLIST
+    PRIVATE
+}
+
+"Who may remote-control a user's session; also the per-session override value."
+enum RemoteControlScope {
+    PRIVATE
+    EVERYONE
+    ALLOWLIST
+    SAME_AS_NOW_PLAYING
+}
+
+"A user's playback-session sharing preferences. The allowlists hold grantee user ids."
+type PlaybackSharingSettings {
+    nowPlayingScope: SharingScope!
+    controlScope: RemoteControlScope!
+    nowPlayingAllowedUserIds: [ID!]!
+    controlAllowedUserIds: [ID!]!
+}
+
+input PlaybackSharingSettingsInput {
+    nowPlayingScope: SharingScope!
+    controlScope: RemoteControlScope!
+    nowPlayingAllowedUserIds: [ID!]!
+    controlAllowedUserIds: [ID!]!
+}
+
+"A user the caller may add to a sharing allowlist: identity only, no admin/email fields."
+type ShareableUser {
+    id: ID!
+    name: String
 }
 
 type PlayQueueItem {

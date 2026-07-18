@@ -30,8 +30,10 @@ in dev ingeschakeld. Naast queries en mutations zijn er drie websocket-subscript
 
 - `serverActivity` — node-heartbeats, queuedieptes, bezige handlers, recente mislukkingen
   (replay-latest)
-- `nowPlaying` — actieve playback-sessies (replay-latest)
-- `playbackCommands(playQueueId)` — party-mode-afstandsbediening (best-effort, non-replaying)
+- `nowPlaying` — actieve playback-sessies, per kijker gefilterd op de sharing-instellingen van de
+  eigenaar ([hoofdstuk 5](05-continue-watching-and-status.md#sessies-delen--privacy), replay-latest)
+- `playbackCommands(playQueueId)` — party-mode-afstandsbediening (best-effort, non-replaying);
+  begrensd door de afstandsbedienings-scope van de eigenaar
 
 ## Authenticatie
 

@@ -29,8 +29,10 @@ enabled in dev. Besides queries and mutations there are three websocket subscrip
 5](05-continue-watching-and-status.md)):
 
 - `serverActivity` — node heartbeats, queue depths, busy handlers, recent failures (replay-latest)
-- `nowPlaying` — active playback sessions (replay-latest)
-- `playbackCommands(playQueueId)` — party-mode remote control (best-effort, non-replaying)
+- `nowPlaying` — active playback sessions, filtered per viewer by the owner's sharing settings
+  ([chapter 5](05-continue-watching-and-status.md#session-sharing--privacy), replay-latest)
+- `playbackCommands(playQueueId)` — party-mode remote control (best-effort, non-replaying); gated by
+  the owner's remote-control sharing scope
 
 ## Authentication
 
