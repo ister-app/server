@@ -41,6 +41,31 @@ type Query {
     search(term: String!, size: Int, libraryId: ID): [SearchResult!]!
     "The calling user's playback settings; defaults (the server's languages) when they never saved any."
     userSettings: UserSettings!
+    "External metadata/image providers actually in use on this server, for attribution display."
+    attributions: [Attribution!]!
+}
+
+"The external provider a metadata row or image originated from, for attribution."
+enum MetadataSource {
+    TMDB
+    MUSICBRAINZ
+    COVER_ART_ARCHIVE
+    WIKIMEDIA_COMMONS
+    WIKIPEDIA
+    WIKIDATA
+    OPEN_LIBRARY
+    PODCAST_FEED
+    LOCAL_FILE
+}
+
+type Attribution {
+    source: MetadataSource!
+    name: String!
+    url: String
+    "Provider-mandated notice text, if any (e.g. the TMDB non-endorsement notice)."
+    notice: String
+    "License of the contributed content where relevant (e.g. \"CC BY-SA 4.0\" for Wikipedia text)."
+    license: String
 }
 
 union SearchResult = Movie | Show | Episode | Person | Album | Track | Book | Podcast
@@ -367,6 +392,8 @@ type Image {
     type: String!
     language: String
     sourceUri: String
+    "Normalized provider for attribution; null for images without a known external origin."
+    source: MetadataSource
     show: Show
     blurHash: String
     directory: Directory!
@@ -422,6 +449,8 @@ type MediaFileStream {
 type Metadata {
     id: ID!
     sourceUri: String
+    "Normalized provider for attribution; null for locally sourced metadata."
+    source: MetadataSource
     language: String
     title: String
     description: String

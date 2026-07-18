@@ -1,5 +1,6 @@
 package app.ister.worker.events.musicbrainz;
 
+import app.ister.core.enums.MetadataSource;
 import app.ister.worker.events.wikipedia.WikipediaService;
 import app.ister.worker.http.MetadataRestClients;
 import lombok.extern.slf4j.Slf4j;
@@ -56,9 +57,12 @@ public class MusicBrainzService {
      * type is MusicBrainz's artist type ("Person", "Group", ...); lifeSpanBegin is the
      * begin date of the artist's life-span (birth date for persons, founding date for
      * groups), possibly just a year ("1946") or year-month. {@code bios} holds a biography per
-     * requested language tag (from Wikipedia via Wikidata); it may be empty.
+     * requested language tag (from Wikipedia via Wikidata); it may be empty. {@code bioSources}
+     * names the attribution source per bio language tag (Wikipedia, or MusicBrainz for the rare
+     * annotation fallback).
      */
-    public record ArtistInfo(Map<String, String> bios, String genre, String imageUrl, String type, String lifeSpanBegin) {}
+    public record ArtistInfo(Map<String, String> bios, Map<String, MetadataSource> bioSources,
+                             String genre, String imageUrl, String type, String lifeSpanBegin) {}
 
     /** Extra artist data that only the MBID lookup (not the search endpoint) provides. */
     private record ArtistDetails(String annotationBio, String genre, String imageUrl, String wikidataId) {
@@ -231,16 +235,19 @@ public class MusicBrainzService {
         String imageUrl = details.imageUrl() != null ? details.imageUrl() : wiki.thumbnail();
 
         Map<String, String> bios = new LinkedHashMap<>(wiki.bios());
+        Map<String, MetadataSource> bioSources = new LinkedHashMap<>();
+        bios.keySet().forEach(tag -> bioSources.put(tag, MetadataSource.WIKIPEDIA));
         // Fall back to the (rare) MusicBrainz annotation, which is English prose — so it fills the
         // English slot only, never whichever language happens to be configured first.
         if (details.annotationBio() != null && languageTags != null && languageTags.contains(ENGLISH)
                 && !bios.containsKey(ENGLISH)) {
             bios.put(ENGLISH, details.annotationBio());
+            bioSources.put(ENGLISH, MetadataSource.MUSICBRAINZ);
         }
 
         // Return whenever the artist was found, so the birth year (life-span) flows through even for
         // artists that have no bio/genre/image — that year is what links them to TMDB actors.
-        return Optional.of(new ArtistInfo(bios, genre, imageUrl, type, lifeSpanBegin));
+        return Optional.of(new ArtistInfo(bios, bioSources, genre, imageUrl, type, lifeSpanBegin));
     }
 
     /** The /artist search endpoint ignores inc=annotation+url-rels, so the annotation and the

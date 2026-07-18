@@ -1,7 +1,9 @@
 package app.ister.core.repository;
 
 import app.ister.core.entity.MetadataEntity;
+import app.ister.core.enums.MetadataSource;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -31,4 +33,8 @@ public interface MetadataRepository extends JpaRepository<MetadataEntity, UUID> 
     List<MetadataEntity> findByPodcastEntityId(UUID podcastId);
 
     List<MetadataEntity> findByPodcastEpisodeEntityId(UUID podcastEpisodeId);
+
+    /** The distinct external providers metadata was fetched from, for attribution display. */
+    @Query("select distinct m.source from MetadataEntity m where m.source is not null")
+    List<MetadataSource> findDistinctSources();
 }

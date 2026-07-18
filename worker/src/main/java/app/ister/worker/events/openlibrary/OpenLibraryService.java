@@ -1,5 +1,6 @@
 package app.ister.worker.events.openlibrary;
 
+import app.ister.core.enums.MetadataSource;
 import app.ister.worker.events.wikipedia.WikipediaService;
 import app.ister.worker.http.MetadataRestClients;
 import lombok.extern.slf4j.Slf4j;
@@ -66,7 +67,8 @@ public class OpenLibraryService {
      * @param birthYear the year of birth, or null when unknown
      * @param sourceKey the Open Library author key (e.g. "OL23919A")
      */
-    public record AuthorInfo(Map<String, String> bios, String photoUrl, Integer birthYear, String sourceKey) {}
+    public record AuthorInfo(Map<String, String> bios, Map<String, MetadataSource> bioSources,
+                             String photoUrl, Integer birthYear, String sourceKey) {}
 
     /**
      * ISBN-first: an ISBN search hit is authoritative (no title verification — a Dutch edition's
@@ -146,12 +148,16 @@ public class OpenLibraryService {
                 ? wikipediaService.fetchContent(wikidataId, languageTags)
                 : wikipediaService.fetchContentForPerson(name, languageTags);
         Map<String, String> bios = new LinkedHashMap<>(wiki.bios());
+        Map<String, MetadataSource> bioSources = new LinkedHashMap<>();
+        bios.keySet().forEach(tag -> bioSources.put(tag, MetadataSource.WIKIPEDIA));
         String openLibraryBio = textValue(author.get("bio"));
         // Open Library bios are English prose, so they can only fill the English slot — filing one
         // under whatever language happens to be configured first would show English text to a user
         // who asked for a Dutch biography. A deployment without English simply gets no fallback.
-        if (openLibraryBio != null && languageTags != null && languageTags.contains(ENGLISH)) {
-            bios.putIfAbsent(ENGLISH, openLibraryBio);
+        if (openLibraryBio != null && languageTags != null && languageTags.contains(ENGLISH)
+                && !bios.containsKey(ENGLISH)) {
+            bios.put(ENGLISH, openLibraryBio);
+            bioSources.put(ENGLISH, MetadataSource.OPEN_LIBRARY);
         }
 
         String photoUrl = hasPhoto(author) ? authorPhotoBase + authorKey + "-L.jpg" : wiki.thumbnail();
@@ -160,7 +166,7 @@ public class OpenLibraryService {
         if (bios.isEmpty() && photoUrl == null && birthYear == null) {
             return Optional.empty();
         }
-        return Optional.of(new AuthorInfo(bios, photoUrl, birthYear, authorKey));
+        return Optional.of(new AuthorInfo(bios, bioSources, photoUrl, birthYear, authorKey));
     }
 
     /** Key ("OL23919A") of the first author search result whose name matches ours after normalisation. */

@@ -7,6 +7,7 @@ import app.ister.core.entity.PersonEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.LibraryType;
+import app.ister.core.enums.MetadataSource;
 import app.ister.core.eventdata.PersonFoundData;
 import app.ister.core.enums.SearchEntityType;
 import app.ister.core.repository.PersonRepository;
@@ -93,10 +94,13 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
             personRepository.save(author);
         }
         if (!hasMetadata && !info.bios().isEmpty()) {
-            saveBiosPerLanguage(author, info.bios(), null, sourceUri);
+            saveBiosPerLanguage(author, info.bios(), info.bioSources(), null, sourceUri);
         }
         if (!hasImage && info.photoUrl() != null) {
-            savePersonImage(author, info.photoUrl(), sourceUri);
+            // The sourceUri carries the photo URL so the attribution source can be derived from
+            // its host: the portrait is an Open Library photo or a Wikipedia thumbnail.
+            String scheme = info.photoUrl().contains("openlibrary.org") ? "openlibrary://" : "wikipedia://";
+            savePersonImage(author, info.photoUrl(), scheme + info.photoUrl());
         }
         serverEventService.createSearchIndexEvent(SearchEntityType.PERSON, author.getId());
     }
@@ -105,7 +109,8 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
                               boolean hasMetadata, boolean hasImage) {
         saveBirthYear(artist, info);
         if (!hasMetadata && !info.bios().isEmpty()) {
-            saveBiosPerLanguage(artist, info.bios(), info.genre(), "musicbrainz://artist/" + artist.getName());
+            saveBiosPerLanguage(artist, info.bios(), info.bioSources(), info.genre(),
+                    "musicbrainz://artist/" + artist.getName());
         }
         if (!hasImage && info.imageUrl() != null) {
             savePersonImage(artist, info.imageUrl(), "wikipedia://" + info.imageUrl());
@@ -138,8 +143,10 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
     }
 
     /** One MetadataEntity per configured language (ISO-639-3), replacing any existing rows so a
-     * re-fetch overwrites instead of duplicating. */
-    private void saveBiosPerLanguage(PersonEntity person, Map<String, String> bios, String genre, String sourceUri) {
+     * re-fetch overwrites instead of duplicating. The attribution source is set per bio: the text
+     * is usually Wikipedia's, while sourceUri stays the provider dedup key. */
+    private void saveBiosPerLanguage(PersonEntity person, Map<String, String> bios,
+                                     Map<String, MetadataSource> bioSources, String genre, String sourceUri) {
         metadataRepository.deleteAll(metadataRepository.findByPersonEntityId(person.getId()));
         bios.forEach((tag, bio) -> metadataRepository.save(MetadataEntity.builder()
                 .description(bio)
@@ -147,6 +154,7 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
                 .language(languageProperties.iso3(tag))
                 .personEntity(person)
                 .sourceUri(sourceUri)
+                .source(bioSources.get(tag))
                 .build()));
     }
 }

@@ -1,9 +1,14 @@
 package app.ister.core.entity;
 
+import app.ister.core.enums.MetadataSource;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -70,6 +75,21 @@ public class MetadataEntity extends BaseEntity {
     @Setter
     @Column(columnDefinition = "text")
     private String sourceUri;
+
+    /** Normalized provider for attribution; derived from sourceUri unless a writer sets it
+     * explicitly (person bios: the text is usually Wikipedia's while sourceUri stays the
+     * musicbrainz/openlibrary dedup key). */
+    @Setter
+    @Enumerated(EnumType.STRING)
+    private MetadataSource source;
+
+    @PrePersist
+    @PreUpdate
+    private void deriveSource() {
+        if (source == null) {
+            source = MetadataSource.fromSourceUri(sourceUri).orElse(null);
+        }
+    }
 
     // https://en.wikipedia.org/wiki/ISO_639-3
     @Setter

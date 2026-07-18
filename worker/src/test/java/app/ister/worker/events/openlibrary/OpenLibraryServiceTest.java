@@ -1,5 +1,6 @@
 package app.ister.worker.events.openlibrary;
 
+import app.ister.core.enums.MetadataSource;
 import app.ister.worker.events.wikipedia.WikipediaService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -198,6 +199,7 @@ class OpenLibraryServiceTest {
         // Open Library prose is English, so it fills the English slot -- never the Dutch one, which
         // would show English text to a reader who asked for a Dutch biography.
         assertEquals("Nederlands schrijver.", result.get().bios().get("en"));
+        assertEquals(MetadataSource.OPEN_LIBRARY, result.get().bioSources().get("en"));
         assertNull(result.get().bios().get("nl"));
         assertEquals("https://covers.openlibrary.org/a/olid/OL1A-L.jpg", result.get().photoUrl());
         assertEquals(1967, result.get().birthYear());
@@ -223,6 +225,7 @@ class OpenLibraryServiceTest {
 
         assertTrue(result.isPresent());
         assertEquals("Nederlandse schrijver.", result.get().bios().get("nl"));
+        assertEquals(MetadataSource.WIKIPEDIA, result.get().bioSources().get("nl"));
         // No "photos" in the Open Library record, so the Wikipedia thumbnail is the portrait.
         assertEquals("https://wiki/photo.jpg", result.get().photoUrl());
         server.verify();

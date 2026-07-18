@@ -1,6 +1,7 @@
 package app.ister.core.entity;
 
 import app.ister.core.enums.ImageType;
+import app.ister.core.enums.MetadataSource;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -30,6 +31,18 @@ public class ImageEntity extends FileFromPathEntity {
     /** Provenance/dedup URI (e.g. "wikipedia://https://upload..."); no natural length bound. */
     @Column(columnDefinition = "text")
     private String sourceUri;
+
+    /** Normalized provider for attribution; derived from sourceUri at persist time. */
+    @Enumerated(EnumType.STRING)
+    private MetadataSource source;
+
+    @PrePersist
+    @PreUpdate
+    private void deriveSource() {
+        if (source == null) {
+            source = MetadataSource.fromSourceUri(sourceUri).orElse(null);
+        }
+    }
 
     private String blurHash;
 

@@ -2,6 +2,7 @@ package app.ister.core.repository;
 
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.ImageEntity;
+import app.ister.core.enums.MetadataSource;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -76,4 +77,8 @@ public interface ImageRepository extends CrudRepository<ImageEntity, UUID> {
     List<ImageEntity> findByPodcastEntityIdIn(Collection<UUID> podcastEntityIds);
 
     List<ImageEntity> findByPodcastEpisodeEntityIdIn(Collection<UUID> podcastEpisodeEntityIds);
+
+    /** The distinct external providers images were fetched from, for attribution display. */
+    @Query("select distinct i.source from ImageEntity i where i.source is not null")
+    List<MetadataSource> findDistinctSources();
 }

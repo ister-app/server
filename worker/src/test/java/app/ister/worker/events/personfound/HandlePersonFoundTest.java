@@ -8,6 +8,7 @@ import app.ister.core.entity.MetadataEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.LibraryType;
+import app.ister.core.enums.MetadataSource;
 import app.ister.core.eventdata.PersonFoundData;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.ImageRepository;
@@ -120,7 +121,7 @@ class HandlePersonFoundTest {
         when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(musicBrainzService.getArtistInfo(eq("Artist"), any()))
-                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), "rock", IMAGE_URL, null, null)));
+                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), Map.of("en", MetadataSource.WIKIPEDIA), "rock", IMAGE_URL, null, null)));
 
         subject.handle(data);
 
@@ -134,6 +135,7 @@ class HandlePersonFoundTest {
         assertEquals("eng", saved.getLanguage());
         assertEquals(artist, saved.getPersonEntity());
         assertEquals("musicbrainz://artist/Artist", saved.getSourceUri());
+        assertEquals(MetadataSource.WIKIPEDIA, saved.getSource());
         verify(imageDownloadService).downloadAndSave(
                 IMAGE_URL, ImageType.COVER, "eng",
                 "wikipedia://" + IMAGE_URL,
@@ -147,7 +149,7 @@ class HandlePersonFoundTest {
         when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(musicBrainzService.getArtistInfo(eq("Artist"), any()))
-                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), "rock", null, "Person", "1946-05-31")));
+                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), Map.of("en", MetadataSource.WIKIPEDIA), "rock", null, "Person", "1946-05-31")));
 
         subject.handle(data);
 
@@ -162,7 +164,7 @@ class HandlePersonFoundTest {
         when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(musicBrainzService.getArtistInfo(eq("Artist"), any()))
-                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), "rock", null, "Group", "1985")));
+                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), Map.of("en", MetadataSource.WIKIPEDIA), "rock", null, "Group", "1985")));
 
         subject.handle(data);
 
@@ -194,7 +196,7 @@ class HandlePersonFoundTest {
         when(imageRepository.findByPersonEntityId(personId))
                 .thenReturn(List.of(ImageEntity.builder().build()));
         when(musicBrainzService.getArtistInfo(eq("Artist"), any()))
-                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of(), null, null, "Person", "1993-06-26")));
+                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of(), Map.of(), null, null, "Person", "1993-06-26")));
 
         subject.handle(data);
 
@@ -211,7 +213,7 @@ class HandlePersonFoundTest {
         when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(musicBrainzService.getArtistInfo(eq("Artist"), any()))
-                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), "rock", IMAGE_URL, null, null)));
+                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), Map.of("en", MetadataSource.WIKIPEDIA), "rock", IMAGE_URL, null, null)));
         doThrow(new IOException("download failed"))
                 .when(imageDownloadService).downloadAndSave(anyString(), any(), anyString(), anyString(), any());
 
@@ -226,7 +228,7 @@ class HandlePersonFoundTest {
         when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(musicBrainzService.getArtistInfo(eq("Artist"), any()))
-                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), "rock", null, null, null)));
+                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), Map.of("en", MetadataSource.WIKIPEDIA), "rock", null, null, null)));
 
         subject.handle(data);
 
@@ -241,7 +243,7 @@ class HandlePersonFoundTest {
                 .thenReturn(List.of(MetadataEntity.builder().build()));
         when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(musicBrainzService.getArtistInfo(eq("Artist"), any()))
-                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), "rock", IMAGE_URL, null, null)));
+                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of("en", "A bio"), Map.of("en", MetadataSource.WIKIPEDIA), "rock", IMAGE_URL, null, null)));
 
         subject.handle(data);
 
@@ -258,7 +260,7 @@ class HandlePersonFoundTest {
         when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(musicBrainzService.getArtistInfo(eq("Artist"), any()))
-                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of(), "rock", IMAGE_URL, null, null)));
+                .thenReturn(Optional.of(new MusicBrainzService.ArtistInfo(Map.of(), Map.of(), "rock", IMAGE_URL, null, null)));
 
         subject.handle(data);
 
@@ -297,7 +299,8 @@ class HandlePersonFoundTest {
         when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(openLibraryService.getAuthorInfo(eq("Artist"), any()))
                 .thenReturn(Optional.of(new OpenLibraryService.AuthorInfo(
-                        Map.of("en", "A writer."), PHOTO_URL, 1967, "OL1A")));
+                        Map.of("en", "A writer."), Map.of("en", MetadataSource.OPEN_LIBRARY),
+                        PHOTO_URL, 1967, "OL1A")));
 
         subject.handle(data);
 
@@ -310,8 +313,10 @@ class HandlePersonFoundTest {
         assertEquals("A writer.", saved.getDescription());
         assertEquals("eng", saved.getLanguage());
         assertEquals("openlibrary://author/OL1A", saved.getSourceUri());
+        assertEquals(MetadataSource.OPEN_LIBRARY, saved.getSource());
+        // The image sourceUri carries the photo URL so the source can be derived from its host.
         verify(imageDownloadService).downloadAndSave(
-                PHOTO_URL, ImageType.COVER, "eng", "openlibrary://author/OL1A",
+                PHOTO_URL, ImageType.COVER, "eng", "openlibrary://" + PHOTO_URL,
                 new ImageSave.MediaEntityRef(null, null, null, author, null));
     }
 
@@ -323,7 +328,7 @@ class HandlePersonFoundTest {
         when(metadataRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(imageRepository.findByPersonEntityId(personId)).thenReturn(List.of());
         when(openLibraryService.getAuthorInfo(eq("Artist"), any()))
-                .thenReturn(Optional.of(new OpenLibraryService.AuthorInfo(Map.of(), null, 1967, "OL1A")));
+                .thenReturn(Optional.of(new OpenLibraryService.AuthorInfo(Map.of(), Map.of(), null, 1967, "OL1A")));
 
         subject.handle(data);
 

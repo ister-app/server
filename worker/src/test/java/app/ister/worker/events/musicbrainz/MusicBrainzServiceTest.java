@@ -1,5 +1,6 @@
 package app.ister.worker.events.musicbrainz;
 
+import app.ister.core.enums.MetadataSource;
 import app.ister.worker.events.wikipedia.WikipediaService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -197,6 +198,7 @@ class MusicBrainzServiceTest {
         assertTrue(result.isPresent());
         assertEquals("rock", result.get().genre());
         assertEquals("An English rock band.", result.get().bios().get("en"));
+        assertEquals(MetadataSource.WIKIPEDIA, result.get().bioSources().get("en"));
         // The MusicBrainz image relation wins over the Wikipedia thumbnail.
         assertEquals("https://commons.wikimedia.org/wiki/Special:FilePath/Radiohead.jpg?width=1000",
                 result.get().imageUrl());
@@ -276,6 +278,7 @@ class MusicBrainzServiceTest {
 
         assertTrue(result.isPresent());
         assertEquals("MB annotation bio", result.get().bios().get("en"));
+        assertEquals(MetadataSource.MUSICBRAINZ, result.get().bioSources().get("en"));
         assertNull(result.get().imageUrl());
         // No wikidata relation, so no Wikidata/Wikipedia calls were made.
         server.verify();
