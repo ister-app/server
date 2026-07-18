@@ -6,6 +6,7 @@ import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.SeriesEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
+import app.ister.core.enums.ReadingDirection;
 import app.ister.core.eventdata.ComicSeriesFoundData;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MetadataRepository;
@@ -62,13 +63,20 @@ public class HandleComicSeriesFound implements Handle<ComicSeriesFoundData> {
                 return;
             }
 
-            WikipediaService.Content content =
+            WikipediaService.SeriesContent seriesContent =
                     metadataProvider.fetchSeriesContent(series.getName(), languageProperties.tags());
+            WikipediaService.Content content = seriesContent.content();
             if (!hasMetadata) {
                 saveDescriptions(series, content.bios());
             }
             if (!hasImage && content.thumbnail() != null) {
                 downloadThumbnail(series, content.thumbnail());
+            }
+            // Weak signal: only fills an unset direction, never overwrites an explicit
+            // ComicInfo.xml Manga tag (which may legitimately say No).
+            if (seriesContent.manga() && series.getDefaultReadingDirection() == null) {
+                series.setDefaultReadingDirection(ReadingDirection.RTL);
+                seriesRepository.save(series);
             }
         });
     }

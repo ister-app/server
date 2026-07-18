@@ -11,6 +11,7 @@ import java.util.List;
 
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -56,10 +57,37 @@ class WikipediaServiceTest {
                         {"extract":"A manga series.","thumbnail":{"source":"https://wiki/aot.jpg"}}
                         """, MediaType.APPLICATION_JSON));
 
-        WikipediaService.Content content = subject.fetchContentForSeries("Attack on Titan", List.of("en"));
+        WikipediaService.SeriesContent seriesContent =
+                subject.fetchContentForSeries("Attack on Titan", List.of("en"));
 
-        assertEquals("A manga series.", content.bios().get("en"));
-        assertEquals("https://wiki/aot.jpg", content.thumbnail());
+        assertEquals("A manga series.", seriesContent.content().bios().get("en"));
+        assertEquals("https://wiki/aot.jpg", seriesContent.content().thumbnail());
+        assertTrue(seriesContent.manga());
+        server.verify();
+    }
+
+    /** A western comic series (Q14406742) is a valid match but not manga. */
+    @Test
+    void aComicBookSeriesIsNotFlaggedAsManga() {
+        server.expect(requestTo(startsWith(WIKIDATA_API)))
+                .andRespond(withSuccess("{\"search\":[{\"id\":\"Q13\"}]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(WIKIDATA_ENDPOINT + "Q13.json"))
+                .andRespond(withSuccess("""
+                        {"entities":{"Q13":{
+                          "claims":{"P31":[{"mainsnak":{"datavalue":{"value":{"id":"Q14406742"}}}}]},
+                          "labels":{"en":{"value":"Lucky Luke"}},
+                          "sitelinks":{"enwiki":{"title":"Lucky Luke"}}}}}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(EN_SUMMARY + "Lucky%20Luke"))
+                .andRespond(withSuccess("""
+                        {"extract":"A comic series."}
+                        """, MediaType.APPLICATION_JSON));
+
+        WikipediaService.SeriesContent seriesContent =
+                subject.fetchContentForSeries("Lucky Luke", List.of("en"));
+
+        assertEquals("A comic series.", seriesContent.content().bios().get("en"));
+        assertFalse(seriesContent.manga());
         server.verify();
     }
 
@@ -76,10 +104,12 @@ class WikipediaServiceTest {
                           "sitelinks":{"enwiki":{"title":"Attack on Titan"}}}}}
                         """, MediaType.APPLICATION_JSON));
 
-        WikipediaService.Content content = subject.fetchContentForSeries("Attack on Titan", List.of("en"));
+        WikipediaService.SeriesContent seriesContent =
+                subject.fetchContentForSeries("Attack on Titan", List.of("en"));
 
-        assertTrue(content.bios().isEmpty());
-        assertNull(content.thumbnail());
+        assertTrue(seriesContent.content().bios().isEmpty());
+        assertNull(seriesContent.content().thumbnail());
+        assertFalse(seriesContent.manga());
         server.verify();
     }
 
@@ -88,7 +118,7 @@ class WikipediaServiceTest {
         server.expect(requestTo(startsWith(WIKIDATA_API)))
                 .andRespond(withSuccess("{\"search\":[]}", MediaType.APPLICATION_JSON));
 
-        assertTrue(subject.fetchContentForSeries("Unknown Series", List.of("en")).bios().isEmpty());
+        assertTrue(subject.fetchContentForSeries("Unknown Series", List.of("en")).content().bios().isEmpty());
     }
 
     @Test

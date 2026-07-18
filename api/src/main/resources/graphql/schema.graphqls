@@ -90,6 +90,12 @@ type Mutation {
     of that user. Returns true.
     """
     setLibrarySorting(libraryId: ID!, sorting: SortingEnum!, sortingOrder: SortingOrder!): Boolean!
+    """
+    Sets the calling user's reading direction for one comic/manga series; it applies to every
+    client of that user. A null direction clears the override so the series default applies again.
+    Returns true.
+    """
+    setSeriesReadingDirection(seriesId: ID!, direction: ReadingDirection): Boolean!
     "Queues a feed refresh for every active podcast."
     refreshPodcasts: Boolean!
     "Queues a download of the episode's audio to this node's cache directory."
@@ -225,6 +231,12 @@ enum SortingEnum {
 enum SortingOrder {
     DESCENDING
     ASCENDING
+}
+
+"Page order of a comic/manga series: western comics read LTR, unflipped manga RTL."
+enum ReadingDirection {
+    LTR
+    RTL
 }
 
 enum LibraryType {
@@ -593,6 +605,13 @@ type Series {
     images: [Image!]
     "The series' own artwork when present, else the cover of the first book/volume."
     cover: Image
+    """
+    The calling user's effective reading direction: their override, else the detected series
+    default (RTL for manga), else LTR.
+    """
+    readingDirection: ReadingDirection!
+    "The calling user's explicit override, if any; null when the series default applies."
+    userReadingDirection: ReadingDirection
 }
 
 type SeriesPage {

@@ -10,6 +10,9 @@ import java.util.List;
  */
 public interface ComicSeriesMetadataProvider {
 
-    /** Per-language descriptions plus a thumbnail; {@code Content.EMPTY} when nothing matched. */
-    WikipediaService.Content fetchSeriesContent(String seriesName, List<String> languageTags);
+    /**
+     * Per-language descriptions plus a thumbnail, and whether the source types the series as
+     * manga; {@code SeriesContent.EMPTY} when nothing matched.
+     */
+    WikipediaService.SeriesContent fetchSeriesContent(String seriesName, List<String> languageTags);
 }

@@ -5,9 +5,11 @@ import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
+import app.ister.core.entity.SeriesEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
+import app.ister.core.enums.ReadingDirection;
 import app.ister.core.enums.SearchEntityType;
 import app.ister.core.eventdata.ComicFileFoundData;
 import app.ister.core.eventdata.ImageFoundData;
@@ -16,6 +18,7 @@ import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MetadataRepository;
+import app.ister.core.repository.SeriesRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
@@ -52,6 +55,7 @@ public class HandleComicFileFound implements Handle<ComicFileFoundData> {
     private final MediaFileRepository mediaFileRepository;
     private final MetadataRepository metadataRepository;
     private final BookRepository bookRepository;
+    private final SeriesRepository seriesRepository;
     private final ImageRepository imageRepository;
     private final CbzParser cbzParser;
     private final PdfParser pdfParser;
@@ -151,6 +155,24 @@ public class HandleComicFileFound implements Handle<ComicFileFoundData> {
             bookRepository.save(volume);
         }
         scannerHelperService.refreshBookReleaseYear(volume);
+        applyMangaTag(volume, info);
+    }
+
+    /**
+     * An explicit Manga tag is authoritative for the whole series (idempotent on rescan, may
+     * overwrite a weaker Wikidata-detected value); an absent tag leaves the default untouched so
+     * the metadata enrichment can still fill it.
+     */
+    private void applyMangaTag(BookEntity volume, ComicInfoXml info) {
+        SeriesEntity series = volume.getSeriesEntity();
+        if (info.manga() == null || series == null) {
+            return;
+        }
+        ReadingDirection detected = info.rightToLeft() ? ReadingDirection.RTL : ReadingDirection.LTR;
+        if (series.getDefaultReadingDirection() != detected) {
+            series.setDefaultReadingDirection(detected);
+            seriesRepository.save(series);
+        }
     }
 
     private void saveCover(DirectoryEntity libraryDir, BookEntity volume, byte[] coverBytes,

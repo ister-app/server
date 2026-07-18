@@ -12,6 +12,7 @@ import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.LibraryType;
+import app.ister.core.enums.ReadingDirection;
 import app.ister.core.enums.SearchEntityType;
 import app.ister.core.eventdata.ComicFileFoundData;
 import app.ister.core.eventdata.ImageFoundData;
@@ -20,6 +21,7 @@ import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MetadataRepository;
+import app.ister.core.repository.SeriesRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
@@ -45,12 +47,14 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -66,6 +70,8 @@ class HandleComicFileFoundTest {
     private MetadataRepository metadataRepository;
     @Mock
     private BookRepository bookRepository;
+    @Mock
+    private SeriesRepository seriesRepository;
     @Mock
     private ImageRepository imageRepository;
     @Mock
@@ -96,12 +102,13 @@ class HandleComicFileFoundTest {
     private DirectoryEntity cacheDir;
     private MediaFileEntity mediaFile;
     private BookEntity volume;
+    private SeriesEntity series;
 
     @BeforeEach
     void setUp() {
         subject = new HandleComicFileFound(directoryRepository, mediaFileRepository, metadataRepository,
-                bookRepository, imageRepository, cbzParser, pdfParser, messageSender, serverEventService,
-                scannerHelperService);
+                bookRepository, seriesRepository, imageRepository, cbzParser, pdfParser, messageSender,
+                serverEventService, scannerHelperService);
         node = NodeEntity.builder().name("node1").build();
         LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.COMIC).name("Comics").build();
         libraryDir = DirectoryEntity.builder()
@@ -112,7 +119,7 @@ class HandleComicFileFoundTest {
                 .id(cacheDirId).nodeEntity(node)
                 .name("node1-cache-directory").path(cachePath.toString()).directoryType(DirectoryType.CACHE)
                 .build();
-        SeriesEntity series = SeriesEntity.builder().id(UUID.randomUUID()).name("Fairy Tail").build();
+        series = SeriesEntity.builder().id(UUID.randomUUID()).name("Fairy Tail").build();
         volume = BookEntity.builder().id(volumeId).libraryEntity(library)
                 .seriesEntity(series).name("fairytail_vol12").build();
         mediaFile = MediaFileEntity.builder().path("unset").size(1L).build();
@@ -231,6 +238,57 @@ class HandleComicFileFoundTest {
 
         verify(metadataRepository).save(own);
         assertEquals("New Title", own.getTitle());
+    }
+
+    /** An explicit Manga tag lands on the series and is idempotent on rescan. */
+    @Test
+    void mangaTagSetsTheSeriesDefaultReadingDirection() throws IOException {
+        String comicInfo = "<ComicInfo><Manga>YesAndRightToLeft</Manga></ComicInfo>";
+        Path cbz = writeCbz(Map.of(
+                "page1.jpg", new byte[]{1},
+                "ComicInfo.xml", comicInfo.getBytes(StandardCharsets.UTF_8)));
+        when(metadataRepository.findByBookEntityId(volumeId)).thenReturn(List.of());
+        when(imageRepository.findByBookEntityId(volumeId)).thenReturn(List.of());
+
+        subject.handle(event(cbz));
+        assertEquals(ReadingDirection.RTL, series.getDefaultReadingDirection());
+        verify(seriesRepository).save(series);
+
+        // Rescan: the direction already matches, no second save.
+        subject.handle(event(cbz));
+        verify(seriesRepository, times(1)).save(series);
+    }
+
+    /** ComicInfo is authoritative: an explicit No overwrites a weaker Wikidata-detected RTL. */
+    @Test
+    void mangaNoOverwritesADetectedDirection() throws IOException {
+        series.setDefaultReadingDirection(ReadingDirection.RTL);
+        String comicInfo = "<ComicInfo><Manga>No</Manga></ComicInfo>";
+        Path cbz = writeCbz(Map.of(
+                "page1.jpg", new byte[]{1},
+                "ComicInfo.xml", comicInfo.getBytes(StandardCharsets.UTF_8)));
+        when(metadataRepository.findByBookEntityId(volumeId)).thenReturn(List.of());
+        when(imageRepository.findByBookEntityId(volumeId)).thenReturn(List.of());
+
+        subject.handle(event(cbz));
+
+        assertEquals(ReadingDirection.LTR, series.getDefaultReadingDirection());
+    }
+
+    /** An absent tag leaves the direction unset so the metadata enrichment can still fill it. */
+    @Test
+    void absentMangaTagLeavesTheDirectionUntouched() throws IOException {
+        String comicInfo = "<ComicInfo><Title>The Guild</Title></ComicInfo>";
+        Path cbz = writeCbz(Map.of(
+                "page1.jpg", new byte[]{1},
+                "ComicInfo.xml", comicInfo.getBytes(StandardCharsets.UTF_8)));
+        when(metadataRepository.findByBookEntityId(volumeId)).thenReturn(List.of());
+        when(imageRepository.findByBookEntityId(volumeId)).thenReturn(List.of());
+
+        subject.handle(event(cbz));
+
+        assertNull(series.getDefaultReadingDirection());
+        verifyNoInteractions(seriesRepository);
     }
 
     @Test

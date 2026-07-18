@@ -13,7 +13,7 @@ public class WikipediaComicSeriesProvider implements ComicSeriesMetadataProvider
     private final WikipediaService wikipediaService;
 
     @Override
-    public WikipediaService.Content fetchSeriesContent(String seriesName, List<String> languageTags) {
+    public WikipediaService.SeriesContent fetchSeriesContent(String seriesName, List<String> languageTags) {
         return wikipediaService.fetchContentForSeries(seriesName, languageTags);
     }
 }

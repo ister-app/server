@@ -15,6 +15,7 @@ import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -62,6 +63,7 @@ class CbzParserTest {
                   <Summary>A wizard guild.</Summary>
                   <Year>2008</Year>
                   <Writer>Hiro Mashima</Writer>
+                  <Manga>YesAndRightToLeft</Manga>
                 </ComicInfo>
                 """;
         Path cbz = writeCbz(Map.of(
@@ -77,6 +79,24 @@ class CbzParserTest {
         assertEquals("A wizard guild.", info.get().summary());
         assertEquals(2008, info.get().year());
         assertEquals("Hiro Mashima", info.get().writer());
+        assertEquals("YesAndRightToLeft", info.get().manga());
+        assertTrue(info.get().rightToLeft());
+    }
+
+    /** Per the ComicRack spec, plain Yes is flipped manga (LTR); only YesAndRightToLeft is RTL. */
+    @Test
+    void mangaTagVariants() throws IOException {
+        assertFalse(parseManga("<ComicInfo><Manga>Yes</Manga></ComicInfo>").rightToLeft());
+        assertFalse(parseManga("<ComicInfo><Manga>No</Manga></ComicInfo>").rightToLeft());
+        assertTrue(parseManga("<ComicInfo><Manga>yesandrighttoleft</Manga></ComicInfo>").rightToLeft());
+        ComicInfoXml absent = parseManga("<ComicInfo/>");
+        assertNull(absent.manga());
+        assertFalse(absent.rightToLeft());
+    }
+
+    private ComicInfoXml parseManga(String xml) throws IOException {
+        return parser.comicInfo(writeCbz(Map.of(
+                "ComicInfo.xml", xml.getBytes(StandardCharsets.UTF_8)))).orElseThrow();
     }
 
     @Test

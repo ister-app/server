@@ -1,5 +1,6 @@
 package app.ister.core.entity;
 
+import app.ister.core.enums.ReadingDirection;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -39,6 +40,15 @@ public class SeriesEntity extends BaseEntity {
     @Setter
     @Column(nullable = false)
     private int startYear;
+
+    /**
+     * Detected default reading direction: RTL for manga (ComicInfo.xml {@code Manga} tag, or the
+     * Wikidata enrichment). NULL = no signal, which resolves to LTR. A user preference row
+     * ({@link UserSeriesPreferenceEntity}) overrides this.
+     */
+    @Setter
+    @Enumerated(EnumType.STRING)
+    private ReadingDirection defaultReadingDirection;
 
     /**
      * Series order: seriesIndex ascending; books with an unknown position sort last (PostgreSQL

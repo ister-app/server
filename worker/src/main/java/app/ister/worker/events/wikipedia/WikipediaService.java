@@ -41,11 +41,21 @@ public class WikipediaService {
             "Q1004",      // comics
             "Q8274"       // manga
     );
+    /** The subset of {@link #COMIC_SERIES_TYPES} that identifies manga (read right-to-left). */
+    private static final Set<String> MANGA_TYPES = Set.of(
+            "Q21198342",  // manga series
+            "Q8274"       // manga
+    );
     private static final int MAX_CANDIDATES = 3;
 
     /** Per-language bios plus the first available thumbnail (image fallback). Either may be empty/null. */
     public record Content(Map<String, String> bios, String thumbnail) {
         public static final Content EMPTY = new Content(Map.of(), null);
+    }
+
+    /** Series content plus whether the matched Wikidata item is typed as manga. */
+    public record SeriesContent(Content content, boolean manga) {
+        public static final SeriesContent EMPTY = new SeriesContent(Content.EMPTY, false);
     }
 
     private record Summary(String extract, String thumbnail) {}
@@ -101,19 +111,20 @@ public class WikipediaService {
      * Multilingual description (and thumbnail) for a comic/manga series known only by name: the
      * first Wikidata candidate that is typed as a comic series and whose label matches wins.
      */
-    public Content fetchContentForSeries(String name, List<String> languageTags) {
+    public SeriesContent fetchContentForSeries(String name, List<String> languageTags) {
         if (name == null || languageTags == null || languageTags.isEmpty()) {
-            return Content.EMPTY;
+            return SeriesContent.EMPTY;
         }
         String wanted = normalizeTitle(name);
         for (String candidateId : searchEntityIds(name, languageTags.getFirst())) {
             Map<String, Object> entity = fetchWikidataEntity(candidateId);
             if (isComicSeries(entity, candidateId) && labelMatches(entity, candidateId, wanted, languageTags)) {
-                return contentOf(entity, candidateId, languageTags);
+                return new SeriesContent(contentOf(entity, candidateId, languageTags),
+                        hasInstanceOf(entity, candidateId, MANGA_TYPES));
             }
         }
         log.debug("No matching Wikidata comic series found for name={}", name);
-        return Content.EMPTY;
+        return SeriesContent.EMPTY;
     }
 
     private Content contentOf(Map<String, Object> wikidata, String wikidataId, List<String> languageTags) {
@@ -167,19 +178,16 @@ public class WikipediaService {
     /** True when the entity is an instance of (P31) human (Q5) — a name search also returns books,
      * films and bands named after the person. */
     private boolean isHuman(Map<String, Object> wikidata, String wikidataId) {
-        Object claims = entityField(wikidata, wikidataId, "claims");
-        if (!(claims instanceof Map<?, ?> claimMap) || !(claimMap.get("P31") instanceof List<?> instanceOf)) {
-            return false;
-        }
-        return instanceOf.stream().anyMatch(claim -> claim instanceof Map<?, ?> c
-                && c.get("mainsnak") instanceof Map<?, ?> snak
-                && snak.get("datavalue") instanceof Map<?, ?> value
-                && value.get("value") instanceof Map<?, ?> item
-                && HUMAN.equals(item.get("id")));
+        return hasInstanceOf(wikidata, wikidataId, Set.of(HUMAN));
     }
 
     /** True when the entity's P31 says it is a comic/manga series (or close enough — see the set). */
     private boolean isComicSeries(Map<String, Object> wikidata, String wikidataId) {
+        return hasInstanceOf(wikidata, wikidataId, COMIC_SERIES_TYPES);
+    }
+
+    /** True when any of the entity's P31 (instance of) claims is one of the wanted item ids. */
+    private boolean hasInstanceOf(Map<String, Object> wikidata, String wikidataId, Set<String> wantedIds) {
         Object claims = entityField(wikidata, wikidataId, "claims");
         if (!(claims instanceof Map<?, ?> claimMap) || !(claimMap.get("P31") instanceof List<?> instanceOf)) {
             return false;
@@ -189,7 +197,7 @@ public class WikipediaService {
                 && snak.get("datavalue") instanceof Map<?, ?> value
                 && value.get("value") instanceof Map<?, ?> item
                 && item.get("id") instanceof String id
-                && COMIC_SERIES_TYPES.contains(id));
+                && wantedIds.contains(id));
     }
 
     /** Guards against a same-named different person: the entity's label in one of our languages must

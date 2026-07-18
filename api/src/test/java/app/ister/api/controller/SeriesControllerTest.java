@@ -4,23 +4,31 @@ import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.SeriesEntity;
+import app.ister.core.entity.UserSeriesPreferenceEntity;
 import app.ister.core.enums.ImageType;
+import app.ister.core.enums.ReadingDirection;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.SeriesRepository;
+import app.ister.core.repository.UserSeriesPreferenceRepository;
+import app.ister.core.service.SeriesPreferenceService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.Authentication;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +45,15 @@ class SeriesControllerTest {
 
     @Mock
     private MetadataRepository metadataRepository;
+
+    @Mock
+    private UserSeriesPreferenceRepository userSeriesPreferenceRepository;
+
+    @Mock
+    private SeriesPreferenceService seriesPreferenceService;
+
+    @Mock
+    private Authentication authentication;
 
     private final PersonEntity author = PersonEntity.builder().id(UUID.randomUUID()).name("John Flanagan").build();
 
@@ -111,6 +128,52 @@ class SeriesControllerTest {
 
         assertEquals(List.of(series), subject.series(Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.of(libraryId)).getContent());
+    }
+
+    @Test
+    void setSeriesReadingDirectionDelegatesToTheService() {
+        UUID seriesId = UUID.randomUUID();
+
+        assertTrue(subject.setSeriesReadingDirection(seriesId, ReadingDirection.RTL, authentication));
+
+        verify(seriesPreferenceService).setReadingDirection(authentication, seriesId, ReadingDirection.RTL);
+    }
+
+    /** Override wins; without one the detected series default; without either LTR. */
+    @Test
+    void readingDirectionResolvesPreferenceOverDefaultOverLtr() {
+        SeriesEntity withOverride = SeriesEntity.builder().id(UUID.randomUUID()).name("A").build();
+        SeriesEntity manga = SeriesEntity.builder().id(UUID.randomUUID()).name("B")
+                .defaultReadingDirection(ReadingDirection.RTL).build();
+        SeriesEntity plain = SeriesEntity.builder().id(UUID.randomUUID()).name("C").build();
+        List<SeriesEntity> all = List.of(withOverride, manga, plain);
+        when(authentication.getName()).thenReturn("user-1");
+        when(userSeriesPreferenceRepository.findByUserEntityExternalIdAndSeriesEntityIn("user-1", all))
+                .thenReturn(List.of(UserSeriesPreferenceEntity.builder()
+                        .seriesEntity(withOverride).readingDirection(ReadingDirection.RTL).build()));
+
+        Map<SeriesEntity, ReadingDirection> resolved = subject.readingDirection(all, authentication);
+
+        assertEquals(ReadingDirection.RTL, resolved.get(withOverride));
+        assertEquals(ReadingDirection.RTL, resolved.get(manga));
+        assertEquals(ReadingDirection.LTR, resolved.get(plain));
+    }
+
+    /** Only series with an explicit override appear; the rest resolve to null (default applies). */
+    @Test
+    void userReadingDirectionOnlyMapsExplicitOverrides() {
+        SeriesEntity withOverride = SeriesEntity.builder().id(UUID.randomUUID()).name("A").build();
+        SeriesEntity without = SeriesEntity.builder().id(UUID.randomUUID()).name("B").build();
+        List<SeriesEntity> all = List.of(withOverride, without);
+        when(authentication.getName()).thenReturn("user-1");
+        when(userSeriesPreferenceRepository.findByUserEntityExternalIdAndSeriesEntityIn("user-1", all))
+                .thenReturn(List.of(UserSeriesPreferenceEntity.builder()
+                        .seriesEntity(withOverride).readingDirection(ReadingDirection.LTR).build()));
+
+        Map<SeriesEntity, ReadingDirection> resolved = subject.userReadingDirection(all, authentication);
+
+        assertEquals(ReadingDirection.LTR, resolved.get(withOverride));
+        assertFalse(resolved.containsKey(without));
     }
 
     @Test

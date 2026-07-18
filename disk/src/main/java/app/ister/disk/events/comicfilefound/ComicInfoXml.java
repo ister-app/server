@@ -18,8 +18,18 @@ import java.util.Optional;
  * @param summary the Summary element, or null
  * @param year    the Year element, or 0 when absent/unparseable
  * @param writer  the Writer element, or null
+ * @param manga   the Manga element ({@code No}/{@code Yes}/{@code YesAndRightToLeft}), or null
  */
-public record ComicInfoXml(String series, Double number, String title, String summary, int year, String writer) {
+public record ComicInfoXml(String series, Double number, String title, String summary, int year, String writer,
+                           String manga) {
+
+    /**
+     * Whether the volume reads right-to-left. Per the ComicRack spec only {@code YesAndRightToLeft}
+     * means RTL; plain {@code Yes} is manga published flipped, reading LTR.
+     */
+    public boolean rightToLeft() {
+        return "YesAndRightToLeft".equalsIgnoreCase(manga);
+    }
 
     /** Parses a ComicInfo.xml stream; empty on any parse failure (untrusted input). */
     public static Optional<ComicInfoXml> parse(InputStream in) {
@@ -37,7 +47,8 @@ public record ComicInfoXml(String series, Double number, String title, String su
                     text(doc, "Title"),
                     text(doc, "Summary"),
                     parseYear(text(doc, "Year")),
-                    text(doc, "Writer")));
+                    text(doc, "Writer"),
+                    text(doc, "Manga")));
         } catch (Exception _) {
             return Optional.empty();
         }
