@@ -41,6 +41,10 @@ type Query {
     search(term: String!, size: Int, libraryId: ID): [SearchResult!]!
     "The calling user's playback settings; defaults (the server's languages) when they never saved any."
     userSettings: UserSettings!
+    "The calling user: identity plus whether the admin realm role is present on the token."
+    me: Me!
+    "Every user that logged in at least once. Admin only."
+    users: [User!]!
     "External metadata/image providers actually in use on this server, for attribution display."
     attributions: [Attribution!]!
 }
@@ -71,7 +75,9 @@ type Attribution {
 union SearchResult = Movie | Show | Episode | Person | Album | Track | Book | Podcast
 
 type Mutation {
+    "Admin only."
     scanLibrary: Boolean!
+    "Admin only."
     analyzeLibrary: Boolean!
     createPlayQueue(input: CreatePlayQueueInput!): PlayQueue!
     """
@@ -84,13 +90,21 @@ type Mutation {
     removePlayQueueItem(playQueueId: ID!, playQueueItemId: ID!): PlayQueue!
     addPlayQueueItem(playQueueId: ID!, mediaType: MediaType!, mediaId: ID!, afterPlayQueueItemId: ID): PlayQueue!
     createStreamToken: StreamToken!
+    "Admin only."
     analyzeDataForEpisode(episodeId: ID!): Boolean!
+    "Admin only."
     analyzeDataForMovie(movieId: ID!): Boolean!
+    "Admin only."
     analyzeDataForShow(showId: ID!): Boolean!
+    "Admin only."
     analyzeDataForLibrary(libraryId: ID!): Boolean!
+    "Admin only."
     analyzeDataForPerson(personId: ID!): Boolean!
+    "Admin only."
     analyzeDataForAlbum(albumId: ID!): Boolean!
+    "Admin only."
     analyzeDataForTrack(trackId: ID!): Boolean!
+    "Admin only."
     reindexSearch: Boolean!
     "Sets the calling user's rating (1-10) for a media item. Pass rating: null to clear it. Returns true."
     setRating(mediaType: RatingMediaType!, mediaId: ID!, rating: Int): Boolean!
@@ -100,9 +114,9 @@ type Mutation {
     one watch status row per user per book.
     """
     updateReadingProgress(bookId: ID!, location: String!, progress: Float!): WatchStatus!
-    "Subscribes to an RSS feed (or reactivates an unsubscribed one) and queues the first refresh."
+    "Admin only. Subscribes to an RSS feed (or reactivates an unsubscribed one) and queues the first refresh."
     subscribePodcast(feedUrl: String!): Podcast!
-    "Deactivates the subscription; episodes and listening history are kept."
+    "Admin only. Deactivates the subscription; episodes and listening history are kept."
     unsubscribePodcast(id: ID!): Boolean!
     """
     Sets the calling user's episode sort order for one podcast. It applies to every client of that
@@ -138,6 +152,13 @@ type Mutation {
     are transcoded in the background.
     """
     updateUserSettings(input: UserSettingsInput!): UserSettings!
+    "Admin only. Marks a library as visible to every user (true) or restricted (false). Returns true."
+    setLibraryVisibleToAll(libraryId: ID!, visibleToAll: Boolean!): Boolean!
+    """
+    Admin only. Grants (true) or revokes (false) one user's access to one restricted library.
+    Idempotent: granting twice or revoking a grant that does not exist is fine. Returns true.
+    """
+    setUserLibraryAccess(userId: ID!, libraryId: ID!, granted: Boolean!): Boolean!
 }
 
 type Subscription {
@@ -432,6 +453,28 @@ type Library {
     sorting: SortingEnum!
     "The calling user's grid sort direction for this library; ASCENDING when unset."
     sortingOrder: SortingOrder!
+    "Whether every user may see this library. Admins always see everything."
+    visibleToAll: Boolean!
+}
+
+"The calling user, as seen by the server."
+type Me {
+    id: ID!
+    name: String
+    email: String
+    "Whether the token carries the admin realm role."
+    isAdmin: Boolean!
+}
+
+"A user known to this server (anyone who logged in at least once). Admin-only fields."
+type User {
+    id: ID!
+    name: String
+    email: String
+    "Snapshot of the admin realm role, as of the user's most recent request."
+    isAdmin: Boolean!
+    "Restricted libraries this user was explicitly granted (visible-to-all libraries are not listed)."
+    grantedLibraries: [Library!]!
 }
 
 type MediaFileStream {

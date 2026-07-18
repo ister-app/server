@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -23,4 +24,12 @@ public class LibraryEntity extends BaseEntity {
 
     @Column(nullable = false, unique = true)
     private String name;
+
+    /**
+     * When false the library is only visible to admins and to users with a
+     * {@link UserLibraryAccessEntity} grant. New libraries start visible to everyone.
+     */
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean visibleToAll = true;
 }

@@ -8,6 +8,7 @@ import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
@@ -31,11 +32,14 @@ import java.util.stream.Collectors;
 public class ChapterController {
     private final ChapterRepository chapterRepository;
     private final WatchStatusRepository watchStatusRepository;
+    private final LibraryAccessService libraryAccessService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public Optional<ChapterEntity> chapterById(@Argument UUID id) {
-        return chapterRepository.findById(id);
+    public Optional<ChapterEntity> chapterById(@Argument UUID id, Authentication authentication) {
+        return chapterRepository.findById(id)
+                .filter(chapter -> libraryAccessService.canAccess(
+                        chapter.getBookEntity().getLibraryEntity(), authentication));
     }
 
     @SchemaMapping(typeName = "Chapter", field = "author")

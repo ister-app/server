@@ -34,6 +34,30 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class RatingControllerTest {
 
+    @Mock
+    private app.ister.core.repository.MovieRepository movieRepository;
+
+    @Mock
+    private app.ister.core.repository.ShowRepository showRepository;
+
+    @Mock
+    private app.ister.core.repository.EpisodeRepository episodeRepository;
+
+    @Mock
+    private app.ister.core.repository.AlbumRepository albumRepository;
+
+    @Mock
+    private app.ister.core.repository.TrackRepository trackRepository;
+
+    @Mock
+    private app.ister.core.repository.BookRepository bookRepository;
+
+    @Mock
+    private app.ister.core.repository.PodcastRepository podcastRepository;
+
+    @Mock
+    private app.ister.core.service.LibraryAccessService libraryAccessService;
+
     @InjectMocks
     private RatingController subject;
 
@@ -59,6 +83,11 @@ class RatingControllerTest {
     @Test
     void setRatingDelegatesToService() {
         UUID mediaId = UUID.randomUUID();
+        MovieEntity ratedMovie = MovieEntity.builder().name("Heat").releaseYear(1995)
+                .libraryEntity(app.ister.core.entity.LibraryEntity.builder().name("Movies").build()).build();
+        when(movieRepository.findById(mediaId)).thenReturn(java.util.Optional.of(ratedMovie));
+        when(libraryAccessService.canAccess(org.mockito.ArgumentMatchers.<app.ister.core.entity.LibraryEntity>any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(true);
 
         assertTrue(subject.setRating(RatingMediaType.MOVIE, mediaId, 8, authentication));
 

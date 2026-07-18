@@ -6,6 +6,7 @@ import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.UserLibraryPreferenceRepository;
+import app.ister.core.service.LibraryAccessService;
 import app.ister.core.service.LibraryPreferenceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -27,11 +28,15 @@ public class LibraryController {
     private final LibraryRepository libraryRepository;
     private final UserLibraryPreferenceRepository userLibraryPreferenceRepository;
     private final LibraryPreferenceService libraryPreferenceService;
+    private final LibraryAccessService libraryAccessService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public List<LibraryEntity> libraries() {
-        return libraryRepository.findAll();
+    public List<LibraryEntity> libraries(Authentication authentication) {
+        return libraryAccessService.allowedLibraryIds(authentication)
+                .map(allowed -> libraryRepository.findAll().stream()
+                        .filter(library -> allowed.contains(library.getId())).toList())
+                .orElseGet(libraryRepository::findAll);
     }
 
     @PreAuthorize("hasRole('user')")
@@ -41,6 +46,9 @@ public class LibraryController {
             @Argument SortingEnum sorting,
             @Argument SortingOrder sortingOrder,
             Authentication authentication) {
+        if (!libraryAccessService.canAccess(libraryId, authentication)) {
+            return false;
+        }
         libraryPreferenceService.setSorting(authentication, libraryId, sorting, sortingOrder);
         return true;
     }

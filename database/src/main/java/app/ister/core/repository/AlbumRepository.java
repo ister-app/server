@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,7 +32,11 @@ public interface AlbumRepository extends JpaRepository<AlbumEntity, UUID> {
 
     Page<AlbumEntity> findByPersonEntity(PersonEntity personEntity, Pageable pageable);
 
+    Page<AlbumEntity> findByPersonEntityAndLibraryEntityIdIn(PersonEntity personEntity, Collection<UUID> libraryIds, Pageable pageable);
+
     Page<AlbumEntity> findByLibraryEntityId(UUID libraryId, Pageable pageable);
+
+    Page<AlbumEntity> findByLibraryEntityIdIn(Collection<UUID> libraryIds, Pageable pageable);
 
     List<AlbumEntity> findByPersonEntityId(UUID personId);
 

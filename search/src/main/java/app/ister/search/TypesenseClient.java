@@ -12,6 +12,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -154,7 +155,8 @@ public class TypesenseClient {
         }
     }
 
-    public JsonNode search(String collection, String term, int perPage, UUID libraryId) {
+    public JsonNode search(String collection, String term, int perPage, UUID libraryId,
+                           Collection<UUID> allowedLibraryIds) {
         String queryBy = queryByFields();
         String queryByWeights = queryByWeights();
         return restClient.get()
@@ -164,13 +166,29 @@ public class TypesenseClient {
                             .queryParam("query_by", queryBy)
                             .queryParam("query_by_weights", queryByWeights)
                             .queryParam("per_page", perPage);
-                    if (libraryId != null) {
-                        uriBuilder.queryParam("filter_by", "libraryId:=" + libraryId);
-                    }
+                    filterBy(libraryId, allowedLibraryIds)
+                            .ifPresent(filter -> uriBuilder.queryParam("filter_by", filter));
                     return uriBuilder.build(collection);
                 })
                 .retrieve()
                 .body(JsonNode.class);
+    }
+
+    /**
+     * An explicit libraryId wins (the caller already checked it is allowed); otherwise a
+     * multi-value filter restricts hits to the allowed set. Documents without a libraryId are
+     * excluded by either filter.
+     */
+    private Optional<String> filterBy(UUID libraryId, Collection<UUID> allowedLibraryIds) {
+        if (libraryId != null) {
+            return Optional.of("libraryId:=" + libraryId);
+        }
+        if (allowedLibraryIds == null) {
+            return Optional.empty();
+        }
+        return Optional.of(allowedLibraryIds.stream()
+                .map(UUID::toString)
+                .collect(Collectors.joining(",", "libraryId:=[", "]")));
     }
 
     /** {@code title,context} plus every configured language's title/description/genre field. */

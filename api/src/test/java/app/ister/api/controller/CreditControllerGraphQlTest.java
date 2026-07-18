@@ -35,6 +35,9 @@ class CreditControllerGraphQlTest {
     private GraphQlTester graphQlTester;
 
     @MockitoBean
+    private app.ister.core.service.LibraryAccessService libraryAccessService;
+
+    @MockitoBean
     private MovieRepository movieRepository;
 
     @MockitoBean
@@ -51,6 +54,28 @@ class CreditControllerGraphQlTest {
 
     @MockitoBean
     private EpisodeRepository episodeRepository;
+
+
+    @org.junit.jupiter.api.BeforeEach
+    void authenticateAsUser() {
+        org.mockito.Mockito.lenient().when(libraryAccessService.allowedLibraryIds(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(java.util.Optional.empty());
+        org.mockito.Mockito.lenient().when(libraryAccessService.canAccess(
+                org.mockito.ArgumentMatchers.<app.ister.core.entity.LibraryEntity>any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        org.mockito.Mockito.lenient().when(libraryAccessService.canAccess(
+                org.mockito.ArgumentMatchers.<java.util.UUID>any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        "test-user", null,
+                        java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_user"))));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearAuthentication() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
 
     @Test
     void movieCastResolvesCreditsAndPersons() {

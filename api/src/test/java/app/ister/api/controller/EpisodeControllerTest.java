@@ -10,6 +10,7 @@ import app.ister.core.entity.ShowEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.LibraryAccessService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -41,15 +42,21 @@ class EpisodeControllerTest {
     private WatchStatusRepository watchStatusRepository;
 
     @Mock
+    private LibraryAccessService libraryAccessService;
+
+    @Mock
     private Authentication authentication;
 
     @Test
     void episodeByIdReturnsFromRepository() {
         UUID id = UUID.randomUUID();
-        EpisodeEntity episode = EpisodeEntity.builder().number(1).build();
+        ShowEntity showOfEpisode = ShowEntity.builder().name("Test").releaseYear(2020)
+                .libraryEntity(app.ister.core.entity.LibraryEntity.builder().name("Shows").build()).build();
+        EpisodeEntity episode = EpisodeEntity.builder().number(1).showEntity(showOfEpisode).build();
         when(episodeRepository.findById(id)).thenReturn(Optional.of(episode));
+        when(libraryAccessService.canAccess(any(app.ister.core.entity.LibraryEntity.class), any())).thenReturn(true);
 
-        Optional<EpisodeEntity> result = subject.episodeById(id);
+        Optional<EpisodeEntity> result = subject.episodeById(id, authentication);
 
         assertTrue(result.isPresent());
         assertEquals(episode, result.get());
@@ -60,7 +67,7 @@ class EpisodeControllerTest {
         UUID id = UUID.randomUUID();
         when(episodeRepository.findById(id)).thenReturn(Optional.empty());
 
-        Optional<EpisodeEntity> result = subject.episodeById(id);
+        Optional<EpisodeEntity> result = subject.episodeById(id, authentication);
 
         assertTrue(result.isEmpty());
     }

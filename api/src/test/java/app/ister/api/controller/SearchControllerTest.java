@@ -12,6 +12,8 @@ import app.ister.core.repository.ShowRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.ServerEventService;
 import app.ister.search.SearchQueryService;
+import app.ister.core.service.LibraryAccessService;
+import org.springframework.security.core.Authentication;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -49,12 +51,18 @@ class SearchControllerTest {
     @InjectMocks
     private SearchController subject;
 
+    @Mock
+    private LibraryAccessService libraryAccessService;
+
+    @Mock
+    private Authentication authentication;
+
     @Test
     void searchThrowsWhenTypesenseIsNotConfigured() {
         when(searchQueryService.isEnabled()).thenReturn(false);
 
         assertThrows(SearchUnavailableException.class,
-                () -> subject.search("matrix", Optional.empty(), Optional.empty()));
+                () -> subject.search("matrix", Optional.empty(), Optional.empty(), authentication));
     }
 
     @Test
@@ -66,13 +74,14 @@ class SearchControllerTest {
 
         when(searchQueryService.isEnabled()).thenReturn(true);
         // Show ranks above movie in Typesense; hydration must keep that order.
-        when(searchQueryService.search("matrix", 20, null)).thenReturn(List.of(
+        when(libraryAccessService.allowedLibraryIds(org.mockito.ArgumentMatchers.any())).thenReturn(Optional.empty());
+        when(searchQueryService.search("matrix", 20, null, null)).thenReturn(List.of(
                 new SearchQueryService.SearchHit(SearchEntityType.SHOW, show.getId()),
                 new SearchQueryService.SearchHit(SearchEntityType.MOVIE, movie.getId())));
         when(showRepository.findAllById(List.of(show.getId()))).thenReturn(List.of(show));
         when(movieRepository.findAllById(List.of(movie.getId()))).thenReturn(List.of(movie));
 
-        List<Object> result = subject.search("matrix", Optional.empty(), Optional.empty());
+        List<Object> result = subject.search("matrix", Optional.empty(), Optional.empty(), authentication);
 
         assertEquals(List.of(show, movie), result);
     }
@@ -81,11 +90,12 @@ class SearchControllerTest {
     void searchDropsHitsThatNoLongerExistInTheDatabase() {
         UUID goneId = UUID.randomUUID();
         when(searchQueryService.isEnabled()).thenReturn(true);
-        when(searchQueryService.search("matrix", 20, null)).thenReturn(List.of(
+        when(libraryAccessService.allowedLibraryIds(org.mockito.ArgumentMatchers.any())).thenReturn(Optional.empty());
+        when(searchQueryService.search("matrix", 20, null, null)).thenReturn(List.of(
                 new SearchQueryService.SearchHit(SearchEntityType.MOVIE, goneId)));
         when(movieRepository.findAllById(List.of(goneId))).thenReturn(List.of());
 
-        List<Object> result = subject.search("matrix", Optional.empty(), Optional.empty());
+        List<Object> result = subject.search("matrix", Optional.empty(), Optional.empty(), authentication);
 
         assertTrue(result.isEmpty());
     }

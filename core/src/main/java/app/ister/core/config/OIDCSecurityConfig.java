@@ -1,5 +1,7 @@
 package app.ister.core.config;
 
+import app.ister.core.service.LibraryAccessService;
+import app.ister.core.service.MediaLibraryResolver;
 import app.ister.core.service.StreamTokenService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -25,9 +27,15 @@ import static org.springframework.security.config.Customizer.withDefaults;
 public class OIDCSecurityConfig {
 
     private final StreamTokenService streamTokenService;
+    private final MediaLibraryResolver mediaLibraryResolver;
+    private final LibraryAccessService libraryAccessService;
 
-    public OIDCSecurityConfig(StreamTokenService streamTokenService) {
+    public OIDCSecurityConfig(StreamTokenService streamTokenService,
+                              MediaLibraryResolver mediaLibraryResolver,
+                              LibraryAccessService libraryAccessService) {
         this.streamTokenService = streamTokenService;
+        this.mediaLibraryResolver = mediaLibraryResolver;
+        this.libraryAccessService = libraryAccessService;
     }
 
     @Bean
@@ -39,6 +47,7 @@ public class OIDCSecurityConfig {
                         .jwtAuthenticationConverter(jwtAuthenticationConverter()))
                 )
                 .addFilterBefore(new StreamTokenAuthenticationFilter(streamTokenService, pathPrefix), BearerTokenAuthenticationFilter.class)
+                .addFilterAfter(new MediaAccessEnforcementFilter(mediaLibraryResolver, libraryAccessService, pathPrefix), BearerTokenAuthenticationFilter.class)
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/v3/api-docs/**").permitAll()
                         .requestMatchers("/swagger-ui/**").permitAll()

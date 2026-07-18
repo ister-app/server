@@ -10,6 +10,7 @@ import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import app.ister.core.service.ContinueWatchingService;
+import app.ister.core.service.LibraryAccessService;
 import app.ister.core.service.UserService;
 import app.ister.core.service.WatchStatusService;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +54,7 @@ public class ReadingProgressController {
     private final WatchStatusService watchStatusService;
     private final ContinueWatchingService continueWatchingService;
     private final UserService userService;
+    private final LibraryAccessService libraryAccessService;
 
     /**
      * @param chapterId                  the audiobook chapter the reading position maps onto, or
@@ -87,7 +89,9 @@ public class ReadingProgressController {
     @PostMapping("/reading-progress")
     public ReadingProgressResponse updateReadingProgress(@RequestBody ReadingProgressRequest request,
                                                          Authentication authentication) {
-        BookEntity book = bookRepository.findById(request.bookId()).orElseThrow();
+        BookEntity book = bookRepository.findById(request.bookId())
+                .filter(found -> libraryAccessService.canAccess(found.getLibraryEntity(), authentication))
+                .orElseThrow();
         WatchStatusEntity watchStatus = watchStatusService.getOrCreateForBook(authentication, book);
         watchStatus.setReadingLocation(request.location());
         watchStatus.setReadingLocationMediaFileId(request.readingLocationMediaFileId());
@@ -106,7 +110,8 @@ public class ReadingProgressController {
     @GetMapping("/reading-progress")
     public ResponseEntity<ReadingProgressResponse> getReadingProgress(@RequestParam UUID bookId,
                                                                       Authentication authentication) {
-        Optional<BookEntity> book = bookRepository.findById(bookId);
+        Optional<BookEntity> book = bookRepository.findById(bookId)
+                .filter(found -> libraryAccessService.canAccess(found.getLibraryEntity(), authentication));
         if (book.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -118,7 +123,8 @@ public class ReadingProgressController {
     @GetMapping("/book-progress")
     public ResponseEntity<BookProgressResponse> getBookProgress(@RequestParam UUID bookId,
                                                                 Authentication authentication) {
-        Optional<BookEntity> found = bookRepository.findById(bookId);
+        Optional<BookEntity> found = bookRepository.findById(bookId)
+                .filter(book -> libraryAccessService.canAccess(book.getLibraryEntity(), authentication));
         if (found.isEmpty()) {
             return ResponseEntity.notFound().build();
         }

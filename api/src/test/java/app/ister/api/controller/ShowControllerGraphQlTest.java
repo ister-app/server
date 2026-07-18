@@ -6,6 +6,7 @@ import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.ShowRepository;
+import app.ister.core.service.LibraryAccessService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.graphql.test.autoconfigure.GraphQlTest;
@@ -34,6 +35,21 @@ class ShowControllerGraphQlTest {
     @Autowired
     private GraphQlTester graphQlTester;
 
+    // The resolvers take an Authentication parameter; without a security context the
+    // principal resolver errors the field, so every test runs as a plain user.
+    @org.junit.jupiter.api.BeforeEach
+    void authenticate() {
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        "test-user", null,
+                        List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_user"))));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearAuthentication() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
+
     @MockitoBean
     private ShowRepository showRepository;
 
@@ -46,11 +62,15 @@ class ShowControllerGraphQlTest {
     @MockitoBean
     private LibraryRepository libraryRepository;
 
+    @MockitoBean
+    private LibraryAccessService libraryAccessService;
+
     @Test
     void showsQueryResolvesPageAndBatchedEpisodes() {
         ShowEntity show = ShowEntity.builder().name("Test show").releaseYear(2020).build();
         show.setId(UUID.randomUUID());
         EpisodeEntity episode = EpisodeEntity.builder().number(1).showEntity(show).build();
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(java.util.Optional.empty());
         when(showRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(show)));
         when(episodeRepository.findByShowEntityIdIn(anyCollection(), any(Sort.class))).thenReturn(List.of(episode));
         when(imageRepository.findByShowEntityIdIn(anyCollection())).thenReturn(List.of());

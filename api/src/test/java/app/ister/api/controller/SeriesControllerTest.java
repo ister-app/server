@@ -2,6 +2,7 @@ package app.ister.api.controller;
 
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.ImageEntity;
+import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.SeriesEntity;
 import app.ister.core.entity.UserSeriesPreferenceEntity;
@@ -11,6 +12,7 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.SeriesRepository;
 import app.ister.core.repository.UserSeriesPreferenceRepository;
+import app.ister.core.service.LibraryAccessService;
 import app.ister.core.service.SeriesPreferenceService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -53,6 +55,9 @@ class SeriesControllerTest {
     private SeriesPreferenceService seriesPreferenceService;
 
     @Mock
+    private LibraryAccessService libraryAccessService;
+
+    @Mock
     private Authentication authentication;
 
     private final PersonEntity author = PersonEntity.builder().id(UUID.randomUUID()).name("John Flanagan").build();
@@ -64,10 +69,15 @@ class SeriesControllerTest {
     @Test
     void seriesByIdDelegatesToTheRepository() {
         UUID id = UUID.randomUUID();
-        SeriesEntity series = SeriesEntity.builder().id(id).name("De Grijze Jager").build();
+        LibraryEntity library = LibraryEntity.builder().name("L").build();
+        library.setId(UUID.randomUUID());
+        SeriesEntity series = SeriesEntity.builder().id(id).name("De Grijze Jager")
+                .libraryEntity(library).build();
         when(seriesRepository.findById(id)).thenReturn(Optional.of(series));
+        when(libraryAccessService.canAccess(org.mockito.ArgumentMatchers.any(LibraryEntity.class),
+                org.mockito.ArgumentMatchers.any())).thenReturn(true);
 
-        assertEquals(Optional.of(series), subject.seriesById(id));
+        assertEquals(Optional.of(series), subject.seriesById(id, authentication));
     }
 
     @Test
@@ -125,9 +135,11 @@ class SeriesControllerTest {
         SeriesEntity series = SeriesEntity.builder().name("De Grijze Jager").build();
         when(seriesRepository.findByLibraryEntityId(org.mockito.ArgumentMatchers.eq(libraryId), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(series)));
+        when(libraryAccessService.canAccess(org.mockito.ArgumentMatchers.any(UUID.class),
+                org.mockito.ArgumentMatchers.any())).thenReturn(true);
 
         assertEquals(List.of(series), subject.series(Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.of(libraryId)).getContent());
+                Optional.empty(), Optional.empty(), Optional.of(libraryId), authentication).getContent());
     }
 
     @Test
@@ -181,6 +193,6 @@ class SeriesControllerTest {
         UUID id = UUID.randomUUID();
         when(seriesRepository.findById(id)).thenReturn(Optional.empty());
 
-        assertTrue(subject.seriesById(id).isEmpty());
+        assertTrue(subject.seriesById(id, authentication).isEmpty());
     }
 }

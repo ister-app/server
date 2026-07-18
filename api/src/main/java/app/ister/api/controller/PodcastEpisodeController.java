@@ -10,8 +10,10 @@ import app.ister.core.enums.EventType;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.eventdata.PodcastEpisodeDownloadRequestedData;
 import app.ister.core.repository.PodcastEpisodeRepository;
+import app.ister.core.repository.PodcastRepository;
 import app.ister.core.repository.UserPodcastPreferenceRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.LibraryAccessService;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.PodcastPreferenceService;
 import lombok.RequiredArgsConstructor;
@@ -41,18 +43,22 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PodcastEpisodeController {
     private final PodcastEpisodeRepository podcastEpisodeRepository;
+    private final PodcastRepository podcastRepository;
     private final WatchStatusRepository watchStatusRepository;
     private final UserPodcastPreferenceRepository userPodcastPreferenceRepository;
     private final PodcastPreferenceService podcastPreferenceService;
     private final MessageSender messageSender;
+    private final LibraryAccessService libraryAccessService;
 
     @Value("${app.ister.server.name}")
     private String nodeName;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public Optional<PodcastEpisodeEntity> podcastEpisodeById(@Argument UUID id) {
-        return podcastEpisodeRepository.findById(id);
+    public Optional<PodcastEpisodeEntity> podcastEpisodeById(@Argument UUID id, Authentication authentication) {
+        return podcastEpisodeRepository.findById(id)
+                .filter(episode -> libraryAccessService.canAccess(
+                        episode.getPodcastEntity().getLibraryEntity(), authentication));
     }
 
     /**
@@ -72,8 +78,13 @@ public class PodcastEpisodeController {
                 () -> podcastPreferenceService.getEpisodeOrder(authentication, podcastId));
         Sort sort = Sort.by("publishedAt");
         sort = order == SortingOrder.ASCENDING ? sort.ascending() : sort.descending();
-        return podcastEpisodeRepository.findByPodcastEntityId(podcastId,
-                PageRequest.of(Math.max(page.orElse(0), 0), pageSize, sort));
+        PageRequest pageRequest = PageRequest.of(Math.max(page.orElse(0), 0), pageSize, sort);
+        if (podcastRepository.findById(podcastId)
+                .filter(podcast -> libraryAccessService.canAccess(podcast.getLibraryEntity(), authentication))
+                .isEmpty()) {
+            return Page.empty(pageRequest);
+        }
+        return podcastEpisodeRepository.findByPodcastEntityId(podcastId, pageRequest);
     }
 
     @PreAuthorize("hasRole('user')")
@@ -104,8 +115,11 @@ public class PodcastEpisodeController {
     /** Sends the download to THIS node's cache directory; the client polls `downloaded`. */
     @PreAuthorize("hasRole('user')")
     @MutationMapping
-    public Boolean downloadPodcastEpisode(@Argument UUID episodeId) {
-        if (!podcastEpisodeRepository.existsById(episodeId)) {
+    public Boolean downloadPodcastEpisode(@Argument UUID episodeId, Authentication authentication) {
+        if (podcastEpisodeRepository.findById(episodeId)
+                .filter(episode -> libraryAccessService.canAccess(
+                        episode.getPodcastEntity().getLibraryEntity(), authentication))
+                .isEmpty()) {
             throw new NoSuchElementException("Podcast episode not found: " + episodeId);
         }
         messageSender.sendPodcastEpisodeDownloadRequested(PodcastEpisodeDownloadRequestedData.builder()

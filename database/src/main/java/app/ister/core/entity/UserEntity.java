@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 @Entity
@@ -19,4 +20,12 @@ public class UserEntity extends BaseEntity {
     private String name;
 
     private String email;
+
+    /**
+     * Snapshot of the Keycloak 'admin' realm role, refreshed on every JWT-authenticated request.
+     * Stream-token requests carry no JWT and read this snapshot instead.
+     */
+    @Setter
+    @Column(nullable = false)
+    private boolean admin;
 }

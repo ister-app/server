@@ -36,6 +36,9 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class RecentlyWatchedControllerTest {
 
+    @Mock
+    private app.ister.core.service.LibraryAccessService libraryAccessService;
+
     @InjectMocks
     private RecentlyWatchedController subject;
 
@@ -52,6 +55,9 @@ class RecentlyWatchedControllerTest {
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(libraryAccessService.canAccess(
+                org.mockito.ArgumentMatchers.<app.ister.core.entity.LibraryEntity>any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(true);
         lenient().when(authentication.getName()).thenReturn("sub-123");
         lenient().when(userService.getOrCreateUser(authentication)).thenReturn(user);
     }

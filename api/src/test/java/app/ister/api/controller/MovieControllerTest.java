@@ -11,6 +11,7 @@ import app.ister.core.enums.SortingOrder;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.LibraryAccessService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -48,14 +49,18 @@ class MovieControllerTest {
     private LibraryRepository libraryRepository;
 
     @Mock
+    private LibraryAccessService libraryAccessService;
+
+    @Mock
     private Authentication authentication;
 
     @Test
     void moviesUsesDefaultsWhenNoArgumentsGiven() {
         Page<MovieEntity> page = new PageImpl<>(List.of());
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
         when(movieRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        Page<MovieEntity> result = subject.movies(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+        Page<MovieEntity> result = subject.movies(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), authentication);
 
         assertNotNull(result);
         verify(movieRepository).findAll(any(Pageable.class));
@@ -65,9 +70,10 @@ class MovieControllerTest {
     void moviesAppliesPageAndSizeArguments() {
         MovieEntity movie = MovieEntity.builder().name("Test").releaseYear(2020).build();
         Page<MovieEntity> page = new PageImpl<>(List.of(movie));
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
         when(movieRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        Page<MovieEntity> result = subject.movies(Optional.of(2), Optional.of(5), Optional.empty(), Optional.empty(), Optional.empty());
+        Page<MovieEntity> result = subject.movies(Optional.of(2), Optional.of(5), Optional.empty(), Optional.empty(), Optional.empty(), authentication);
 
         assertEquals(1, result.getContent().size());
     }
@@ -75,9 +81,10 @@ class MovieControllerTest {
     @Test
     void moviesAppliesAscendingSortingOrder() {
         Page<MovieEntity> page = new PageImpl<>(List.of());
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
         when(movieRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        subject.movies(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.ASCENDING), Optional.empty());
+        subject.movies(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.ASCENDING), Optional.empty(), authentication);
 
         verify(movieRepository).findAll(any(Pageable.class));
     }
@@ -85,9 +92,10 @@ class MovieControllerTest {
     @Test
     void moviesAppliesDescendingSortingOrder() {
         Page<MovieEntity> page = new PageImpl<>(List.of());
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
         when(movieRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        subject.movies(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.DESCENDING), Optional.empty());
+        subject.movies(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.DESCENDING), Optional.empty(), authentication);
 
         verify(movieRepository).findAll(any(Pageable.class));
     }
@@ -98,10 +106,11 @@ class MovieControllerTest {
         LibraryEntity library = LibraryEntity.builder().name("Movies").build();
         library.setId(libraryId);
         Page<MovieEntity> page = new PageImpl<>(List.of());
+        when(libraryAccessService.canAccess(any(UUID.class), any())).thenReturn(true);
         when(libraryRepository.findById(libraryId)).thenReturn(Optional.of(library));
         when(movieRepository.findByLibraryEntity(eq(library), any(Pageable.class))).thenReturn(page);
 
-        Page<MovieEntity> result = subject.movies(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(libraryId));
+        Page<MovieEntity> result = subject.movies(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(libraryId), authentication);
 
         assertNotNull(result);
         verify(movieRepository).findByLibraryEntity(eq(library), any(Pageable.class));
@@ -109,25 +118,26 @@ class MovieControllerTest {
     }
 
     @Test
-    void moviesReturnsAllWhenLibraryIdNotFound() {
+    void moviesReturnsEmptyPageWhenLibraryIdNotFound() {
         UUID libraryId = UUID.randomUUID();
-        Page<MovieEntity> page = new PageImpl<>(List.of());
+        when(libraryAccessService.canAccess(any(UUID.class), any())).thenReturn(true);
         when(libraryRepository.findById(libraryId)).thenReturn(Optional.empty());
-        when(movieRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        Page<MovieEntity> result = subject.movies(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(libraryId));
+        Page<MovieEntity> result = subject.movies(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(libraryId), authentication);
 
-        assertNotNull(result);
-        verify(movieRepository).findAll(any(Pageable.class));
+        assertTrue(result.isEmpty());
+        verify(movieRepository, never()).findAll(any(Pageable.class));
     }
 
     @Test
     void movieByIdReturnsFromRepository() {
         UUID id = UUID.randomUUID();
-        MovieEntity movie = MovieEntity.builder().name("Test").releaseYear(2020).build();
+        MovieEntity movie = MovieEntity.builder().name("Test").releaseYear(2020)
+                .libraryEntity(app.ister.core.entity.LibraryEntity.builder().name("Movies").build()).build();
         when(movieRepository.findById(id)).thenReturn(Optional.of(movie));
+        when(libraryAccessService.canAccess(any(app.ister.core.entity.LibraryEntity.class), any())).thenReturn(true);
 
-        Optional<MovieEntity> result = subject.movieById(id);
+        Optional<MovieEntity> result = subject.movieById(id, authentication);
 
         assertTrue(result.isPresent());
         assertEquals(movie, result.get());
@@ -138,7 +148,7 @@ class MovieControllerTest {
         UUID id = UUID.randomUUID();
         when(movieRepository.findById(id)).thenReturn(Optional.empty());
 
-        Optional<MovieEntity> result = subject.movieById(id);
+        Optional<MovieEntity> result = subject.movieById(id, authentication);
 
         assertTrue(result.isEmpty());
     }

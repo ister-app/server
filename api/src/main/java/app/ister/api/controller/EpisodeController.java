@@ -3,6 +3,7 @@ package app.ister.api.controller;
 import app.ister.core.entity.*;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -24,11 +25,14 @@ import java.util.stream.Collectors;
 public class EpisodeController {
     private final EpisodeRepository episodeRepository;
     private final WatchStatusRepository watchStatusRepository;
+    private final LibraryAccessService libraryAccessService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public Optional<EpisodeEntity> episodeById(@Argument UUID id) {
-        return episodeRepository.findById(id);
+    public Optional<EpisodeEntity> episodeById(@Argument UUID id, Authentication authentication) {
+        return episodeRepository.findById(id)
+                .filter(episode -> libraryAccessService.canAccess(
+                        episode.getShowEntity().getLibraryEntity(), authentication));
     }
 
     @SchemaMapping(typeName = "Episode", field = "show")

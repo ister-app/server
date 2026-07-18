@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,8 +26,13 @@ public class SearchQueryService {
         return properties.isEnabled();
     }
 
-    public List<SearchHit> search(String term, int size, UUID libraryId) {
-        JsonNode response = typesenseClient.search(properties.getCollection(), term, size, libraryId);
+    /**
+     * @param allowedLibraryIds the caller's visible libraries, or {@code null} when unrestricted
+     *                          (admin). Documents outside the set never surface, including
+     *                          documents without a libraryId.
+     */
+    public List<SearchHit> search(String term, int size, UUID libraryId, Collection<UUID> allowedLibraryIds) {
+        JsonNode response = typesenseClient.search(properties.getCollection(), term, size, libraryId, allowedLibraryIds);
         List<SearchHit> hits = new ArrayList<>();
         if (response != null) {
             for (JsonNode hit : response.path("hits")) {

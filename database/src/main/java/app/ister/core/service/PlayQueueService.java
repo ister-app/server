@@ -82,7 +82,11 @@ public class PlayQueueService {
     // Bound for the shuffle exclusion parameter when there is no start item; matches no row.
     private static final UUID NIL_UUID = new UUID(0, 0);
 
-    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, ChapterRepository chapterRepository, PodcastEpisodeRepository podcastEpisodeRepository, LibraryRepository libraryRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService, ContinueWatchingService continueWatchingService, PodcastPreferenceService podcastPreferenceService) {
+    private final LibraryAccessService libraryAccessService;
+
+    private final MediaLibraryResolver mediaLibraryResolver;
+
+    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, ChapterRepository chapterRepository, PodcastEpisodeRepository podcastEpisodeRepository, LibraryRepository libraryRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService, ContinueWatchingService continueWatchingService, PodcastPreferenceService podcastPreferenceService, LibraryAccessService libraryAccessService, MediaLibraryResolver mediaLibraryResolver) {
         this.playQueueRepository = playQueueRepository;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
@@ -95,6 +99,8 @@ public class PlayQueueService {
         this.watchStatusService = watchStatusService;
         this.continueWatchingService = continueWatchingService;
         this.podcastPreferenceService = podcastPreferenceService;
+        this.libraryAccessService = libraryAccessService;
+        this.mediaLibraryResolver = mediaLibraryResolver;
     }
 
     /**
@@ -103,9 +109,24 @@ public class PlayQueueService {
      */
     @Transactional
     public Optional<PlayQueueEntity> getPlayQueue(UUID id, Authentication authentication) {
-        Optional<PlayQueueEntity> playQueueEntityOptional = playQueueRepository.findById(id);
+        Optional<PlayQueueEntity> playQueueEntityOptional = playQueueRepository.findById(id)
+                .filter(queue -> canAccessSource(queue.getSourceType(), queue.getSourceId(), authentication));
         playQueueEntityOptional.ifPresent(this::maybeExtend);
         return playQueueEntityOptional;
+    }
+
+    /**
+     * A queue whose source library the caller may not see behaves like a missing queue. A queue
+     * whose source media was deleted since (resolver finds no library) stays readable — its
+     * remaining items still play, matching the pre-permissions behaviour.
+     */
+    private boolean canAccessSource(PlayQueueSourceType sourceType, UUID sourceId, Authentication authentication) {
+        if (sourceType == null || sourceId == null) {
+            return true;
+        }
+        return mediaLibraryResolver.ofSource(sourceType, sourceId)
+                .map(library -> libraryAccessService.canAccess(library, authentication))
+                .orElse(true);
     }
 
     /**
@@ -118,6 +139,9 @@ public class PlayQueueService {
     @Transactional
     public PlayQueueEntity createPlayQueue(PlayQueueSourceType sourceType, UUID sourceId, UUID startId, boolean shuffle, Authentication authentication) {
         log.debug("Creating play queue for user: {}, source type: {}, source: {}, shuffle: {}", authentication.getName(), sourceType, sourceId, shuffle);
+        if (!canAccessSource(sourceType, sourceId, authentication)) {
+            throw new IllegalArgumentException("Source not found");
+        }
 
         PlayQueueEntity queue = PlayQueueEntity.builder()
                 .userEntity(userService.getOrCreateUser(authentication))

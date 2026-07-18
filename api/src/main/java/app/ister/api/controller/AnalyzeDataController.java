@@ -18,7 +18,7 @@ public class AnalyzeDataController {
     private final MessageSender messageSender;
 
     @MutationMapping
-    @PreAuthorize("hasRole('user')")
+    @PreAuthorize("hasRole('admin')")
     public Boolean analyzeDataForEpisode(@Argument UUID episodeId) {
         messageSender.sendAnalyzeData(
                 AnalyzeData.builder()
@@ -29,7 +29,7 @@ public class AnalyzeDataController {
     }
 
     @MutationMapping
-    @PreAuthorize("hasRole('user')")
+    @PreAuthorize("hasRole('admin')")
     public Boolean analyzeDataForMovie(@Argument UUID movieId) {
         messageSender.sendAnalyzeData(
                 AnalyzeData.builder()
@@ -40,7 +40,7 @@ public class AnalyzeDataController {
     }
 
     @MutationMapping
-    @PreAuthorize("hasRole('user')")
+    @PreAuthorize("hasRole('admin')")
     public Boolean analyzeDataForShow(@Argument UUID showId) {
         messageSender.sendAnalyzeData(
                 AnalyzeData.builder()
@@ -51,7 +51,7 @@ public class AnalyzeDataController {
     }
 
     @MutationMapping
-    @PreAuthorize("hasRole('user')")
+    @PreAuthorize("hasRole('admin')")
     public Boolean analyzeDataForLibrary(@Argument UUID libraryId) {
         messageSender.sendAnalyzeData(
                 AnalyzeData.builder()
@@ -62,7 +62,7 @@ public class AnalyzeDataController {
     }
 
     @MutationMapping
-    @PreAuthorize("hasRole('user')")
+    @PreAuthorize("hasRole('admin')")
     public Boolean analyzeDataForPerson(@Argument UUID personId) {
         messageSender.sendAnalyzeData(
                 AnalyzeData.builder()
@@ -73,7 +73,7 @@ public class AnalyzeDataController {
     }
 
     @MutationMapping
-    @PreAuthorize("hasRole('user')")
+    @PreAuthorize("hasRole('admin')")
     public Boolean analyzeDataForAlbum(@Argument UUID albumId) {
         messageSender.sendAnalyzeData(
                 AnalyzeData.builder()
@@ -84,7 +84,7 @@ public class AnalyzeDataController {
     }
 
     @MutationMapping
-    @PreAuthorize("hasRole('user')")
+    @PreAuthorize("hasRole('admin')")
     public Boolean analyzeDataForTrack(@Argument UUID trackId) {
         messageSender.sendAnalyzeData(
                 AnalyzeData.builder()

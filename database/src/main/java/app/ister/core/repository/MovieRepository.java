@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,6 +18,8 @@ public interface MovieRepository extends JpaRepository<MovieEntity, UUID> {
     Optional<MovieEntity> findByLibraryEntityAndNameAndReleaseYear(LibraryEntity libraryEntity, String name, int releaseYear);
 
     Page<MovieEntity> findByLibraryEntity(LibraryEntity libraryEntity, Pageable pageable);
+
+    Page<MovieEntity> findByLibraryEntityIdIn(Collection<UUID> libraryIds, Pageable pageable);
 
     @Query("SELECT m.id FROM MovieEntity m WHERE m.libraryEntity.id = :libraryId")
     List<UUID> findIdsByLibraryId(@Param("libraryId") UUID libraryId);

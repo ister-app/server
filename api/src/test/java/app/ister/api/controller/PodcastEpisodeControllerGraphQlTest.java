@@ -43,6 +43,12 @@ class PodcastEpisodeControllerGraphQlTest {
     private GraphQlTester graphQlTester;
 
     @MockitoBean
+    private app.ister.core.repository.PodcastRepository podcastRepository;
+
+    @MockitoBean
+    private app.ister.core.service.LibraryAccessService libraryAccessService;
+
+    @MockitoBean
     private PodcastEpisodeRepository podcastEpisodeRepository;
 
     @MockitoBean
@@ -62,6 +68,17 @@ class PodcastEpisodeControllerGraphQlTest {
     /** The resolvers take an Authentication argument; without one they fail before any logic runs. */
     @BeforeEach
     void authenticate() {
+        org.mockito.Mockito.lenient().when(podcastRepository.findById(org.mockito.ArgumentMatchers.<java.util.UUID>any()))
+                .thenReturn(java.util.Optional.of(app.ister.core.entity.PodcastEntity.builder()
+                        .title("Serial").feedUrl("https://example.org/feed").build()));
+        org.mockito.Mockito.lenient().when(libraryAccessService.allowedLibraryIds(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(java.util.Optional.empty());
+        org.mockito.Mockito.lenient().when(libraryAccessService.canAccess(
+                org.mockito.ArgumentMatchers.<app.ister.core.entity.LibraryEntity>any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        org.mockito.Mockito.lenient().when(libraryAccessService.canAccess(
+                org.mockito.ArgumentMatchers.<java.util.UUID>any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(true);
         SecurityContextHolder.getContext().setAuthentication(
                 new TestingAuthenticationToken("user-1", "n/a", "ROLE_user"));
     }
@@ -81,6 +98,8 @@ class PodcastEpisodeControllerGraphQlTest {
     }
 
     /** The whole point of storing the order server-side: a client that asks for nothing gets it. */
+
+
     @Test
     void podcastEpisodesSortsByTheStoredPreferenceWhenNoOrderIsGiven() {
         mockEpisodePage();

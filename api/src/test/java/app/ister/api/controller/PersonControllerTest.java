@@ -12,6 +12,8 @@ import app.ister.core.repository.CreditRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
+import app.ister.core.service.LibraryAccessService;
+import org.springframework.security.core.Authentication;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -33,6 +35,12 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PersonControllerTest {
+
+    @Mock
+    private app.ister.core.service.LibraryAccessService libraryAccessService;
+
+    @Mock
+    private org.springframework.security.core.Authentication authentication;
 
     @InjectMocks
     private PersonController subject;
@@ -66,10 +74,12 @@ class PersonControllerTest {
     @Test
     void personByIdReturnsFromRepository() {
         UUID id = UUID.randomUUID();
-        PersonEntity artist = PersonEntity.builder().name("The Beatles").build();
+        PersonEntity artist = PersonEntity.builder().name("The Beatles")
+                .libraryEntity(LibraryEntity.builder().name("Music").build()).build();
         when(personRepository.findById(id)).thenReturn(Optional.of(artist));
+        when(libraryAccessService.canAccess(any(LibraryEntity.class), any())).thenReturn(true);
 
-        Optional<PersonEntity> result = subject.personById(id);
+        Optional<PersonEntity> result = subject.personById(id, authentication);
 
         assertTrue(result.isPresent());
         assertEquals("The Beatles", result.get().getName());
@@ -80,19 +90,20 @@ class PersonControllerTest {
         UUID id = UUID.randomUUID();
         when(personRepository.findById(id)).thenReturn(Optional.empty());
 
-        assertTrue(subject.personById(id).isEmpty());
+        assertTrue(subject.personById(id, authentication).isEmpty());
     }
 
     @Test
     void personsWithoutLibraryFilterReturnsAll() {
         PersonEntity artist = PersonEntity.builder().name("Artist A").build();
         Page<PersonEntity> page = new PageImpl<>(List.of(artist));
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
         when(personRepository.findAll(any(Pageable.class))).thenReturn(page);
 
         Page<PersonEntity> result = subject.persons(
                 Optional.of(0), Optional.of(10),
                 Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.ASCENDING),
-                Optional.empty());
+                Optional.empty(), authentication);
 
         assertEquals(1, result.getContent().size());
         verify(personRepository).findAll(any(Pageable.class));
@@ -107,11 +118,12 @@ class PersonControllerTest {
         Page<PersonEntity> page = new PageImpl<>(List.of(artist));
         when(libraryRepository.findById(libraryId)).thenReturn(Optional.of(library));
         when(personRepository.findByLibraryEntity(eq(library), any(Pageable.class))).thenReturn(page);
+        when(libraryAccessService.canAccess(eq(libraryId), any())).thenReturn(true);
 
         Page<PersonEntity> result = subject.persons(
                 Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(),
-                Optional.of(libraryId));
+                Optional.of(libraryId), authentication);
 
         assertEquals(1, result.getContent().size());
     }

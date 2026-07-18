@@ -53,7 +53,7 @@ class TypesenseClientTest {
                         {"hits": [{"document": {"id": "abc", "type": "MOVIE"}}]}
                         """, MediaType.APPLICATION_JSON));
 
-        JsonNode response = subject.search("media", "matrix", 5, null);
+        JsonNode response = subject.search("media", "matrix", 5, null, null);
 
         assertEquals("abc", response.path("hits").get(0).path("document").path("id").asString());
         server.verify();
@@ -82,7 +82,7 @@ class TypesenseClientTest {
         server.expect(requestTo(org.hamcrest.Matchers.containsString("filter_by=libraryId:%3D" + libraryId)))
                 .andRespond(withSuccess("{\"hits\": []}", MediaType.APPLICATION_JSON));
 
-        subject.search("media", "matrix", 5, libraryId);
+        subject.search("media", "matrix", 5, libraryId, null);
 
         server.verify();
     }

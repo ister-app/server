@@ -38,6 +38,9 @@ class SeriesControllerGraphQlTest {
     private GraphQlTester graphQlTester;
 
     @MockitoBean
+    private app.ister.core.service.LibraryAccessService libraryAccessService;
+
+    @MockitoBean
     private SeriesRepository seriesRepository;
 
     @MockitoBean
@@ -57,6 +60,14 @@ class SeriesControllerGraphQlTest {
     /** The resolvers take an Authentication argument; without one they fail before any logic runs. */
     @BeforeEach
     void authenticate() {
+        org.mockito.Mockito.lenient().when(libraryAccessService.allowedLibraryIds(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(java.util.Optional.empty());
+        org.mockito.Mockito.lenient().when(libraryAccessService.canAccess(
+                org.mockito.ArgumentMatchers.<app.ister.core.entity.LibraryEntity>any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        org.mockito.Mockito.lenient().when(libraryAccessService.canAccess(
+                org.mockito.ArgumentMatchers.<java.util.UUID>any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(true);
         SecurityContextHolder.getContext().setAuthentication(
                 new TestingAuthenticationToken("user-1", "n/a", "ROLE_user"));
     }
@@ -65,6 +76,8 @@ class SeriesControllerGraphQlTest {
     void clearAuthentication() {
         SecurityContextHolder.clearContext();
     }
+
+
 
     @Test
     void readingDirectionResolvesTheSeriesDefaultWithoutAnOverride() {

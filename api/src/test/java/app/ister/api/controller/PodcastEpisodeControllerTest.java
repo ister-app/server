@@ -14,6 +14,7 @@ import app.ister.core.repository.WatchStatusRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.PodcastPreferenceService;
 import org.junit.jupiter.api.BeforeEach;
+import app.ister.core.service.LibraryAccessService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -48,6 +49,12 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PodcastEpisodeControllerTest {
 
+    @Mock
+    private app.ister.core.service.LibraryAccessService libraryAccessService;
+
+    @Mock
+    private app.ister.core.repository.PodcastRepository podcastRepository;
+
     @InjectMocks
     private PodcastEpisodeController subject;
 
@@ -73,6 +80,11 @@ class PodcastEpisodeControllerTest {
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(podcastRepository.findById(podcastId))
+                .thenReturn(java.util.Optional.of(podcast()));
+        org.mockito.Mockito.lenient().when(libraryAccessService.canAccess(
+                org.mockito.ArgumentMatchers.<app.ister.core.entity.LibraryEntity>any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(true);
         ReflectionTestUtils.setField(subject, "nodeName", "node-1");
         lenient().when(authentication.getName()).thenReturn("user-1");
     }
@@ -95,8 +107,9 @@ class PodcastEpisodeControllerTest {
     void podcastEpisodeByIdDelegatesToRepository() {
         PodcastEpisodeEntity episode = episode("ep-1");
         when(podcastEpisodeRepository.findById(episode.getId())).thenReturn(Optional.of(episode));
+        when(libraryAccessService.canAccess((app.ister.core.entity.LibraryEntity) null, authentication)).thenReturn(true);
 
-        Optional<PodcastEpisodeEntity> result = subject.podcastEpisodeById(episode.getId());
+        Optional<PodcastEpisodeEntity> result = subject.podcastEpisodeById(episode.getId(), authentication);
 
         assertTrue(result.isPresent());
     }
@@ -174,9 +187,12 @@ class PodcastEpisodeControllerTest {
     @Test
     void downloadPodcastEpisodeSendsTheEventToThisNodesCacheDirectory() {
         UUID episodeId = UUID.randomUUID();
-        when(podcastEpisodeRepository.existsById(episodeId)).thenReturn(true);
+        PodcastEpisodeEntity downloadable = episode("dl-1");
+        downloadable.setId(episodeId);
+        when(podcastEpisodeRepository.findById(episodeId)).thenReturn(Optional.of(downloadable));
+        when(libraryAccessService.canAccess((app.ister.core.entity.LibraryEntity) null, authentication)).thenReturn(true);
 
-        assertTrue(subject.downloadPodcastEpisode(episodeId));
+        assertTrue(subject.downloadPodcastEpisode(episodeId, authentication));
 
         ArgumentCaptor<PodcastEpisodeDownloadRequestedData> data =
                 ArgumentCaptor.forClass(PodcastEpisodeDownloadRequestedData.class);
@@ -187,9 +203,9 @@ class PodcastEpisodeControllerTest {
     @Test
     void downloadPodcastEpisodeFailsForAnUnknownEpisode() {
         UUID episodeId = UUID.randomUUID();
-        when(podcastEpisodeRepository.existsById(episodeId)).thenReturn(false);
+        when(podcastEpisodeRepository.findById(episodeId)).thenReturn(java.util.Optional.empty());
 
-        assertThrows(NoSuchElementException.class, () -> subject.downloadPodcastEpisode(episodeId));
+        assertThrows(NoSuchElementException.class, () -> subject.downloadPodcastEpisode(episodeId, authentication));
 
         verifyNoInteractions(messageSender);
     }

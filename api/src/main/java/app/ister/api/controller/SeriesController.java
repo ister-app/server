@@ -14,6 +14,7 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.SeriesRepository;
 import app.ister.core.repository.UserSeriesPreferenceRepository;
+import app.ister.core.service.LibraryAccessService;
 import app.ister.core.service.SeriesPreferenceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -41,11 +42,13 @@ public class SeriesController {
     private final MetadataRepository metadataRepository;
     private final UserSeriesPreferenceRepository userSeriesPreferenceRepository;
     private final SeriesPreferenceService seriesPreferenceService;
+    private final LibraryAccessService libraryAccessService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public Optional<SeriesEntity> seriesById(@Argument UUID id) {
-        return seriesRepository.findById(id);
+    public Optional<SeriesEntity> seriesById(@Argument UUID id, Authentication authentication) {
+        return seriesRepository.findById(id)
+                .filter(series -> libraryAccessService.canAccess(series.getLibraryEntity(), authentication));
     }
 
     /** The browse grid of a COMIC library: series, not loose volumes. */
@@ -56,13 +59,17 @@ public class SeriesController {
             @Argument Optional<Integer> size,
             @Argument Optional<SortingEnum> sorting,
             @Argument Optional<SortingOrder> sortingOrder,
-            @Argument Optional<UUID> libraryId) {
+            @Argument Optional<UUID> libraryId, Authentication authentication) {
         Pageable pageable = Paging.pageable(page, size, 20,
                 sorting, SortingEnum.NAME, sortingOrder, SortingOrder.ASCENDING);
         if (libraryId.isPresent()) {
-            return seriesRepository.findByLibraryEntityId(libraryId.get(), pageable);
+            return libraryId.filter(id -> libraryAccessService.canAccess(id, authentication))
+                    .map(id -> seriesRepository.findByLibraryEntityId(id, pageable))
+                    .orElseGet(() -> Page.empty(pageable));
         }
-        return seriesRepository.findAll(pageable);
+        return libraryAccessService.allowedLibraryIds(authentication)
+                .map(allowed -> seriesRepository.findByLibraryEntityIdIn(allowed, pageable))
+                .orElseGet(() -> seriesRepository.findAll(pageable));
     }
 
     @SchemaMapping(typeName = "Series", field = "metadata")

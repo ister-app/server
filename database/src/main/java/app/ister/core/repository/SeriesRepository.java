@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,6 +26,8 @@ public interface SeriesRepository extends JpaRepository<SeriesEntity, UUID> {
     Optional<SeriesEntity> findByLibraryEntityAndNameAndStartYear(LibraryEntity libraryEntity, String name, int startYear);
 
     Page<SeriesEntity> findByLibraryEntityId(UUID libraryId, Pageable pageable);
+
+    Page<SeriesEntity> findByLibraryEntityIdIn(Collection<UUID> libraryIds, Pageable pageable);
 
     List<SeriesEntity> findByLibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(LibraryType libraryType);
 

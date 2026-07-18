@@ -4,11 +4,20 @@ import app.ister.core.entity.AlbumEntity;
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
+import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.RatingEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.RatingMediaType;
+import app.ister.core.repository.AlbumRepository;
+import app.ister.core.repository.BookRepository;
+import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.MovieRepository;
+import app.ister.core.repository.PodcastRepository;
 import app.ister.core.repository.RatingRepository;
+import app.ister.core.repository.ShowRepository;
+import app.ister.core.repository.TrackRepository;
+import app.ister.core.service.LibraryAccessService;
 import app.ister.core.service.RatingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +30,7 @@ import org.springframework.stereotype.Controller;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -31,11 +41,34 @@ import java.util.stream.Collectors;
 public class RatingController {
     private final RatingService ratingService;
     private final RatingRepository ratingRepository;
+    private final LibraryAccessService libraryAccessService;
+    private final MovieRepository movieRepository;
+    private final ShowRepository showRepository;
+    private final EpisodeRepository episodeRepository;
+    private final AlbumRepository albumRepository;
+    private final TrackRepository trackRepository;
+    private final BookRepository bookRepository;
+    private final PodcastRepository podcastRepository;
 
     @PreAuthorize("hasRole('user')")
     @MutationMapping
     public Boolean setRating(@Argument RatingMediaType mediaType, @Argument UUID mediaId,
                              @Argument Integer rating, Authentication authentication) {
+        Optional<LibraryEntity> library = switch (mediaType) {
+            case MOVIE -> movieRepository.findById(mediaId).map(MovieEntity::getLibraryEntity);
+            case SHOW -> showRepository.findById(mediaId).map(ShowEntity::getLibraryEntity);
+            case EPISODE -> episodeRepository.findById(mediaId)
+                    .map(episode -> episode.getShowEntity().getLibraryEntity());
+            case ALBUM -> albumRepository.findById(mediaId).map(AlbumEntity::getLibraryEntity);
+            case TRACK -> trackRepository.findById(mediaId)
+                    .map(track -> track.getAlbumEntity().getLibraryEntity());
+            case BOOK -> bookRepository.findById(mediaId).map(BookEntity::getLibraryEntity);
+            case PODCAST -> podcastRepository.findById(mediaId)
+                    .map(app.ister.core.entity.PodcastEntity::getLibraryEntity);
+        };
+        if (library.isEmpty() || !libraryAccessService.canAccess(library.get(), authentication)) {
+            return false;
+        }
         ratingService.setRating(authentication, mediaType, mediaId, rating);
         return true;
     }

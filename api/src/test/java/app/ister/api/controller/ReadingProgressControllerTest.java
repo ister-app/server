@@ -47,6 +47,9 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class ReadingProgressControllerTest {
 
+    @Mock
+    private app.ister.core.service.LibraryAccessService libraryAccessService;
+
     @InjectMocks
     private ReadingProgressController subject;
 
@@ -80,6 +83,9 @@ class ReadingProgressControllerTest {
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(libraryAccessService.canAccess(
+                org.mockito.ArgumentMatchers.<app.ister.core.entity.LibraryEntity>any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(true);
         chapters = new ArrayList<>();
         book = BookEntity.builder().chapterEntities(chapters).build();
         book.setId(UUID.randomUUID());

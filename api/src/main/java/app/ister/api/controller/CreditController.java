@@ -10,6 +10,7 @@ import app.ister.core.repository.CreditRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.ShowRepository;
+import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -20,6 +21,7 @@ import org.springframework.graphql.data.method.annotation.BatchMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import java.util.Comparator;
@@ -47,6 +49,7 @@ public class CreditController {
     private final MovieRepository movieRepository;
     private final ShowRepository showRepository;
     private final EpisodeRepository episodeRepository;
+    private final LibraryAccessService libraryAccessService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -55,13 +58,28 @@ public class CreditController {
             @Argument Optional<UUID> movieId,
             @Argument Optional<UUID> episodeId,
             @Argument Optional<Integer> page,
-            @Argument Optional<Integer> size) {
+            @Argument Optional<Integer> size,
+            Authentication authentication) {
         long provided = List.of(showId, movieId, episodeId).stream().filter(Optional::isPresent).count();
         if (provided != 1) {
             throw new IllegalArgumentException("Exactly one of showId, movieId or episodeId must be provided.");
         }
         int pageSize = Math.clamp(size.orElse(DEFAULT_PAGE_SIZE), 1, Paging.MAX_PAGE_SIZE);
         Pageable pageable = PageRequest.of(Math.max(page.orElse(0), 0), pageSize, BY_CAST_ORDER_SORT);
+        boolean allowed = showId.map(id -> showRepository.findById(id)
+                        .filter(show -> libraryAccessService.canAccess(show.getLibraryEntity(), authentication))
+                        .isPresent())
+                .or(() -> movieId.map(id -> movieRepository.findById(id)
+                        .filter(movie -> libraryAccessService.canAccess(movie.getLibraryEntity(), authentication))
+                        .isPresent()))
+                .or(() -> episodeId.map(id -> episodeRepository.findById(id)
+                        .filter(episode -> libraryAccessService.canAccess(
+                                episode.getShowEntity().getLibraryEntity(), authentication))
+                        .isPresent()))
+                .orElseThrow();
+        if (!allowed) {
+            return Page.empty(pageable);
+        }
         return showId.map(id -> creditRepository.findByShowEntityId(id, pageable))
                 .or(() -> movieId.map(id -> creditRepository.findByMovieEntityId(id, pageable)))
                 .or(() -> episodeId.map(id -> creditRepository.findByEpisodeEntityId(id, pageable)))

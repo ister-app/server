@@ -14,6 +14,7 @@ import app.ister.core.eventdata.PodcastRefreshRequestedData;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.PodcastRepository;
+import app.ister.core.service.LibraryAccessService;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ServerEventService;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import java.util.List;
@@ -47,11 +49,13 @@ public class PodcastController {
     private final ItunesSearchService itunesSearchService;
     private final ServerEventService serverEventService;
     private final MessageSender messageSender;
+    private final LibraryAccessService libraryAccessService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public Optional<PodcastEntity> podcastById(@Argument UUID id) {
-        return podcastRepository.findById(id);
+    public Optional<PodcastEntity> podcastById(@Argument UUID id, Authentication authentication) {
+        return podcastRepository.findById(id)
+                .filter(podcast -> libraryAccessService.canAccess(podcast.getLibraryEntity(), authentication));
     }
 
     @PreAuthorize("hasRole('user')")
@@ -61,7 +65,7 @@ public class PodcastController {
             @Argument Optional<Integer> size,
             @Argument Optional<SortingEnum> sorting,
             @Argument Optional<SortingOrder> sortingOrder,
-            @Argument Optional<UUID> libraryId) {
+            @Argument Optional<UUID> libraryId, Authentication authentication) {
         Pageable pageable = Paging.pageable(page, size, 20,
                 sorting, SortingEnum.NAME, sortingOrder, SortingOrder.ASCENDING);
         // Podcasts have a "title" column where the other types have "name", and no "releaseYear"
@@ -75,8 +79,13 @@ public class PodcastController {
                         .toList());
         Pageable byTitle = org.springframework.data.domain.PageRequest.of(
                 pageable.getPageNumber(), pageable.getPageSize(), sort);
-        return libraryId
-                .map(id -> podcastRepository.findByLibraryEntityIdAndActiveTrue(id, byTitle))
+        if (libraryId.isPresent()) {
+            return libraryId.filter(id -> libraryAccessService.canAccess(id, authentication))
+                    .map(id -> podcastRepository.findByLibraryEntityIdAndActiveTrue(id, byTitle))
+                    .orElseGet(() -> Page.empty(byTitle));
+        }
+        return libraryAccessService.allowedLibraryIds(authentication)
+                .map(allowed -> podcastRepository.findByLibraryEntityIdInAndActiveTrue(allowed, byTitle))
                 .orElseGet(() -> podcastRepository.findByActiveTrue(byTitle));
     }
 
@@ -86,7 +95,7 @@ public class PodcastController {
         return itunesSearchService.search(term, DIRECTORY_SEARCH_LIMIT);
     }
 
-    @PreAuthorize("hasRole('user')")
+    @PreAuthorize("hasRole('admin')")
     @MutationMapping
     public PodcastEntity subscribePodcast(@Argument String feedUrl) {
         String url = feedUrl.strip();
@@ -113,7 +122,7 @@ public class PodcastController {
         return podcast;
     }
 
-    @PreAuthorize("hasRole('user')")
+    @PreAuthorize("hasRole('admin')")
     @MutationMapping
     public Boolean unsubscribePodcast(@Argument UUID id) {
         PodcastEntity podcast = podcastRepository.findById(id)

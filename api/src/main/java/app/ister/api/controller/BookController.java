@@ -17,6 +17,7 @@ import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import app.ister.core.service.BookResumeService;
 import app.ister.core.service.ContinueWatchingService;
+import app.ister.core.service.LibraryAccessService;
 import app.ister.core.service.UserService;
 import app.ister.core.service.WatchStatusService;
 import lombok.RequiredArgsConstructor;
@@ -56,11 +57,13 @@ public class BookController {
     private final ContinueWatchingService continueWatchingService;
     private final BookResumeService bookResumeService;
     private final UserService userService;
+    private final LibraryAccessService libraryAccessService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public Optional<BookEntity> bookById(@Argument UUID id) {
-        return bookRepository.findById(id);
+    public Optional<BookEntity> bookById(@Argument UUID id, Authentication authentication) {
+        return bookRepository.findById(id)
+                .filter(book -> libraryAccessService.canAccess(book.getLibraryEntity(), authentication));
     }
 
     @PreAuthorize("hasRole('user')")
@@ -71,18 +74,24 @@ public class BookController {
             @Argument Optional<SortingEnum> sorting,
             @Argument Optional<SortingOrder> sortingOrder,
             @Argument Optional<UUID> authorId,
-            @Argument Optional<UUID> libraryId) {
+            @Argument Optional<UUID> libraryId, Authentication authentication) {
         Pageable pageable = Paging.pageable(page, size, 20,
                 sorting, SortingEnum.NAME, sortingOrder, SortingOrder.ASCENDING);
         if (authorId.isPresent()) {
             return personRepository.findById(authorId.get())
-                    .map(author -> bookRepository.findByPersonEntity(author, pageable))
+                    .map(author -> libraryAccessService.allowedLibraryIds(authentication)
+                            .map(allowed -> bookRepository.findByPersonEntityAndLibraryEntityIdIn(author, allowed, pageable))
+                            .orElseGet(() -> bookRepository.findByPersonEntity(author, pageable)))
                     .orElseGet(() -> Page.empty(pageable));
         }
         if (libraryId.isPresent()) {
-            return bookRepository.findByLibraryEntityId(libraryId.get(), pageable);
+            return libraryId.filter(id -> libraryAccessService.canAccess(id, authentication))
+                    .map(id -> bookRepository.findByLibraryEntityId(id, pageable))
+                    .orElseGet(() -> Page.empty(pageable));
         }
-        return bookRepository.findAll(pageable);
+        return libraryAccessService.allowedLibraryIds(authentication)
+                .map(allowed -> bookRepository.findByLibraryEntityIdIn(allowed, pageable))
+                .orElseGet(() -> bookRepository.findAll(pageable));
     }
 
     @PreAuthorize("hasRole('user')")
@@ -90,6 +99,7 @@ public class BookController {
     public WatchStatusEntity updateReadingProgress(@Argument UUID bookId, @Argument String location,
                                                    @Argument double progress, Authentication authentication) {
         BookEntity book = bookRepository.findById(bookId)
+                .filter(found -> libraryAccessService.canAccess(found.getLibraryEntity(), authentication))
                 .orElseThrow(() -> new NoSuchElementException("Book not found: " + bookId));
         WatchStatusEntity watchStatus = watchStatusService.getOrCreateForBook(authentication, book);
         watchStatus.setReadingLocation(location);

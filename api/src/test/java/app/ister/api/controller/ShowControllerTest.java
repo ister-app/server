@@ -12,6 +12,7 @@ import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.ShowRepository;
+import app.ister.core.service.LibraryAccessService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -21,10 +22,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.Authentication;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -50,13 +53,26 @@ class ShowControllerTest {
     @Mock
     private LibraryRepository libraryRepository;
 
+    @Mock
+    private LibraryAccessService libraryAccessService;
+
+    @Mock
+    private Authentication authentication;
+
+    private LibraryEntity library() {
+        LibraryEntity library = LibraryEntity.builder().name("Shows").build();
+        library.setId(UUID.randomUUID());
+        return library;
+    }
+
     @Test
     void showByIdReturnsFromRepository() {
         UUID id = UUID.randomUUID();
-        ShowEntity show = ShowEntity.builder().name("Test").releaseYear(2020).build();
+        ShowEntity show = ShowEntity.builder().name("Test").releaseYear(2020).libraryEntity(library()).build();
         when(showRepository.findById(id)).thenReturn(Optional.of(show));
+        when(libraryAccessService.canAccess(any(LibraryEntity.class), any())).thenReturn(true);
 
-        Optional<ShowEntity> result = subject.showById(id);
+        Optional<ShowEntity> result = subject.showById(id, authentication);
 
         assertTrue(result.isPresent());
         assertEquals(show, result.get());
@@ -67,7 +83,19 @@ class ShowControllerTest {
         UUID id = UUID.randomUUID();
         when(showRepository.findById(id)).thenReturn(Optional.empty());
 
-        Optional<ShowEntity> result = subject.showById(id);
+        Optional<ShowEntity> result = subject.showById(id, authentication);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void showByIdOfAnInaccessibleShowReturnsEmpty() {
+        UUID id = UUID.randomUUID();
+        ShowEntity show = ShowEntity.builder().name("Test").releaseYear(2020).libraryEntity(library()).build();
+        when(showRepository.findById(id)).thenReturn(Optional.of(show));
+        when(libraryAccessService.canAccess(any(LibraryEntity.class), any())).thenReturn(false);
+
+        Optional<ShowEntity> result = subject.showById(id, authentication);
 
         assertTrue(result.isEmpty());
     }
@@ -75,9 +103,10 @@ class ShowControllerTest {
     @Test
     void showsUsesDefaultsWhenNoArgumentsGiven() {
         Page<ShowEntity> page = new PageImpl<>(List.of());
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
         when(showRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        Page<ShowEntity> result = subject.shows(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+        Page<ShowEntity> result = subject.shows(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), authentication);
 
         assertNotNull(result);
         verify(showRepository).findAll(any(Pageable.class));
@@ -87,9 +116,10 @@ class ShowControllerTest {
     void showsAppliesPageAndSizeArguments() {
         ShowEntity show = ShowEntity.builder().name("Test").releaseYear(2020).build();
         Page<ShowEntity> page = new PageImpl<>(List.of(show));
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
         when(showRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        Page<ShowEntity> result = subject.shows(Optional.of(2), Optional.of(5), Optional.empty(), Optional.empty(), Optional.empty());
+        Page<ShowEntity> result = subject.shows(Optional.of(2), Optional.of(5), Optional.empty(), Optional.empty(), Optional.empty(), authentication);
 
         assertEquals(1, result.getContent().size());
     }
@@ -97,9 +127,10 @@ class ShowControllerTest {
     @Test
     void showsAppliesAscendingSortingOrder() {
         Page<ShowEntity> page = new PageImpl<>(List.of());
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
         when(showRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        subject.shows(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.ASCENDING), Optional.empty());
+        subject.shows(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.ASCENDING), Optional.empty(), authentication);
 
         verify(showRepository).findAll(any(Pageable.class));
     }
@@ -107,11 +138,26 @@ class ShowControllerTest {
     @Test
     void showsAppliesDescendingSortingOrder() {
         Page<ShowEntity> page = new PageImpl<>(List.of());
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
         when(showRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        subject.shows(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.DESCENDING), Optional.empty());
+        subject.shows(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.DESCENDING), Optional.empty(), authentication);
 
         verify(showRepository).findAll(any(Pageable.class));
+    }
+
+    @Test
+    void showsWithRestrictedAccessQueriesOnlyTheAllowedLibraries() {
+        UUID allowedLibraryId = UUID.randomUUID();
+        Page<ShowEntity> page = new PageImpl<>(List.of());
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.of(Set.of(allowedLibraryId)));
+        when(showRepository.findByLibraryEntityIdIn(eq(Set.of(allowedLibraryId)), any(Pageable.class))).thenReturn(page);
+
+        Page<ShowEntity> result = subject.shows(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), authentication);
+
+        assertNotNull(result);
+        verify(showRepository).findByLibraryEntityIdIn(eq(Set.of(allowedLibraryId)), any(Pageable.class));
+        verify(showRepository, never()).findAll(any(Pageable.class));
     }
 
     @Test
@@ -120,10 +166,11 @@ class ShowControllerTest {
         LibraryEntity library = LibraryEntity.builder().name("Shows").build();
         library.setId(libraryId);
         Page<ShowEntity> page = new PageImpl<>(List.of());
+        when(libraryAccessService.canAccess(any(UUID.class), any())).thenReturn(true);
         when(libraryRepository.findById(libraryId)).thenReturn(Optional.of(library));
         when(showRepository.findByLibraryEntity(eq(library), any(Pageable.class))).thenReturn(page);
 
-        Page<ShowEntity> result = subject.shows(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(libraryId));
+        Page<ShowEntity> result = subject.shows(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(libraryId), authentication);
 
         assertNotNull(result);
         verify(showRepository).findByLibraryEntity(eq(library), any(Pageable.class));
@@ -131,16 +178,27 @@ class ShowControllerTest {
     }
 
     @Test
-    void showsReturnsAllWhenLibraryIdNotFound() {
+    void showsWithAForbiddenLibraryIdReturnsAnEmptyPage() {
         UUID libraryId = UUID.randomUUID();
-        Page<ShowEntity> page = new PageImpl<>(List.of());
+        when(libraryAccessService.canAccess(any(UUID.class), any())).thenReturn(false);
+
+        Page<ShowEntity> result = subject.shows(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(libraryId), authentication);
+
+        assertEquals(0, result.getTotalElements());
+        verify(showRepository, never()).findByLibraryEntity(any(), any(Pageable.class));
+        verify(showRepository, never()).findAll(any(Pageable.class));
+    }
+
+    @Test
+    void showsReturnsEmptyWhenLibraryIdNotFound() {
+        UUID libraryId = UUID.randomUUID();
+        when(libraryAccessService.canAccess(any(UUID.class), any())).thenReturn(true);
         when(libraryRepository.findById(libraryId)).thenReturn(Optional.empty());
-        when(showRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        Page<ShowEntity> result = subject.shows(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(libraryId));
+        Page<ShowEntity> result = subject.shows(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(libraryId), authentication);
 
-        assertNotNull(result);
-        verify(showRepository).findAll(any(Pageable.class));
+        assertEquals(0, result.getTotalElements());
+        verify(showRepository, never()).findAll(any(Pageable.class));
     }
 
     @Test

@@ -1,16 +1,19 @@
 package app.ister.api.controller;
 
 import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.repository.TrackRepository;
+import app.ister.core.service.LibraryAccessService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.Authentication;
 
 import java.util.List;
 import java.util.Optional;
@@ -28,16 +31,26 @@ class TrackControllerTest {
     @Mock
     private TrackRepository trackRepository;
 
+    @Mock
+    private LibraryAccessService libraryAccessService;
+
+    @Mock
+    private Authentication authentication;
+
     @Test
     void trackByIdReturnsFromRepository() {
         UUID id = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder().name("L").build();
+        library.setId(UUID.randomUUID());
         PersonEntity artist = PersonEntity.builder().name("The Beatles").build();
-        AlbumEntity album = AlbumEntity.builder().name("Abbey Road").releaseYear(1969).build();
+        AlbumEntity album = AlbumEntity.builder().name("Abbey Road").releaseYear(1969)
+                .libraryEntity(library).build();
         TrackEntity track = TrackEntity.builder().number(1).discNumber(1)
                 .personEntity(artist).albumEntity(album).build();
         when(trackRepository.findById(id)).thenReturn(Optional.of(track));
+        when(libraryAccessService.canAccess(any(LibraryEntity.class), any())).thenReturn(true);
 
-        Optional<TrackEntity> result = subject.trackById(id);
+        Optional<TrackEntity> result = subject.trackById(id, authentication);
 
         assertTrue(result.isPresent());
         assertEquals(1, result.get().getNumber());
@@ -49,7 +62,7 @@ class TrackControllerTest {
         UUID id = UUID.randomUUID();
         when(trackRepository.findById(id)).thenReturn(Optional.empty());
 
-        assertTrue(subject.trackById(id).isEmpty());
+        assertTrue(subject.trackById(id, authentication).isEmpty());
     }
 
     @Test

@@ -75,6 +75,16 @@ class PlayQueueServiceTest {
     @Mock
     private ContinueWatchingService continueWatchingService;
 
+    /**
+     * Unstubbed: ofSource defaults to Optional.empty(), which counts as accessible (the
+     * source-deleted fallback), so the pre-permissions behaviour of every test is preserved.
+     */
+    @Mock
+    private MediaLibraryResolver mediaLibraryResolver;
+
+    @Mock
+    private LibraryAccessService libraryAccessService;
+
     @Mock
     private Authentication authentication;
 

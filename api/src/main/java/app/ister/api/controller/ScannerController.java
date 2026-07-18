@@ -25,7 +25,7 @@ public class ScannerController {
         this.directoryRepository = directoryRepository;
     }
 
-    @PreAuthorize("hasRole('user')")
+    @PreAuthorize("hasRole('admin')")
     @MutationMapping
     public Boolean scanLibrary() {
         log.debug("Start scanLibrary");
@@ -41,7 +41,7 @@ public class ScannerController {
         return true;
     }
 
-    @PreAuthorize("hasRole('user')")
+    @PreAuthorize("hasRole('admin')")
     @MutationMapping
     public Boolean analyzeLibrary() {
         log.debug("start analyzeLibrary");

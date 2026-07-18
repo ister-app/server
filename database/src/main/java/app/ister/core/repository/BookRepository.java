@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -74,7 +75,11 @@ public interface BookRepository extends JpaRepository<BookEntity, UUID> {
 
     Page<BookEntity> findByPersonEntity(PersonEntity personEntity, Pageable pageable);
 
+    Page<BookEntity> findByPersonEntityAndLibraryEntityIdIn(PersonEntity personEntity, Collection<UUID> libraryIds, Pageable pageable);
+
     Page<BookEntity> findByLibraryEntityId(UUID libraryId, Pageable pageable);
+
+    Page<BookEntity> findByLibraryEntityIdIn(Collection<UUID> libraryIds, Pageable pageable);
 
     List<BookEntity> findByPersonEntityId(UUID personId);
 

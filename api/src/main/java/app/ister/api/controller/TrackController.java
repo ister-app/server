@@ -6,12 +6,14 @@ import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.repository.TrackRepository;
+import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import java.util.List;
@@ -23,11 +25,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TrackController {
     private final TrackRepository trackRepository;
+    private final LibraryAccessService libraryAccessService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public Optional<TrackEntity> trackById(@Argument UUID id) {
-        return trackRepository.findById(id);
+    public Optional<TrackEntity> trackById(@Argument UUID id, Authentication authentication) {
+        return trackRepository.findById(id)
+                .filter(track -> libraryAccessService.canAccess(
+                        track.getAlbumEntity().getLibraryEntity(), authentication));
     }
 
     @SchemaMapping(typeName = "Track", field = "artist")

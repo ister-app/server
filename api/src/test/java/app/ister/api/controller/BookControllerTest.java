@@ -3,6 +3,7 @@ package app.ister.api.controller;
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.ImageEntity;
+import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.PersonEntity;
@@ -15,6 +16,7 @@ import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import app.ister.core.service.ContinueWatchingService;
+import app.ister.core.service.LibraryAccessService;
 import app.ister.core.service.WatchStatusService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -72,10 +74,15 @@ class BookControllerTest {
     private ContinueWatchingService continueWatchingService;
 
     @Mock
+    private LibraryAccessService libraryAccessService;
+
+    @Mock
     private Authentication authentication;
 
     private BookEntity book(String name) {
-        BookEntity book = BookEntity.builder().name(name).build();
+        LibraryEntity library = LibraryEntity.builder().name("L").build();
+        library.setId(UUID.randomUUID());
+        BookEntity book = BookEntity.builder().name(name).libraryEntity(library).build();
         book.setId(UUID.randomUUID());
         return book;
     }
@@ -84,8 +91,9 @@ class BookControllerTest {
     void bookByIdDelegatesToRepository() {
         BookEntity book = book("Dit zijn de namen");
         when(bookRepository.findById(book.getId())).thenReturn(Optional.of(book));
+        when(libraryAccessService.canAccess(any(LibraryEntity.class), any())).thenReturn(true);
 
-        Optional<BookEntity> result = subject.bookById(book.getId());
+        Optional<BookEntity> result = subject.bookById(book.getId(), authentication);
 
         assertTrue(result.isPresent());
     }
@@ -94,10 +102,11 @@ class BookControllerTest {
     void booksReturnsAllBooksWhenNoFilterIsGiven() {
         when(bookRepository.findAll(any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(book("Dit zijn de namen"))));
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
 
         Page<BookEntity> result = subject.books(Optional.empty(), Optional.empty(),
                 Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.ASCENDING),
-                Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), authentication);
 
         assertEquals(1, result.getTotalElements());
     }
@@ -110,9 +119,10 @@ class BookControllerTest {
         when(personRepository.findById(authorId)).thenReturn(Optional.of(author));
         when(bookRepository.findByPersonEntity(eq(author), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(book)));
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
 
         Page<BookEntity> result = subject.books(Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.of(authorId), Optional.empty());
+                Optional.empty(), Optional.of(authorId), Optional.empty(), authentication);
 
         assertEquals(List.of(book), result.getContent());
     }
@@ -123,7 +133,7 @@ class BookControllerTest {
         when(personRepository.findById(authorId)).thenReturn(Optional.empty());
 
         Page<BookEntity> result = subject.books(Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.of(authorId), Optional.empty());
+                Optional.empty(), Optional.of(authorId), Optional.empty(), authentication);
 
         assertTrue(result.isEmpty());
         verifyNoInteractions(bookRepository);
@@ -134,9 +144,10 @@ class BookControllerTest {
         UUID libraryId = UUID.randomUUID();
         when(bookRepository.findByLibraryEntityId(eq(libraryId), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(book("Dit zijn de namen"))));
+        when(libraryAccessService.canAccess(any(UUID.class), any())).thenReturn(true);
 
         Page<BookEntity> result = subject.books(Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.of(libraryId));
+                Optional.empty(), Optional.empty(), Optional.of(libraryId), authentication);
 
         assertEquals(1, result.getTotalElements());
         verifyNoInteractions(personRepository);
@@ -147,6 +158,7 @@ class BookControllerTest {
         BookEntity book = book("Dit zijn de namen");
         WatchStatusEntity status = WatchStatusEntity.builder().bookEntity(book).build();
         when(bookRepository.findById(book.getId())).thenReturn(Optional.of(book));
+        when(libraryAccessService.canAccess(any(LibraryEntity.class), any())).thenReturn(true);
         when(watchStatusService.getOrCreateForBook(authentication, book)).thenReturn(status);
 
         WatchStatusEntity result = subject.updateReadingProgress(book.getId(), "epubcfi(/6/4!/4/2)", 0.5, authentication);
@@ -163,6 +175,7 @@ class BookControllerTest {
         BookEntity book = book("Dit zijn de namen");
         WatchStatusEntity status = WatchStatusEntity.builder().bookEntity(book).build();
         when(bookRepository.findById(book.getId())).thenReturn(Optional.of(book));
+        when(libraryAccessService.canAccess(any(LibraryEntity.class), any())).thenReturn(true);
         when(watchStatusService.getOrCreateForBook(authentication, book)).thenReturn(status);
 
         WatchStatusEntity result = subject.updateReadingProgress(book.getId(), "epubcfi(/6/40)", 1.5, authentication);

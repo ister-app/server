@@ -6,6 +6,7 @@ import app.ister.core.enums.SortingOrder;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -32,6 +33,7 @@ public class MovieController {
     private final MovieRepository movieRepository;
     private final WatchStatusRepository watchStatusRepository;
     private final LibraryRepository libraryRepository;
+    private final LibraryAccessService libraryAccessService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -40,18 +42,25 @@ public class MovieController {
             @Argument Optional<Integer> size,
             @Argument Optional<SortingEnum> sorting,
             @Argument Optional<SortingOrder> sortingOrder,
-            @Argument Optional<UUID> libraryId) {
+            @Argument Optional<UUID> libraryId, Authentication authentication) {
         Pageable pageable = Paging.pageable(page, size, 10,
                 sorting, SortingEnum.DATE_CREATED, sortingOrder, SortingOrder.DESCENDING);
-        return libraryId.flatMap(libraryRepository::findById)
-                .map(lib -> movieRepository.findByLibraryEntity(lib, pageable))
+        if (libraryId.isPresent()) {
+            return libraryId.filter(id -> libraryAccessService.canAccess(id, authentication))
+                    .flatMap(libraryRepository::findById)
+                    .map(lib -> movieRepository.findByLibraryEntity(lib, pageable))
+                    .orElseGet(() -> Page.empty(pageable));
+        }
+        return libraryAccessService.allowedLibraryIds(authentication)
+                .map(allowed -> movieRepository.findByLibraryEntityIdIn(allowed, pageable))
                 .orElseGet(() -> movieRepository.findAll(pageable));
     }
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public Optional<MovieEntity> movieById(@Argument UUID id) {
-        return movieRepository.findById(id);
+    public Optional<MovieEntity> movieById(@Argument UUID id, Authentication authentication) {
+        return movieRepository.findById(id)
+                .filter(movie -> libraryAccessService.canAccess(movie.getLibraryEntity(), authentication));
     }
 
     @SchemaMapping(typeName = "Movie", field = "metadata")

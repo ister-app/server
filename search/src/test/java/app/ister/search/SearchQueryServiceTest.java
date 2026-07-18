@@ -41,10 +41,10 @@ class SearchQueryServiceTest {
                     {"document": {"id": "%s", "type": "MOVIE", "title": "The Matrix"}},
                     {"document": {"id": "%s", "type": "SHOW", "title": "The Matrix Show"}}
                 ]}""".formatted(movieId, showId);
-        when(typesenseClient.search("media", "matrix", 10, null))
+        when(typesenseClient.search("media", "matrix", 10, null, null))
                 .thenReturn(JsonMapper.builder().build().readTree(response));
 
-        List<SearchQueryService.SearchHit> hits = subject.search("matrix", 10, null);
+        List<SearchQueryService.SearchHit> hits = subject.search("matrix", 10, null, null);
 
         assertEquals(List.of(
                 new SearchQueryService.SearchHit(SearchEntityType.MOVIE, movieId),
@@ -53,9 +53,9 @@ class SearchQueryServiceTest {
 
     @Test
     void searchReturnsEmptyListWhenNoHits() {
-        when(typesenseClient.search(any(), any(), org.mockito.ArgumentMatchers.anyInt(), any()))
+        when(typesenseClient.search(any(), any(), org.mockito.ArgumentMatchers.anyInt(), any(), any()))
                 .thenReturn(JsonMapper.builder().build().readTree("{\"hits\": []}"));
 
-        assertTrue(subject.search("nothing", 10, null).isEmpty());
+        assertTrue(subject.search("nothing", 10, null, null).isEmpty());
     }
 }

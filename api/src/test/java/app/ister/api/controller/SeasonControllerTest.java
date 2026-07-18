@@ -4,6 +4,8 @@ import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.SeasonEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.repository.SeasonRepository;
+import app.ister.core.service.LibraryAccessService;
+import org.springframework.security.core.Authentication;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -26,13 +28,22 @@ class SeasonControllerTest {
     @Mock
     private SeasonRepository seasonRepository;
 
+    @Mock
+    private LibraryAccessService libraryAccessService;
+
+    @Mock
+    private Authentication authentication;
+
     @Test
     void seasonByIdReturnsFromRepository() {
         UUID id = UUID.randomUUID();
-        SeasonEntity season = SeasonEntity.builder().number(1).build();
+        ShowEntity showOfSeason = ShowEntity.builder().name("Test").releaseYear(2020)
+                .libraryEntity(app.ister.core.entity.LibraryEntity.builder().name("Shows").build()).build();
+        SeasonEntity season = SeasonEntity.builder().number(1).showEntity(showOfSeason).build();
         when(seasonRepository.findById(id)).thenReturn(Optional.of(season));
+        when(libraryAccessService.canAccess(any(app.ister.core.entity.LibraryEntity.class), any())).thenReturn(true);
 
-        Optional<SeasonEntity> result = subject.seasonById(id);
+        Optional<SeasonEntity> result = subject.seasonById(id, authentication);
 
         assertTrue(result.isPresent());
         assertEquals(season, result.get());
@@ -43,7 +54,7 @@ class SeasonControllerTest {
         UUID id = UUID.randomUUID();
         when(seasonRepository.findById(id)).thenReturn(Optional.empty());
 
-        Optional<SeasonEntity> result = subject.seasonById(id);
+        Optional<SeasonEntity> result = subject.seasonById(id, authentication);
 
         assertTrue(result.isEmpty());
     }

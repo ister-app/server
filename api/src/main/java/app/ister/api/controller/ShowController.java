@@ -7,6 +7,7 @@ import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.ShowRepository;
+import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -17,6 +18,7 @@ import org.springframework.graphql.data.method.annotation.BatchMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import java.util.List;
@@ -33,11 +35,13 @@ public class ShowController {
     private final EpisodeRepository episodeRepository;
     private final ImageRepository imageRepository;
     private final LibraryRepository libraryRepository;
+    private final LibraryAccessService libraryAccessService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public Optional<ShowEntity> showById(@Argument UUID id) {
-        return showRepository.findById(id);
+    public Optional<ShowEntity> showById(@Argument UUID id, Authentication authentication) {
+        return showRepository.findById(id)
+                .filter(show -> libraryAccessService.canAccess(show.getLibraryEntity(), authentication));
     }
 
     @PreAuthorize("hasRole('user')")
@@ -47,11 +51,18 @@ public class ShowController {
             @Argument Optional<Integer> size,
             @Argument Optional<SortingEnum> sorting,
             @Argument Optional<SortingOrder> sortingOrder,
-            @Argument Optional<UUID> libraryId) {
+            @Argument Optional<UUID> libraryId,
+            Authentication authentication) {
         Pageable pageable = Paging.pageable(page, size, 10,
                 sorting, SortingEnum.NAME, sortingOrder, SortingOrder.ASCENDING);
-        return libraryId.flatMap(libraryRepository::findById)
-                .map(lib -> showRepository.findByLibraryEntity(lib, pageable))
+        if (libraryId.isPresent()) {
+            return libraryId.filter(id -> libraryAccessService.canAccess(id, authentication))
+                    .flatMap(libraryRepository::findById)
+                    .map(lib -> showRepository.findByLibraryEntity(lib, pageable))
+                    .orElseGet(() -> Page.empty(pageable));
+        }
+        return libraryAccessService.allowedLibraryIds(authentication)
+                .map(allowed -> showRepository.findByLibraryEntityIdIn(allowed, pageable))
                 .orElseGet(() -> showRepository.findAll(pageable));
     }
 

@@ -15,6 +15,8 @@ import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.PodcastRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ServerEventService;
+import app.ister.core.service.LibraryAccessService;
+import org.springframework.security.core.Authentication;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -46,6 +48,12 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class PodcastControllerTest {
+
+    @Mock
+    private app.ister.core.service.LibraryAccessService libraryAccessService;
+
+    @Mock
+    private org.springframework.security.core.Authentication authentication;
 
     @InjectMocks
     private PodcastController subject;
@@ -79,8 +87,9 @@ class PodcastControllerTest {
     void podcastByIdDelegatesToRepository() {
         PodcastEntity podcast = podcast("Serial");
         when(podcastRepository.findById(podcast.getId())).thenReturn(Optional.of(podcast));
+        when(libraryAccessService.canAccess((app.ister.core.entity.LibraryEntity) null, authentication)).thenReturn(true);
 
-        Optional<PodcastEntity> result = subject.podcastById(podcast.getId());
+        Optional<PodcastEntity> result = subject.podcastById(podcast.getId(), authentication);
 
         assertTrue(result.isPresent());
         assertEquals(podcast, result.get());
@@ -89,11 +98,12 @@ class PodcastControllerTest {
     /** Podcasts store their name in a "title" column, so the default NAME sort has to be rewritten. */
     @Test
     void podcastsSortsOnTitleInsteadOfName() {
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
         when(podcastRepository.findByActiveTrue(any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(podcast("Serial"))));
 
         Page<PodcastEntity> result = subject.podcasts(Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), authentication);
 
         assertEquals(1, result.getTotalElements());
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
@@ -107,9 +117,10 @@ class PodcastControllerTest {
         UUID libraryId = UUID.randomUUID();
         when(podcastRepository.findByLibraryEntityIdAndActiveTrue(eq(libraryId), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(podcast("Serial"))));
+        when(libraryAccessService.canAccess(eq(libraryId), any())).thenReturn(true);
 
         Page<PodcastEntity> result = subject.podcasts(Optional.of(2), Optional.of(5),
-                Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.DESCENDING), Optional.of(libraryId));
+                Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.DESCENDING), Optional.of(libraryId), authentication);
 
         assertEquals(1, result.getTotalElements());
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);

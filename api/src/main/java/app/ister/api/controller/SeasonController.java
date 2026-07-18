@@ -4,12 +4,14 @@ import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.SeasonEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.repository.SeasonRepository;
+import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import java.util.List;
@@ -21,11 +23,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SeasonController {
     private final SeasonRepository seasonRepository;
+    private final LibraryAccessService libraryAccessService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public Optional<SeasonEntity> seasonById(@Argument UUID id) {
-        return seasonRepository.findById(id);
+    public Optional<SeasonEntity> seasonById(@Argument UUID id, Authentication authentication) {
+        return seasonRepository.findById(id)
+                .filter(season -> libraryAccessService.canAccess(
+                        season.getShowEntity().getLibraryEntity(), authentication));
     }
 
     @SchemaMapping(typeName = "Season", field = "show")

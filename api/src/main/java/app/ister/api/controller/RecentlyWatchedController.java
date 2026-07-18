@@ -7,7 +7,9 @@ import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PodcastEpisodeEntity;
 import app.ister.core.entity.UserEntity;
+import app.ister.core.entity.LibraryEntity;
 import app.ister.core.service.ContinueWatchingService;
+import app.ister.core.service.LibraryAccessService;
 import app.ister.core.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +34,7 @@ import java.util.Optional;
 public class RecentlyWatchedController {
     private final ContinueWatchingService continueWatchingService;
     private final UserService userService;
+    private final LibraryAccessService libraryAccessService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -40,8 +43,35 @@ public class RecentlyWatchedController {
         UserEntity userEntity = userService.getOrCreateUser(authentication);
 
         return continueWatchingService.entriesFor(userEntity.getId()).stream()
+                .filter(entry -> libraryAccessService.canAccess(libraryOf(entry), authentication))
                 .flatMap(entry -> toRecentlyWatched(entry).stream())
                 .toList();
+    }
+
+    /** The library the entry's media lives in; null when the media was deleted since. */
+    private LibraryEntity libraryOf(ContinueWatchingEntity entry) {
+        return switch (entry.getEntryType()) {
+            case EPISODE -> entry.getEpisodeEntity() == null || entry.getEpisodeEntity().getShowEntity() == null
+                    ? null : entry.getEpisodeEntity().getShowEntity().getLibraryEntity();
+            case MOVIE -> entry.getMovieEntity() == null ? null
+                    : entry.getMovieEntity().getLibraryEntity();
+            case CHAPTER -> libraryOfChapter(entry.getChapterEntity());
+            case BOOK, COMIC -> {
+                if (entry.getBookEntity() != null) {
+                    yield entry.getBookEntity().getLibraryEntity();
+                }
+                yield libraryOfChapter(entry.getChapterEntity());
+            }
+            case PODCAST_EPISODE -> entry.getPodcastEpisodeEntity() == null
+                    || entry.getPodcastEpisodeEntity().getPodcastEntity() == null
+                    ? null : entry.getPodcastEpisodeEntity().getPodcastEntity().getLibraryEntity();
+            case TRACK -> null;
+        };
+    }
+
+    private LibraryEntity libraryOfChapter(ChapterEntity chapter) {
+        return chapter == null || chapter.getBookEntity() == null ? null
+                : chapter.getBookEntity().getLibraryEntity();
     }
 
     /**

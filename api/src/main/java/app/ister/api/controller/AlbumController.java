@@ -10,6 +10,7 @@ import app.ister.core.enums.SortingOrder;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.ImageRepository;
+import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -19,6 +20,7 @@ import org.springframework.graphql.data.method.annotation.BatchMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import java.time.LocalDate;
@@ -36,11 +38,13 @@ public class AlbumController {
     private final AlbumRepository albumRepository;
     private final PersonRepository personRepository;
     private final ImageRepository imageRepository;
+    private final LibraryAccessService libraryAccessService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public Optional<AlbumEntity> albumById(@Argument UUID id) {
-        return albumRepository.findById(id);
+    public Optional<AlbumEntity> albumById(@Argument UUID id, Authentication authentication) {
+        return albumRepository.findById(id)
+                .filter(album -> libraryAccessService.canAccess(album.getLibraryEntity(), authentication));
     }
 
     @PreAuthorize("hasRole('user')")
@@ -51,18 +55,24 @@ public class AlbumController {
             @Argument Optional<SortingEnum> sorting,
             @Argument Optional<SortingOrder> sortingOrder,
             @Argument Optional<UUID> artistId,
-            @Argument Optional<UUID> libraryId) {
+            @Argument Optional<UUID> libraryId, Authentication authentication) {
         Pageable pageable = Paging.pageable(page, size, 20,
                 sorting, SortingEnum.NAME, sortingOrder, SortingOrder.ASCENDING);
         if (artistId.isPresent()) {
             return personRepository.findById(artistId.get())
-                    .map(artist -> albumRepository.findByPersonEntity(artist, pageable))
+                    .map(artist -> libraryAccessService.allowedLibraryIds(authentication)
+                            .map(allowed -> albumRepository.findByPersonEntityAndLibraryEntityIdIn(artist, allowed, pageable))
+                            .orElseGet(() -> albumRepository.findByPersonEntity(artist, pageable)))
                     .orElseGet(() -> Page.empty(pageable));
         }
         if (libraryId.isPresent()) {
-            return albumRepository.findByLibraryEntityId(libraryId.get(), pageable);
+            return libraryId.filter(id -> libraryAccessService.canAccess(id, authentication))
+                    .map(id -> albumRepository.findByLibraryEntityId(id, pageable))
+                    .orElseGet(() -> Page.empty(pageable));
         }
-        return albumRepository.findAll(pageable);
+        return libraryAccessService.allowedLibraryIds(authentication)
+                .map(allowed -> albumRepository.findByLibraryEntityIdIn(allowed, pageable))
+                .orElseGet(() -> albumRepository.findAll(pageable));
     }
 
     @SchemaMapping(typeName = "Album", field = "artist")

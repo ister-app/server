@@ -11,6 +11,7 @@ import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.PodcastRepository;
 import app.ister.core.repository.ShowRepository;
 import app.ister.core.repository.TrackRepository;
+import app.ister.core.service.LibraryAccessService;
 import app.ister.core.service.ServerEventService;
 import app.ister.search.SearchQueryService;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import java.util.HashMap;
@@ -27,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -37,6 +40,7 @@ public class SearchController {
     private static final int DEFAULT_SIZE = 20;
 
     private final SearchQueryService searchQueryService;
+    private final LibraryAccessService libraryAccessService;
     private final ServerEventService serverEventService;
     private final MovieRepository movieRepository;
     private final ShowRepository showRepository;
@@ -52,16 +56,24 @@ public class SearchController {
     public List<Object> search(
             @Argument String term,
             @Argument Optional<Integer> size,
-            @Argument Optional<UUID> libraryId) {
+            @Argument Optional<UUID> libraryId,
+            Authentication authentication) {
         if (!searchQueryService.isEnabled()) {
             throw new SearchUnavailableException();
         }
-        List<SearchQueryService.SearchHit> hits =
-                searchQueryService.search(term, size.orElse(DEFAULT_SIZE), libraryId.orElse(null));
+        Optional<Set<UUID>> allowed = libraryAccessService.allowedLibraryIds(authentication);
+        if (allowed.isPresent() && allowed.get().isEmpty()) {
+            return List.of();
+        }
+        if (libraryId.isPresent() && !libraryAccessService.canAccess(libraryId.get(), authentication)) {
+            return List.of();
+        }
+        List<SearchQueryService.SearchHit> hits = searchQueryService.search(
+                term, size.orElse(DEFAULT_SIZE), libraryId.orElse(null), allowed.orElse(null));
         return hydrate(hits);
     }
 
-    @PreAuthorize("hasRole('user')")
+    @PreAuthorize("hasRole('admin')")
     @MutationMapping
     public Boolean reindexSearch() {
         if (!searchQueryService.isEnabled()) {
