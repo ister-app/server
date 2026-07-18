@@ -27,6 +27,8 @@ public class ImageEntity extends FileFromPathEntity {
     // https://en.wikipedia.org/wiki/ISO_639-3
     private String language;
 
+    /** Provenance/dedup URI (e.g. "wikipedia://https://upload..."); no natural length bound. */
+    @Column(columnDefinition = "text")
     private String sourceUri;
 
     private String blurHash;

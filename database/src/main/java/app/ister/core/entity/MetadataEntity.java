@@ -66,7 +66,9 @@ public class MetadataEntity extends BaseEntity {
     @ManyToOne
     private SeriesEntity seriesEntity;
 
+    /** Provenance/dedup URI (e.g. "wikipedia://https://en.wikipedia..."); no natural length bound. */
     @Setter
+    @Column(columnDefinition = "text")
     private String sourceUri;
 
     // https://en.wikipedia.org/wiki/ISO_639-3

@@ -66,7 +66,7 @@ There is no separate formatter/linter: quality gating is SonarCloud (`org.sonarq
 as part of `check`. Integration tests are not a separate source set or task — they run under `test`
 and pull PostgreSQL via Testcontainers.
 
-Schema is Flyway, `database/src/main/resources/db/migration/V<n>__<name>.sql` (latest: `V23`).
+Schema is Flyway, `database/src/main/resources/db/migration/V<n>__<name>.sql` (latest: `V24`).
 Migrations are forward-only and also shipped as `Dockerfile.migrations`; never edit an applied one.
 
 ## Module Structure

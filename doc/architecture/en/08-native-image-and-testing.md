@@ -27,7 +27,7 @@ that constrains how code is written:
 
 Prod runs `hibernate.ddl-auto=validate`: an entity change without a matching Flyway migration fails
 startup. Migrations live in `database/src/main/resources/db/migration/V<n>__<name>.sql` (latest:
-`V23`), are **forward-only**, and are also shipped as a separate image (`Dockerfile.migrations`).
+`V24`), are **forward-only**, and are also shipped as a separate image (`Dockerfile.migrations`).
 Never edit a migration that has been applied anywhere.
 
 ## Testing
