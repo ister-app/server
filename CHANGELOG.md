@@ -1,5 +1,31 @@
 # Changelog
 
+## server v2.1.1
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.1.1` |
+| `ghcr.io/ister-app/migrations` | `2.1.1` |
+
+### Fixes
+
+- fix(disk): make PDFBox work in the GraalVM native image ([`32bba36`](https://github.com/ister-app/server/commit/32bba36))
+- fix(core): log every failed handler attempt with its cause chain ([`3f9db3e`](https://github.com/ister-app/server/commit/3f9db3e))
+- fix(core): make comic series and volume creation race-safe ([`791df56`](https://github.com/ister-app/server/commit/791df56))
+- fix(disk): follow podcast enclosure redirect chains past the JDK limit ([`5e6a3df`](https://github.com/ister-app/server/commit/5e6a3df))
+
+### Other
+
+- docs(admin): add a per-library-type naming-conventions chapter ([`aef0a2e`](https://github.com/ister-app/server/commit/aef0a2e))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.1.1
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.1.0...v2.1.1
+
 ## server v2.1.0
 
 | Image | Tag |
