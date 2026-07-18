@@ -73,8 +73,9 @@ class BookLibraryScanIntegrationTest {
     static final RabbitMQContainer RABBIT = new RabbitMQContainer("rabbitmq:3-alpine");
 
     // No own JwtDecoder stub: GraphQlSubscriptionIntegrationTest.FakeJwtConfig (same package)
-    // is picked up by the component scan and already accepts any bearer token with role "user";
-    // a second nested @TestConfiguration with the same bean name breaks AOT processing.
+    // is picked up by the component scan and already accepts any bearer token with roles
+    // "user"+"admin"; a second nested @TestConfiguration with the same bean name breaks AOT
+    // processing.
 
     @Autowired
     private MessageSender messageSender;

@@ -63,8 +63,10 @@ class GraphQlSubscriptionIntegrationTest {
     @ServiceConnection
     static final RabbitMQContainer RABBIT = new RabbitMQContainer("rabbitmq:3-alpine");
 
-    /** Accepts the literal token "test-token" and grants the "user" role, so the real
-     * AuthenticationWebSocketInterceptor + @PreAuthorize chain is exercised unchanged. */
+    /** Accepts the literal token "test-token" and grants the "user" and "admin" roles, so the real
+     * AuthenticationWebSocketInterceptor + @PreAuthorize chain is exercised unchanged (admin-only
+     * actions such as subscribePodcast are reachable). Shared by the other integration tests in
+     * this package via the component scan. */
     @TestConfiguration
     static class FakeJwtConfig {
         @Bean
@@ -72,7 +74,7 @@ class GraphQlSubscriptionIntegrationTest {
             return token -> Jwt.withTokenValue(token)
                     .header("alg", "none")
                     .subject(UUID.randomUUID().toString())
-                    .claim("roles", List.of("user"))
+                    .claim("roles", List.of("user", "admin"))
                     .issuedAt(Instant.now())
                     .expiresAt(Instant.now().plusSeconds(3600))
                     .build();
