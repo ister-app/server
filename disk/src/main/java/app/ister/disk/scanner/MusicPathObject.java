@@ -48,7 +48,17 @@ public class MusicPathObject {
     private FileType fileType = FileType.NONE;
     private boolean flatAlbumStructure = false;
 
+    /**
+     * Guesses whether the path is a directory from its last segment: no dot means directory. Only
+     * for callers that don't know; an artist like "R.E.M." defeats the guess, so pass the explicit
+     * flag whenever the caller knows what the path points at.
+     */
     public MusicPathObject(String libraryRootPath, String currentPath) {
+        this(libraryRootPath, currentPath, !lastSegmentHasExtension(currentPath));
+    }
+
+    /** @param directory whether {@code currentPath} itself is a directory (files' parent segments are always directories). */
+    public MusicPathObject(String libraryRootPath, String currentPath, boolean directory) {
         String root = libraryRootPath.endsWith("/") ? libraryRootPath : libraryRootPath + "/";
         if (!currentPath.startsWith(root)) {
             return;
@@ -59,26 +69,26 @@ public class MusicPathObject {
         }
         String[] parts = relative.split("/", -1);
         if (parts.length == 1) {
-            parseOneLevel(parts);
+            parseOneLevel(parts, directory);
         } else if (parts.length == 2) {
-            parseTwoLevels(parts);
+            parseTwoLevels(parts, directory);
         } else if (parts.length >= 3) {
-            parseThreePlusLevels(parts);
+            parseThreePlusLevels(parts, directory);
         }
     }
 
-    private void parseOneLevel(String[] parts) {
-        if (!hasExtension(parts[0])) {
+    private void parseOneLevel(String[] parts, boolean directory) {
+        if (directory) {
             artistName = parseArtistName(parts[0]);
             artistYear = parseAlbumYear(parts[0]);
             dirType = DirType.ARTIST;
         }
     }
 
-    private void parseTwoLevels(String[] parts) {
+    private void parseTwoLevels(String[] parts, boolean directory) {
         artistName = parseArtistName(parts[0]);
         String item = parts[1];
-        if (!hasExtension(item)) {
+        if (directory) {
             // parts[0] is a genuine artist directory here, so a trailing (YYYY) is the artist's year.
             artistYear = parseAlbumYear(parts[0]);
             albumName = parseAlbumName(item, artistName);
@@ -98,14 +108,16 @@ public class MusicPathObject {
         }
     }
 
-    private void parseThreePlusLevels(String[] parts) {
+    private void parseThreePlusLevels(String[] parts, boolean directory) {
         artistName = parseArtistName(parts[0]);
         artistYear = parseAlbumYear(parts[0]);
         String albumPart = parts[1];
         albumName = parseAlbumName(albumPart, artistName);
         albumYear = parseAlbumYear(albumPart);
         dirType = DirType.ALBUM;
-        setFileTypeForAlbumFile(parts[parts.length - 1]);
+        if (!directory) {
+            setFileTypeForAlbumFile(parts[parts.length - 1]);
+        }
     }
 
     private void setFileTypeForArtistFile(String filename) {
@@ -199,7 +211,8 @@ public class MusicPathObject {
         return regex(REGEX_ALBUM_YEAR, dirName).map(m -> m.group(1).strip()).orElse(dirName);
     }
 
-    private boolean hasExtension(String name) {
+    private static boolean lastSegmentHasExtension(String path) {
+        String name = path.substring(path.lastIndexOf('/') + 1);
         return name.contains(".") && !name.startsWith(".");
     }
 

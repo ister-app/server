@@ -26,6 +26,24 @@ class ComicPathObjectTest {
     }
 
     @Test
+    void seriesDirectoryWithDotsInNameIsNotMistakenForAFile() {
+        ComicPathObject path = new ComicPathObject(ROOT, ROOT + "/Dr. Stone", true);
+
+        assertEquals(DirType.SERIES, path.getDirType());
+        assertEquals("Dr. Stone", path.getSeriesName());
+        assertEquals(FileType.NONE, path.getFileType());
+    }
+
+    @Test
+    void volumeInsideASeriesWithDotsInName() {
+        ComicPathObject path = parse("Dr. Stone/Volume 3.cbz");
+
+        assertEquals(DirType.SERIES, path.getDirType());
+        assertEquals("Dr. Stone", path.getSeriesName());
+        assertEquals(FileType.COMIC, path.getFileType());
+    }
+
+    @Test
     void seriesDirectoryWithoutYear() {
         ComicPathObject path = parse("Attack on Titan");
 

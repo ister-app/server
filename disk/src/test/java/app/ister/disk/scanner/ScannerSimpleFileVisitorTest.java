@@ -231,6 +231,39 @@ class ScannerSimpleFileVisitorTest {
         }
 
         @Test
+        void bookAuthorDirWithDotsInNameWillBeContinued() {
+            when(basicFileAttributes.isDirectory()).thenReturn(true);
+            DirectoryEntity bookDir = libraryDirectory(LibraryType.BOOK, "/disk/books");
+            Path path = fileSystem.getPath("/disk/books/J.K. Rowling");
+
+            var result = visitor(bookDir).preVisitDirectory(path, basicFileAttributes);
+
+            assertEquals(FileVisitResult.CONTINUE, result);
+        }
+
+        @Test
+        void musicArtistDirWithDotsInNameWillBeContinued() {
+            when(basicFileAttributes.isDirectory()).thenReturn(true);
+            DirectoryEntity musicDir = libraryDirectory(LibraryType.MUSIC, "/disk/music");
+            Path path = fileSystem.getPath("/disk/music/R.E.M.");
+
+            var result = visitor(musicDir).preVisitDirectory(path, basicFileAttributes);
+
+            assertEquals(FileVisitResult.CONTINUE, result);
+        }
+
+        @Test
+        void comicSeriesDirWithDotsInNameWillBeContinued() {
+            when(basicFileAttributes.isDirectory()).thenReturn(true);
+            DirectoryEntity comicDir = libraryDirectory(LibraryType.COMIC, "/disk/comics");
+            Path path = fileSystem.getPath("/disk/comics/Dr. Stone");
+
+            var result = visitor(comicDir).preVisitDirectory(path, basicFileAttributes);
+
+            assertEquals(FileVisitResult.CONTINUE, result);
+        }
+
+        @Test
         void bookDirOutsideLibraryRootWillBeSkipped() {
             when(basicFileAttributes.isDirectory()).thenReturn(true);
             DirectoryEntity bookDir = libraryDirectory(LibraryType.BOOK, "/disk/books");

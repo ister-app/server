@@ -52,7 +52,17 @@ public class BookPathObject {
     private DirType dirType = DirType.NONE;
     private FileType fileType = FileType.NONE;
 
+    /**
+     * Guesses whether the path is a directory from its last segment: no dot means directory. Only
+     * for callers that don't know; a name like "J.K. Rowling" defeats the guess, so pass the
+     * explicit flag whenever the caller knows what the path points at.
+     */
     public BookPathObject(String libraryRootPath, String currentPath) {
+        this(libraryRootPath, currentPath, !lastSegmentHasExtension(currentPath));
+    }
+
+    /** @param directory whether {@code currentPath} itself is a directory (files' parent segments are always directories). */
+    public BookPathObject(String libraryRootPath, String currentPath, boolean directory) {
         String root = libraryRootPath.endsWith("/") ? libraryRootPath : libraryRootPath + "/";
         if (!currentPath.startsWith(root)) {
             return;
@@ -63,27 +73,27 @@ public class BookPathObject {
         }
         String[] parts = relative.split("/", -1);
         if (parts.length == 1) {
-            parseOneLevel(parts);
+            parseOneLevel(parts, directory);
         } else if (parts.length == 2) {
-            parseTwoLevels(parts);
+            parseTwoLevels(parts, directory);
         } else if (parts.length >= 3) {
-            parseThreePlusLevels(parts);
+            parseThreePlusLevels(parts, directory);
         }
     }
 
-    private void parseOneLevel(String[] parts) {
-        if (!hasExtension(parts[0])) {
+    private void parseOneLevel(String[] parts, boolean directory) {
+        if (directory) {
             authorName = stripYear(parts[0]);
             authorYear = parseYear(parts[0]);
             dirType = DirType.ARTIST;
         }
     }
 
-    private void parseTwoLevels(String[] parts) {
+    private void parseTwoLevels(String[] parts, boolean directory) {
         authorName = stripYear(parts[0]);
         authorYear = parseYear(parts[0]);
         String item = parts[1];
-        if (!hasExtension(item)) {
+        if (directory) {
             // Book directory (audiobook folder, or a folder that also holds an epub).
             parseBookName(item);
             dirType = DirType.ALBUM;
@@ -99,12 +109,14 @@ public class BookPathObject {
         }
     }
 
-    private void parseThreePlusLevels(String[] parts) {
+    private void parseThreePlusLevels(String[] parts, boolean directory) {
         authorName = stripYear(parts[0]);
         authorYear = parseYear(parts[0]);
         parseBookName(parts[1]);
         dirType = DirType.ALBUM;
-        setFileTypeForBookFile(parts[parts.length - 1]);
+        if (!directory) {
+            setFileTypeForBookFile(parts[parts.length - 1]);
+        }
     }
 
     private void setFileTypeForAuthorFile(String filename) {
@@ -158,7 +170,8 @@ public class BookPathObject {
         return regex(REGEX_YEAR, name).map(m -> Integer.parseInt(m.group(2))).orElse(0);
     }
 
-    private boolean hasExtension(String name) {
+    private static boolean lastSegmentHasExtension(String path) {
+        String name = path.substring(path.lastIndexOf('/') + 1);
         return name.contains(".") && !name.startsWith(".");
     }
 

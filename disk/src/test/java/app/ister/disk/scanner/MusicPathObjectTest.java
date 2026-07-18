@@ -24,6 +24,33 @@ class MusicPathObjectTest {
     }
 
     @Test
+    void artistDirectoryWithDotsInNameIsNotMistakenForAFile() {
+        var subject = new MusicPathObject(ROOT, "/music/R.E.M.", true);
+        assertEquals(DirType.ARTIST, subject.getDirType());
+        assertEquals(FileType.NONE, subject.getFileType());
+        assertEquals("R.E.M.", subject.getArtistName());
+    }
+
+    @Test
+    void albumDirectoryWithDotsInNameIsNotMistakenForAFile() {
+        var subject = new MusicPathObject(ROOT, "/music/R.E.M./Vol. 2 (1992)", true);
+        assertEquals(DirType.ALBUM, subject.getDirType());
+        assertEquals(FileType.NONE, subject.getFileType());
+        assertEquals("R.E.M.", subject.getArtistName());
+        assertEquals("Vol. 2", subject.getAlbumName());
+        assertEquals(1992, subject.getAlbumYear());
+    }
+
+    @Test
+    void trackUnderArtistWithDotsInName() {
+        var subject = new MusicPathObject(ROOT, "/music/R.E.M./Automatic for the People/01 - Drive.flac");
+        assertEquals(FileType.AUDIO, subject.getFileType());
+        assertEquals("R.E.M.", subject.getArtistName());
+        assertEquals("Automatic for the People", subject.getAlbumName());
+        assertEquals(1, subject.getTrackNumber());
+    }
+
+    @Test
     void artistDirectoryWithYear() {
         var subject = new MusicPathObject(ROOT, "/music/Ariana Grande (1993)");
         assertEquals(DirType.ARTIST, subject.getDirType());

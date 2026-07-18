@@ -22,6 +22,40 @@ class BookPathObjectTest {
     }
 
     @Test
+    void authorDirectoryWithDotsInNameIsNotMistakenForAFile() {
+        var subject = new BookPathObject(ROOT, "/books/J.K. Rowling", true);
+        assertEquals(DirType.ARTIST, subject.getDirType());
+        assertEquals(FileType.NONE, subject.getFileType());
+        assertEquals("J.K. Rowling", subject.getAuthorName());
+    }
+
+    @Test
+    void bookDirectoryWithDotsInNameIsNotMistakenForAFile() {
+        var subject = new BookPathObject(ROOT, "/books/J.K. Rowling/Boek dl. 1", true);
+        assertEquals(DirType.ALBUM, subject.getDirType());
+        assertEquals(FileType.NONE, subject.getFileType());
+        assertEquals("J.K. Rowling", subject.getAuthorName());
+        assertEquals("Boek dl. 1", subject.getBookName());
+    }
+
+    @Test
+    void epubUnderAuthorWithDotsInName() {
+        var subject = new BookPathObject(ROOT, "/books/J.K. Rowling/Harry Potter en de steen der wijzen.epub");
+        assertEquals(FileType.EPUB, subject.getFileType());
+        assertEquals("J.K. Rowling", subject.getAuthorName());
+        assertEquals("Harry Potter en de steen der wijzen", subject.getBookName());
+    }
+
+    @Test
+    void chapterUnderAuthorWithDotsInName() {
+        var subject = new BookPathObject(ROOT, "/books/J.K. Rowling/Harry Potter en de steen der wijzen/003_Hoofdstuk_1.mp3");
+        assertEquals(FileType.AUDIO, subject.getFileType());
+        assertEquals("J.K. Rowling", subject.getAuthorName());
+        assertEquals("Harry Potter en de steen der wijzen", subject.getBookName());
+        assertEquals(3, subject.getChapterNumber());
+    }
+
+    @Test
     void authorDirectoryWithBirthYear() {
         var subject = new BookPathObject(ROOT, "/books/John Flanagan (1944)");
         assertEquals(DirType.ARTIST, subject.getDirType());

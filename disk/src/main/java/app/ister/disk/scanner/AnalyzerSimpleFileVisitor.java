@@ -58,17 +58,17 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
             return FileVisitResult.SKIP_SUBTREE;
         }
         if (libraryTypeIs(LibraryType.MUSIC)) {
-            MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), dir.toString());
+            MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), dir.toString(), true);
             return List.of(DirType.ARTIST, DirType.ALBUM).contains(musicPath.getDirType())
                     ? FileVisitResult.CONTINUE : FileVisitResult.SKIP_SUBTREE;
         }
         if (libraryTypeIs(LibraryType.BOOK)) {
-            BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), dir.toString());
+            BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), dir.toString(), true);
             return List.of(DirType.ARTIST, DirType.ALBUM).contains(bookPath.getDirType())
                     ? FileVisitResult.CONTINUE : FileVisitResult.SKIP_SUBTREE;
         }
         if (libraryTypeIs(LibraryType.COMIC)) {
-            ComicPathObject comicPath = new ComicPathObject(directoryEntity.getPath(), dir.toString());
+            ComicPathObject comicPath = new ComicPathObject(directoryEntity.getPath(), dir.toString(), true);
             return comicPath.getDirType() == DirType.SERIES
                     ? FileVisitResult.CONTINUE : FileVisitResult.SKIP_SUBTREE;
         }

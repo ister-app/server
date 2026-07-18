@@ -44,7 +44,17 @@ public class ComicPathObject {
     private DirType dirType = DirType.NONE;
     private FileType fileType = FileType.NONE;
 
+    /**
+     * Guesses whether the path is a directory from its last segment: no dot means directory. Only
+     * for callers that don't know; a series like "Dr. Stone" defeats the guess, so pass the
+     * explicit flag whenever the caller knows what the path points at.
+     */
     public ComicPathObject(String libraryRootPath, String currentPath) {
+        this(libraryRootPath, currentPath, !lastSegmentHasExtension(currentPath));
+    }
+
+    /** @param directory whether {@code currentPath} itself is a directory (files' parent segments are always directories). */
+    public ComicPathObject(String libraryRootPath, String currentPath, boolean directory) {
         String root = libraryRootPath.endsWith("/") ? libraryRootPath : libraryRootPath + "/";
         if (!currentPath.startsWith(root)) {
             return;
@@ -55,15 +65,15 @@ public class ComicPathObject {
         }
         String[] parts = relative.split("/", -1);
         if (parts.length == 1) {
-            parseSeriesDir(parts[0]);
+            parseSeriesDir(parts[0], directory);
         } else if (parts.length == 2) {
-            parseSeriesFile(parts[0], parts[1]);
+            parseSeriesFile(parts[0], parts[1], directory);
         }
         // Deeper nesting is not part of the grammar; the visitor never descends into it.
     }
 
-    private void parseSeriesDir(String name) {
-        if (hasExtension(name)) {
+    private void parseSeriesDir(String name, boolean directory) {
+        if (!directory) {
             return; // A loose file directly under the library root is ignored.
         }
         seriesName = stripYear(name);
@@ -71,10 +81,13 @@ public class ComicPathObject {
         dirType = DirType.SERIES;
     }
 
-    private void parseSeriesFile(String seriesDir, String filename) {
+    private void parseSeriesFile(String seriesDir, String filename, boolean directory) {
         seriesName = stripYear(seriesDir);
         startYear = parseYear(seriesDir);
         dirType = DirType.SERIES;
+        if (directory) {
+            return; // A directory inside a series dir carries no file information.
+        }
 
         String ext = getExtension(filename).toLowerCase();
         String base = removeExtension(filename);
@@ -104,7 +117,8 @@ public class ComicPathObject {
         return matcher.results().findFirst();
     }
 
-    private boolean hasExtension(String name) {
+    private static boolean lastSegmentHasExtension(String path) {
+        String name = path.substring(path.lastIndexOf('/') + 1);
         return name.contains(".") && !name.startsWith(".");
     }
 
