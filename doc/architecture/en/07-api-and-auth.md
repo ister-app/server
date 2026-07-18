@@ -34,10 +34,38 @@ enabled in dev. Besides queries and mutations there are three websocket subscrip
 - `playbackCommands(playQueueId)` — party-mode remote control (best-effort, non-replaying); gated by
   the owner's remote-control sharing scope
 
+## Per-user preferences and attribution
+
+Three small API surfaces that the chapters above only touch in passing:
+
+- **Ratings** — `setRating(mediaType, mediaId, rating)` stores the calling user's 1–10 rating for a
+  media item (`rating: null` clears it); `RatingMediaType` covers MOVIE / SHOW / EPISODE / ALBUM /
+  TRACK / BOOK / PODCAST. The value is read back per user through a `rating` field on the
+  corresponding type (e.g. `Movie.rating`), null when unrated. `RatingController`.
+- **Playback settings** — `userSettings` / `updateUserSettings` hold each user's
+  `preferredAudioLanguages`, `preferredSubtitleLanguages`, `directPlay`, `transcode` and
+  `maxVideoHeight`. They apply to every client of that user **and steer pre-transcoding**: only the
+  preferred audio languages and video variants up to `maxVideoHeight` are transcoded in the
+  background ([chapter 4](04-transcoding.md)). Defaults fall back to the server's configured
+  languages. `UserSettingsController`.
+- **Attribution** — `attributions` returns the external providers actually in use on this server,
+  for the client's attribution screen: `source` (a `MetadataSource`: TMDB, MUSICBRAINZ,
+  COVER_ART_ARCHIVE, WIKIMEDIA_COMMONS, WIKIPEDIA, WIKIDATA, OPEN_LIBRARY, PODCAST_FEED, LOCAL_FILE),
+  a display `name`/`url`, a provider-mandated `notice` (e.g. TMDB's non-endorsement line) and a
+  content `license` where relevant (e.g. `CC BY-SA 4.0` for Wikipedia text). Each `Metadata` row and
+  image also carries its own `source` so a single item can be attributed field by field
+  ([chapter 3](03-media-types-and-metadata.md)). `AttributionController`, backed by migration V26.
+
+Admins, per-library visibility, and playback-session sharing are their own surface — see the admin
+guide, [Users, sharing, and access](../../admin/en/08-users-sharing-and-access.md), and
+[chapter 5](05-continue-watching-and-status.md#session-sharing--privacy) for the sharing internals.
+
 ## Authentication
 
 Primary auth is **OAuth2 JWT** via Spring Security's resource server, against a Keycloak-compatible
-OIDC provider (`OIDC_URL` env var).
+OIDC provider (`OIDC_URL` env var). The JWT's `roles` claim is mapped to Spring authorities with a
+`ROLE_` prefix (`OIDCSecurityConfig`), so a realm role `admin` becomes `ROLE_admin` and gates the
+admin-only mutations via `@PreAuthorize("hasRole('admin')")`.
 
 **Stream tokens** cover the places a media player cannot send a bearer header. HLS playlist and
 segment requests may authenticate with a short-lived `?token=` query parameter

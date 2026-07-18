@@ -29,7 +29,7 @@ en dat legt beperkingen op aan hoe je code schrijft:
 
 Prod draait `hibernate.ddl-auto=validate`: een entity-wijziging zonder bijpassende
 Flyway-migratie laat de startup falen. Migraties staan in
-`database/src/main/resources/db/migration/V<n>__<name>.sql` (laatste: `V24`), zijn
+`database/src/main/resources/db/migration/V<n>__<name>.sql` (laatste: `V28`), zijn
 **forward-only** en worden ook als apart image uitgeleverd (`Dockerfile.migrations`). Bewerk nooit
 een migratie die ergens al toegepast is.
 

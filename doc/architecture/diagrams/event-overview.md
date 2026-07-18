@@ -26,6 +26,9 @@ graph LR
         H10[HandlePreTranscodeRecentlyWatched]
         H11[HandlePersonFound]
         H12[HandleAlbumFound]
+        H13[HandleEpubFileFound]
+        H14[HandleComicFileFound]
+        H15[HandlePodcastEpisodeDownloadRequested]
     end
 
     subgraph worker module
@@ -36,11 +39,20 @@ graph LR
         W5[MovieFoundHandle]
         W6[HandlePersonFound]
         W7[HandleAlbumFound]
+        W8[HandleBookFound]
+        W9[HandleComicSeriesFound]
+        W10[HandlePodcastRefreshRequested]
+        W11[HandleContinueWatchingRebuildRequested]
     end
 
     subgraph transcoder module
         TR1[HandleTranscodeRequested]
         TR2[HandleTranscodePassRequested]
+    end
+
+    subgraph search module
+        S1[HandleSearchIndexRequested]
+        S2[HandleSearchReindexRequested]
     end
 
     T1 --> H1 --> H2
@@ -49,6 +61,9 @@ graph LR
     H2 --> H5
     H2 --> H6
     H2 --> H7
+    H2 --> H13 --> H6
+    H2 --> H14 --> H6
+    H14 --> W9
 
     T2 --> W1
     W1 --> H8
@@ -57,6 +72,7 @@ graph LR
     W1 --> W5 --> H6
     W1 --> W6
     W1 --> W7 --> H6
+    W1 --> W8
     W1 --> H7
     W1 --> H11 --> H7
     W1 --> H12 --> H7
@@ -68,4 +84,13 @@ graph LR
 
     T4 --> H10 --> TR1 --> TR2
     T5 --> TR1
+    T4 --> W10 --> H15 --> H4
+    T4 --> W11
+
+    T6([reindexSearch API]) --> S2
+    W3 & W5 & W7 & H4 -.->|SEARCH_INDEX_REQUESTED| S1
 ```
+
+Enrichment handlers emit `SEARCH_INDEX_REQUESTED` after their metadata saves (only a few edges are
+drawn, to keep the graph readable); the search module discards those events when Typesense is
+disabled ([chapter 6](../en/06-search.md)).

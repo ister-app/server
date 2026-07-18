@@ -144,10 +144,12 @@ type Mutation {
     "Queues a download of the episode's audio to this node's cache directory."
     downloadPodcastEpisode(episodeId: ID!): Boolean!
     """
-    Sends a remote-control command to the client playing the given queue. Any authenticated
-    user may control any session. Delivered over the cluster status exchange, so it reaches
-    the playing client regardless of which node it is connected to. Returns whether an
-    active session for the queue was known when the command was sent.
+    Sends a remote-control command to the client playing the given queue. The caller must be
+    allowed to control that session by the owner's remote-control sharing scope (see
+    updatePlaybackSharingSettings / setSessionSharing); the owner always may, and a denied caller
+    gets a dropped command. Delivered over the cluster status exchange, so it reaches the playing
+    client regardless of which node it is connected to. Returns whether an active session for the
+    queue was known and the command was accepted.
     """
     sendPlaybackCommand(playQueueId: ID!, command: PlaybackCommandType!, positionInMilliseconds: Int, playQueueItemId: ID): Boolean!
     """

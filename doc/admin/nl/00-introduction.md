@@ -52,3 +52,4 @@ een fractie van een seconde en bevat geen JVM. Normaal gesproken pull je gewoon
 5. [Zoeken (Typesense)](05-search-typesense.md) — full-text zoeken inschakelen en onderhouden
 6. [Onderhoud en probleemoplossing](06-maintenance-and-troubleshooting.md) — geplande taken, back-up, monitoring
 7. [Naamconventies](07-naming-conventions.md) — de exacte map- en bestandsnaamregels per librarytype
+8. [Gebruikers, delen en toegang](08-users-sharing-and-access.md) — admins, zichtbaarheid per library, playback-sessies delen

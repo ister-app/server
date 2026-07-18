@@ -17,7 +17,7 @@ flowchart TD
 
     D -->|video| E["MEDIA_FILE_FOUND\n.{dirName}"]
     D -->|audio| F["AUDIO_FILE_FOUND\n.{dirName}"]
-    D -->|".epub (BOOK library)"| EP["EPUB_FILE_FOUND\n.{dirName}"]
+    D -->|".epub (BOOK/COMIC library)"| EP["EPUB_FILE_FOUND\n.{dirName}"]
     D -->|".cbz/.pdf (COMIC library)"| CO["COMIC_FILE_FOUND\n.{dirName}"]
     D -->|.srt| G["SUBTITLE_FILE_FOUND\n.{dirName}"]
     D -->|image| H["IMAGE_FOUND\n.{dirName}"]
@@ -35,7 +35,7 @@ flowchart TD
     K --> O["HandleImageFound\n📦 disk"]
     M --> O
     H --> O
-    O -->|"generate BlurHash\nsave ImageEntity\nlink to show/movie/episode/etc."| DB2[(Database)]
+    O -->|"save ImageEntity (BlurHash filled later\nby the UPDATE_IMAGES_REQUESTED sweep)\nlink to show/movie/episode/etc."| DB2[(Database)]
 
     I --> P["HandleNfoFileFound\n📦 disk"]
     P -->|"parses XML NFO\ntitle, description, release date\nbiography/review for music/books"| DB3[(Database)]

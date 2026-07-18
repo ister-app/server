@@ -52,3 +52,4 @@ building it yourself is covered in [Installation](01-installation.md).
 5. [Search (Typesense)](05-search-typesense.md) — enabling and maintaining full-text search
 6. [Maintenance and troubleshooting](06-maintenance-and-troubleshooting.md) — scheduled jobs, backup, monitoring
 7. [Naming conventions](07-naming-conventions.md) — the exact directory and file naming rules per library type
+8. [Users, sharing, and access](08-users-sharing-and-access.md) — admins, per-library visibility, playback-session sharing

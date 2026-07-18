@@ -12,7 +12,8 @@ een single-node thuisopstelling.
 | Databasehost / poort / naam | `DB_HOST` / `DB_PATH` / `DB_NAME` | `localhost` / `5432` / `ister` | PostgreSQL |
 | Database-inloggegevens | `DB_USER` / `DB_PASSWORD` | `ister` / `ister` | wijzig dit in productie |
 | Connectionpool | `DB_POOL_SIZE` | `20` | afspelen waaiert uit naar veel gelijktijdige queries |
-| RabbitMQ | `SPRING_RABBITMQ_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` | `localhost`, `user`/`password` | |
+| Connectie-timeout (ms) | `DB_CONNECTION_TIMEOUT` | `10000` | hoe lang een thread op een poolverbinding wacht voordat het faalt |
+| RabbitMQ | `SPRING_RABBITMQ_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` | `localhost`, `5672`, `user`/`password` | poort valt terug op de RabbitMQ-standaard 5672 |
 | OIDC-issuer | `OIDC_URL` | — | Keycloak-compatibel; bijv. `https://keycloak.example.com/realms/Home` |
 
 ## Identiteit en paden
@@ -53,6 +54,43 @@ Zie [Zoeken](05-search-typesense.md) voor de procedure om in te schakelen en te 
 | `app.ister.transcoder.hls.hwaccel-device` | `HLS_HWACCEL_DEVICE` | `/dev/dri/renderD128` | alleen VAAPI |
 | `app.ister.transcoder.hls.max-concurrent-files` | `HLS_MAX_CONCURRENT_FILES` | `2` | gelijktijdig getranscodeerde bestanden; pre-transcoding deelt dit budget |
 
+### Geavanceerde transcoding
+
+Zelden aan te raken — de standaardwaarden passen bij de meeste opstellingen. Deze hebben geen eigen
+korte env var (gebruik relaxed binding, bijv. `APP_ISTER_TRANSCODER_HLS_MAX_BACKGROUND_FILES`). De
+mechaniek erachter staat in de architectuurgids, [Transcoding](../../architecture/nl/04-transcoding.md).
+
+| Property | Standaard | Opmerkingen |
+| --- | --- | --- |
+| `app.ister.transcoder.hls.max-concurrent-passes` | `4` | gelijktijdig lopende FFmpeg-passes (threadpoolgrootte) |
+| `app.ister.transcoder.hls.max-background-files` | `1` | bestanden die een achtergrond-pre-transcode mag vasthouden, onder het interactieve budget |
+| `app.ister.transcoder.hls.max-background-passes` | `2` | passes die een achtergrond-pre-transcode mag vasthouden |
+| `app.ister.transcoder.hls.background-nice` | `10` | `nice`-waarde voor achtergrondpasses, zodat interactief afspelen de CPU wint |
+| `app.ister.transcoder.hls.nice-path` | `/usr/bin/nice` | pad naar de `nice`-binary voor bovenstaande |
+| `app.ister.transcoder.hls.cache-retention-hours` | `2` | een transcode-cachemap wordt pas verwijderd na zo lang onaangeraakt (en voorbij zijn keep-until) |
+| `app.ister.transcoder.hls.segment-stability-ms` | `200` | een segmentbestand moet zo lang ongewijzigd zijn voordat het als klaar telt |
+| `app.ister.transcoder.hls.pass-timeout-multiplier` | `4` | pass-timeout = mediaduur × dit |
+| `app.ister.transcoder.hls.pass-timeout-min-seconds` | `1800` | …maar nooit onder deze ondergrens |
+| `app.ister.transcoder.hls.pass-stall-timeout-seconds` | `60` | breek een pass af die zo lang geen nieuw segment schrijft |
+| `app.ister.transcoder.hls.upload-drain-timeout-ms` | `300000` | multi-node: hoe lang na afloop van een pass segmenten naar de vragende node geüpload blijven worden |
+| `app.ister.server.hls.segment-timeout-ms` | `60000` | hoe lang een HTTP-`.ts`-verzoek op dat segment van de encoder wacht |
+| `app.ister.server.hls.master-playlist-timeout-ms` | `120000` | hoe lang een `master.m3u8`-verzoek op het genereren van de playlists wacht |
+
+## Pre-transcoding en prefetch
+
+Twee achtergrondmechanismen warmen de transcode-cache op zodat afspelen direct start.
+Pre-transcoding werkt vanuit de continue-watching-lijst; prefetch reageert op wat een play queue nú
+doet. Zie de architectuurgids, [Transcoding](../../architecture/nl/04-transcoding.md).
+
+| Property | Standaard | Opmerkingen |
+| --- | --- | --- |
+| `app.ister.server.pretranscode.keep-minutes` | `30` | hoe lang een voor-getranscodeerd bestand warm blijft voordat het geveegd mag worden |
+| `app.ister.server.prefetch.enabled` | `true` | prefetch het volgende item in een play queue tijdens afspelen |
+| `app.ister.server.prefetch.video-threshold-seconds` | `120` | begin de volgende video te prefetchen na zoveel seconden in de huidige |
+| `app.ister.server.prefetch.track-threshold-seconds` | `60` | idem, voor audiotracks |
+| `app.ister.server.prefetch.track-depth` | `2` | hoeveel komende tracks vooruit te prefetchen |
+| `app.ister.server.prefetch.keep-hours` | `24` | hoe lang een geprefetcht bestand warm blijft |
+
 ## Continue watching
 
 | Env var | Standaard | Opmerkingen |
@@ -71,6 +109,7 @@ Zie [Zoeken](05-search-typesense.md) voor de procedure om in te schakelen en te 
 | `app.ister.server.cache-cleanup.podcast-retention-days` | `30` | gedownloade podcastafleveringen verlopen hierna, tenzij iemand middenin een aflevering zit |
 | `app.ister.worker.podcast.auto-download-count` | `3` | nieuwste afleveringen die per feed automatisch worden gedownload |
 | `app.ister.worker.podcast.refresh-cron` | `0 10 * * * *` | feeds elk uur verversen |
+| `app.ister.worker.podcast.refresh-min-interval-minutes` | `30` | een feed wordt binnen dit venster niet opnieuw opgehaald, ook al vuurt de cron |
 
 ## Externe metadata-endpoints
 
@@ -88,6 +127,19 @@ lopen — de CI van de chart wijst ze allemaal naar één WireMock-pod:
 
 `app.ister.disk.libraries[n].*` en `app.ister.disk.directories[n].*` bepalen wat er gescand
 wordt — volledig behandeld in [Libraries en media-indeling](03-libraries-and-media-layout.md).
+Aparte transcoder-nodes krijgen schijven toegewezen met `app.ister.transcoder.disks[n].name` — zie
+[Multi-node](04-multi-node.md).
+
+## Health, metrics en overige interne knoppen
+
+De Spring Actuator (`/actuator/health`, `/actuator/metrics`, `/actuator/prometheus`) draait op een
+eigen poort, zodat die buiten de publieke API blijft. Zie [Installatie](01-installation.md#health-metrics-logs).
+
+| Property | Standaard | Opmerkingen |
+| --- | --- | --- |
+| `management.server.port` | `8081` | poort voor de Actuator-endpoints |
+| `management.endpoints.web.exposure.include` | `health,metrics,prometheus` | welke Actuator-endpoints beschikbaar zijn |
+| `app.ister.server.blur-hash.chunk-size` | `500` | afbeeldingen per chunk tijdens de BlurHash-sweep (houdt een chunk onder de RabbitMQ-consumer-timeout) |
 
 ## Lokale overrides (ontwikkeling)
 
