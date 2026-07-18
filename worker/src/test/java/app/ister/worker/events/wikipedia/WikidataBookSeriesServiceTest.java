@@ -144,4 +144,115 @@ class WikidataBookSeriesServiceTest {
         assertTrue(subject.findBookInSeries("Book", " ", TAGS).isEmpty());
         assertTrue(subject.findBookInSeries("Book", "Series", List.of()).isEmpty());
     }
+
+    // ===== discoverSeries =====
+
+    private Map<String, Object> authorClaim(String authorId) {
+        return Map.of("P50", List.of(Map.of("mainsnak", mainsnak(authorId))));
+    }
+
+    private Map<String, Object> bookClaims(String seriesId, String ordinal, String authorId) {
+        Map<String, Object> claims = new java.util.HashMap<>(partOfSeriesClaim(seriesId, ordinal));
+        if (authorId != null) {
+            claims.putAll(authorClaim(authorId));
+        }
+        claims.putAll(publicationDates("+2003-06-21T00:00:00Z"));
+        return claims;
+    }
+
+    @Test
+    void discoversWhichOfTheAuthorsSeriesTheBookBelongsTo() {
+        givenEntityFieldsPassThrough();
+        Map<String, Object> bookEntity = entity("Q102225",
+                label("nl", "Harry Potter en de Orde van de Feniks"),
+                bookClaims("Q8337", "5", "Q34660"));
+        Map<String, Object> seriesEntity = entity("Q8337", label("en", "Harry Potter"), Map.of());
+        Map<String, Object> authorEntity = entity("Q34660", label("en", "J. K. Rowling"), Map.of());
+
+        when(wikipediaService.searchEntityIds("Harry Potter en de Orde van de Feniks", "en"))
+                .thenReturn(List.of("Q102225"));
+        when(wikipediaService.fetchWikidataEntity("Q102225")).thenReturn(bookEntity);
+        when(wikipediaService.fetchWikidataEntity("Q8337")).thenReturn(seriesEntity);
+        when(wikipediaService.fetchWikidataEntity("Q34660")).thenReturn(authorEntity);
+        when(wikipediaService.labelMatches(bookEntity, "Q102225", "harrypotterendeordevandefeniks", TAGS))
+                .thenReturn(true);
+        when(wikipediaService.labelMatches(seriesEntity, "Q8337", "degrijzejager", TAGS)).thenReturn(false);
+        when(wikipediaService.labelMatches(seriesEntity, "Q8337", "harrypotter", TAGS)).thenReturn(true);
+        when(wikipediaService.labelMatches(authorEntity, "Q34660", "jkrowling", TAGS)).thenReturn(true);
+
+        Optional<WikidataBookSeriesService.DiscoveredSeries> found = subject.discoverSeries(
+                "Harry Potter en de Orde van de Feniks", "J.K. Rowling",
+                List.of("De Grijze Jager", "Harry Potter"), TAGS);
+
+        assertEquals("Q102225", found.orElseThrow().wikidataId());
+        assertEquals("Harry Potter", found.orElseThrow().seriesName());
+        assertEquals(5.0, found.orElseThrow().seriesIndex());
+        assertEquals(2003, found.orElseThrow().firstPublicationYear());
+    }
+
+    /** The series matches, but the item's P50 is another writer: the match is rejected. */
+    @Test
+    void discoveryRejectsAnItemWhoseAuthorDoesNotMatch() {
+        givenEntityFieldsPassThrough();
+        Map<String, Object> bookEntity = entity("Q1",
+                label("en", "Some Book"), bookClaims("Q2", "1", "Q3"));
+        Map<String, Object> seriesEntity = entity("Q2", label("en", "Some Series"), Map.of());
+        Map<String, Object> otherAuthor = entity("Q3", label("en", "Somebody Else"), Map.of());
+
+        when(wikipediaService.searchEntityIds(anyString(), anyString())).thenReturn(List.of("Q1"));
+        when(wikipediaService.fetchWikidataEntity("Q1")).thenReturn(bookEntity);
+        when(wikipediaService.fetchWikidataEntity("Q2")).thenReturn(seriesEntity);
+        when(wikipediaService.fetchWikidataEntity("Q3")).thenReturn(otherAuthor);
+        when(wikipediaService.labelMatches(bookEntity, "Q1", "somebook", TAGS)).thenReturn(true);
+        when(wikipediaService.labelMatches(seriesEntity, "Q2", "someseries", TAGS)).thenReturn(true);
+        // The author label does not match (unstubbed → false).
+
+        assertTrue(subject.discoverSeries("Some Book", "The Author", List.of("Some Series"), TAGS)
+                .isEmpty());
+    }
+
+    /** An item without any P50 statement is never trusted — the film has no author either. */
+    @Test
+    void discoveryRejectsAnItemWithoutAnAuthorStatement() {
+        givenEntityFieldsPassThrough();
+        Map<String, Object> bookEntity = entity("Q1",
+                label("en", "Some Book"), bookClaims("Q2", "1", null));
+        Map<String, Object> seriesEntity = entity("Q2", label("en", "Some Series"), Map.of());
+
+        when(wikipediaService.searchEntityIds(anyString(), anyString())).thenReturn(List.of("Q1"));
+        when(wikipediaService.fetchWikidataEntity("Q1")).thenReturn(bookEntity);
+        when(wikipediaService.fetchWikidataEntity("Q2")).thenReturn(seriesEntity);
+        when(wikipediaService.labelMatches(bookEntity, "Q1", "somebook", TAGS)).thenReturn(true);
+        when(wikipediaService.labelMatches(seriesEntity, "Q2", "someseries", TAGS)).thenReturn(true);
+
+        assertTrue(subject.discoverSeries("Some Book", "The Author", List.of("Some Series"), TAGS)
+                .isEmpty());
+    }
+
+    /** Series check runs before the author check: no candidate series match, no author fetch. */
+    @Test
+    void discoveryRejectsWhenTheSeriesIsNotAmongTheCandidates() {
+        givenEntityFieldsPassThrough();
+        Map<String, Object> bookEntity = entity("Q1",
+                label("en", "Some Book"), bookClaims("Q2", "1", "Q3"));
+        Map<String, Object> seriesEntity = entity("Q2", label("en", "Unrelated Series"), Map.of());
+
+        when(wikipediaService.searchEntityIds(anyString(), anyString())).thenReturn(List.of("Q1"));
+        when(wikipediaService.fetchWikidataEntity("Q1")).thenReturn(bookEntity);
+        when(wikipediaService.fetchWikidataEntity("Q2")).thenReturn(seriesEntity);
+        when(wikipediaService.labelMatches(bookEntity, "Q1", "somebook", TAGS)).thenReturn(true);
+        // The series label matches no candidate (unstubbed → false).
+
+        assertTrue(subject.discoverSeries("Some Book", "The Author", List.of("Some Series"), TAGS)
+                .isEmpty());
+        verify(wikipediaService, never()).fetchWikidataEntity("Q3");
+    }
+
+    @Test
+    void discoveryReturnsEmptyOnBlankInput() {
+        assertTrue(subject.discoverSeries(null, "Author", List.of("Series"), TAGS).isEmpty());
+        assertTrue(subject.discoverSeries("Book", " ", List.of("Series"), TAGS).isEmpty());
+        assertTrue(subject.discoverSeries("Book", "Author", List.of(), TAGS).isEmpty());
+        assertTrue(subject.discoverSeries("Book", "Author", List.of("Series"), List.of()).isEmpty());
+    }
 }

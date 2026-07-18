@@ -54,6 +54,11 @@ public class BookSeriesService {
      * Series assignment from epub metadata: authoritative, so it always overwrites — a scan or
      * library analyze re-fires EPUB_FILE_FOUND, which lets corrected epub metadata converge over
      * any earlier heuristic assignment.
+     *
+     * <p>When this <em>creates</em> the series, the author's other series-less books get a fresh
+     * BOOK_FOUND: their Wikidata series discovery may have run before the series existed (scan
+     * order is arbitrary) and only links into existing series. Once per new series, so a large
+     * series does not re-fire on every volume; BOOK_FOUND never creates series, so no loop.
      */
     public void assignFromEpub(BookEntity book, String seriesName, Double seriesIndex) {
         if (seriesName == null || seriesName.isBlank()) {
@@ -64,10 +69,23 @@ public class BookSeriesService {
             // and book series are keyed per author.
             return;
         }
-        SeriesEntity series = getOrCreateSeries(book.getLibraryEntity(), book.getPersonEntity(), seriesName.strip());
+        String name = seriesName.strip();
+        boolean isNewSeries = seriesRepository
+                .findByPersonEntityAndName(book.getPersonEntity(), name).isEmpty();
+        SeriesEntity series = getOrCreateSeries(book.getLibraryEntity(), book.getPersonEntity(), name);
         book.setSeriesEntity(series);
         book.setSeriesIndex(seriesIndex);
         updateDisplayTitle(book);
+        if (isNewSeries) {
+            refireSerieslessBooks(book);
+        }
+    }
+
+    /** BOOK_FOUND for the author's books still without a series, the linked book excluded. */
+    private void refireSerieslessBooks(BookEntity book) {
+        bookRepository.findByPersonEntityId(book.getPersonEntity().getId()).stream()
+                .filter(other -> other.getSeriesEntity() == null && !other.getId().equals(book.getId()))
+                .forEach(other -> serverEventService.createBookFoundEvent(other.getId()));
     }
 
     /**

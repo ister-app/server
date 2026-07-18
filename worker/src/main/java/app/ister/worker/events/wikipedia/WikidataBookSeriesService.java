@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -17,12 +18,20 @@ import static app.ister.worker.events.musicbrainz.MusicBrainzService.normalizeTi
  * the earliest publication date (P577, the original edition, not the local reprint) are read.
  * Wikidata's coverage of translated titles is thin, so a miss is normal and non-fatal; local epub
  * series metadata keeps precedence over anything found here.
+ *
+ * <p>{@link #discoverSeries} works the other way around: for a book whose series is unknown it
+ * reads which of the author's <em>existing</em> series the Wikidata item belongs to. That covers
+ * titles the path-prefix heuristic can never split ("Harry Potter en de steen der wijzen" has no
+ * separator) and audiobook-only books without epub series metadata. Discovery additionally
+ * requires an author (P50) label match, so the film or the game — same title, different creator
+ * statement — can never link a book into a series.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class WikidataBookSeriesService {
 
+    private static final String AUTHOR = "P50";
     private static final String PART_OF_SERIES = "P179";
     private static final String SERIES_ORDINAL = "P1545";
     private static final String PUBLICATION_DATE = "P577";
@@ -31,6 +40,11 @@ public class WikidataBookSeriesService {
 
     /** Either field may be null: membership can be confirmed without an ordinal or a date. */
     public record BookSeriesInfo(String wikidataId, Double seriesIndex, Integer firstPublicationYear) {}
+
+    /** {@code seriesName} is the caller's candidate name that matched, verbatim — the caller uses
+     * it to look the {@code SeriesEntity} back up. Index and year may be null, as above. */
+    public record DiscoveredSeries(String wikidataId, String seriesName, Double seriesIndex,
+                                   Integer firstPublicationYear) {}
 
     public Optional<BookSeriesInfo> findBookInSeries(String bookTitle, String seriesName, List<String> languageTags) {
         if (bookTitle == null || bookTitle.isBlank() || seriesName == null || seriesName.isBlank()
@@ -54,14 +68,60 @@ public class WikidataBookSeriesService {
         return Optional.empty();
     }
 
+    /**
+     * Which of the author's known series a book belongs to, per its Wikidata item. A candidate is
+     * accepted only when its title label matches, one of its P179 series labels matches one of
+     * {@code candidateSeriesNames}, <em>and</em> one of its P50 (author) labels matches
+     * {@code authorName} — an item without an author statement is rejected, never guessed at.
+     */
+    public Optional<DiscoveredSeries> discoverSeries(String bookTitle, String authorName,
+                                                     Collection<String> candidateSeriesNames,
+                                                     List<String> languageTags) {
+        if (bookTitle == null || bookTitle.isBlank() || authorName == null || authorName.isBlank()
+                || candidateSeriesNames == null || candidateSeriesNames.isEmpty()
+                || languageTags == null || languageTags.isEmpty()) {
+            return Optional.empty();
+        }
+        String wantedTitle = normalizeTitle(bookTitle);
+        for (String tag : languageTags) {
+            for (String candidateId : wikipediaService.searchEntityIds(bookTitle, tag)) {
+                Map<String, Object> entity = wikipediaService.fetchWikidataEntity(candidateId);
+                if (!wikipediaService.labelMatches(entity, candidateId, wantedTitle, languageTags)
+                        || !(wikipediaService.entityField(entity, candidateId, "claims")
+                                instanceof Map<?, ?> claims)) {
+                    continue;
+                }
+                // Series first: most false candidates (the film, the game) fail here without the
+                // extra author-entity fetch.
+                Optional<DiscoveredSeries> match =
+                        seriesFromClaims(claims, candidateId, candidateSeriesNames, languageTags);
+                if (match.isPresent() && authorMatches(claims, authorName, languageTags)) {
+                    return match;
+                }
+            }
+        }
+        log.debug("No Wikidata series discovered for book={} author={}", bookTitle, authorName);
+        return Optional.empty();
+    }
+
     /** The candidate is accepted only when one of its P179 statements points at our series. */
     private Optional<BookSeriesInfo> fromEntity(Map<String, Object> entity, String entityId,
                                                 String seriesName, List<String> languageTags) {
-        if (!(wikipediaService.entityField(entity, entityId, "claims") instanceof Map<?, ?> claims)
-                || !(claims.get(PART_OF_SERIES) instanceof List<?> seriesClaims)) {
+        if (!(wikipediaService.entityField(entity, entityId, "claims") instanceof Map<?, ?> claims)) {
             return Optional.empty();
         }
-        String wantedSeries = normalizeTitle(seriesName);
+        return seriesFromClaims(claims, entityId, List.of(seriesName), languageTags)
+                .map(found -> new BookSeriesInfo(
+                        found.wikidataId(), found.seriesIndex(), found.firstPublicationYear()));
+    }
+
+    /** The first P179 statement whose series label matches one of the candidate names wins. */
+    private Optional<DiscoveredSeries> seriesFromClaims(Map<?, ?> claims, String entityId,
+                                                        Collection<String> candidateSeriesNames,
+                                                        List<String> languageTags) {
+        if (!(claims.get(PART_OF_SERIES) instanceof List<?> seriesClaims)) {
+            return Optional.empty();
+        }
         for (Object claim : seriesClaims) {
             if (!(claim instanceof Map<?, ?> statement)) {
                 continue;
@@ -71,13 +131,32 @@ public class WikidataBookSeriesService {
                 continue;
             }
             Map<String, Object> seriesEntity = wikipediaService.fetchWikidataEntity(seriesId);
-            if (wikipediaService.labelMatches(seriesEntity, seriesId, wantedSeries, languageTags)) {
-                return Optional.of(new BookSeriesInfo(entityId,
-                        ordinalOf(statement),
-                        earliestPublicationYear(claims)));
+            for (String candidateName : candidateSeriesNames) {
+                if (wikipediaService.labelMatches(
+                        seriesEntity, seriesId, normalizeTitle(candidateName), languageTags)) {
+                    return Optional.of(new DiscoveredSeries(entityId, candidateName,
+                            ordinalOf(statement),
+                            earliestPublicationYear(claims)));
+                }
             }
         }
         return Optional.empty();
+    }
+
+    /** True when one of the item's P50 (author) statements resolves to a label matching the name. */
+    private boolean authorMatches(Map<?, ?> claims, String authorName, List<String> languageTags) {
+        if (!(claims.get(AUTHOR) instanceof List<?> authorClaims)) {
+            return false;
+        }
+        String wantedAuthor = normalizeTitle(authorName);
+        return authorClaims.stream().anyMatch(claim -> {
+            if (!(claim instanceof Map<?, ?> statement)) {
+                return false;
+            }
+            String authorId = mainsnakItemId(statement);
+            return authorId != null && wikipediaService.labelMatches(
+                    wikipediaService.fetchWikidataEntity(authorId), authorId, wantedAuthor, languageTags);
+        });
     }
 
     private String mainsnakItemId(Map<?, ?> statement) {

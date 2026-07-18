@@ -18,6 +18,9 @@ import java.util.UUID;
 public interface SeriesRepository extends JpaRepository<SeriesEntity, UUID> {
     Optional<SeriesEntity> findByPersonEntityAndName(PersonEntity personEntity, String name);
 
+    /** All series of one author — the candidate set for Wikidata series discovery. */
+    List<SeriesEntity> findByPersonEntityId(UUID personId);
+
     /** Comic series identity: the library + the series directory name + its "(YYYY)" year. */
     Optional<SeriesEntity> findByLibraryEntityAndNameAndStartYear(LibraryEntity libraryEntity, String name, int startYear);
 

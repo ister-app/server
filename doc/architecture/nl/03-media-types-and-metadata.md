@@ -61,6 +61,18 @@ audiobook-mp3's via `ChapterEntity` (gestreamd over hetzelfde audio-only HLS-pad
 - `BOOK_FOUND` triggert **Open Library**-verrijking (beschrijving, en een cover alleen als er nog
   geen is); **Wikidata** voegt reekslidmaatschap toe (reeksnaam + positie); NFO-data wordt
   gededupliceerd tegen provider-data, zodat re-scans de beschrijvingen niet verdubbelen.
+- **Reeksen** (`BookSeriesService`, core) komen uit drie bronnen met vaste voorrang:
+  epub-reeksmetadata (calibre / EPUB 3 belongs-to-collection) is autoritatief en herschrijft de
+  koppeling bij elke scan; een pad-prefix-heuristiek vult reeksloze boeken wanneer ≥2 boeken van de
+  auteur de prefix vóór een ` - `/`: `-scheider delen; en **Wikidata-reeksontdekking**
+  (`WikidataBookSeriesService.discoverSeries`, gedraaid vanuit `BOOK_FOUND`) koppelt een reeksloos
+  boek aan een van de *bestaande* reeksen van de auteur via zijn P179-statement (part of series) —
+  ze maakt nooit een reeks aan, en vereist een P50-labelmatch (auteur) zodat de gelijknamige film of
+  game nooit kan koppelen. Ontdekking dekt wat de andere twee niet zien: titels zonder scheider
+  ("Harry Potter en de steen der wijzen") en audiobook-only boeken zonder epub-metadata. Wanneer
+  epub-metadata een reeks *aanmaakt*, wordt `BOOK_FOUND` eenmalig opnieuw afgevuurd voor de
+  reeksloze boeken van de auteur, zodat ontdekking binnen één scan convergeert ongeacht de
+  scanvolgorde.
 - Epubs worden door de client lazy gelezen via `GET /epub/{mediaFileId}/resource/{entry}`
   ([hoofdstuk 7](07-api-and-auth.md)); de leespositie is een `WatchStatusEntity` met
   `readingLocation` (epubcfi) + `readingProgress`.

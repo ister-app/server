@@ -59,6 +59,17 @@ type to create chapters instead of tracks.
 - `BOOK_FOUND` triggers **Open Library** enrichment (description, and a cover only when none exists
   yet); **Wikidata** adds series membership (series name + position); NFO data is deduplicated
   against provider data so re-scans do not double descriptions.
+- **Series** (`BookSeriesService`, core) come from three sources with fixed precedence: epub
+  series metadata (calibre / EPUB 3 belongs-to-collection) is authoritative and rewrites the link
+  on every scan; a path-prefix heuristic fills series-less books when ≥2 books of the author share
+  the prefix before a ` - `/`: ` separator; and **Wikidata series discovery**
+  (`WikidataBookSeriesService.discoverSeries`, run from `BOOK_FOUND`) links a series-less book into
+  one of the author's *existing* series via its P179 (part of series) statement — it never creates
+  a series, and requires a P50 (author) label match so the same-titled film or game can never link.
+  Discovery covers what the other two can't see: titles without a separator ("Harry Potter en de
+  steen der wijzen") and audiobook-only books without epub metadata. When epub metadata *creates* a
+  series, `BOOK_FOUND` re-fires once for the author's series-less books, so discovery converges
+  within one scan regardless of scan order.
 - Epubs are read lazily by the client through `GET /epub/{mediaFileId}/resource/{entry}` ([chapter
   7](07-api-and-auth.md)); reading position is a `WatchStatusEntity` with `readingLocation`
   (epubcfi) + `readingProgress`.

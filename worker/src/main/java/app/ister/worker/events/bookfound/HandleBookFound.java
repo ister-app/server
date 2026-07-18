@@ -4,6 +4,7 @@ import app.ister.core.Handle;
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
+import app.ister.core.entity.SeriesEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.SearchEntityType;
@@ -12,6 +13,8 @@ import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MetadataRepository;
+import app.ister.core.repository.SeriesRepository;
+import app.ister.core.service.BookSeriesService;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
 import app.ister.core.config.LanguageProperties;
@@ -51,6 +54,8 @@ public class HandleBookFound implements Handle<BookFoundData> {
     private final ImageRepository imageRepository;
     private final MetadataRepository metadataRepository;
     private final MediaFileRepository mediaFileRepository;
+    private final SeriesRepository seriesRepository;
+    private final BookSeriesService bookSeriesService;
     private final OpenLibraryService openLibraryService;
     private final ImageDownloadService imageDownloadService;
     private final ServerEventService serverEventService;
@@ -88,12 +93,16 @@ public class HandleBookFound implements Handle<BookFoundData> {
                     .anyMatch(m -> isOpenLibraryRow(m) && m.getReleased() != null);
             boolean hasWikidataYear = existingMetadata.stream()
                     .anyMatch(m -> isWikidataRow(m) && m.getReleased() != null);
-            // Wikidata is only consulted for series books: it fills a missing series position and
-            // the original (untranslated) publication year, which the Open Library match — often a
-            // translated edition's work — gets wrong.
-            boolean wantsWikidata = book.getSeriesEntity() != null
+            // Wikidata's role depends on whether the book has a series. With one, it fills a
+            // missing series position and the original (untranslated) publication year, which the
+            // Open Library match — often a translated edition's work — gets wrong. Without one,
+            // discovery checks whether the book belongs to one of the author's existing series —
+            // the case the path heuristic can't see (no separator in the name) and epub metadata
+            // can't cover (audiobook-only books).
+            boolean seriesless = book.getSeriesEntity() == null;
+            boolean wantsWikidata = !seriesless
                     && (book.getSeriesIndex() == null || !hasWikidataYear);
-            if (hasDescription && hasCover && hasOpenLibraryYear && !wantsWikidata) {
+            if (hasDescription && hasCover && hasOpenLibraryYear && !wantsWikidata && !seriesless) {
                 return;
             }
 
@@ -112,10 +121,48 @@ public class HandleBookFound implements Handle<BookFoundData> {
                 }, () -> log.debug("No Open Library match for author={} book={}", authorName, bookName));
             }
 
-            if (wantsWikidata) {
+            if (seriesless) {
+                discoverSeriesFromWikidata(book, existingMetadata);
+            } else if (wantsWikidata) {
                 enrichFromWikidata(book, existingMetadata);
             }
         });
+    }
+
+    /**
+     * Series discovery for a book without one: only links into a series the author already has
+     * (confirmed earlier by epub metadata or the path heuristic) — Wikidata never creates a
+     * series, or every standalone book in some obscure Wikidata series would grow one. Epub
+     * metadata keeps precedence: {@code assignFromEpub} overwrites this link on every scan.
+     */
+    private void discoverSeriesFromWikidata(BookEntity book, List<MetadataEntity> existingMetadata) {
+        List<SeriesEntity> candidates = seriesRepository.findByPersonEntityId(book.getPersonEntity().getId());
+        if (candidates.isEmpty()) {
+            return;
+        }
+        String title = book.getTitle() != null ? book.getTitle() : book.getName();
+        wikidataBookSeriesService
+                .discoverSeries(title, book.getPersonEntity().getName(),
+                        candidates.stream().map(SeriesEntity::getName).toList(),
+                        languageProperties.tags())
+                .ifPresent(found -> {
+                    SeriesEntity series = candidates.stream()
+                            .filter(candidate -> candidate.getName().equals(found.seriesName()))
+                            .findFirst()
+                            .orElseThrow();
+                    log.info("Wikidata series discovery: book={} joins series={} at index={}",
+                            book.getName(), series.getName(), found.seriesIndex());
+                    book.setSeriesEntity(series);
+                    if (found.seriesIndex() != null) {
+                        book.setSeriesIndex(found.seriesIndex());
+                    }
+                    // Saves the book; only re-indexes on a title change, so index explicitly —
+                    // series membership changed either way.
+                    bookSeriesService.updateDisplayTitle(book);
+                    saveWikidataMetadata(book, existingMetadata,
+                            found.wikidataId(), found.firstPublicationYear());
+                    serverEventService.createSearchIndexEvent(SearchEntityType.BOOK, book.getId());
+                });
     }
 
     /**
@@ -133,20 +180,28 @@ public class HandleBookFound implements Handle<BookFoundData> {
                         book.setSeriesIndex(info.seriesIndex());
                         bookRepository.save(book);
                     }
-                    if (info.firstPublicationYear() != null) {
-                        MetadataEntity metadata = existingMetadata.stream()
-                                .filter(this::isWikidataRow)
-                                .findFirst()
-                                .orElseGet(() -> MetadataEntity.builder()
-                                        .bookEntity(book)
-                                        .build());
-                        metadata.setSourceUri(WIKIDATA_URI_PREFIX + info.wikidataId());
-                        metadata.setReleased(LocalDate.of(info.firstPublicationYear(), 1, 1));
-                        metadataRepository.save(metadata);
-                        scannerHelperService.refreshBookReleaseYear(book);
-                    }
+                    saveWikidataMetadata(book, existingMetadata,
+                            info.wikidataId(), info.firstPublicationYear());
                     serverEventService.createSearchIndexEvent(SearchEntityType.BOOK, book.getId());
                 });
+    }
+
+    /** Upserts the book's single wikidata:// metadata row carrying the original publication year. */
+    private void saveWikidataMetadata(BookEntity book, List<MetadataEntity> existingMetadata,
+                                      String wikidataId, Integer firstPublicationYear) {
+        if (firstPublicationYear == null) {
+            return;
+        }
+        MetadataEntity metadata = existingMetadata.stream()
+                .filter(this::isWikidataRow)
+                .findFirst()
+                .orElseGet(() -> MetadataEntity.builder()
+                        .bookEntity(book)
+                        .build());
+        metadata.setSourceUri(WIKIDATA_URI_PREFIX + wikidataId);
+        metadata.setReleased(LocalDate.of(firstPublicationYear, 1, 1));
+        metadataRepository.save(metadata);
+        scannerHelperService.refreshBookReleaseYear(book);
     }
 
     private boolean isWikidataRow(MetadataEntity metadata) {

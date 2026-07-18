@@ -140,6 +140,38 @@ class BookSeriesServiceTest {
         verify(seriesRepository, never()).save(any());
     }
 
+    /** A new series re-fires BOOK_FOUND for the author's series-less books (discovery may have
+     * run before the series existed), but never for the book that just got linked. */
+    @Test
+    void assignFromEpubRefiresSerieslessSiblingsWhenTheSeriesIsNew() {
+        mockSeriesCreation();
+        BookEntity linked = book("De Grijze Jager - De ruïnes van Gorlan");
+        BookEntity seriesless = book("Alleen - maar niet eenzaam");
+        BookEntity alreadyInSeries = book("Elders - deel 1");
+        alreadyInSeries.setSeriesEntity(SeriesEntity.builder().name("Elders").build());
+        when(bookRepository.findByPersonEntityId(author.getId()))
+                .thenReturn(List.of(linked, seriesless, alreadyInSeries));
+
+        subject.assignFromEpub(linked, "De Grijze Jager", 1.0);
+
+        verify(serverEventService).createBookFoundEvent(seriesless.getId());
+        verify(serverEventService, never()).createBookFoundEvent(linked.getId());
+        verify(serverEventService, never()).createBookFoundEvent(alreadyInSeries.getId());
+    }
+
+    /** Volume two of an existing series must not re-fire: once per new series is the bound. */
+    @Test
+    void assignFromEpubDoesNotRefireForAnExistingSeries() {
+        SeriesEntity existing = SeriesEntity.builder().personEntity(author).name("De Grijze Jager").build();
+        when(seriesRepository.findByPersonEntityAndName(author, "De Grijze Jager"))
+                .thenReturn(Optional.of(existing));
+        BookEntity book = book("De Grijze Jager - De brandende brug");
+
+        subject.assignFromEpub(book, "De Grijze Jager", 2.0);
+
+        verify(serverEventService, never()).createBookFoundEvent(any());
+    }
+
     // ===== applyPrefixHeuristic =====
 
     @Test

@@ -13,8 +13,10 @@ import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MetadataRepository;
+import app.ister.core.repository.SeriesRepository;
 import app.ister.core.config.LanguageProperties;
 import app.ister.core.entity.SeriesEntity;
+import app.ister.core.service.BookSeriesService;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
 import app.ister.worker.events.openlibrary.OpenLibraryService;
@@ -66,6 +68,12 @@ class HandleBookFoundTest {
 
     @Mock
     private MediaFileRepository mediaFileRepository;
+
+    @Mock
+    private SeriesRepository seriesRepository;
+
+    @Mock
+    private BookSeriesService bookSeriesService;
 
     @Mock
     private OpenLibraryService openLibraryService;
@@ -391,6 +399,80 @@ class HandleBookFoundTest {
         assertEquals(null, bookInSeries.getSeriesIndex());
         verify(metadataRepository, never()).save(any());
         verifyNoInteractions(serverEventService);
+    }
+
+    // ===== series discovery for series-less books =====
+
+    private final UUID authorId = UUID.randomUUID();
+
+    private BookEntity serieslessBook() {
+        return BookEntity.builder()
+                .id(bookId)
+                .name("Harry Potter en de Orde van de Feniks")
+                .personEntity(PersonEntity.builder().id(authorId).name("J.K. Rowling").build())
+                .build();
+    }
+
+    /** An audiobook-only book without a series joins an existing series of its author. */
+    @Test
+    void handleDiscoversTheSeriesOfASerieslessBook() {
+        BookEntity seriesless = serieslessBook();
+        SeriesEntity harryPotter = SeriesEntity.builder().name("Harry Potter").build();
+        when(bookRepository.findById(bookId)).thenReturn(Optional.of(seriesless));
+        when(metadataRepository.findByBookEntityId(bookId)).thenReturn(completeMetadata());
+        when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
+        when(seriesRepository.findByPersonEntityId(authorId)).thenReturn(List.of(harryPotter));
+        when(wikidataBookSeriesService.discoverSeries(
+                "Harry Potter en de Orde van de Feniks", "J.K. Rowling",
+                List.of("Harry Potter"), List.of("en", "nl")))
+                .thenReturn(Optional.of(new WikidataBookSeriesService.DiscoveredSeries(
+                        "Q102225", "Harry Potter", 5.0, 2003)));
+
+        subject.handle(data);
+
+        assertEquals(harryPotter, seriesless.getSeriesEntity());
+        assertEquals(5.0, seriesless.getSeriesIndex());
+        verify(bookSeriesService).updateDisplayTitle(seriesless);
+        ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
+        verify(metadataRepository).save(captor.capture());
+        assertEquals("wikidata://Q102225", captor.getValue().getSourceUri());
+        assertEquals(LocalDate.of(2003, 1, 1), captor.getValue().getReleased());
+        verify(scannerHelperService).refreshBookReleaseYear(seriesless);
+        verify(serverEventService).createSearchIndexEvent(SearchEntityType.BOOK, bookId);
+    }
+
+    /** Discovery never creates a series: without candidates Wikidata is not even consulted. */
+    @Test
+    void handleSkipsDiscoveryWhenTheAuthorHasNoSeries() {
+        BookEntity seriesless = serieslessBook();
+        when(bookRepository.findById(bookId)).thenReturn(Optional.of(seriesless));
+        when(metadataRepository.findByBookEntityId(bookId)).thenReturn(completeMetadata());
+        when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
+        when(seriesRepository.findByPersonEntityId(authorId)).thenReturn(List.of());
+
+        subject.handle(data);
+
+        verifyNoInteractions(wikidataBookSeriesService, bookSeriesService);
+        assertEquals(null, seriesless.getSeriesEntity());
+    }
+
+    /** A discovery miss leaves the book alone; the next analyze retries. */
+    @Test
+    void handleLeavesTheBookAloneOnADiscoveryMiss() {
+        BookEntity seriesless = serieslessBook();
+        SeriesEntity harryPotter = SeriesEntity.builder().name("Harry Potter").build();
+        when(bookRepository.findById(bookId)).thenReturn(Optional.of(seriesless));
+        when(metadataRepository.findByBookEntityId(bookId)).thenReturn(completeMetadata());
+        when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
+        when(seriesRepository.findByPersonEntityId(authorId)).thenReturn(List.of(harryPotter));
+        when(wikidataBookSeriesService.discoverSeries(anyString(), anyString(), any(), any()))
+                .thenReturn(Optional.empty());
+
+        subject.handle(data);
+
+        assertEquals(null, seriesless.getSeriesEntity());
+        verifyNoInteractions(bookSeriesService, serverEventService);
+        verify(metadataRepository, never()).save(any());
     }
 
     /** An unknown first-publish year leaves released null, so a later analyze retries it. */
