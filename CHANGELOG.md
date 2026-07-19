@@ -1,5 +1,38 @@
 # Changelog
 
+## server v2.2.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.2.0` |
+| `ghcr.io/ister-app/migrations` | `2.2.0` |
+
+### Features
+
+- feat: per-user sharing controls for now-playing and remote control ([`2bb8dd2`](https://github.com/ister-app/server/commit/2bb8dd2))
+- feat: add admin role and per-user library visibility ([`bad0a93`](https://github.com/ister-app/server/commit/bad0a93))
+- feat(worker): discover book series membership via Wikidata ([`c1a0cd7`](https://github.com/ister-app/server/commit/c1a0cd7))
+- feat: record and expose metadata/image source attribution ([`f93f33b`](https://github.com/ister-app/server/commit/f93f33b))
+- feat: per-user series reading direction with manga auto-detect ([`e4a2d99`](https://github.com/ister-app/server/commit/e4a2d99))
+
+### Fixes
+
+- fix(disk): stop skipping library directories with dots in their name ([`cfcadfc`](https://github.com/ister-app/server/commit/cfcadfc))
+- fix(database): widen source_uri to text on image and metadata ([`b297433`](https://github.com/ister-app/server/commit/b297433))
+
+### Other
+
+- docs: document admins/sharing/attribution, complete config reference, fix stale refs ([`0a602a7`](https://github.com/ister-app/server/commit/0a602a7))
+- test: grant admin role to shared integration-test JWT ([`500eb76`](https://github.com/ister-app/server/commit/500eb76))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.2.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.1.1...v2.2.0
+
 ## server v2.1.1
 
 | Image | Tag |
