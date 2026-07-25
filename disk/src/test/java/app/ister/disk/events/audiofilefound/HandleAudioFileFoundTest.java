@@ -39,6 +39,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -106,6 +107,7 @@ class HandleAudioFileFoundTest {
     @TempDir
     Path tempDir;
 
+    @InjectMocks
     private HandleAudioFileFound subject;
 
     private static final UUID DIRECTORY_ID = UUID.randomUUID();
@@ -115,22 +117,6 @@ class HandleAudioFileFoundTest {
 
     @BeforeEach
     void setup() {
-        subject = new HandleAudioFileFound(
-                directoryRepositoryMock,
-                mediaFileRepositoryMock,
-                mediaFileStreamRepositoryMock,
-                metadataRepositoryMock,
-                trackRepositoryMock,
-                albumRepositoryMock,
-                chapterRepositoryMock,
-                imageRepositoryMock,
-                scannerHelperServiceMock,
-                mediaFileFoundGetDurationMock,
-                mediaFileFoundCheckForStreamsMock,
-                audioFileFoundExtractCoverArtMock,
-                messageSenderMock,
-                serverEventServiceMock,
-                jaffreeMock);
         ReflectionTestUtils.setField(subject, "dirOfFFmpeg", "/usr/bin");
         ReflectionTestUtils.setField(subject, "tmpDir", tempDir.toString());
     }

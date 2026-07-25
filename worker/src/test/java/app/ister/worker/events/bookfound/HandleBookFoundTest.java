@@ -33,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -143,7 +144,7 @@ class HandleBookFoundTest {
         when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of(
                 MetadataEntity.builder().description("Already there").sourceUri("file:///b.epub").build(),
                 MetadataEntity.builder().sourceUri("openlibrary://works/OL1W")
-                        .released(LocalDate.of(1937, 1, 1)).build()));
+                        .released(LocalDate.of(1937, Month.JANUARY, 1)).build()));
         when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
 
         subject.handle(data);
@@ -158,7 +159,7 @@ class HandleBookFoundTest {
         when(bookRepository.findById(bookId)).thenReturn(Optional.of(book));
         when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of(
                 MetadataEntity.builder().description("Local").sourceUri("file:///b.nfo")
-                        .released(LocalDate.of(2011, 1, 1)).build()));
+                        .released(LocalDate.of(2011, Month.JANUARY, 1)).build()));
         when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
         when(mediaFileRepository.findByBookEntityId(bookId)).thenReturn(List.of());
         when(openLibraryService.getBookInfo("The Hobbit", "J.R.R. Tolkien", List.of()))
@@ -169,7 +170,7 @@ class HandleBookFoundTest {
         ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
         verify(metadataRepository).save(captor.capture());
         assertEquals("openlibrary://works/OL1W", captor.getValue().getSourceUri());
-        assertEquals(LocalDate.of(1937, 1, 1), captor.getValue().getReleased());
+        assertEquals(LocalDate.of(1937, Month.JANUARY, 1), captor.getValue().getReleased());
         verify(scannerHelperService).refreshBookReleaseYear(book);
     }
 
@@ -226,7 +227,7 @@ class HandleBookFoundTest {
         assertEquals("A hobbit goes on an adventure.", saved.getDescription());
         assertEquals(book, saved.getBookEntity());
         assertEquals("openlibrary://works/OL1W", saved.getSourceUri());
-        assertEquals(LocalDate.of(1937, 1, 1), saved.getReleased());
+        assertEquals(LocalDate.of(1937, Month.JANUARY, 1), saved.getReleased());
         assertEquals("eng", saved.getLanguage());
         verify(serverEventService).createSearchIndexEvent(SearchEntityType.BOOK, bookId);
     }
@@ -271,7 +272,7 @@ class HandleBookFoundTest {
 
         verify(metadataRepository).save(olRow);
         assertEquals("A description", olRow.getDescription());
-        assertEquals(LocalDate.of(1937, 1, 1), olRow.getReleased());
+        assertEquals(LocalDate.of(1937, Month.JANUARY, 1), olRow.getReleased());
     }
 
     @Test
@@ -320,7 +321,7 @@ class HandleBookFoundTest {
         return List.of(
                 MetadataEntity.builder().description("Already there").sourceUri("file:///b.epub").build(),
                 MetadataEntity.builder().sourceUri("openlibrary://works/OL1W")
-                        .released(LocalDate.of(2009, 1, 1)).build());
+                        .released(LocalDate.of(2009, Month.JANUARY, 1)).build());
     }
 
     /** A series book with an unknown position still consults Wikidata when Open Library is done. */
@@ -340,7 +341,7 @@ class HandleBookFoundTest {
         ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
         verify(metadataRepository).save(captor.capture());
         assertEquals("wikidata://Q3497559", captor.getValue().getSourceUri());
-        assertEquals(LocalDate.of(2007, 1, 1), captor.getValue().getReleased());
+        assertEquals(LocalDate.of(2007, Month.JANUARY, 1), captor.getValue().getReleased());
         verify(scannerHelperService).refreshBookReleaseYear(bookInSeries);
         verify(serverEventService).createSearchIndexEvent(SearchEntityType.BOOK, bookId);
         verifyNoInteractions(openLibraryService);
@@ -373,9 +374,9 @@ class HandleBookFoundTest {
         when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of(
                 MetadataEntity.builder().description("Already there").sourceUri("file:///b.epub").build(),
                 MetadataEntity.builder().sourceUri("openlibrary://works/OL1W")
-                        .released(LocalDate.of(2009, 1, 1)).build(),
+                        .released(LocalDate.of(2009, Month.JANUARY, 1)).build(),
                 MetadataEntity.builder().sourceUri("wikidata://Q3497559")
-                        .released(LocalDate.of(2007, 1, 1)).build()));
+                        .released(LocalDate.of(2007, Month.JANUARY, 1)).build()));
         when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
 
         subject.handle(data);
@@ -436,7 +437,7 @@ class HandleBookFoundTest {
         ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
         verify(metadataRepository).save(captor.capture());
         assertEquals("wikidata://Q102225", captor.getValue().getSourceUri());
-        assertEquals(LocalDate.of(2003, 1, 1), captor.getValue().getReleased());
+        assertEquals(LocalDate.of(2003, Month.JANUARY, 1), captor.getValue().getReleased());
         verify(scannerHelperService).refreshBookReleaseYear(seriesless);
         verify(serverEventService).createSearchIndexEvent(SearchEntityType.BOOK, bookId);
     }

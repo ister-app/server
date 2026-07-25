@@ -15,8 +15,6 @@ import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.PodcastRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ServerEventService;
-import app.ister.core.service.LibraryAccessService;
-import org.springframework.security.core.Authentication;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -49,11 +50,11 @@ class HlsTranscodeServiceTest {
 
     @TempDir Path tempDir;
 
+    @InjectMocks
     private HlsTranscodeService service;
 
     @BeforeEach
     void setUp() {
-        service = new HlsTranscodeService(jaffree, ffprobeService);
         ReflectionTestUtils.setField(service, "tmpDir", tempDir.toString());
         ReflectionTestUtils.setField(service, "segmentTimeoutMs", 5000L);
         ReflectionTestUtils.setField(service, "hwaccelProperty", "none");

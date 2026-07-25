@@ -13,9 +13,9 @@ import app.ister.disk.scanner.scanners.ImageScanner;
 import app.ister.disk.scanner.scanners.MediaFileScanner;
 import app.ister.disk.scanner.scanners.NfoScanner;
 import app.ister.disk.scanner.scanners.SubtitleScanner;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -47,12 +47,8 @@ class FileScanRequestedHandleTest {
     @Mock
     private ComicScanner comicScanner;
 
+    @InjectMocks
     private FileScanRequestedHandle subject;
-
-    @BeforeEach
-    void setUp() {
-        subject = new FileScanRequestedHandle(directoryRepositoryMock, mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner, comicScanner);
-    }
 
     @Test
     void handles() {

@@ -2,9 +2,9 @@ package app.ister.core.service;
 
 import app.ister.core.config.StatusExchangeConfig;
 import app.ister.core.eventdata.*;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -17,12 +17,8 @@ class MessageSenderTest {
     @Mock
     private RabbitTemplate rabbitTemplateMock;
 
+    @InjectMocks
     private MessageSender subject;
-
-    @BeforeEach
-    void setUp() {
-        subject = new MessageSender(rabbitTemplateMock);
-    }
 
     @Test
     void sendEpisodeFound() {

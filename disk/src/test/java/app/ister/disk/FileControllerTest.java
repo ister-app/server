@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.InputStreamResource;
@@ -32,11 +33,11 @@ class FileControllerTest {
 
     @TempDir Path tempDir;
 
+    @InjectMocks
     private FileController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new FileController(imageRepository, mediaFileRepository);
         ReflectionTestUtils.setField(controller, "tmpDir", tempDir.toString());
     }
 

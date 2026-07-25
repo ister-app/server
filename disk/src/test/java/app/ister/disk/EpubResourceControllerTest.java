@@ -9,6 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
@@ -45,13 +46,12 @@ class EpubResourceControllerTest {
     @TempDir
     Path tempDir;
 
+    @InjectMocks
     private EpubResourceController controller;
     private final UUID mediaFileId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() throws IOException {
-        controller = new EpubResourceController(mediaFileRepository);
-
         Path epub = tempDir.resolve("book.epub");
         try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(epub))) {
             zip.putNextEntry(new ZipEntry("OEBPS/chapter_001.xhtml"));

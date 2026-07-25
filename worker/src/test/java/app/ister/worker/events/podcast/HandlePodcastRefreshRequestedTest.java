@@ -18,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -60,15 +61,13 @@ class HandlePodcastRefreshRequestedTest {
     @Mock
     private MessageSender messageSender;
 
+    @InjectMocks
     private HandlePodcastRefreshRequested subject;
 
     private PodcastEntity podcast;
 
     @BeforeEach
     void setUp() {
-        subject = new HandlePodcastRefreshRequested(podcastRepository, podcastEpisodeRepository,
-                metadataRepository, imageRepository, mediaFileRepository, rssFeedParser,
-                imageDownloadService, serverEventService, messageSender);
         ReflectionTestUtils.setField(subject, "nodeName", "node1");
         ReflectionTestUtils.setField(subject, "autoDownloadCount", 2);
 

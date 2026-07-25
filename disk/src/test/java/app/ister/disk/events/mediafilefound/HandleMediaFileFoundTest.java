@@ -9,9 +9,9 @@ import app.ister.core.repository.*;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.NodeService;
 import com.github.kokorin.jaffree.process.JaffreeAbnormalExitException;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -58,28 +58,12 @@ class HandleMediaFileFoundTest {
     @Mock
     private MessageSender messageSenderMock;
 
+    @InjectMocks
     private HandleMediaFileFound subject;
 
     @Test
     void handles() {
         assertEquals(EventType.MEDIA_FILE_FOUND, subject.handles());
-    }
-
-    @BeforeEach
-    void setup() {
-        subject = new HandleMediaFileFound(
-                nodeServiceMock,
-                directoryRepositoryMock,
-                mediaFileRepositoryMock,
-                episodeRepositoryMock,
-                movieRepositoryMock,
-                mediaFileStreamRepositoryMock,
-                imageRepositoryMock,
-                mediaFileFoundCheckForStreamsMock,
-                mediaFileFoundCreateBackgroundMock,
-                mediaFileFoundGetDurationMock,
-                mediaFileFoundExtractSubtitlesMock,
-                messageSenderMock);
     }
 
     @Test

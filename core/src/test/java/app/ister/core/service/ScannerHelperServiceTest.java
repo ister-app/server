@@ -409,9 +409,9 @@ class ScannerHelperServiceTest {
         BookEntity book = BookEntity.builder().pathYear(0).releaseYear(2011).build();
         when(metadataRepository.findByBookEntityId(book.getId())).thenReturn(java.util.List.of(
                 MetadataEntity.builder().sourceUri("file:///books/x.nfo")
-                        .released(java.time.LocalDate.of(2011, 1, 1)).build(),
+                        .released(java.time.LocalDate.of(2011, java.time.Month.JANUARY, 1)).build(),
                 MetadataEntity.builder().sourceUri("openlibrary://works/OL1W")
-                        .released(java.time.LocalDate.of(2004, 1, 1)).build()));
+                        .released(java.time.LocalDate.of(2004, java.time.Month.JANUARY, 1)).build()));
 
         subject.refreshBookReleaseYear(book);
 
@@ -424,9 +424,9 @@ class ScannerHelperServiceTest {
         BookEntity book = BookEntity.builder().pathYear(0).releaseYear(0).build();
         when(metadataRepository.findByBookEntityId(book.getId())).thenReturn(java.util.List.of(
                 MetadataEntity.builder().sourceUri("file:///books/x.nfo")
-                        .released(java.time.LocalDate.of(2011, 1, 1)).build(),
+                        .released(java.time.LocalDate.of(2011, java.time.Month.JANUARY, 1)).build(),
                 MetadataEntity.builder().sourceUri("file:///books/x.epub")
-                        .released(java.time.LocalDate.of(2008, 1, 1)).build()));
+                        .released(java.time.LocalDate.of(2008, java.time.Month.JANUARY, 1)).build()));
 
         subject.refreshBookReleaseYear(book);
 

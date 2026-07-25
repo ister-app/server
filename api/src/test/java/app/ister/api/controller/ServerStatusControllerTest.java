@@ -1,6 +1,5 @@
 package app.ister.api.controller;
 
-import app.ister.api.dto.PlaybackSession;
 import app.ister.api.dto.ServerActivityEvent;
 import app.ister.api.dto.ServerActivitySnapshot;
 import app.ister.core.enums.PlayState;

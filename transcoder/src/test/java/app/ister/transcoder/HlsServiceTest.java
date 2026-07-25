@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -69,15 +70,13 @@ class HlsServiceTest {
     Path tempDir;
 
     private HlsPlaylistBuilder playlistBuilder;
-    private HlsSubtitleService subtitleService;
-    private HlsTranscodeService transcodeService;
+    @InjectMocks private HlsSubtitleService subtitleService;
+    @InjectMocks private HlsTranscodeService transcodeService;
     private HlsService hlsService;
 
     @BeforeEach
     void setUp() {
         playlistBuilder = new HlsPlaylistBuilder();
-        subtitleService = new HlsSubtitleService(jaffree, ffprobeService);
-        transcodeService = new HlsTranscodeService(jaffree, ffprobeService);
         ReflectionTestUtils.setField(transcodeService, "tmpDir", tempDir.toString());
         ReflectionTestUtils.setField(transcodeService, "segmentTimeoutMs", 5000L);
         ReflectionTestUtils.setField(transcodeService, "maxConcurrentFiles", 10);

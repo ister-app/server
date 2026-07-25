@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
@@ -40,11 +41,11 @@ class StartupTasksTest {
     @Mock private ApplicationContext applicationContext;
     @Mock private ApplicationContext parentContext;
 
+    @InjectMocks
     private StartupTasks startupTasks;
 
     @BeforeEach
     void setUp() {
-        startupTasks = new StartupTasks(nodeService, config, directoryRepository, libraryRepository);
         ReflectionTestUtils.setField(startupTasks, "cacheDir", "/tmp/ister-cache");
         lenient().when(config.getLibraries()).thenReturn(List.of());
         lenient().when(config.getDirectories()).thenReturn(List.of());

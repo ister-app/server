@@ -170,9 +170,10 @@ class UserAdminControllerTest {
     @Test
     void setUserLibraryAccessThrowsWhenUserUnknown() {
         UUID userId = UUID.randomUUID();
+        UUID libraryId = UUID.randomUUID();
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
-        assertThrows(NoSuchElementException.class, () -> subject.setUserLibraryAccess(userId, UUID.randomUUID(), true));
+        assertThrows(NoSuchElementException.class, () -> subject.setUserLibraryAccess(userId, libraryId, true));
     }
 
     @Test

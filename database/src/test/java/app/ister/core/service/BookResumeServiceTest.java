@@ -57,13 +57,13 @@ class BookResumeServiceTest {
     }
 
     private List<ChapterEntity> chapters(int count) {
-        List<ChapterEntity> chapters = new ArrayList<>();
+        List<ChapterEntity> built = new ArrayList<>();
         for (int number = 1; number <= count; number++) {
             ChapterEntity chapter = ChapterEntity.builder().number(number).bookEntity(book).build();
             chapter.setId(UUID.randomUUID());
-            chapters.add(chapter);
+            built.add(chapter);
         }
-        return chapters;
+        return built;
     }
 
     private ChapterEntity chapter(int number) {

@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -41,11 +42,11 @@ class HandlePreTranscodeRecentlyWatchedTest {
     @Mock
     private MessageSender messageSender;
 
+    @InjectMocks
     private HandlePreTranscodeRecentlyWatched subject;
 
     @BeforeEach
     void setUp() {
-        subject = new HandlePreTranscodeRecentlyWatched(preTranscodeService, messageSender);
         ReflectionTestUtils.setField(subject, "keepMinutes", 30L);
     }
 

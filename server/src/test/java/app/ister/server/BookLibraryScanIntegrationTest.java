@@ -220,15 +220,24 @@ class BookLibraryScanIntegrationTest {
 
         BookEntity book = bookRepository.findAll().stream()
                 .filter(b -> "Night Flight".equals(b.getName())).findFirst().orElseThrow();
+        assertBookAndAuthor(book);
+        assertEpubFileAndMetadata(book);
+        assertSeriesLinking();
+        assertEpubResourceServed(book);
+    }
+
+    private void assertBookAndAuthor(BookEntity book) {
         assertEquals("Night Flight", book.getName());
         assertEquals(2015, book.getPathYear(), "the year from the \"(YYYY)\" suffix is scanner identity");
         assertEquals(2015, book.getReleaseYear());
         var author = personRepository.findById(book.getPersonEntity().getId()).orElseThrow();
         assertEquals("Owl", author.getName());
         assertEquals(1950, author.getBirthYear());
+    }
 
-        // HandleEpubFileFound: overlay flag from the CONTENT (no "karaoke" in the filename),
-        // duration from media:duration, OPF metadata and the extracted cover.
+    // HandleEpubFileFound: overlay flag from the CONTENT (no "karaoke" in the filename),
+    // duration from media:duration, OPF metadata and the extracted cover.
+    private void assertEpubFileAndMetadata(BookEntity book) {
         Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> {
             List<MediaFileEntity> files = mediaFileRepository.findByBookEntityId(book.getId());
             assertEquals(1, files.size());
@@ -244,11 +253,13 @@ class BookLibraryScanIntegrationTest {
         assertEquals("Night Flight", metadata.getTitle());
         assertEquals("An integration test book.", metadata.getDescription());
         assertEquals("eng", metadata.getLanguage());
-        assertEquals(java.time.LocalDate.of(2015, 1, 1), metadata.getReleased(),
+        assertEquals(java.time.LocalDate.of(2015, java.time.Month.JANUARY, 1), metadata.getReleased(),
                 "the epub's dc:date year must be persisted");
+    }
 
-        // Series: the calibre-tagged epub assigns book one; the prefix heuristic pulls in book
-        // two. Both end up under one series with the prefix stripped from their display title.
+    // Series: the calibre-tagged epub assigns book one; the prefix heuristic pulls in book
+    // two. Both end up under one series with the prefix stripped from their display title.
+    private void assertSeriesLinking() {
         Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> {
             BookEntity first = bookRepository.findAll().stream()
                     .filter(b -> "Sky Rangers - First Flight".equals(b.getName())).findFirst().orElseThrow();
@@ -262,8 +273,10 @@ class BookLibraryScanIntegrationTest {
             assertEquals("Second Flight", second.getTitle());
             assertEquals(1.0, first.getSeriesIndex());
         });
+    }
 
-        // Lazy reading: fetch one chapter file from inside the epub over HTTP.
+    // Lazy reading: fetch one chapter file from inside the epub over HTTP.
+    private void assertEpubResourceServed(BookEntity book) {
         MediaFileEntity epubFile = mediaFileRepository.findByBookEntityId(book.getId()).getFirst();
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth("test-token");

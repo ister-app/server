@@ -209,8 +209,10 @@ class PlayQueueServiceTest {
         when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
         when(playbackSharingService.canControl(any(), any(), any(), any())).thenReturn(false);
 
+        UUID queueId = queue.getId();
+        UUID itemId = UUID.randomUUID();
         assertThrows(IllegalArgumentException.class,
-                () -> subject.removePlayQueueItem(queue.getId(), UUID.randomUUID(), authentication));
+                () -> subject.removePlayQueueItem(queueId, itemId, authentication));
     }
 
     @Test

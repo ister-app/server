@@ -6,9 +6,9 @@ import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffprobe.FFprobe;
 import com.github.kokorin.jaffree.ffprobe.FFprobeResult;
 import com.github.kokorin.jaffree.ffprobe.Stream;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -36,12 +36,8 @@ class MediaFileFoundGetDurationTest {
     @Mock
     private Jaffree jaffree;
 
+    @InjectMocks
     private MediaFileFoundGetDuration subject;
-
-    @BeforeEach
-    void setup() {
-        subject = new MediaFileFoundGetDuration(jaffree);
-    }
 
     @Test
     void getDurationFromStreams() {

@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -72,6 +73,7 @@ class HandlePodcastEpisodeDownloadRequestedTest {
     @TempDir
     Path cachePath;
 
+    @InjectMocks
     private HandlePodcastEpisodeDownloadRequested subject;
     private PodcastEpisodeEntity episode;
     private DirectoryEntity cacheDir;
@@ -121,9 +123,6 @@ class HandlePodcastEpisodeDownloadRequestedTest {
 
     @BeforeEach
     void setUp() {
-        subject = new HandlePodcastEpisodeDownloadRequested(podcastEpisodeRepository, mediaFileRepository,
-                directoryRepository, nodeService, messageSender);
-
         PodcastEntity podcast = PodcastEntity.builder().feedUrl("f").title("t").active(true).build();
         episode = PodcastEpisodeEntity.builder()
                 .podcastEntity(podcast)

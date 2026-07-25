@@ -202,7 +202,7 @@ class HandleEpubFileFoundTest {
         assertEquals("nld", saved.getValue().getLanguage());
         assertEquals("file://" + EPUB_PATH, saved.getValue().getSourceUri());
         // The epub's dc:date year is persisted, so it can drive the display year.
-        assertEquals(java.time.LocalDate.of(2020, 1, 1), saved.getValue().getReleased());
+        assertEquals(java.time.LocalDate.of(2020, java.time.Month.JANUARY, 1), saved.getValue().getReleased());
         verify(scannerHelperService).refreshBookReleaseYear(book);
         verify(serverEventService).createSearchIndexEvent(SearchEntityType.BOOK, bookId);
     }
@@ -238,7 +238,7 @@ class HandleEpubFileFoundTest {
 
         verify(metadataRepository).save(own);
         assertEquals("Book Title", own.getTitle());
-        assertEquals(java.time.LocalDate.of(2020, 1, 1), own.getReleased());
+        assertEquals(java.time.LocalDate.of(2020, java.time.Month.JANUARY, 1), own.getReleased());
     }
 
     @Test

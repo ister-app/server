@@ -9,6 +9,7 @@ import app.ister.core.repository.UserSharingSettingsRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -34,6 +35,7 @@ class PlaybackSharingServiceTest {
     @Mock
     private UserSharingGrantRepository grantRepository;
 
+    @InjectMocks
     private PlaybackSharingService subject;
 
     private final UUID owner = UUID.randomUUID();
@@ -41,7 +43,6 @@ class PlaybackSharingServiceTest {
 
     @BeforeEach
     void setUp() {
-        subject = new PlaybackSharingService(settingsRepository, grantRepository);
         lenient().when(grantRepository.findGranteeIdsByOwnerAndCapability(eq(owner), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of());
     }

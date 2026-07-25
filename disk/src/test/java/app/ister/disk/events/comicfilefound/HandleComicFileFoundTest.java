@@ -30,7 +30,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -39,6 +38,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -185,7 +185,7 @@ class HandleComicFileFoundTest {
         verify(metadataRepository).save(saved.capture());
         assertEquals("The Guild", saved.getValue().getTitle());
         assertEquals("A wizard guild.", saved.getValue().getDescription());
-        assertEquals(LocalDate.of(2008, 1, 1), saved.getValue().getReleased());
+        assertEquals(LocalDate.of(2008, Month.JANUARY, 1), saved.getValue().getReleased());
         // ComicInfo refines the filename-derived position and title.
         assertEquals(12.0, volume.getSeriesIndex());
         assertEquals("The Guild", volume.getTitle());

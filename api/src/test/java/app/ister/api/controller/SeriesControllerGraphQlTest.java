@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -88,14 +89,16 @@ class SeriesControllerGraphQlTest {
         when(userSeriesPreferenceRepository.findByUserEntityExternalIdAndSeriesEntityIn(eq("user-1"), any()))
                 .thenReturn(List.of());
 
-        graphQlTester.document("""
+        GraphQlTester.Response response = graphQlTester.document("""
                         query($id: ID) {
                           seriesById(id: $id) { id readingDirection userReadingDirection }
                         }""")
                 .variable("id", seriesId)
-                .execute()
-                .path("seriesById.readingDirection").entity(ReadingDirection.class).isEqualTo(ReadingDirection.RTL)
-                .path("seriesById.userReadingDirection").valueIsNull();
+                .execute();
+
+        response.path("seriesById.userReadingDirection").valueIsNull();
+        assertEquals(ReadingDirection.RTL,
+                response.path("seriesById.readingDirection").entity(ReadingDirection.class).get());
     }
 
     @Test

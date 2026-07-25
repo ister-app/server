@@ -9,6 +9,8 @@ import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.SeriesRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -74,34 +76,19 @@ class BookSeriesServiceTest {
         verify(serverEventService).createSearchIndexEvent(SearchEntityType.BOOK, book.getId());
     }
 
-    @Test
-    void assignFromEpubStripsAColonSeparatorToo() {
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+            "'De Grijze Jager: Losgeld voor Erak', 'Losgeld voor Erak'", // colon separator
+            "'De Grijze Jager – Het ijzige land', 'Het ijzige land'", // en dash separator
+            "'De Grijze jager - De brandende brug', 'De brandende brug'", // case-insensitive prefix
+    })
+    void assignFromEpubStripsTheSeriesPrefixVariants(String name, String expectedTitle) {
         mockSeriesCreation();
-        BookEntity book = book("De Grijze Jager: Losgeld voor Erak");
+        BookEntity book = book(name);
 
-        subject.assignFromEpub(book, "De Grijze Jager", 7.0);
+        subject.assignFromEpub(book, "De Grijze Jager", 1.0);
 
-        assertEquals("Losgeld voor Erak", book.getTitle());
-    }
-
-    @Test
-    void assignFromEpubStripsAnEnDashSeparator() {
-        mockSeriesCreation();
-        BookEntity book = book("De Grijze Jager – Het ijzige land");
-
-        subject.assignFromEpub(book, "De Grijze Jager", 3.0);
-
-        assertEquals("Het ijzige land", book.getTitle());
-    }
-
-    @Test
-    void assignFromEpubMatchesTheSeriesPrefixCaseInsensitively() {
-        mockSeriesCreation();
-        BookEntity book = book("De Grijze jager - De brandende brug");
-
-        subject.assignFromEpub(book, "De Grijze Jager", 2.0);
-
-        assertEquals("De brandende brug", book.getTitle());
+        assertEquals(expectedTitle, book.getTitle());
     }
 
     /** "Harry Potter en de Steen der Wijzen": series name in the title without a separator. */
