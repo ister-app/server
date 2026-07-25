@@ -31,6 +31,10 @@ public class EpubParser {
     private static final String NS_OPF = "http://www.idpf.org/2007/opf";
     private static final String NS_DC = "http://purl.org/dc/elements/1.1/";
     private static final String SMIL_MEDIA_TYPE = "application/smil+xml";
+    private static final String URN_ISBN_PREFIX = "urn:isbn:";
+    private static final String ATTR_PROPERTY = "property";
+    private static final String ATTR_REFINES = "refines";
+    private static final String ATTR_CONTENT = "content";
 
     public Optional<EpubInfo> parse(Path epubPath) {
         try (ZipFile zipFile = new ZipFile(epubPath.toFile())) {
@@ -143,7 +147,7 @@ public class EpubParser {
             }
             String normalized = normalizeIsbn(value);
             boolean claimsIsbn = "isbn".equalsIgnoreCase(scheme)
-                    || value.strip().toLowerCase(java.util.Locale.ROOT).startsWith("urn:isbn:");
+                    || value.strip().toLowerCase(java.util.Locale.ROOT).startsWith(URN_ISBN_PREFIX);
             if (normalized != null && (claimsIsbn || scheme.isBlank())) {
                 return normalized;
             }
@@ -154,8 +158,8 @@ public class EpubParser {
     /** Strips urn:isbn:, hyphens and spaces; returns null unless the result looks like an ISBN. */
     static String normalizeIsbn(String value) {
         String v = value.strip();
-        if (v.toLowerCase(java.util.Locale.ROOT).startsWith("urn:isbn:")) {
-            v = v.substring("urn:isbn:".length());
+        if (v.toLowerCase(java.util.Locale.ROOT).startsWith(URN_ISBN_PREFIX)) {
+            v = v.substring(URN_ISBN_PREFIX.length());
         }
         v = v.replaceAll("[\\s-]", "");
         if (v.matches("\\d{13}") || v.matches("\\d{9}[\\dXx]")) {
@@ -176,8 +180,8 @@ public class EpubParser {
         NodeList metas = opf.getElementsByTagNameNS(NS_OPF, "meta");
         for (int i = 0; i < metas.getLength(); i++) {
             Element meta = (Element) metas.item(i);
-            if ("belongs-to-collection".equals(meta.getAttribute("property"))
-                    && meta.getAttribute("refines").isBlank()) {
+            if ("belongs-to-collection".equals(meta.getAttribute(ATTR_PROPERTY))
+                    && meta.getAttribute(ATTR_REFINES).isBlank()) {
                 String name = meta.getTextContent();
                 if (name != null && !name.isBlank()) {
                     Double index = parseIndex(refinesValue(opf, meta.getAttribute("id"), "group-position"));
@@ -190,9 +194,9 @@ public class EpubParser {
         for (int i = 0; i < metas.getLength(); i++) {
             Element meta = (Element) metas.item(i);
             if ("calibre:series".equals(meta.getAttribute("name"))) {
-                calibreSeries = meta.getAttribute("content");
+                calibreSeries = meta.getAttribute(ATTR_CONTENT);
             } else if ("calibre:series_index".equals(meta.getAttribute("name"))) {
-                calibreIndex = meta.getAttribute("content");
+                calibreIndex = meta.getAttribute(ATTR_CONTENT);
             }
         }
         if (calibreSeries != null && !calibreSeries.isBlank()) {
@@ -209,8 +213,8 @@ public class EpubParser {
         NodeList metas = opf.getElementsByTagNameNS(NS_OPF, "meta");
         for (int i = 0; i < metas.getLength(); i++) {
             Element meta = (Element) metas.item(i);
-            if (property.equals(meta.getAttribute("property"))
-                    && ("#" + id).equals(meta.getAttribute("refines"))) {
+            if (property.equals(meta.getAttribute(ATTR_PROPERTY))
+                    && ("#" + id).equals(meta.getAttribute(ATTR_REFINES))) {
                 return meta.getTextContent();
             }
         }
@@ -246,7 +250,7 @@ public class EpubParser {
         for (int i = 0; i < metas.getLength(); i++) {
             Element meta = (Element) metas.item(i);
             if ("cover".equals(meta.getAttribute("name"))) {
-                coverId = meta.getAttribute("content");
+                coverId = meta.getAttribute(ATTR_CONTENT);
                 break;
             }
         }
@@ -283,8 +287,8 @@ public class EpubParser {
         NodeList metas = opf.getElementsByTagNameNS(NS_OPF, "meta");
         for (int i = 0; i < metas.getLength(); i++) {
             Element meta = (Element) metas.item(i);
-            if ("media:duration".equals(meta.getAttribute("property"))
-                    && meta.getAttribute("refines").isBlank()) {
+            if ("media:duration".equals(meta.getAttribute(ATTR_PROPERTY))
+                    && meta.getAttribute(ATTR_REFINES).isBlank()) {
                 return parseClockValue(meta.getTextContent());
             }
         }

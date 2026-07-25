@@ -3,7 +3,7 @@ package app.ister.worker.events.wikipedia;
 import app.ister.worker.http.MetadataRestClients;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -22,7 +22,7 @@ import static app.ister.worker.events.musicbrainz.MusicBrainzService.normalizeTi
  * both know a person's Wikidata id but nothing about their biography.
  */
 @Slf4j
-@Component
+@Service
 public class WikipediaService {
 
     /** Wikidata id of "human", the P31 (instance of) value every person carries. */

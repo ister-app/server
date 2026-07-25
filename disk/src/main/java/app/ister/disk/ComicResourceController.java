@@ -54,6 +54,8 @@ import java.util.zip.ZipFile;
 @RequiredArgsConstructor
 public class ComicResourceController {
 
+    private static final String CACHE_CONTROL_IMMUTABLE = "private, max-age=31536000, immutable";
+
     private static final Map<String, MediaType> FILE_CONTENT_TYPES = Map.of(
             "pdf", MediaType.APPLICATION_PDF,
             "cbz", MediaType.parseMediaType("application/vnd.comicbook+zip"),
@@ -93,11 +95,15 @@ public class ComicResourceController {
         if ("CBZ".equals(format)) {
             pages = cbzPages(path);
         }
+        Integer pageCount = entity.getPageCount();
+        if (pageCount == null && !pages.isEmpty()) {
+            pageCount = pages.size();
+        }
         return ResponseEntity.ok(new ComicManifest(
                 entity.getId(),
                 entity.getBookEntity().getId(),
                 format,
-                entity.getPageCount() != null ? entity.getPageCount() : (pages.isEmpty() ? null : pages.size()),
+                pageCount,
                 pages));
     }
 
@@ -144,14 +150,15 @@ public class ComicResourceController {
                 return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
             }
             if (targetWidth != null) {
-                byte[] scaled = scaleToJpeg(zipFile, entry, targetWidth);
-                if (scaled != null) {
+                Optional<byte[]> scaled = scaleToJpeg(zipFile, entry, targetWidth);
+                if (scaled.isPresent()) {
+                    byte[] jpeg = scaled.get();
                     return ResponseEntity.ok()
                             .eTag(etag)
-                            .header(HttpHeaders.CACHE_CONTROL, "private, max-age=31536000, immutable")
+                            .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_IMMUTABLE)
                             .contentType(MediaType.IMAGE_JPEG)
-                            .contentLength(scaled.length)
-                            .body(output -> output.write(scaled));
+                            .contentLength(jpeg.length)
+                            .body(output -> output.write(jpeg));
                 }
             }
             byte[] bytes;
@@ -160,7 +167,7 @@ public class ComicResourceController {
             }
             return ResponseEntity.ok()
                     .eTag(etag)
-                    .header(HttpHeaders.CACHE_CONTROL, "private, max-age=31536000, immutable")
+                    .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_IMMUTABLE)
                     .contentType(PAGE_CONTENT_TYPES.getOrDefault(extensionOf(entryName), MediaType.APPLICATION_OCTET_STREAM))
                     .contentLength(bytes.length)
                     .body(output -> output.write(bytes));
@@ -183,15 +190,16 @@ public class ComicResourceController {
     }
 
     /**
-     * The entry downscaled to {@code targetWidth} as jpeg bytes, or null when the source is
+     * The entry downscaled to {@code targetWidth} as jpeg bytes, or empty when the source is
      * already narrower or scaling is unavailable (undecodable image, native image without AWT) —
      * the caller then streams the original.
      */
-    private byte[] scaleToJpeg(ZipFile zipFile, ZipEntry entry, int targetWidth) {
+    @SuppressWarnings("java:S1181") // a native image without AWT throws LinkageError, which must degrade, not propagate
+    private Optional<byte[]> scaleToJpeg(ZipFile zipFile, ZipEntry entry, int targetWidth) {
         try (InputStream in = zipFile.getInputStream(entry)) {
             BufferedImage source = ImageIO.read(in);
             if (source == null || source.getWidth() <= targetWidth) {
-                return null;
+                return Optional.empty();
             }
             int targetHeight = Math.max(1, Math.round(source.getHeight() * (targetWidth / (float) source.getWidth())));
             BufferedImage scaled = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
@@ -204,14 +212,14 @@ public class ComicResourceController {
             }
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             if (!ImageIO.write(scaled, "jpg", out)) {
-                return null;
+                return Optional.empty();
             }
-            return out.toByteArray();
+            return Optional.of(out.toByteArray());
         } catch (Throwable t) {
             // Throwable on purpose: a native image without AWT throws LinkageError/
             // ExceptionInInitializerError, and a broken page must degrade to the original bytes.
             log.warn("Could not downscale comic page {}: {}", entry.getName(), t.toString());
-            return null;
+            return Optional.empty();
         }
     }
 
@@ -233,7 +241,7 @@ public class ComicResourceController {
         ResponseEntity.BodyBuilder response = ResponseEntity
                 .status(range != null ? HttpStatus.PARTIAL_CONTENT : HttpStatus.OK)
                 .header(HttpHeaders.ACCEPT_RANGES, "bytes")
-                .header(HttpHeaders.CACHE_CONTROL, "private, max-age=31536000, immutable")
+                .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_IMMUTABLE)
                 .contentType(FILE_CONTENT_TYPES.getOrDefault(extensionOf(mediaFile.get().getPath()),
                         MediaType.APPLICATION_OCTET_STREAM));
         if (range != null) {

@@ -5,7 +5,7 @@ import app.ister.worker.events.wikipedia.WikipediaService;
 import app.ister.worker.http.MetadataRestClients;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -25,7 +25,7 @@ import static app.ister.worker.events.musicbrainz.MusicBrainzService.normalizeTi
  * (epub OPF, nfo, cover.jpg) are primary; this only fills gaps.
  */
 @Slf4j
-@Component
+@Service
 public class OpenLibraryService {
 
     /** Language tag of the provider's own free-text prose (Open Library bios are English). */
@@ -155,8 +155,7 @@ public class OpenLibraryService {
         // under whatever language happens to be configured first would show English text to a user
         // who asked for a Dutch biography. A deployment without English simply gets no fallback.
         if (openLibraryBio != null && languageTags != null && languageTags.contains(ENGLISH)
-                && !bios.containsKey(ENGLISH)) {
-            bios.put(ENGLISH, openLibraryBio);
+                && bios.putIfAbsent(ENGLISH, openLibraryBio) == null) {
             bioSources.put(ENGLISH, MetadataSource.OPEN_LIBRARY);
         }
 

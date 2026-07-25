@@ -21,7 +21,7 @@ import java.util.Optional;
 
 @Service
 @Slf4j
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @RequiredArgsConstructor
 public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
     private final EpisodeRepository episodeRepository;

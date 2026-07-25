@@ -70,6 +70,8 @@ public class UserSettingsService {
         return new UserSettings(defaultLanguages, defaultLanguages, true, true, null);
     }
 
+    // Sonar FP: Lombok @SuperBuilder declares builder() on the subclass itself
+    @SuppressWarnings("java:S3252")
     @Transactional
     public UserSettings update(Authentication authentication, UserSettings settings) {
         UserEntity user = userService.getOrCreateUser(authentication);

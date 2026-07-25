@@ -30,7 +30,7 @@ import java.util.regex.Pattern;
 @Slf4j
 public class ComicPathObject {
 
-    private static final String REGEX_YEAR = "^(.*?)\\s*\\((\\d{4})\\)\\s*$";
+    private static final String REGEX_YEAR = "^(.*?)\\s*+\\((\\d{4})\\)\\s*+$";
     private static final List<String> COMIC_EXTENSIONS = List.of("cbz", "pdf", "epub");
     private static final List<String> IMAGE_EXTENSIONS = List.of("jpg", "jpeg", "png");
     private static final List<String> SERIES_IMAGE_NAMES = List.of("cover", "folder", "poster", "background");

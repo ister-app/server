@@ -20,7 +20,7 @@ import java.util.Optional;
 import static app.ister.core.MessageQueue.APP_ISTER_SERVER_SHOW_FOUND;
 
 @Service
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @Slf4j
 @RequiredArgsConstructor
 public class HandleShowFound implements Handle<app.ister.core.eventdata.ShowFoundData> {

@@ -118,7 +118,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
                 if (parsed.getReleasedate() != null) {
                     released = parsed.getReleasedate();
                 } else if (parsed.getYear() > 0) {
-                    released = java.time.LocalDate.of(parsed.getYear(), 1, 1);
+                    released = java.time.LocalDate.of(parsed.getYear(), java.time.Month.JANUARY, 1);
                 } else {
                     released = null;
                 }
@@ -178,7 +178,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
                 if (parsed.getReleasedate() != null) {
                     released = parsed.getReleasedate();
                 } else if (parsed.getYear() > 0) {
-                    released = java.time.LocalDate.of(parsed.getYear(), 1, 1);
+                    released = java.time.LocalDate.of(parsed.getYear(), java.time.Month.JANUARY, 1);
                 } else {
                     released = null;
                 }

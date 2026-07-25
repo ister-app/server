@@ -6,6 +6,7 @@ import app.ister.core.eventdata.MessageData;
 public interface Handle<T extends MessageData> {
     org.slf4j.Logger loggerForInterface = org.slf4j.LoggerFactory.getLogger(Handle.class);
 
+    @SuppressWarnings({"java:S1181", "java:S2139"}) // see the comment in the catch block
     default void listener(T t) {
         loggerForInterface.debug("Received message for queue: {} and data: {}", handles(), t);
         if (t.getEventType().equals(handles())) {
@@ -15,7 +16,8 @@ public interface Handle<T extends MessageData> {
                 // Log every failed attempt, not just the final one: the retry layer only surfaces
                 // the last attempt's exception to the dead-letter recoverer, and that one can hide
                 // the real cause — a class whose static init failed throws ExceptionInInitializerError
-                // (with cause) once, then bare NoClassDefFoundError forever after.
+                // (with cause) once, then bare NoClassDefFoundError forever after. Error is caught
+                // intentionally for exactly that case; the rethrow drives RabbitMQ retry/DLQ.
                 loggerForInterface.warn("Handler for {} failed (will retry or dead-letter)", handles(), e);
                 throw e;
             }

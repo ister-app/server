@@ -1,7 +1,7 @@
 package app.ister.transcoder.cleanup;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -26,7 +26,7 @@ import java.util.stream.Stream;
  * Directories whose name is not a media-file UUID are left untouched.
  */
 @Slf4j
-@Component
+@Service
 public class TmpCleanupService {
 
     public record CleanupResult(long dirsDeleted, long bytesFreed, long dirsKept) {

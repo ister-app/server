@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 public class BookSeriesService {
 
     /** " - ", " – ", " — " (spaced dashes) or ": " — the first one splits series from title. */
-    private static final Pattern SEPARATOR = Pattern.compile("\\s+[-–—]\\s+|\\s*:\\s+");
+    private static final Pattern SEPARATOR = Pattern.compile("\\s++[-–—]\\s++|\\s*+:\\s++");
 
     private final SeriesRepository seriesRepository;
     private final BookRepository bookRepository;

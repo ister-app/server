@@ -493,7 +493,7 @@ public class PlayQueueService {
     /**
      * Hibernate association management (bytecode enhancement) may already have inserted the
      * item into the queue's collection when its owning side was set; only add it when absent.
-     * Checks by identity: BaseEntity's Lombok equals treats all unsaved (id-less) items as equal.
+     * Checks by identity: BaseEntity's id-based equals cannot recognize an unsaved (id-less) item.
      */
     private void addItem(PlayQueueEntity queue, PlayQueueItemEntity item) {
         for (PlayQueueItemEntity existing : queue.getItems()) {
@@ -517,6 +517,7 @@ public class PlayQueueService {
             case CHAPTER -> item.setChapterEntityId(mediaId);
             case PODCAST_EPISODE -> item.setPodcastEpisodeEntityId(mediaId);
             case BOOK -> throw new IllegalArgumentException("Books cannot be played; queue their chapters instead");
+            default -> throw new IllegalArgumentException("Media type cannot be queued: " + mediaType);
         }
         return item;
     }

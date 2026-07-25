@@ -21,7 +21,7 @@ import java.util.Optional;
 import static app.ister.core.MessageQueue.APP_ISTER_SERVER_MOVIE_FOUND;
 
 @Service
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @Slf4j
 @RequiredArgsConstructor
 public class MovieFoundHandle implements Handle<MovieFoundData> {

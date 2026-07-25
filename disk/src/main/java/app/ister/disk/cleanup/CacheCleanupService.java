@@ -2,7 +2,7 @@ package app.ister.disk.cleanup;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -25,7 +25,7 @@ import java.util.stream.Stream;
  * older than {@code minAge} avoids racing that window.
  */
 @Slf4j
-@Component
+@Service
 public class CacheCleanupService {
 
     public record CleanupResult(long filesDeleted, long bytesFreed, long filesKept) {

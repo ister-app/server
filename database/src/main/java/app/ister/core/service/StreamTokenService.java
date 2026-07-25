@@ -25,6 +25,8 @@ public class StreamTokenService {
         streamTokenRepository.deleteByExpiresAtBefore(Instant.now());
     }
 
+    // Sonar FP: Lombok @SuperBuilder declares builder() on the subclass itself
+    @SuppressWarnings("java:S3252")
     public StreamTokenEntity createToken(UserEntity userEntity) {
         StreamTokenEntity entity = StreamTokenEntity.builder()
                 .userEntity(userEntity)
@@ -61,6 +63,7 @@ public class StreamTokenService {
         return createNodeToken(false, true);
     }
 
+    @SuppressWarnings("java:S3252")
     private StreamTokenEntity createNodeToken(boolean download, boolean upload) {
         StreamTokenEntity entity = StreamTokenEntity.builder()
                 .token(UUID.randomUUID())

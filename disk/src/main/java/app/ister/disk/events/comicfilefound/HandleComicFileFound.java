@@ -33,6 +33,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -139,7 +140,7 @@ public class HandleComicFileFound implements Handle<ComicFileFoundData> {
                         .build());
         metadata.setTitle(info.title());
         metadata.setDescription(info.summary());
-        metadata.setReleased(info.year() > 0 ? LocalDate.of(info.year(), 1, 1) : null);
+        metadata.setReleased(info.year() > 0 ? LocalDate.of(info.year(), Month.JANUARY, 1) : null);
         metadataRepository.save(metadata);
 
         boolean volumeChanged = false;

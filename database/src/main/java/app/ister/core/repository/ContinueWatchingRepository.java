@@ -75,6 +75,7 @@ public interface ContinueWatchingRepository extends JpaRepository<ContinueWatchi
                 podcast_episode_entity_id = EXCLUDED.podcast_episode_entity_id,
                 last_watched = GREATEST(continue_watching.last_watched, EXCLUDED.last_watched)""",
             nativeQuery = true)
+    @SuppressWarnings("java:S107") // parameters mirror the query's bind variables
     void upsert(@Param("userId") UUID userId,
                 @Param("entryType") String entryType,
                 @Param("groupId") UUID groupId,

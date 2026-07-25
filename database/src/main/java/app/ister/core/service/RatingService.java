@@ -79,6 +79,8 @@ public class RatingService {
         };
     }
 
+    // Sonar FP: Lombok @SuperBuilder declares builder() on the subclass itself
+    @SuppressWarnings("java:S3252")
     private RatingEntity build(UserEntity user, RatingMediaType mediaType, UUID mediaId, int rating) {
         RatingEntity.RatingEntityBuilder<?, ?> builder = RatingEntity.builder().userEntity(user).value(rating);
         switch (mediaType) {

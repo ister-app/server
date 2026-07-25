@@ -23,6 +23,8 @@ public class WatchStatusService {
     private final UserService userService;
     private final WatchStatusRepository watchStatusRepository;
 
+    // Sonar FP: Lombok @SuperBuilder declares builder() on the subclass itself
+    @SuppressWarnings("java:S3252")
     public WatchStatusEntity getOrCreate(Authentication authentication, UUID playQueueItemId, EpisodeEntity episodeEntity, MovieEntity movieEntity) {
         UserEntity userEntity = userService.getOrCreateUser(authentication);
         Optional<WatchStatusEntity> user = watchStatusRepository.findByUserEntityAndPlayQueueItemIdAndEpisodeEntity(userEntity, playQueueItemId, episodeEntity);
@@ -46,6 +48,7 @@ public class WatchStatusService {
      * {@code Chapter.watchStatus} expecting a single row. The chapter id doubles as the play queue
      * item id, exactly like {@link #getOrCreateForBook} does with the book id.
      */
+    @SuppressWarnings("java:S3252")
     public WatchStatusEntity getOrCreateForChapter(Authentication authentication, ChapterEntity chapterEntity) {
         UserEntity userEntity = userService.getOrCreateUser(authentication);
         return watchStatusRepository.findByUserEntityAndChapterEntity(userEntity, chapterEntity)
@@ -56,6 +59,7 @@ public class WatchStatusService {
                         .watched(false).build()));
     }
 
+    @SuppressWarnings("java:S3252")
     public WatchStatusEntity getOrCreateForPodcastEpisode(Authentication authentication, UUID playQueueItemId, PodcastEpisodeEntity podcastEpisodeEntity) {
         UserEntity userEntity = userService.getOrCreateUser(authentication);
         return watchStatusRepository.findByUserEntityAndPlayQueueItemIdAndPodcastEpisodeEntity(userEntity, playQueueItemId, podcastEpisodeEntity)
@@ -71,6 +75,7 @@ public class WatchStatusService {
      * play queue item id (see {@link WatchStatusEntity#getPlayQueueItemId()}), giving one row per
      * user per book.
      */
+    @SuppressWarnings("java:S3252")
     public WatchStatusEntity getOrCreateForBook(Authentication authentication, BookEntity bookEntity) {
         UserEntity userEntity = userService.getOrCreateUser(authentication);
         return watchStatusRepository.findByUserEntityAndBookEntity(userEntity, bookEntity)

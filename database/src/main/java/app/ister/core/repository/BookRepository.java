@@ -35,6 +35,7 @@ public interface BookRepository extends JpaRepository<BookEntity, UUID> {
             VALUES (:id, now(), now(), :libraryId, :seriesId, :name, :title, :seriesIndex, :pathYear, :releaseYear)
             ON CONFLICT (series_entity_id, name, path_year) WHERE person_entity_id IS NULL DO NOTHING
             """, nativeQuery = true)
+    @SuppressWarnings("java:S107") // parameters mirror the query's bind variables
     int insertComicVolumeIfAbsent(@Param("id") UUID id,
                                   @Param("libraryId") UUID libraryId,
                                   @Param("seriesId") UUID seriesId,

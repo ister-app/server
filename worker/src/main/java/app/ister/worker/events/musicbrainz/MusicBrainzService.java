@@ -5,7 +5,7 @@ import app.ister.worker.events.wikipedia.WikipediaService;
 import app.ister.worker.http.MetadataRestClients;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -17,7 +17,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
-@Component
+@Service
 public class MusicBrainzService {
 
     private static final int IMAGE_WIDTH = 1000;

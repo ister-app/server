@@ -46,6 +46,8 @@ public class PodcastPreferenceService {
      *
      * @throws NoSuchElementException if the podcast does not exist
      */
+    // Sonar FP: Lombok @SuperBuilder declares builder() on the subclass itself
+    @SuppressWarnings("java:S3252")
     @Transactional
     public void setEpisodeOrder(Authentication authentication, UUID podcastId, SortingOrder episodeOrder) {
         UserEntity userEntity = userService.getOrCreateUser(authentication);

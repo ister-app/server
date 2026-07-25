@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Objects;
 
@@ -76,57 +77,64 @@ public class HandleBookFound implements Handle<BookFoundData> {
 
     @Override
     public void handle(BookFoundData data) {
-        bookRepository.findById(data.getBookId()).ifPresent(book -> {
-            if (book.getPersonEntity() == null) {
-                // A comic volume: Open Library is a book database and BOOK_FOUND should never
-                // fire for comics; the series-level Wikipedia enrichment covers them.
-                return;
-            }
-            String authorName = book.getPersonEntity().getName();
-            String bookName = book.getName();
+        bookRepository.findById(data.getBookId()).ifPresent(this::enrich);
+    }
 
-            List<MetadataEntity> existingMetadata = metadataRepository.findByBookEntityId(book.getId());
-            boolean hasDescription = existingMetadata.stream()
-                    .anyMatch(m -> m.getDescription() != null && !m.getDescription().isBlank());
-            boolean hasCover = !imageRepository.findByBookEntityId(book.getId()).isEmpty();
-            boolean hasOpenLibraryYear = existingMetadata.stream()
-                    .anyMatch(m -> isOpenLibraryRow(m) && m.getReleased() != null);
-            boolean hasWikidataYear = existingMetadata.stream()
-                    .anyMatch(m -> isWikidataRow(m) && m.getReleased() != null);
-            // Wikidata's role depends on whether the book has a series. With one, it fills a
-            // missing series position and the original (untranslated) publication year, which the
-            // Open Library match — often a translated edition's work — gets wrong. Without one,
-            // discovery checks whether the book belongs to one of the author's existing series —
-            // the case the path heuristic can't see (no separator in the name) and epub metadata
-            // can't cover (audiobook-only books).
-            boolean seriesless = book.getSeriesEntity() == null;
-            boolean wantsWikidata = !seriesless
-                    && (book.getSeriesIndex() == null || !hasWikidataYear);
-            if (hasDescription && hasCover && hasOpenLibraryYear && !wantsWikidata && !seriesless) {
-                return;
-            }
+    private void enrich(BookEntity book) {
+        if (book.getPersonEntity() == null) {
+            // A comic volume: Open Library is a book database and BOOK_FOUND should never
+            // fire for comics; the series-level Wikipedia enrichment covers them.
+            return;
+        }
+        List<MetadataEntity> existingMetadata = metadataRepository.findByBookEntityId(book.getId());
+        boolean hasDescription = existingMetadata.stream()
+                .anyMatch(m -> m.getDescription() != null && !m.getDescription().isBlank());
+        boolean hasCover = !imageRepository.findByBookEntityId(book.getId()).isEmpty();
+        boolean hasOpenLibraryYear = existingMetadata.stream()
+                .anyMatch(m -> isOpenLibraryRow(m) && m.getReleased() != null);
+        boolean hasWikidataYear = existingMetadata.stream()
+                .anyMatch(m -> isWikidataRow(m) && m.getReleased() != null);
+        // Wikidata's role depends on whether the book has a series. With one, it fills a
+        // missing series position and the original (untranslated) publication year, which the
+        // Open Library match — often a translated edition's work — gets wrong. Without one,
+        // discovery checks whether the book belongs to one of the author's existing series —
+        // the case the path heuristic can't see (no separator in the name) and epub metadata
+        // can't cover (audiobook-only books).
+        boolean seriesless = book.getSeriesEntity() == null;
+        boolean wantsWikidata = !seriesless
+                && (book.getSeriesIndex() == null || !hasWikidataYear);
+        if (hasDescription && hasCover && hasOpenLibraryYear && !wantsWikidata && !seriesless) {
+            return;
+        }
 
-            if (!hasDescription || !hasCover || !hasOpenLibraryYear) {
-                List<String> isbns = mediaFileRepository.findByBookEntityId(book.getId()).stream()
-                        .map(MediaFileEntity::getIsbn)
-                        .filter(Objects::nonNull)
-                        .distinct()
-                        .toList();
+        if (!hasDescription || !hasCover || !hasOpenLibraryYear) {
+            enrichFromOpenLibrary(book, existingMetadata, hasCover);
+        }
 
-                openLibraryService.getBookInfo(bookName, authorName, isbns).ifPresentOrElse(info -> {
-                    if (!hasCover && info.coverUrl() != null) {
-                        downloadCover(book, info.coverUrl());
-                    }
-                    saveOpenLibraryMetadata(book, existingMetadata, info);
-                }, () -> log.debug("No Open Library match for author={} book={}", authorName, bookName));
-            }
+        if (seriesless) {
+            discoverSeriesFromWikidata(book, existingMetadata);
+        } else if (wantsWikidata) {
+            enrichFromWikidata(book, existingMetadata);
+        }
+    }
 
-            if (seriesless) {
-                discoverSeriesFromWikidata(book, existingMetadata);
-            } else if (wantsWikidata) {
-                enrichFromWikidata(book, existingMetadata);
+    /** Description, cover and first-publication year from Open Library; ISBN-first matching. */
+    private void enrichFromOpenLibrary(BookEntity book, List<MetadataEntity> existingMetadata,
+                                       boolean hasCover) {
+        String authorName = book.getPersonEntity().getName();
+        String bookName = book.getName();
+        List<String> isbns = mediaFileRepository.findByBookEntityId(book.getId()).stream()
+                .map(MediaFileEntity::getIsbn)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        openLibraryService.getBookInfo(bookName, authorName, isbns).ifPresentOrElse(info -> {
+            if (!hasCover && info.coverUrl() != null) {
+                downloadCover(book, info.coverUrl());
             }
-        });
+            saveOpenLibraryMetadata(book, existingMetadata, info);
+        }, () -> log.debug("No Open Library match for author={} book={}", authorName, bookName));
     }
 
     /**
@@ -199,7 +207,7 @@ public class HandleBookFound implements Handle<BookFoundData> {
                         .bookEntity(book)
                         .build());
         metadata.setSourceUri(WIKIDATA_URI_PREFIX + wikidataId);
-        metadata.setReleased(LocalDate.of(firstPublicationYear, 1, 1));
+        metadata.setReleased(LocalDate.of(firstPublicationYear, Month.JANUARY, 1));
         metadataRepository.save(metadata);
         scannerHelperService.refreshBookReleaseYear(book);
     }
@@ -246,7 +254,7 @@ public class HandleBookFound implements Handle<BookFoundData> {
             metadata.setDescription(info.description());
         }
         if (info.firstPublishYear() > 0) {
-            metadata.setReleased(LocalDate.of(info.firstPublishYear(), 1, 1));
+            metadata.setReleased(LocalDate.of(info.firstPublishYear(), Month.JANUARY, 1));
         }
         metadataRepository.save(metadata);
         scannerHelperService.refreshBookReleaseYear(book);

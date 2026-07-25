@@ -31,7 +31,10 @@ record RecentlyWatched(MediaType type, EpisodeEntity episode, MovieEntity movie,
      * audio slot is set the book is derived from the chapter so the tile still has a title and cover.
      */
     static RecentlyWatched ofBook(BookEntity book, ChapterEntity chapter, Instant lastWatched) {
-        BookEntity resolvedBook = book != null ? book : (chapter != null ? chapter.getBookEntity() : null);
+        BookEntity resolvedBook = book;
+        if (resolvedBook == null && chapter != null) {
+            resolvedBook = chapter.getBookEntity();
+        }
         return new RecentlyWatched(MediaType.BOOK, null, null, chapter, resolvedBook, null, lastWatched);
     }
 

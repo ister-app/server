@@ -2,7 +2,7 @@ package app.ister.worker.events.wikipedia;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.util.Collection;
 import java.util.List;
@@ -27,7 +27,7 @@ import static app.ister.worker.events.musicbrainz.MusicBrainzService.normalizeTi
  * statement — can never link a book into a series.
  */
 @Slf4j
-@Component
+@Service
 @RequiredArgsConstructor
 public class WikidataBookSeriesService {
 
@@ -35,6 +35,8 @@ public class WikidataBookSeriesService {
     private static final String PART_OF_SERIES = "P179";
     private static final String SERIES_ORDINAL = "P1545";
     private static final String PUBLICATION_DATE = "P577";
+    private static final String DATAVALUE = "datavalue";
+    private static final String VALUE = "value";
 
     private final WikipediaService wikipediaService;
 
@@ -123,24 +125,35 @@ public class WikidataBookSeriesService {
             return Optional.empty();
         }
         for (Object claim : seriesClaims) {
-            if (!(claim instanceof Map<?, ?> statement)) {
-                continue;
-            }
-            String seriesId = mainsnakItemId(statement);
-            if (seriesId == null) {
-                continue;
-            }
-            Map<String, Object> seriesEntity = wikipediaService.fetchWikidataEntity(seriesId);
-            for (String candidateName : candidateSeriesNames) {
-                if (wikipediaService.labelMatches(
-                        seriesEntity, seriesId, normalizeTitle(candidateName), languageTags)) {
-                    return Optional.of(new DiscoveredSeries(entityId, candidateName,
-                            ordinalOf(statement),
-                            earliestPublicationYear(claims)));
-                }
+            Optional<DiscoveredSeries> match =
+                    seriesFromStatement(claim, claims, entityId, candidateSeriesNames, languageTags);
+            if (match.isPresent()) {
+                return match;
             }
         }
         return Optional.empty();
+    }
+
+    /** A match when this P179 statement's series label matches one of the candidate names. */
+    private Optional<DiscoveredSeries> seriesFromStatement(Object claim, Map<?, ?> claims,
+                                                           String entityId,
+                                                           Collection<String> candidateSeriesNames,
+                                                           List<String> languageTags) {
+        if (!(claim instanceof Map<?, ?> statement)) {
+            return Optional.empty();
+        }
+        String seriesId = mainsnakItemId(statement);
+        if (seriesId == null) {
+            return Optional.empty();
+        }
+        Map<String, Object> seriesEntity = wikipediaService.fetchWikidataEntity(seriesId);
+        return candidateSeriesNames.stream()
+                .filter(candidateName -> wikipediaService.labelMatches(
+                        seriesEntity, seriesId, normalizeTitle(candidateName), languageTags))
+                .findFirst()
+                .map(candidateName -> new DiscoveredSeries(entityId, candidateName,
+                        ordinalOf(statement),
+                        earliestPublicationYear(claims)));
     }
 
     /** True when one of the item's P50 (author) statements resolves to a label matching the name. */
@@ -161,8 +174,8 @@ public class WikidataBookSeriesService {
 
     private String mainsnakItemId(Map<?, ?> statement) {
         return statement.get("mainsnak") instanceof Map<?, ?> snak
-                && snak.get("datavalue") instanceof Map<?, ?> value
-                && value.get("value") instanceof Map<?, ?> item
+                && snak.get(DATAVALUE) instanceof Map<?, ?> value
+                && value.get(VALUE) instanceof Map<?, ?> item
                 && item.get("id") instanceof String id ? id : null;
     }
 
@@ -174,8 +187,8 @@ public class WikidataBookSeriesService {
         }
         for (Object ordinal : ordinals) {
             if (ordinal instanceof Map<?, ?> snak
-                    && snak.get("datavalue") instanceof Map<?, ?> value
-                    && value.get("value") instanceof String text) {
+                    && snak.get(DATAVALUE) instanceof Map<?, ?> value
+                    && value.get(VALUE) instanceof String text) {
                 try {
                     return Double.valueOf(text.strip());
                 } catch (NumberFormatException _) {
@@ -202,8 +215,8 @@ public class WikidataBookSeriesService {
     private Integer yearOf(Object dateClaim) {
         if (!(dateClaim instanceof Map<?, ?> statement)
                 || !(statement.get("mainsnak") instanceof Map<?, ?> snak)
-                || !(snak.get("datavalue") instanceof Map<?, ?> value)
-                || !(value.get("value") instanceof Map<?, ?> time)
+                || !(snak.get(DATAVALUE) instanceof Map<?, ?> value)
+                || !(value.get(VALUE) instanceof Map<?, ?> time)
                 || !(time.get("time") instanceof String text)) {
             return null;
         }

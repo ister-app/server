@@ -31,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.time.LocalDate;
+import java.time.Month;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -134,7 +135,7 @@ public class HandleEpubFileFound implements Handle<EpubFileFoundData> {
         metadata.setTitle(info.title());
         metadata.setDescription(info.description());
         metadata.setLanguage(toIso3(info.language()));
-        metadata.setReleased(info.releaseYear() > 0 ? LocalDate.of(info.releaseYear(), 1, 1) : null);
+        metadata.setReleased(info.releaseYear() > 0 ? LocalDate.of(info.releaseYear(), Month.JANUARY, 1) : null);
         metadataRepository.save(metadata);
         scannerHelperService.refreshBookReleaseYear(book);
         serverEventService.createSearchIndexEvent(SearchEntityType.BOOK, book.getId());

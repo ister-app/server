@@ -43,7 +43,7 @@ import java.util.Optional;
  */
 @Slf4j
 @Service
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @RequiredArgsConstructor
 public class HandlePodcastEpisodeDownloadRequested implements Handle<PodcastEpisodeDownloadRequestedData> {
 

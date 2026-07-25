@@ -60,6 +60,8 @@ public class LibraryPreferenceService {
      *
      * @throws NoSuchElementException if the library does not exist
      */
+    // Sonar FP: Lombok @SuperBuilder declares builder() on the subclass itself
+    @SuppressWarnings("java:S3252")
     @Transactional
     public void setSorting(Authentication authentication, UUID libraryId, SortingEnum sorting, SortingOrder sortingOrder) {
         UserEntity userEntity = userService.getOrCreateUser(authentication);

@@ -16,6 +16,8 @@ import java.util.Optional;
 public class UserService {
     private final UserRepository userRepository;
 
+    // Sonar FP: Lombok @SuperBuilder declares builder() on the subclass itself
+    @SuppressWarnings("java:S3252")
     public UserEntity getOrCreateUser(Authentication authentication) {
         Optional<UserEntity> user = userRepository.findByExternalId(authentication.getName());
         if (user.isPresent()) {

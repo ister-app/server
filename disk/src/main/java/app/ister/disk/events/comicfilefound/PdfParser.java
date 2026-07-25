@@ -37,6 +37,7 @@ public class PdfParser {
     }
 
     /** Page 1 rendered as jpg bytes, or empty when rendering is unavailable or fails. */
+    @SuppressWarnings("java:S1181") // a native image without AWT throws LinkageError, which must degrade, not dead-letter the scan
     public Optional<byte[]> renderCoverJpeg(Path pdfPath) {
         try (PDDocument document = Loader.loadPDF(pdfPath.toFile())) {
             if (document.getNumberOfPages() == 0) {

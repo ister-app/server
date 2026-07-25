@@ -75,52 +75,72 @@ public class ContinueWatchingService {
         Instant lastWatched = Instant.now();
 
         if (status.getEpisodeEntity() != null) {
-            EpisodeEntity episode = status.getEpisodeEntity();
-            UUID target = status.isWatched()
-                    ? nextUnwatchedEpisode(episode.getShowEntity().getId(), user.getId(),
-                            episode.getSeasonEntity().getNumber(), episode.getNumber()).orElse(null)
-                    : episode.getId();
-            upsertEpisode(user, episode.getShowEntity().getId(), target, lastWatched);
+            onEpisodeChanged(status, user, lastWatched);
         } else if (status.getChapterEntity() != null) {
-            ChapterEntity chapter = status.getChapterEntity();
-            UUID bookId = chapter.getBookEntity().getId();
-            UUID target = status.isWatched()
-                    ? nextUnfinishedChapter(bookId, user.getId(), chapter.getNumber()).orElse(null)
-                    : chapter.getId();
-            upsertChapter(user, bookId, target, lastWatched);
+            onChapterChanged(status, user, lastWatched);
         } else if (status.getMovieEntity() != null) {
             UUID movieId = status.getMovieEntity().getId();
             upsertMovie(user, movieId, status.isWatched() ? null : movieId, lastWatched);
         } else if (status.getBookEntity() != null) {
-            BookEntity book = status.getBookEntity();
-            if (isComicVolume(book)) {
-                UUID seriesId = book.getSeriesEntity().getId();
-                if (status.isWatched()) {
-                    UUID target = nextUnfinishedVolume(seriesId, user.getId(),
-                            book.getSeriesIndex(), book.getName()).orElse(null);
-                    upsertComicVolume(user, seriesId, target, lastWatched);
-                } else if (startedReading(status)) {
-                    upsertComicVolume(user, seriesId, book.getId(), lastWatched);
-                }
-                // Not started and not finished: leave any existing entry alone — the entry is
-                // keyed per series, so a null target would clobber another volume in progress.
-            } else {
-                UUID bookId = book.getId();
-                upsertBook(user, bookId, startedReading(status) ? bookId : null, lastWatched);
-            }
+            onBookChanged(status, user, lastWatched);
         } else if (status.getPodcastEpisodeEntity() != null) {
-            var episode = status.getPodcastEpisodeEntity();
-            UUID podcastId = episode.getPodcastEntity().getId();
-            if (status.isWatched()) {
-                UUID target = nextUnfinishedPodcastEpisode(podcastId, user.getId(), episode.getId()).orElse(null);
-                upsertPodcastEpisode(user, podcastId, target, lastWatched);
-            } else if (startedListening(status)) {
-                upsertPodcastEpisode(user, podcastId, episode.getId(), lastWatched);
-            }
-            // Not started (progress 0) and not watched: nothing to resume yet. Since the entry is now
-            // keyed by podcast, writing a null target here would clobber another episode the user is
-            // mid-way through, so leave any existing entry untouched.
+            onPodcastEpisodeChanged(status, user, lastWatched);
         }
+    }
+
+    private void onEpisodeChanged(WatchStatusEntity status, UserEntity user, Instant lastWatched) {
+        EpisodeEntity episode = status.getEpisodeEntity();
+        UUID target = status.isWatched()
+                ? nextUnwatchedEpisode(episode.getShowEntity().getId(), user.getId(),
+                        episode.getSeasonEntity().getNumber(), episode.getNumber()).orElse(null)
+                : episode.getId();
+        upsertEpisode(user, episode.getShowEntity().getId(), target, lastWatched);
+    }
+
+    private void onChapterChanged(WatchStatusEntity status, UserEntity user, Instant lastWatched) {
+        ChapterEntity chapter = status.getChapterEntity();
+        UUID bookId = chapter.getBookEntity().getId();
+        UUID target = status.isWatched()
+                ? nextUnfinishedChapter(bookId, user.getId(), chapter.getNumber()).orElse(null)
+                : chapter.getId();
+        upsertChapter(user, bookId, target, lastWatched);
+    }
+
+    private void onBookChanged(WatchStatusEntity status, UserEntity user, Instant lastWatched) {
+        BookEntity book = status.getBookEntity();
+        if (isComicVolume(book)) {
+            onComicVolumeChanged(status, user, book, lastWatched);
+        } else {
+            UUID bookId = book.getId();
+            upsertBook(user, bookId, startedReading(status) ? bookId : null, lastWatched);
+        }
+    }
+
+    private void onComicVolumeChanged(WatchStatusEntity status, UserEntity user, BookEntity book, Instant lastWatched) {
+        UUID seriesId = book.getSeriesEntity().getId();
+        if (status.isWatched()) {
+            UUID target = nextUnfinishedVolume(seriesId, user.getId(),
+                    book.getSeriesIndex(), book.getName()).orElse(null);
+            upsertComicVolume(user, seriesId, target, lastWatched);
+        } else if (startedReading(status)) {
+            upsertComicVolume(user, seriesId, book.getId(), lastWatched);
+        }
+        // Not started and not finished: leave any existing entry alone — the entry is
+        // keyed per series, so a null target would clobber another volume in progress.
+    }
+
+    private void onPodcastEpisodeChanged(WatchStatusEntity status, UserEntity user, Instant lastWatched) {
+        var episode = status.getPodcastEpisodeEntity();
+        UUID podcastId = episode.getPodcastEntity().getId();
+        if (status.isWatched()) {
+            UUID target = nextUnfinishedPodcastEpisode(podcastId, user.getId(), episode.getId()).orElse(null);
+            upsertPodcastEpisode(user, podcastId, target, lastWatched);
+        } else if (startedListening(status)) {
+            upsertPodcastEpisode(user, podcastId, episode.getId(), lastWatched);
+        }
+        // Not started (progress 0) and not watched: nothing to resume yet. Since the entry is now
+        // keyed by podcast, writing a null target here would clobber another episode the user is
+        // mid-way through, so leave any existing entry untouched.
     }
 
     /**
