@@ -2,9 +2,10 @@ package app.ister.core.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -15,10 +16,11 @@ import java.util.UUID;
  * This class is extended by the other entities so al entities hava a:
  * -
  */
-@EqualsAndHashCode(callSuper = true)
 @MappedSuperclass
 @NoArgsConstructor(access = AccessLevel.PACKAGE)
-@Data
+@Getter
+@Setter
+@ToString
 @SuperBuilder
 @EntityListeners(AuditingEntityListener.class)
 public class FileFromPathEntity extends BaseEntity {

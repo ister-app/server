@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 
+import static org.mockito.ArgumentMatchers.refEq;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,6 +48,6 @@ class MetadataSaveTest {
                 .description("DESCRIPTION")
                 .build();
         subject.save(tmdbResult, null, showEntity, episodeEntity);
-        verify(metadataRepositoryMock).save(build);
+        verify(metadataRepositoryMock).save(refEq(build));
     }
 }

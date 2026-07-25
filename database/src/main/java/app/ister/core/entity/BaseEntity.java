@@ -2,8 +2,10 @@ package app.ister.core.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -17,7 +19,9 @@ import java.util.UUID;
  */
 @MappedSuperclass
 @NoArgsConstructor(access = AccessLevel.PACKAGE)
-@Data
+@Getter
+@Setter
+@ToString
 @SuperBuilder
 @EntityListeners(AuditingEntityListener.class)
 public class BaseEntity {
@@ -31,4 +35,19 @@ public class BaseEntity {
     @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(nullable = false)
     private UUID id;
+
+    // instanceof instead of getClass(): a Hibernate proxy must compare equal to its entity.
+    @Override
+    public final boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof BaseEntity that)) return false;
+        return id != null && id.equals(that.getId());
+    }
+
+    // Constant per class: the id is only assigned on insert, and a hash that changes
+    // mid-lifecycle corrupts hash-based collections.
+    @Override
+    public final int hashCode() {
+        return getClass().hashCode();
+    }
 }
