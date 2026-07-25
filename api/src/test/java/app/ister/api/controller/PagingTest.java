@@ -34,6 +34,18 @@ class PagingTest {
     }
 
     @Test
+    void addsIdTieBreakerToSort() {
+        Pageable pageable = Paging.pageable(Optional.empty(), Optional.empty(), 10,
+                Optional.of(SortingEnum.RELEASE_YEAR), SortingEnum.NAME,
+                Optional.of(SortingOrder.DESCENDING), SortingOrder.ASCENDING);
+
+        var orders = pageable.getSort().stream().toList();
+        assertEquals(2, orders.size());
+        assertEquals(SortingEnum.RELEASE_YEAR.getDatabaseString(), orders.get(0).getProperty());
+        assertEquals("id", orders.get(1).getProperty());
+    }
+
+    @Test
     void clampsPageSizeToMaximum() {
         Pageable pageable = Paging.pageable(Optional.empty(), Optional.of(1_000_000), 10,
                 Optional.empty(), SortingEnum.NAME, Optional.empty(), SortingOrder.ASCENDING);

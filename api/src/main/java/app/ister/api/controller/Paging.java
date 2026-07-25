@@ -22,6 +22,9 @@ final class Paging {
                              Optional<SortingOrder> sortingOrder, SortingOrder defaultOrder) {
         Sort sort = Sort.by(sorting.orElse(defaultSorting).getDatabaseString());
         sort = sortingOrder.orElse(defaultOrder) == SortingOrder.ASCENDING ? sort.ascending() : sort.descending();
+        // Tie-break on id: without a unique column in the sort, rows with equal sort values may
+        // shift between the queries for consecutive pages, duplicating or skipping items.
+        sort = sort.and(Sort.by("id"));
         int pageSize = Math.clamp(size.orElse(defaultSize), 1, MAX_PAGE_SIZE);
         return PageRequest.of(Math.max(page.orElse(0), 0), pageSize, sort);
     }

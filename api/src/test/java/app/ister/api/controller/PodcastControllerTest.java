@@ -108,7 +108,7 @@ class PodcastControllerTest {
         assertEquals(1, result.getTotalElements());
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(podcastRepository).findByActiveTrue(pageable.capture());
-        assertEquals(Sort.by("title").ascending(), pageable.getValue().getSort());
+        assertEquals(Sort.by("title").ascending().and(Sort.by("id")), pageable.getValue().getSort());
         assertEquals(20, pageable.getValue().getPageSize());
     }
 
@@ -125,7 +125,7 @@ class PodcastControllerTest {
         assertEquals(1, result.getTotalElements());
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(podcastRepository).findByLibraryEntityIdAndActiveTrue(eq(libraryId), pageable.capture());
-        assertEquals(Sort.by("title").descending(), pageable.getValue().getSort());
+        assertEquals(Sort.by("title").descending().and(Sort.by("id")), pageable.getValue().getSort());
         assertEquals(2, pageable.getValue().getPageNumber());
         assertEquals(5, pageable.getValue().getPageSize());
         verify(podcastRepository, never()).findByActiveTrue(any(Pageable.class));
