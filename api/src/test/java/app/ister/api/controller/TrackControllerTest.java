@@ -6,6 +6,7 @@ import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.TrackEntity;
+import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.LibraryAccessService;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,9 @@ class TrackControllerTest {
 
     @Mock
     private TrackRepository trackRepository;
+
+    @Mock
+    private PersonRepository personRepository;
 
     @Mock
     private LibraryAccessService libraryAccessService;
@@ -66,11 +70,22 @@ class TrackControllerTest {
     }
 
     @Test
-    void artistSchemaMappingReturnsArtist() {
-        PersonEntity artist = PersonEntity.builder().name("The Beatles").build();
-        TrackEntity track = TrackEntity.builder().personEntity(artist).build();
+    void artistBatchMappingResolvesPerTrackArtists() {
+        PersonEntity beatles = PersonEntity.builder().name("The Beatles").build();
+        beatles.setId(UUID.randomUUID());
+        PersonEntity stones = PersonEntity.builder().name("The Rolling Stones").build();
+        stones.setId(UUID.randomUUID());
+        TrackEntity track1 = TrackEntity.builder().personEntity(beatles).build();
+        track1.setId(UUID.randomUUID());
+        TrackEntity track2 = TrackEntity.builder().personEntity(stones).build();
+        track2.setId(UUID.randomUUID());
+        when(personRepository.findAllById(List.of(beatles.getId(), stones.getId())))
+                .thenReturn(List.of(beatles, stones));
 
-        assertEquals(artist, subject.artist(track));
+        var result = subject.artist(List.of(track1, track2));
+
+        assertEquals(beatles, result.get(track1));
+        assertEquals(stones, result.get(track2));
     }
 
     @Test

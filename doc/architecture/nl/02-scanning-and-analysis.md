@@ -21,7 +21,7 @@ Zie het [scan-flow-diagram](../diagrams/scan-flow.md). `scanLibrary()` stuurt pe
 | Bestand | Event | Wat de handler doet |
 | --- | --- | --- |
 | Video | `MEDIA_FILE_FOUND` | ffprobe: streams + duur, embedded subs naar SRT extraheren, screenshot als achtergrond |
-| Audio | `AUDIO_FILE_FOUND` | ffprobe, ID3-tags (titel/artiest/tracknr), embedded cover, HLS-cache leegmaken |
+| Audio | `AUDIO_FILE_FOUND` | ffprobe, ID3-tags (titel/tracknr, track-artiest uit de `artist`-tag met de pad-artiest als fallback), embedded cover, HLS-cache leegmaken |
 | `.epub` (BOOK-library) | `EPUB_FILE_FOUND` | OPF: titel/taal/beschrijving, media overlays uit de inhoud, cover uit de zip |
 | `.cbz`/`.pdf`/`.epub` (COMIC-library) | `COMIC_FILE_FOUND` (epubs hergebruiken `EPUB_FILE_FOUND`) | paginatelling, `ComicInfo.xml`, cover extraheren |
 | `.srt` | `SUBTITLE_FILE_FOUND` | SRT als `EXTERNAL_SUBTITLE`-stream aan de episode koppelen |

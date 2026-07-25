@@ -20,7 +20,7 @@ See the [scan-flow diagram](../diagrams/scan-flow.md). `scanLibrary()` sends
 | File | Event | Handler work |
 | --- | --- | --- |
 | Video | `MEDIA_FILE_FOUND` | ffprobe streams + duration, extract embedded subs to SRT, screenshot as backdrop |
-| Audio | `AUDIO_FILE_FOUND` | ffprobe, ID3 tags (title/artist/track no), embedded cover, clear the HLS cache |
+| Audio | `AUDIO_FILE_FOUND` | ffprobe, ID3 tags (title/track no, track artist from the `artist` tag with the path artist as fallback), embedded cover, clear the HLS cache |
 | `.epub` (BOOK library) | `EPUB_FILE_FOUND` | OPF title/language/description, media overlays from content, cover from the zip |
 | `.cbz`/`.pdf`/`.epub` (COMIC library) | `COMIC_FILE_FOUND` (epubs reuse `EPUB_FILE_FOUND`) | page count, `ComicInfo.xml`, cover extraction |
 | `.srt` | `SUBTITLE_FILE_FOUND` | link SRT to episode as an `EXTERNAL_SUBTITLE` stream |

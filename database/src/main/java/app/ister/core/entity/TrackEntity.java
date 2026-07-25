@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 import java.util.List;
@@ -15,7 +16,8 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class TrackEntity extends BaseEntity {
 
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @Setter
     private PersonEntity personEntity;
 
     @ManyToOne(optional = false)

@@ -34,7 +34,9 @@ between actors and music artists; TMDB cast members are deduplicated against exi
 
 Artist directories become `PersonEntity` rows (`PERSON_FOUND`), albums `AlbumEntity`
 (`ALBUM_FOUND`), tracks via `AUDIO_FILE_FOUND` (ffprobe + ID3 tags + embedded cover). Album identity
-comes from the **path**, never from tags. The worker's `HandleAlbumFound` queries MusicBrainz and
+comes from the **path**, never from tags. The track's artist, however, comes from the `artist`
+**tag** (falling back to the path artist): on compilation albums the per-track performer only exists
+there, while the album keeps the path-derived album artist. The worker's `HandleAlbumFound` queries MusicBrainz and
 downloads the release-group cover; the disk-side `HandlePersonFound`/`HandleAlbumFound` look for
 `artist.nfo`/`album.nfo`. Artists get a `birthYear` (MusicBrainz life-span, or the folder name)
 precisely so the TMDB actor dedup above can match them.

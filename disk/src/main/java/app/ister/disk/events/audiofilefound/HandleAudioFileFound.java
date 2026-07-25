@@ -199,6 +199,8 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
             track = trackRepository.findById(correctedTrackId).orElse(track);
         }
 
+        updateTrackArtistFromTag(track, format);
+
         String title = extractTitle(format, mediaFile.getPath());
         if (title != null) {
             metadataRepository.deleteAll(metadataRepository.findByTrackEntityId(track.getId()));
@@ -236,6 +238,19 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                 .chapterEntity(chapter)
                 .sourceUri(FILE_URI_SCHEME + mediaFile.getPath())
                 .build());
+    }
+
+    /**
+     * The path-derived artist ({@code AudioScanner}) is the album artist; on compilation albums the
+     * per-track performer only exists in the {@code artist} tag. The album keeps its path-derived
+     * artist — that is the album's identity for the cover and NFO scanners.
+     */
+    private void updateTrackArtistFromTag(TrackEntity track, Format format) {
+        String tagArtist = extractArtistTag(format);
+        if (tagArtist == null || tagArtist.equals(track.getPersonEntity().getName())) return;
+        var library = track.getAlbumEntity().getLibraryEntity();
+        track.setPersonEntity(scannerHelperService.getOrCreatePerson(library, tagArtist));
+        trackRepository.save(track);
     }
 
     /**
@@ -385,6 +400,13 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
             // Tag holds no parseable year; give up and return null.
         }
         return null;
+    }
+
+    private static String extractArtistTag(Format format) {
+        if (format == null) return null;
+        String tag = format.getTag("artist");
+        if (tag == null) tag = format.getTag("ARTIST");
+        return tag != null && !tag.isBlank() ? tag.strip() : null;
     }
 
     private static String extractGenreTag(Format format) {

@@ -34,7 +34,9 @@ is via `personById { credits { movie/show/episode } }`.
 
 Artiest-directories worden `PersonEntity`-rijen (`PERSON_FOUND`), albums `AlbumEntity`
 (`ALBUM_FOUND`), tracks lopen via `AUDIO_FILE_FOUND` (ffprobe + ID3-tags + embedded cover).
-Album-identiteit komt uit het **pad**, nooit uit tags. De worker-`HandleAlbumFound` bevraagt
+Album-identiteit komt uit het **pad**, nooit uit tags. De artiest van een track komt juist wél uit
+de `artist`-**tag** (met de pad-artiest als fallback): op verzamelalbums bestaat de uitvoerende per
+track alleen daar, terwijl het album de pad-afgeleide albumartiest houdt. De worker-`HandleAlbumFound` bevraagt
 MusicBrainz en downloadt de release-group-cover; de disk-kant
 (`HandlePersonFound`/`HandleAlbumFound`) zoekt naar `artist.nfo`/`album.nfo`. Artiesten krijgen een
 `birthYear` (MusicBrainz life-span, of de mapnaam) — precies zodat de TMDB-acteur-dedup hierboven ze
