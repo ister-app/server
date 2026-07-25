@@ -430,13 +430,19 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         if (!hasAttachedPic) return;
         UUID albumId = null;
         UUID bookId = null;
+        UUID coverOwnerId;
+        String coverSubDir;
         TrackEntity track = mediaFile.getTrackEntity();
         if (track != null && track.getAlbumEntity() != null) {
             albumId = track.getAlbumEntity().getId();
             if (!imageRepository.findByAlbumEntityId(albumId).isEmpty()) return;
+            coverOwnerId = albumId;
+            coverSubDir = "album-covers";
         } else if (mediaFile.getChapterEntity() != null && mediaFile.getChapterEntity().getBookEntity() != null) {
             bookId = mediaFile.getChapterEntity().getBookEntity().getId();
             if (!imageRepository.findByBookEntityId(bookId).isEmpty()) return;
+            coverOwnerId = bookId;
+            coverSubDir = "book-covers";
         } else {
             return;
         }
@@ -446,9 +452,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         if (cacheDirs.isEmpty()) return;
         DirectoryEntity cacheDir = cacheDirs.get(0);
 
-        Path outputPath = albumId != null
-                ? Paths.get(cacheDir.getPath(), "album-covers", albumId.toString(), "cover.jpg")
-                : Paths.get(cacheDir.getPath(), "book-covers", bookId.toString(), "cover.jpg");
+        Path outputPath = Paths.get(cacheDir.getPath(), coverSubDir, coverOwnerId.toString(), "cover.jpg");
         try {
             audioFileFoundExtractCoverArt.extract(outputPath, mediaFile.getPath(), dirOfFFmpeg);
         } catch (Exception e) {
