@@ -103,6 +103,24 @@ class PersonControllerGraphQlTest {
     }
 
     @Test
+    void personByIdResolvesLibrarylessPersonWithCredits() {
+        PersonEntity person = PersonEntity.builder().name("Cast Only").build();
+        person.setId(UUID.randomUUID());
+        CreditEntity credit = CreditEntity.builder()
+                .characterName("Neo").creditType(CreditType.CAST).castOrder(0).build();
+        credit.setId(UUID.randomUUID());
+        when(personRepository.findById(person.getId())).thenReturn(java.util.Optional.of(person));
+        when(creditRepository.findByPersonEntityId(eq(person.getId()), any(Sort.class))).thenReturn(List.of(credit));
+
+        assertDoesNotThrow(() -> graphQlTester.document("""
+                        { personById(id: "%s") { name credits { characterName } } }
+                        """.formatted(person.getId()))
+                .execute()
+                .path("personById.name").entity(String.class).isEqualTo("Cast Only")
+                .path("personById.credits[0].characterName").entity(String.class).isEqualTo("Neo"));
+    }
+
+    @Test
     void personByIdReturnsNullWhenNotFound() {
         when(personRepository.findById(any(UUID.class))).thenReturn(java.util.Optional.empty());
 

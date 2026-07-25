@@ -48,7 +48,23 @@ public class PersonController {
     @QueryMapping
     public Optional<PersonEntity> personById(@Argument UUID id, Authentication authentication) {
         return personRepository.findById(id)
-                .filter(person -> libraryAccessService.canAccess(person.getLibraryEntity(), authentication));
+                .filter(person -> canSeePerson(person, authentication));
+    }
+
+    /**
+     * A person with a library follows normal library access. Persons created from TMDB cast
+     * credits are library-less; they are visible when any of their credits lies in an accessible
+     * library. Uses allowedLibraryIds (empty Optional = admin, sees everything) directly instead
+     * of canAccess(UUID), whose null-check would deny before the admin bypass.
+     */
+    private boolean canSeePerson(PersonEntity person, Authentication authentication) {
+        if (person.getLibraryEntity() != null) {
+            return libraryAccessService.canAccess(person.getLibraryEntity(), authentication);
+        }
+        return libraryAccessService.allowedLibraryIds(authentication)
+                .map(allowed -> !allowed.isEmpty()
+                        && creditRepository.hasCreditInLibraries(person.getId(), allowed))
+                .orElse(true);
     }
 
     @PreAuthorize("hasRole('user')")
@@ -88,8 +104,12 @@ public class PersonController {
     }
 
     @SchemaMapping(typeName = "Person", field = "credits")
-    public List<CreditEntity> credits(PersonEntity personEntity) {
-        return creditRepository.findByPersonEntityId(personEntity.getId(), Sort.by("castOrder"));
+    public List<CreditEntity> credits(PersonEntity personEntity, Authentication authentication) {
+        return libraryAccessService.allowedLibraryIds(authentication)
+                .map(allowed -> allowed.isEmpty()
+                        ? List.<CreditEntity>of()
+                        : creditRepository.findByPersonEntityIdInLibraries(personEntity.getId(), allowed))
+                .orElseGet(() -> creditRepository.findByPersonEntityId(personEntity.getId(), Sort.by("castOrder")));
     }
 
     @BatchMapping(typeName = "Person", field = "images")

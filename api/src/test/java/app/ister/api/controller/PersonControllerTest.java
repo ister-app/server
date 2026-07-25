@@ -26,6 +26,7 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -58,17 +59,44 @@ class PersonControllerTest {
     private CreditRepository creditRepository;
 
     @Test
-    void creditsSchemaMappingReturnsFromRepository() {
+    void creditsSchemaMappingReturnsUnfilteredForAdmin() {
         UUID id = UUID.randomUUID();
         PersonEntity person = PersonEntity.builder().build();
         org.springframework.test.util.ReflectionTestUtils.setField(person, "id", id);
         CreditEntity credit = CreditEntity.builder().characterName("Neo").build();
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
         when(creditRepository.findByPersonEntityId(eq(id), any(org.springframework.data.domain.Sort.class)))
                 .thenReturn(List.of(credit));
 
-        List<CreditEntity> result = subject.credits(person);
+        List<CreditEntity> result = subject.credits(person, authentication);
 
         assertEquals(List.of(credit), result);
+    }
+
+    @Test
+    void creditsSchemaMappingFiltersForNonAdmin() {
+        UUID id = UUID.randomUUID();
+        UUID libraryId = UUID.randomUUID();
+        PersonEntity person = PersonEntity.builder().build();
+        org.springframework.test.util.ReflectionTestUtils.setField(person, "id", id);
+        CreditEntity credit = CreditEntity.builder().characterName("Neo").build();
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.of(Set.of(libraryId)));
+        when(creditRepository.findByPersonEntityIdInLibraries(id, Set.of(libraryId))).thenReturn(List.of(credit));
+
+        List<CreditEntity> result = subject.credits(person, authentication);
+
+        assertEquals(List.of(credit), result);
+        verify(creditRepository, never()).findByPersonEntityId(any(), any());
+    }
+
+    @Test
+    void creditsSchemaMappingReturnsEmptyWhenNoLibrariesAllowed() {
+        PersonEntity person = PersonEntity.builder().build();
+        org.springframework.test.util.ReflectionTestUtils.setField(person, "id", UUID.randomUUID());
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.of(Set.of()));
+
+        assertTrue(subject.credits(person, authentication).isEmpty());
+        verifyNoInteractions(creditRepository);
     }
 
     @Test
@@ -83,6 +111,54 @@ class PersonControllerTest {
 
         assertTrue(result.isPresent());
         assertEquals("The Beatles", result.get().getName());
+    }
+
+    @Test
+    void personByIdReturnsLibrarylessPersonForAdmin() {
+        UUID id = UUID.randomUUID();
+        PersonEntity person = PersonEntity.builder().name("Cast Only").build();
+        when(personRepository.findById(id)).thenReturn(Optional.of(person));
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
+
+        assertTrue(subject.personById(id, authentication).isPresent());
+        verifyNoInteractions(creditRepository);
+    }
+
+    @Test
+    void personByIdReturnsLibrarylessPersonWhenCreditInAccessibleLibrary() {
+        UUID id = UUID.randomUUID();
+        UUID libraryId = UUID.randomUUID();
+        PersonEntity person = PersonEntity.builder().name("Cast Only").build();
+        org.springframework.test.util.ReflectionTestUtils.setField(person, "id", id);
+        when(personRepository.findById(id)).thenReturn(Optional.of(person));
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.of(Set.of(libraryId)));
+        when(creditRepository.hasCreditInLibraries(id, Set.of(libraryId))).thenReturn(true);
+
+        assertTrue(subject.personById(id, authentication).isPresent());
+    }
+
+    @Test
+    void personByIdHidesLibrarylessPersonWithoutAccessibleCredits() {
+        UUID id = UUID.randomUUID();
+        UUID libraryId = UUID.randomUUID();
+        PersonEntity person = PersonEntity.builder().name("Cast Only").build();
+        org.springframework.test.util.ReflectionTestUtils.setField(person, "id", id);
+        when(personRepository.findById(id)).thenReturn(Optional.of(person));
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.of(Set.of(libraryId)));
+        when(creditRepository.hasCreditInLibraries(id, Set.of(libraryId))).thenReturn(false);
+
+        assertTrue(subject.personById(id, authentication).isEmpty());
+    }
+
+    @Test
+    void personByIdHidesLibrarylessPersonWhenNoLibrariesAllowed() {
+        UUID id = UUID.randomUUID();
+        PersonEntity person = PersonEntity.builder().name("Cast Only").build();
+        when(personRepository.findById(id)).thenReturn(Optional.of(person));
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.of(Set.of()));
+
+        assertTrue(subject.personById(id, authentication).isEmpty());
+        verifyNoInteractions(creditRepository);
     }
 
     @Test

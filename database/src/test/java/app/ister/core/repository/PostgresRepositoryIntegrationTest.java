@@ -104,6 +104,9 @@ class PostgresRepositoryIntegrationTest {
     @Autowired
     private BookRepository bookRepository;
 
+    @Autowired
+    private CreditRepository creditRepository;
+
     /**
      * The blur-hash sweep walks a directory in chunks, resuming from the last id of the previous
      * chunk. Note that PostgreSQL orders {@code uuid} as unsigned bytes while
@@ -365,6 +368,49 @@ class PostgresRepositoryIntegrationTest {
         assertEquals(movie.getId(), found.getMovieEntityId());
         assertEquals("Lady Gaga", found.getPersonEntity().getName());
         assertEquals(1986, found.getPersonEntity().getBirthYear());
+    }
+
+    @Test
+    void creditLibraryQueriesFilterOnMovieShowAndEpisodeLibraries() {
+        LibraryEntity movieLibrary = em.persist(LibraryEntity.builder().libraryType(LibraryType.MOVIE).name("Movies-cl").build());
+        LibraryEntity showLibrary = em.persist(LibraryEntity.builder().libraryType(LibraryType.SHOW).name("Shows-cl").build());
+        MovieEntity movie = em.persist(MovieEntity.builder().libraryEntity(movieLibrary).name("Movie-cl").releaseYear(2020).build());
+        ShowEntity show = em.persist(ShowEntity.builder().libraryEntity(showLibrary).name("Show-cl").releaseYear(2021).build());
+        SeasonEntity season = em.persist(SeasonEntity.builder().showEntity(show).number(1).build());
+        EpisodeEntity episode = em.persist(EpisodeEntity.builder().showEntity(show).seasonEntity(season).number(1).build());
+        PersonEntity person = em.persist(PersonEntity.builder().name("Cast Only").tmdbId(4242L).build());
+
+        CreditEntity movieCredit = CreditEntity.builder()
+                .personEntity(person).creditType(CreditType.CAST).castOrder(2).tmdbCreditId("cl-m").build();
+        movieCredit.setMovieEntity(movie);
+        em.persist(movieCredit);
+        CreditEntity showCredit = CreditEntity.builder()
+                .personEntity(person).creditType(CreditType.CAST).castOrder(0).tmdbCreditId("cl-s").build();
+        showCredit.setShowEntity(show);
+        em.persist(showCredit);
+        CreditEntity episodeCredit = CreditEntity.builder()
+                .personEntity(person).creditType(CreditType.GUEST_STAR).castOrder(1).tmdbCreditId("cl-e").build();
+        episodeCredit.setEpisodeEntity(episode);
+        em.persist(episodeCredit);
+        em.flush();
+
+        assertTrue(creditRepository.hasCreditInLibraries(person.getId(), List.of(movieLibrary.getId())));
+        assertTrue(creditRepository.hasCreditInLibraries(person.getId(), List.of(showLibrary.getId())));
+        assertFalse(creditRepository.hasCreditInLibraries(person.getId(), List.of(UUID.randomUUID())));
+
+        // Movie library only: just the movie credit.
+        assertEquals(List.of(movieCredit.getId()),
+                creditRepository.findByPersonEntityIdInLibraries(person.getId(), List.of(movieLibrary.getId())).stream()
+                        .map(CreditEntity::getId).toList());
+        // Show library: show credit and episode credit (episode reaches its library via its show), castOrder ascending.
+        assertEquals(List.of(showCredit.getId(), episodeCredit.getId()),
+                creditRepository.findByPersonEntityIdInLibraries(person.getId(), List.of(showLibrary.getId())).stream()
+                        .map(CreditEntity::getId).toList());
+        // Both libraries: all three, castOrder ascending across parents.
+        assertEquals(List.of(showCredit.getId(), episodeCredit.getId(), movieCredit.getId()),
+                creditRepository.findByPersonEntityIdInLibraries(person.getId(),
+                                List.of(movieLibrary.getId(), showLibrary.getId())).stream()
+                        .map(CreditEntity::getId).toList());
     }
 
     // --- play queue chunk queries (seeded shuffle + natural order pagination) ---
