@@ -1,5 +1,33 @@
 # Changelog
 
+## server v2.2.1
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.2.1` |
+| `ghcr.io/ister-app/migrations` | `2.2.1` |
+
+### Fixes
+
+- fix(disk): build embedded-cover output path without ternary over nullable id ([`761c5d4`](https://github.com/ister-app/server/commit/761c5d4))
+- fix(database): replace entity value-equals with final id-based equals/hashCode ([`b779e11`](https://github.com/ister-app/server/commit/b779e11))
+- fix: let cast-credit persons load again under library visibility ([`0134b30`](https://github.com/ister-app/server/commit/0134b30))
+- fix(disk): set track artist from artist tag for compilation albums ([`dfa248e`](https://github.com/ister-app/server/commit/dfa248e))
+- fix(api): add id tie-breaker to paginated sorts to stop page-boundary duplicates ([`0c8dc63`](https://github.com/ister-app/server/commit/0c8dc63))
+
+### Other
+
+- test: resolve SonarCloud issues in tests ([`8f600cb`](https://github.com/ister-app/server/commit/8f600cb))
+- refactor: resolve SonarCloud issues in main sources ([`109ec2a`](https://github.com/ister-app/server/commit/109ec2a))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.2.1
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.2.0...v2.2.1
+
 ## server v2.2.0
 
 | Image | Tag |
