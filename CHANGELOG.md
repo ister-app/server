@@ -1,5 +1,24 @@
 # Changelog
 
+## server v2.2.2
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.2.2` |
+| `ghcr.io/ister-app/migrations` | `2.2.2` |
+
+### Dependency updates
+
+- chore(deps): update gradle plugins and pdfbox ([`a5174dc`](https://github.com/ister-app/server/commit/a5174dc))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.2.2
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.2.1...v2.2.2
+
 ## server v2.2.1
 
 | Image | Tag |
