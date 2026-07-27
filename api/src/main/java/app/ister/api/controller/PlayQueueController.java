@@ -310,6 +310,14 @@ public class PlayQueueController {
         return queue;
     }
 
+    @PreAuthorize("hasRole('user')")
+    @MutationMapping
+    public PlayQueueEntity addPlayQueueAlbum(@Argument UUID playQueueId, @Argument UUID albumId, Authentication authentication) {
+        PlayQueueEntity queue = playQueueService.addPlayQueueAlbum(playQueueId, albumId, authentication);
+        playbackCommandService.publishQueueChanged(playQueueId);
+        return queue;
+    }
+
     @SchemaMapping(typeName = "PlayQueue", field = "currentItemId")
     public UUID currentItemId(PlayQueueEntity playQueueEntity) {
         return playQueueEntity.getCurrentItem();

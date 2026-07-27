@@ -93,6 +93,8 @@ type Mutation {
     movePlayQueueItem(playQueueId: ID!, playQueueItemId: ID!, afterPlayQueueItemId: ID): PlayQueue!
     removePlayQueueItem(playQueueId: ID!, playQueueItemId: ID!): PlayQueue!
     addPlayQueueItem(playQueueId: ID!, mediaType: MediaType!, mediaId: ID!, afterPlayQueueItemId: ID): PlayQueue!
+    "Appends all tracks of the album to the end of the queue, in natural play order (disc number, track number)."
+    addPlayQueueAlbum(playQueueId: ID!, albumId: ID!): PlayQueue!
     createStreamToken: StreamToken!
     "Admin only."
     analyzeDataForEpisode(episodeId: ID!): Boolean!

@@ -191,6 +191,19 @@ class PlayQueueControllerTest {
     }
 
     @Test
+    void addPlayQueueAlbumDelegatesToService() {
+        UUID queueId = UUID.randomUUID();
+        UUID albumId = UUID.randomUUID();
+        PlayQueueEntity queue = PlayQueueEntity.builder().build();
+        when(playQueueService.addPlayQueueAlbum(queueId, albumId, authentication)).thenReturn(queue);
+
+        PlayQueueEntity result = subject.addPlayQueueAlbum(queueId, albumId, authentication);
+
+        assertEquals(queue, result);
+        verify(playbackCommandService).publishQueueChanged(queueId);
+    }
+
+    @Test
     void updatePlayQueueDelegatesToService() {
         UUID id = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();

@@ -328,6 +328,33 @@ public class PlayQueueService {
     }
 
     /**
+     * Appends all tracks of an album to the end of the queue, in natural play order
+     * (disc number, track number). Like addPlayQueueItem, the added items are independent
+     * of the queue's source cursor.
+     */
+    @Transactional
+    public PlayQueueEntity addPlayQueueAlbum(UUID playQueueId, UUID albumId, Authentication authentication) {
+        log.debug("Adding album {} to queue {}", albumId, playQueueId);
+        PlayQueueEntity queue = getEditableQueue(playQueueId, authentication);
+        if (!canAccessSource(PlayQueueSourceType.ALBUM, albumId, authentication)) {
+            throw new IllegalArgumentException("Album not found");
+        }
+        List<UUID> trackIds = trackRepository.findTrackIdsForAlbumOrdered(albumId, Integer.MAX_VALUE, 0);
+        if (trackIds.isEmpty()) {
+            // Also covers an unknown album id: both look the same to the track query.
+            throw new IllegalArgumentException("Album not found");
+        }
+        BigDecimal position = maxPosition(queue);
+        for (UUID trackId : trackIds) {
+            position = nextPosition(position);
+            addItem(queue, buildItem(queue, MediaType.TRACK, trackId, position));
+        }
+        sortItems(queue);
+        playQueueRepository.save(queue);
+        return queue;
+    }
+
+    /**
      * Returns the next position value given the previous one (or null for the first item).
      */
     private BigDecimal nextPosition(BigDecimal previous) {

@@ -922,6 +922,58 @@ class PlayQueueServiceTest {
                 () -> subject.addPlayQueueItem(queueId, MediaType.TRACK, trackId, unknownItemId, authentication));
     }
 
+    // --- addPlayQueueAlbum ---
+
+    @Test
+    void addPlayQueueAlbumAppendsAllTracksInOrderAtTheEnd() {
+        mockUser();
+        UUID albumId = UUID.randomUUID();
+        UUID trackA = UUID.randomUUID();
+        UUID trackB = UUID.randomUUID();
+        PlayQueueItemEntity first = buildItem(MediaType.TRACK, UUID.randomUUID(), "1000");
+        PlayQueueEntity queue = ownedQueue(List.of(first));
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        when(trackRepository.findTrackIdsForAlbumOrdered(albumId, Integer.MAX_VALUE, 0))
+                .thenReturn(List.of(trackA, trackB));
+
+        subject.addPlayQueueAlbum(queue.getId(), albumId, authentication);
+
+        assertEquals(3, queue.getItems().size());
+        assertEquals(trackA, queue.getItems().get(1).getTrackEntityId());
+        assertEquals(trackB, queue.getItems().get(2).getTrackEntityId());
+        assertEquals(0, new BigDecimal("2000").compareTo(queue.getItems().get(1).getPosition()));
+        assertEquals(0, new BigDecimal("3000").compareTo(queue.getItems().get(2).getPosition()));
+    }
+
+    @Test
+    void addPlayQueueAlbumWithoutTracksThrows() {
+        mockUser();
+        UUID albumId = UUID.randomUUID();
+        PlayQueueEntity queue = ownedQueue(List.of());
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        when(trackRepository.findTrackIdsForAlbumOrdered(albumId, Integer.MAX_VALUE, 0))
+                .thenReturn(List.of());
+        UUID queueId = queue.getId();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> subject.addPlayQueueAlbum(queueId, albumId, authentication));
+    }
+
+    @Test
+    void addPlayQueueAlbumFromAnInaccessibleLibraryThrows() {
+        mockUser();
+        UUID albumId = UUID.randomUUID();
+        PlayQueueEntity queue = ownedQueue(List.of());
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        LibraryEntity library = LibraryEntity.builder().id(UUID.randomUUID()).build();
+        when(mediaLibraryResolver.ofSource(PlayQueueSourceType.ALBUM, albumId)).thenReturn(Optional.of(library));
+        when(libraryAccessService.canAccess(library, authentication)).thenReturn(false);
+        UUID queueId = queue.getId();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> subject.addPlayQueueAlbum(queueId, albumId, authentication));
+    }
+
     // --- queue lookup ---
 
     @Test
