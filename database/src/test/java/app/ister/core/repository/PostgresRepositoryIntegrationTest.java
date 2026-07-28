@@ -658,12 +658,13 @@ class PostgresRepositoryIntegrationTest {
     void discoverBookAndSeriesQueriesCoverReadingAndListeningRows() {
         UserEntity user = em.persist(UserEntity.builder().externalId("reader-d1").build());
         LibraryEntity bookLibrary = em.persist(LibraryEntity.builder().libraryType(LibraryType.BOOK).name("Books-d").build());
+        PersonEntity author = em.persist(PersonEntity.builder().name("Author-d").build());
         app.ister.core.entity.BookEntity epub = em.persist(app.ister.core.entity.BookEntity.builder()
-                .libraryEntity(bookLibrary).name("Epub").build());
+                .libraryEntity(bookLibrary).personEntity(author).name("Epub").build());
         app.ister.core.entity.BookEntity audiobook = em.persist(app.ister.core.entity.BookEntity.builder()
-                .libraryEntity(bookLibrary).name("Audio").build());
+                .libraryEntity(bookLibrary).personEntity(author).name("Audio").build());
         app.ister.core.entity.ChapterEntity chapter = em.persist(app.ister.core.entity.ChapterEntity.builder()
-                .bookEntity(audiobook).number(1).build());
+                .personEntity(author).bookEntity(audiobook).number(1).build());
         em.persistAndFlush(WatchStatusEntity.builder()
                 .playQueueItemId(epub.getId()).userEntity(user).bookEntity(epub)
                 .readingProgress(0.4).build());
@@ -697,11 +698,11 @@ class PostgresRepositoryIntegrationTest {
         app.ister.core.entity.PodcastEntity unsubscribed = em.persist(app.ister.core.entity.PodcastEntity.builder()
                 .libraryEntity(library).feedUrl("https://feed/old").title("Old").active(false).build());
         app.ister.core.entity.PodcastEpisodeEntity activeEpisode = em.persist(app.ister.core.entity.PodcastEpisodeEntity.builder()
-                .podcastEntity(active).guid("g1").build());
+                .podcastEntity(active).guid("g1").enclosureUrl("https://feed/e1.mp3").build());
         app.ister.core.entity.PodcastEpisodeEntity abandonedEpisode = em.persist(app.ister.core.entity.PodcastEpisodeEntity.builder()
-                .podcastEntity(active).guid("g2").build());
+                .podcastEntity(active).guid("g2").enclosureUrl("https://feed/e2.mp3").build());
         app.ister.core.entity.PodcastEpisodeEntity unsubscribedEpisode = em.persist(app.ister.core.entity.PodcastEpisodeEntity.builder()
-                .podcastEntity(unsubscribed).guid("g3").build());
+                .podcastEntity(unsubscribed).guid("g3").enclosureUrl("https://feed/e3.mp3").build());
         em.persist(WatchStatusEntity.builder().playQueueItemId(UUID.randomUUID()).userEntity(user)
                 .podcastEpisodeEntity(activeEpisode).progressInMilliseconds(300_000).build());
         em.persist(WatchStatusEntity.builder().playQueueItemId(UUID.randomUUID()).userEntity(user)
