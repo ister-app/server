@@ -627,6 +627,12 @@ type Person {
     images: [Image!]
     metadata: [Metadata!]
     credits: [Credit!]
+    "The calling user's most played tracks of this artist (as track or album artist), most played first."
+    topPlayedTracks(limit: Int): [Track!]!
+    "The calling user's most recently played tracks of this artist, newest first."
+    recentlyPlayedTracks(limit: Int): [Track!]!
+    "The calling user's highest rated tracks of this artist, highest rating first."
+    topRatedTracks(limit: Int): [Track!]!
 }
 
 enum CreditType {
@@ -667,6 +673,10 @@ type Track {
     mediaFile: [MediaFile!]
     "The calling user's rating (1-10), or null if unrated."
     rating: Int
+    "How often the calling user played this track, or null when never played."
+    playCount: Int
+    "When the calling user last played this track (ISO-8601), or null when never played."
+    lastPlayedAt: String
 }
 
 type Book {

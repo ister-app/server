@@ -34,6 +34,18 @@ See the [continue-watching-flow diagram](../diagrams/continue-watching-flow.md).
 - `PreTranscodeService` reads the same table — the entries *are* the "what will they play next" set
   ([chapter 4](04-transcoding.md)) — instead of walking watch history itself.
 
+## Track plays
+
+Music tracks reuse the watch-status machinery as a **play history** rather than resume state
+(migration V29 adds `track_entity_id` to `watch_status_entity`). The playback heartbeat
+(`PlayQueueService`) writes one row per played play-queue item once 30 seconds — or half of a
+track shorter than a minute — has been heard; repeated heartbeats of the same item hit the same
+row via `WatchStatusService.getOrCreateForTrack`, so a play is never counted twice, while
+replaying the track (a new queue item) creates a new row. A user's play count for a track is
+simply their row count (`WatchStatusRepository.findTrackPlayStats`), and the row's
+`date_updated` doubles as "last played". Track rows never reach continue watching: the
+`onWatchStatusChanged` type dispatch and the rebuild queries only match the other media types.
+
 ## Live status (`core/.../status/`)
 
 Separate from the work queues, every node publishes its state to a **fanout exchange**

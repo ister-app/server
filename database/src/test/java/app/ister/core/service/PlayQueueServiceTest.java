@@ -562,6 +562,62 @@ class PlayQueueServiceTest {
     }
 
     @Test
+    void trackHeartbeatBelowThresholdRecordsNoPlay() {
+        mockUser();
+        PlayQueueItemEntity item = buildItem(MediaType.TRACK, UUID.randomUUID(), "1000");
+        PlayQueueEntity queue = ownedQueue(List.of(item));
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        when(trackRepository.findById(item.getTrackEntityId())).thenReturn(Optional.of(trackWithDuration(180_000)));
+
+        subject.updatePlayQueue(queue.getId(), 5000L, item.getId(), null, authentication);
+
+        verifyNoInteractions(watchStatusService);
+    }
+
+    @Test
+    void trackHeartbeatPastThresholdRecordsPlay() {
+        mockUser();
+        PlayQueueItemEntity item = buildItem(MediaType.TRACK, UUID.randomUUID(), "1000");
+        PlayQueueEntity queue = ownedQueue(List.of(item));
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        TrackEntity track = trackWithDuration(180_000);
+        when(trackRepository.findById(item.getTrackEntityId())).thenReturn(Optional.of(track));
+        WatchStatusEntity status = WatchStatusEntity.builder().build();
+        when(watchStatusService.getOrCreateForTrack(authentication, item.getId(), track)).thenReturn(status);
+
+        subject.updatePlayQueue(queue.getId(), 35_000L, item.getId(), null, authentication);
+
+        // The same play-queue item resolves to the same watch-status row on every heartbeat,
+        // so a play is never counted twice.
+        verify(watchStatusService).getOrCreateForTrack(authentication, item.getId(), track);
+        verify(watchStatusRepository).save(status);
+        assertEquals(35_000L, status.getProgressInMilliseconds());
+    }
+
+    @Test
+    void shortTrackCountsAfterHalfItsDuration() {
+        mockUser();
+        PlayQueueItemEntity item = buildItem(MediaType.TRACK, UUID.randomUUID(), "1000");
+        PlayQueueEntity queue = ownedQueue(List.of(item));
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        TrackEntity track = trackWithDuration(40_000);
+        when(trackRepository.findById(item.getTrackEntityId())).thenReturn(Optional.of(track));
+        WatchStatusEntity status = WatchStatusEntity.builder().build();
+        when(watchStatusService.getOrCreateForTrack(authentication, item.getId(), track)).thenReturn(status);
+
+        subject.updatePlayQueue(queue.getId(), 25_000L, item.getId(), null, authentication);
+
+        verify(watchStatusService).getOrCreateForTrack(authentication, item.getId(), track);
+    }
+
+    private TrackEntity trackWithDuration(long durationInMilliseconds) {
+        return TrackEntity.builder()
+                .mediaFileEntities(List.of(MediaFileEntity.builder()
+                        .durationInMilliseconds(durationInMilliseconds).build()))
+                .build();
+    }
+
+    @Test
     void updatePlayQueueDoesNotExtendExhaustedQueue() {
         mockUser();
         PlayQueueItemEntity item = buildItem(MediaType.EPISODE, UUID.randomUUID(), "1000");

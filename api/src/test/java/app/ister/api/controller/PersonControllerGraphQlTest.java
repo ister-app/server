@@ -54,6 +54,9 @@ class PersonControllerGraphQlTest {
     @MockitoBean
     private BookRepository bookRepository;
 
+    @MockitoBean
+    private app.ister.core.repository.TrackRepository trackRepository;
+
 
     @org.junit.jupiter.api.BeforeEach
     void authenticateAsUser() {
@@ -118,6 +121,62 @@ class PersonControllerGraphQlTest {
                 .execute()
                 .path("personById.name").entity(String.class).isEqualTo("Cast Only")
                 .path("personById.credits[0].characterName").entity(String.class).isEqualTo("Neo"));
+    }
+
+    @Test
+    void topTrackListsResolveInRepositoryOrder() {
+        PersonEntity person = PersonEntity.builder().name("Lady Gaga").build();
+        person.setId(UUID.randomUUID());
+        app.ister.core.entity.TrackEntity first = app.ister.core.entity.TrackEntity.builder().number(3).discNumber(1).build();
+        first.setId(UUID.randomUUID());
+        app.ister.core.entity.TrackEntity second = app.ister.core.entity.TrackEntity.builder().number(1).discNumber(1).build();
+        second.setId(UUID.randomUUID());
+        when(personRepository.findById(person.getId())).thenReturn(java.util.Optional.of(person));
+        // Repository ranks first before second; findAllById returns them in the other order.
+        when(trackRepository.findTopPlayedTrackIdsForPerson(eq(person.getId()), any(), eq(10)))
+                .thenReturn(List.of(first.getId(), second.getId()));
+        when(trackRepository.findRecentlyPlayedTrackIdsForPerson(eq(person.getId()), any(), eq(5)))
+                .thenReturn(List.of(second.getId()));
+        when(trackRepository.findTopRatedTrackIdsForPerson(eq(person.getId()), any(), eq(10)))
+                .thenReturn(List.of());
+        when(trackRepository.findAllById(anyCollection())).thenAnswer(invocation -> {
+            java.util.Collection<UUID> ids = invocation.getArgument(0);
+            return java.util.stream.Stream.of(second, first).filter(t -> ids.contains(t.getId())).toList();
+        });
+
+        assertDoesNotThrow(() -> graphQlTester.document("""
+                        { personById(id: "%s") {
+                            topPlayedTracks { id }
+                            recentlyPlayedTracks(limit: 5) { id }
+                            topRatedTracks { id }
+                        } }
+                        """.formatted(person.getId()))
+                .execute()
+                .path("personById.topPlayedTracks[0].id").entity(String.class).isEqualTo(first.getId().toString())
+                .path("personById.topPlayedTracks[1].id").entity(String.class).isEqualTo(second.getId().toString())
+                .path("personById.recentlyPlayedTracks[0].id").entity(String.class).isEqualTo(second.getId().toString())
+                .path("personById.topRatedTracks").entityList(Object.class).hasSize(0));
+    }
+
+    @Test
+    void topTrackListsUseLibraryScopedQueryForRestrictedUsers() {
+        PersonEntity person = PersonEntity.builder().name("Scoped").build();
+        person.setId(UUID.randomUUID());
+        UUID allowedLibrary = UUID.randomUUID();
+        when(personRepository.findById(person.getId())).thenReturn(java.util.Optional.of(person));
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(java.util.Optional.of(java.util.Set.of(allowedLibrary)));
+        when(creditRepository.hasCreditInLibraries(any(), anyCollection())).thenReturn(true);
+        when(trackRepository.findTopPlayedTrackIdsForPersonInLibraries(eq(person.getId()), any(), anyCollection(), eq(10)))
+                .thenReturn(List.of());
+        when(trackRepository.findAllById(anyCollection())).thenReturn(List.of());
+
+        assertDoesNotThrow(() -> graphQlTester.document("""
+                        { personById(id: "%s") { topPlayedTracks { id } } }
+                        """.formatted(person.getId()))
+                .execute()
+                .path("personById.topPlayedTracks").entityList(Object.class).hasSize(0));
+        org.mockito.Mockito.verify(trackRepository)
+                .findTopPlayedTrackIdsForPersonInLibraries(eq(person.getId()), any(), anyCollection(), eq(10));
     }
 
     @Test

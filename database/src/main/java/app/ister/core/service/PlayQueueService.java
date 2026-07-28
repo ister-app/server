@@ -44,6 +44,8 @@ import java.util.UUID;
 public class PlayQueueService {
     /** Audiobook chapters record progress from here on; see updatePlayQueueItemWithProgress. */
     private static final long CHAPTER_PROGRESS_THRESHOLD_MS = 5000;
+    /** How much of a track has to be heard before it counts as a play. */
+    private static final long TRACK_PLAY_THRESHOLD_MS = 30000;
     private static final String FIELD_NUMBER = "number";
 
     private final PlayQueueRepository playQueueRepository;
@@ -685,7 +687,28 @@ public class PlayQueueService {
                     updatePodcastEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
                 }
             }
+            // Tracks have their own, shorter threshold (many are barely longer than a minute):
+            // a play counts once 30 seconds — or half of a short track — has been heard.
+            if (type == MediaType.TRACK) {
+                updateTrackWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
+            }
         });
+    }
+
+    private void updateTrackWatchStatus(long progressInMilliseconds, UUID playQueueItemId, Authentication authentication, PlayQueueItemEntity playQueueItemEntity) {
+        trackRepository.findById(playQueueItemEntity.getTrackEntityId()).ifPresent(trackEntity -> {
+            if (progressInMilliseconds > trackPlayThreshold(trackEntity)) {
+                WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreateForTrack(authentication, playQueueItemId, trackEntity);
+                updateWatchStatus(progressInMilliseconds, watchStatusEntity, trackEntity.getMediaFileEntities());
+            }
+        });
+    }
+
+    /** Half the track when it is shorter than a minute, {@value #TRACK_PLAY_THRESHOLD_MS} ms otherwise. */
+    private long trackPlayThreshold(TrackEntity trackEntity) {
+        return trackEntity.getMediaFileEntities().stream().findFirst()
+                .map(file -> Math.min(TRACK_PLAY_THRESHOLD_MS, file.getDurationInMilliseconds() / 2))
+                .orElse(TRACK_PLAY_THRESHOLD_MS);
     }
 
     private void updateEpisodeWatchStatus(long progressInMilliseconds, UUID playQueueItemId, Authentication authentication, PlayQueueItemEntity playQueueItemEntity) {

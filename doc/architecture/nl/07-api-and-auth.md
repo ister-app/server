@@ -44,6 +44,13 @@ Drie kleine API-oppervlakken die de hoofdstukken hierboven slechts terloops rake
   EPISODE / ALBUM / TRACK / BOOK / PODCAST. De waarde wordt per gebruiker teruggelezen via een
   `rating`-veld op het bijbehorende type (bijv. `Movie.rating`), null als er geen rating is.
   `RatingController`.
+- **Track-afspeelstatistieken** — `Track.playCount` en `Track.lastPlayedAt` (ISO-8601) tonen de
+  plays van de aanroepende gebruiker, afgeleid van track-watch-status-rijen
+  ([hoofdstuk 5](05-continue-watching-and-status.md)); beide null als de track nooit is
+  afgespeeld. Toplijsten per artiest staan op `Person`: `topPlayedTracks`,
+  `recentlyPlayedTracks` en `topRatedTracks` (allemaal per aanroepende gebruiker, `limit`
+  begrensd op 1–50, standaard 10, library-gescoped zoals elke andere resolver).
+  `PersonController` / `TrackController`.
 - **Playback-instellingen** — `userSettings` / `updateUserSettings` bevatten per gebruiker
   `preferredAudioLanguages`, `preferredSubtitleLanguages`, `directPlay`, `transcode` en
   `maxVideoHeight`. Ze gelden voor elke client van die gebruiker **en sturen pre-transcoding**:

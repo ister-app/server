@@ -11,7 +11,7 @@ import lombok.experimental.SuperBuilder;
 import java.util.UUID;
 
 @Entity
-@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"playQueueItemId", "userEntityId", "movieEntityId", "episodeEntityId", "chapterEntityId", "bookEntityId", "podcastEpisodeEntityId"}))
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"playQueueItemId", "userEntityId", "movieEntityId", "episodeEntityId", "chapterEntityId", "bookEntityId", "podcastEpisodeEntityId", "trackEntityId"}))
 @Getter
 @Setter
 @SuperBuilder
@@ -55,6 +55,14 @@ public class WatchStatusEntity extends BaseEntity {
     @Getter(onMethod = @__(@JsonBackReference))
     @ManyToOne(optional = true)
     private PodcastEpisodeEntity podcastEpisodeEntity;
+
+    /**
+     * Set for music track plays. One row per played play-queue item, so a user's play count
+     * for a track is the number of rows and {@code dateUpdated} is when it was last played.
+     */
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne(optional = true)
+    private TrackEntity trackEntity;
 
     @Column(nullable = false)
     private boolean watched;

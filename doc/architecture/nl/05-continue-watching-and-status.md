@@ -36,6 +36,19 @@ Zie het [continue-watching-flow-diagram](../diagrams/continue-watching-flow.md).
 - `PreTranscodeService` leest dezelfde tabel — de entries *zijn* de "wat gaan ze hierna spelen"-set
   ([hoofdstuk 4](04-transcoding.md)) — in plaats van zelf de kijkgeschiedenis af te lopen.
 
+## Track-plays
+
+Muziektracks hergebruiken de watch-status-machinerie als **afspeelhistorie** in plaats van
+hervat-positie (migratie V29 voegt `track_entity_id` toe aan `watch_status_entity`). De
+playback-heartbeat (`PlayQueueService`) schrijft één rij per afgespeeld play-queue-item zodra 30
+seconden — of de helft van een track korter dan een minuut — is beluisterd; herhaalde heartbeats
+van hetzelfde item komen via `WatchStatusService.getOrCreateForTrack` op dezelfde rij uit, dus een
+play telt nooit dubbel, terwijl de track opnieuw afspelen (een nieuw queue-item) een nieuwe rij
+oplevert. De play count van een gebruiker voor een track is simpelweg het aantal rijen
+(`WatchStatusRepository.findTrackPlayStats`), en `date_updated` van de rij is meteen "laatst
+afgespeeld". Track-rijen bereiken continue watching nooit: de type-dispatch van
+`onWatchStatusChanged` en de rebuild-queries matchen alleen de andere mediatypes.
+
 ## Live status (`core/.../status/`)
 
 Los van de werkqueues publiceert elke node zijn toestand naar een **fanout-exchange**

@@ -36,6 +36,8 @@ public interface WatchStatusRepository extends JpaRepository<WatchStatusEntity, 
 
     Optional<WatchStatusEntity> findByUserEntityAndPlayQueueItemIdAndPodcastEpisodeEntity(UserEntity userEntity, UUID playQueueItemId, app.ister.core.entity.PodcastEpisodeEntity podcastEpisodeEntity);
 
+    Optional<WatchStatusEntity> findByUserEntityAndPlayQueueItemIdAndTrackEntity(UserEntity userEntity, UUID playQueueItemId, app.ister.core.entity.TrackEntity trackEntity);
+
     List<WatchStatusEntity> findByUserEntityExternalIdAndPodcastEpisodeEntityIn(String userEntityExternalId, java.util.Collection<app.ister.core.entity.PodcastEpisodeEntity> podcastEpisodeEntities, Sort sort);
 
     List<WatchStatusEntity> findByUserEntityExternalIdAndChapterEntityIn(String userEntityExternalId, java.util.Collection<ChapterEntity> chapterEntities, Sort sort);
@@ -49,6 +51,28 @@ public interface WatchStatusRepository extends JpaRepository<WatchStatusEntity, 
 
     /** True when someone is mid-episode: started (progress > 0) but not finished. */
     boolean existsByPodcastEpisodeEntityIdAndWatchedFalseAndProgressInMillisecondsGreaterThan(UUID podcastEpisodeId, long progressInMilliseconds);
+
+    /** Per-track play statistics of one user: number of plays and when it was last played. */
+    interface TrackPlayStats {
+
+        UUID getTrackId();
+
+        long getPlays();
+
+        Instant getLastPlayedAt();
+    }
+
+    /** Play statistics for a batch of tracks (GraphQL {@code Track.playCount}/{@code lastPlayedAt}). */
+    @Query(value = """
+            SELECT wse.track_entity_id AS "trackId",
+              COUNT(*) AS "plays",
+              MAX(wse.date_updated) AS "lastPlayedAt"
+            FROM watch_status_entity wse
+            JOIN user_entity u ON u.id = wse.user_entity_id
+            WHERE u.external_id = :externalId AND wse.track_entity_id IN (:trackIds)
+            GROUP BY wse.track_entity_id
+            """, nativeQuery = true)
+    List<TrackPlayStats> findTrackPlayStats(@Param("externalId") String externalId, @Param("trackIds") java.util.Collection<UUID> trackIds);
 
     /**
      * The latest watch status of one container, as needed to rebuild a continue-watching entry:

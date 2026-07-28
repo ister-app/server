@@ -499,6 +499,78 @@ class PostgresRepositoryIntegrationTest {
     }
 
     @Test
+    void trackPlayStatsCountOneRowPerPlayedQueueItem() {
+        UserEntity user = em.persist(UserEntity.builder().externalId("listener-1").build());
+        UserEntity other = em.persist(UserEntity.builder().externalId("listener-2").build());
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music-stats").build());
+        PersonEntity artist = em.persist(PersonEntity.builder().name("Artist-stats").build());
+        AlbumEntity album = em.persist(AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Album").releaseYear(2020).build());
+        TrackEntity trackA = em.persist(TrackEntity.builder().albumEntity(album).personEntity(artist).number(1).discNumber(1).build());
+        TrackEntity trackB = em.persist(TrackEntity.builder().albumEntity(album).personEntity(artist).number(2).discNumber(1).build());
+        // Two plays of A (two queue items), one of B, and someone else's play that must not count.
+        em.persist(trackPlay(user, trackA));
+        em.persist(trackPlay(user, trackA));
+        em.persist(trackPlay(user, trackB));
+        em.persist(trackPlay(other, trackA));
+        em.flush();
+
+        var stats = watchStatusRepository.findTrackPlayStats("listener-1", List.of(trackA.getId(), trackB.getId()));
+
+        assertEquals(2, stats.size());
+        var byId = stats.stream().collect(java.util.stream.Collectors.toMap(
+                WatchStatusRepository.TrackPlayStats::getTrackId, s -> s));
+        assertEquals(2, byId.get(trackA.getId()).getPlays());
+        assertEquals(1, byId.get(trackB.getId()).getPlays());
+        assertNotNull(byId.get(trackA.getId()).getLastPlayedAt());
+    }
+
+    @Test
+    void topTrackQueriesRankByPlaysRecencyAndRating() {
+        UserEntity user = em.persist(UserEntity.builder().externalId("listener-top").build());
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music-top").build());
+        LibraryEntity hidden = em.persist(LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music-hidden").build());
+        PersonEntity artist = em.persist(PersonEntity.builder().name("Artist-top").build());
+        PersonEntity albumArtist = em.persist(PersonEntity.builder().name("Album-artist").build());
+        AlbumEntity album = em.persist(AlbumEntity.builder().libraryEntity(library).personEntity(albumArtist).name("Album").releaseYear(2020).build());
+        AlbumEntity hiddenAlbum = em.persist(AlbumEntity.builder().libraryEntity(hidden).personEntity(artist).name("Hidden").releaseYear(2020).build());
+        // The album artist differs from the track artist: both must see these tracks.
+        TrackEntity trackA = em.persist(TrackEntity.builder().albumEntity(album).personEntity(artist).number(1).discNumber(1).build());
+        TrackEntity trackB = em.persist(TrackEntity.builder().albumEntity(album).personEntity(artist).number(2).discNumber(1).build());
+        TrackEntity hiddenTrack = em.persist(TrackEntity.builder().albumEntity(hiddenAlbum).personEntity(artist).number(1).discNumber(1).build());
+        em.persist(trackPlay(user, trackA));
+        em.persistAndFlush(trackPlay(user, trackA));
+        // Later plays, but fewer: recency ranks them first, play count ranks them behind A.
+        em.persistAndFlush(trackPlay(user, trackB));
+        em.persistAndFlush(trackPlay(user, hiddenTrack));
+        em.persist(app.ister.core.entity.RatingEntity.builder().userEntity(user).trackEntity(trackA).value(6).build());
+        em.persist(app.ister.core.entity.RatingEntity.builder().userEntity(user).trackEntity(trackB).value(9).build());
+        em.flush();
+
+        assertEquals(List.of(trackA.getId(), hiddenTrack.getId(), trackB.getId()),
+                trackRepository.findTopPlayedTrackIdsForPerson(artist.getId(), "listener-top", 10));
+        assertEquals(List.of(trackA.getId(), trackB.getId()),
+                trackRepository.findTopPlayedTrackIdsForPersonInLibraries(artist.getId(), "listener-top", List.of(library.getId()), 10));
+        assertEquals(List.of(hiddenTrack.getId(), trackB.getId(), trackA.getId()),
+                trackRepository.findRecentlyPlayedTrackIdsForPerson(artist.getId(), "listener-top", 10));
+        assertEquals(List.of(trackB.getId(), trackA.getId()),
+                trackRepository.findTopRatedTrackIdsForPerson(artist.getId(), "listener-top", 10));
+        // Album-artist match: the album's artist sees the album's tracks too.
+        assertEquals(List.of(trackA.getId(), trackB.getId()),
+                trackRepository.findTopPlayedTrackIdsForPersonInLibraries(albumArtist.getId(), "listener-top", List.of(library.getId()), 10));
+        assertEquals(2, trackRepository.findTopPlayedTrackIdsForPerson(artist.getId(), "listener-top", 2).size(),
+                "limit is applied");
+    }
+
+    private static WatchStatusEntity trackPlay(UserEntity user, TrackEntity track) {
+        return WatchStatusEntity.builder()
+                .playQueueItemId(UUID.randomUUID())
+                .userEntity(user)
+                .trackEntity(track)
+                .watched(true)
+                .build();
+    }
+
+    @Test
     void ratingCanBeStoredAndReadBackPerUserAndItem() {
         UserEntity user = em.persist(UserEntity.builder().externalId("rater-1").build());
         LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.MOVIE).name("Movies-rating").build());

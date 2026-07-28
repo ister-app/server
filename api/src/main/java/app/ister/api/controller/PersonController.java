@@ -6,6 +6,7 @@ import app.ister.core.entity.CreditEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.MetadataEntity;
+import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.repository.BookRepository;
@@ -13,6 +14,7 @@ import app.ister.core.repository.CreditRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
+import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,8 +31,10 @@ import org.springframework.stereotype.Controller;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -42,6 +46,7 @@ public class PersonController {
     private final LibraryRepository libraryRepository;
     private final CreditRepository creditRepository;
     private final BookRepository bookRepository;
+    private final TrackRepository trackRepository;
     private final LibraryAccessService libraryAccessService;
 
     @PreAuthorize("hasRole('user')")
@@ -110,6 +115,47 @@ public class PersonController {
                         ? List.<CreditEntity>of()
                         : creditRepository.findByPersonEntityIdInLibraries(personEntity.getId(), allowed))
                 .orElseGet(() -> creditRepository.findByPersonEntityId(personEntity.getId(), Sort.by("castOrder")));
+    }
+
+    @SchemaMapping(typeName = "Person", field = "topPlayedTracks")
+    public List<TrackEntity> topPlayedTracks(PersonEntity personEntity, @Argument Optional<Integer> limit, Authentication authentication) {
+        int max = clampLimit(limit);
+        return tracksInOrder(libraryAccessService.allowedLibraryIds(authentication)
+                .map(allowed -> allowed.isEmpty()
+                        ? List.<UUID>of()
+                        : trackRepository.findTopPlayedTrackIdsForPersonInLibraries(personEntity.getId(), authentication.getName(), allowed, max))
+                .orElseGet(() -> trackRepository.findTopPlayedTrackIdsForPerson(personEntity.getId(), authentication.getName(), max)));
+    }
+
+    @SchemaMapping(typeName = "Person", field = "recentlyPlayedTracks")
+    public List<TrackEntity> recentlyPlayedTracks(PersonEntity personEntity, @Argument Optional<Integer> limit, Authentication authentication) {
+        int max = clampLimit(limit);
+        return tracksInOrder(libraryAccessService.allowedLibraryIds(authentication)
+                .map(allowed -> allowed.isEmpty()
+                        ? List.<UUID>of()
+                        : trackRepository.findRecentlyPlayedTrackIdsForPersonInLibraries(personEntity.getId(), authentication.getName(), allowed, max))
+                .orElseGet(() -> trackRepository.findRecentlyPlayedTrackIdsForPerson(personEntity.getId(), authentication.getName(), max)));
+    }
+
+    @SchemaMapping(typeName = "Person", field = "topRatedTracks")
+    public List<TrackEntity> topRatedTracks(PersonEntity personEntity, @Argument Optional<Integer> limit, Authentication authentication) {
+        int max = clampLimit(limit);
+        return tracksInOrder(libraryAccessService.allowedLibraryIds(authentication)
+                .map(allowed -> allowed.isEmpty()
+                        ? List.<UUID>of()
+                        : trackRepository.findTopRatedTrackIdsForPersonInLibraries(personEntity.getId(), authentication.getName(), allowed, max))
+                .orElseGet(() -> trackRepository.findTopRatedTrackIdsForPerson(personEntity.getId(), authentication.getName(), max)));
+    }
+
+    private static int clampLimit(Optional<Integer> limit) {
+        return Math.clamp(limit.orElse(10), 1, 50);
+    }
+
+    /** Loads the tracks of the ranked id list, preserving the list's order. */
+    private List<TrackEntity> tracksInOrder(List<UUID> ids) {
+        Map<UUID, TrackEntity> byId = trackRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(TrackEntity::getId, Function.identity()));
+        return ids.stream().map(byId::get).filter(Objects::nonNull).toList();
     }
 
     @BatchMapping(typeName = "Person", field = "images")

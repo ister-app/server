@@ -5,6 +5,7 @@ import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PodcastEpisodeEntity;
+import app.ister.core.entity.TrackEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.repository.WatchStatusRepository;
@@ -67,6 +68,21 @@ public class WatchStatusService {
                         .userEntity(userEntity)
                         .playQueueItemId(playQueueItemId)
                         .podcastEpisodeEntity(podcastEpisodeEntity)
+                        .watched(false).build()));
+    }
+
+    /**
+     * A music track play. Scoped to the play queue item: replaying a track (a new queue item)
+     * creates a new row, so a user's play count for a track is their number of rows.
+     */
+    @SuppressWarnings("java:S3252")
+    public WatchStatusEntity getOrCreateForTrack(Authentication authentication, UUID playQueueItemId, TrackEntity trackEntity) {
+        UserEntity userEntity = userService.getOrCreateUser(authentication);
+        return watchStatusRepository.findByUserEntityAndPlayQueueItemIdAndTrackEntity(userEntity, playQueueItemId, trackEntity)
+                .orElseGet(() -> watchStatusRepository.save(WatchStatusEntity.builder()
+                        .userEntity(userEntity)
+                        .playQueueItemId(playQueueItemId)
+                        .trackEntity(trackEntity)
                         .watched(false).build()));
     }
 
