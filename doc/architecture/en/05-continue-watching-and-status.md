@@ -1,3 +1,7 @@
+---
+description: How Ister precomputes the continue-watching list, counts track plays, and fans out live server and playback status with owner-controlled session sharing.
+---
+
 # Continue watching and live status
 
 Two independent mechanisms with one thing in common: neither is derived on read. The

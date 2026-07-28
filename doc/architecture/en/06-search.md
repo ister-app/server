@@ -1,3 +1,7 @@
+---
+description: "How Ister's optional Typesense search module indexes media: runtime toggling, index update events, alias-swapped reindexing and the multilingual schema."
+---
+
 # Search (Typesense)
 
 Full-text search is an optional module (`search/`, package `app.ister.search`) backed by Typesense.

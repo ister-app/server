@@ -1,3 +1,7 @@
+---
+description: Kennismaking met Ister, een zelfgehoste mediaserver voor films, series, muziek, boeken, strips en podcasts, inclusief de benodigde services en deploymentvormen.
+---
+
 # Inleiding
 
 Ister is een zelfgehoste mediaserver in de geest van Plex en Jellyfin. Je wijst hem naar je media

@@ -1,3 +1,7 @@
+---
+description: "Run Ister as a multi-node self-hosted media server cluster: shared database and broker, directory-scoped work routing and dedicated transcoder nodes."
+---
+
 # Multi-node
 
 One Ister deployment can span several servers ("nodes"). Typical reasons: media spread over

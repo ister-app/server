@@ -1,3 +1,7 @@
+---
+description: Complete configuration reference for the Ister media server, covering database, OIDC, TMDB metadata, Typesense search, transcoding and cache settings.
+---
+
 # Configuration
 
 Everything is a Spring property and every property is overridable via environment variables

@@ -1,3 +1,7 @@
+---
+description: Hoe Ister de continue-watching-lijst voorberekent, track-plays telt en live server- en playbackstatus verspreidt met door de eigenaar beheerd sessie-delen.
+---
+
 # Continue watching en live status
 
 Twee onafhankelijke mechanismen met één ding gemeen: geen van beide wordt bij het lezen afgeleid.

@@ -1,3 +1,7 @@
+---
+description: Hoe Ister medialibraries scant en analyseert, van startup-bootstrap en routering per bestandstype tot heranalyse per item en de BlurHash-sweep.
+---
+
 # Scannen en analyseren
 
 Twee losse flows vullen de database: **scannen** registreert wat er op disk staat, **analyseren**

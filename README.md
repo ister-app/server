@@ -5,6 +5,9 @@ It scans media libraries (movies, TV shows and music), fetches metadata from TMD
 and streams HLS-transcoded media to clients over REST and GraphQL. Multiple nodes can form a
 cluster: one node can transcode media that lives on another node's disks.
 
+Published documentation: administration at [ister.app/server](https://ister.app/server),
+architecture at [ister.app/development](https://ister.app/development).
+
 ## Architecture at a glance
 
 Gradle multi-module project; all significant work flows through RabbitMQ events

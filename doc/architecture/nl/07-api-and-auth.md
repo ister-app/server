@@ -1,3 +1,7 @@
+---
+description: Het REST- en GraphQL-API-oppervlak van Ister met websocket-subscriptions, plus OIDC-JWT-authenticatie, stream-tokens en epub-leesendpoints.
+---
+
 # API en auth
 
 ## REST-oppervlak

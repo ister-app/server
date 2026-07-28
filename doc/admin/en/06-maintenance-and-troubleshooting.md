@@ -1,3 +1,7 @@
+---
+description: "Maintenance guide for the Ister media server: scheduled cleanup jobs, PostgreSQL backup, monitoring via Actuator and the dead-letter queue, and common fixes."
+---
+
 # Maintenance and troubleshooting
 
 Ister is designed to look after itself: caches are swept, the continue-watching list self-heals,

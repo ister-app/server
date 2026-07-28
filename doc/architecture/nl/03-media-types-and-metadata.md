@@ -1,3 +1,7 @@
+---
+description: "Metadatapijplijnen per mediatype in Ister: TMDB voor films en series, MusicBrainz voor muziek, Open Library en Wikidata voor boeken, plus strips en podcasts."
+---
+
 # Mediatypes en metadata
 
 Elk mediatype volgt hetzelfde patroon: de scanner registreert entities op basis van het pad,

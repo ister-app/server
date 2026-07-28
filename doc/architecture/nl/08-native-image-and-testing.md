@@ -1,3 +1,7 @@
+---
+description: "Waarom Ister als GraalVM native image wordt geleverd en wat dat vraagt: reflectie-hints, runtime-toggles, Flyway-discipline, Testcontainers-tests en CI."
+---
+
 # Native image en testen
 
 ## GraalVM native image is het productie-artefact

@@ -1,3 +1,7 @@
+---
+description: "Hoe de optionele Typesense-zoekmodule van Ister indexeert: runtime-toggle, index-updates via events, reindexen met alias-swap en het meertalige schema."
+---
+
 # Zoeken (Typesense)
 
 Full-text search is een optionele module (`search/`, package `app.ister.search`), gedreven door

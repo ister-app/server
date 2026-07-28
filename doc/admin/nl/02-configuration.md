@@ -1,3 +1,7 @@
+---
+description: Volledige configuratiereferentie voor de Ister-mediaserver, van database en OIDC tot TMDB-metadata, Typesense-zoeken, transcoding en cache-instellingen.
+---
+
 # Configuratie
 
 Alles is een Spring-property en elke property is te overschrijven via omgevingsvariabelen

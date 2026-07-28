@@ -1,3 +1,7 @@
+---
+description: Full naming reference for Ister media libraries, with the exact directory and filename patterns for shows, movies, music, books and comics.
+---
+
 # Naming conventions per library type
 
 The scanner derives everything from paths and filenames, so getting the names right is what makes

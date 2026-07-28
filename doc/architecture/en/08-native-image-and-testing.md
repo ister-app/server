@@ -1,3 +1,7 @@
+---
+description: "Why Ister ships as a GraalVM native image and what that demands: reflection hints, runtime toggles, Flyway discipline, Testcontainers tests and CI."
+---
+
 # Native image and testing
 
 ## GraalVM native image is the production artifact

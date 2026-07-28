@@ -1,3 +1,7 @@
+---
+description: How to define Ister libraries and directories and lay out movies, shows, music, books, comics and podcasts on disk so the scanner recognises them.
+---
+
 # Libraries and media layout
 
 A **library** is a named collection of one type (`MOVIE`, `SHOW`, `MUSIC`, `BOOK`, `COMIC` or

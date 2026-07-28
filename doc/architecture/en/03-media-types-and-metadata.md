@@ -1,3 +1,7 @@
+---
+description: "Ister's per-type metadata pipelines: TMDB for movies and shows, MusicBrainz for music, Open Library and Wikidata for books, plus comics, podcasts and NFO files."
+---
+
 # Media types and metadata
 
 Every media type follows the same pattern: the scanner registers entities from the path, `*_FOUND`

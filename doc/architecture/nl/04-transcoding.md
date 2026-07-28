@@ -1,3 +1,7 @@
+---
+description: "Hoe HLS-transcoding met FFmpeg in Ister werkt: lazy segmenten, één continue pass per kwaliteit, pre-transcoding op de achtergrond en multi-node-uploads."
+---
+
 # Transcoding
 
 Streaming is HLS, geproduceerd door FFmpeg (via Jaffree) in de transcoder-module. `HlsService` +

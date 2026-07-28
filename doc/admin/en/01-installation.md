@@ -1,3 +1,7 @@
+---
+description: Install the Ister self-hosted media server with Docker Compose or Kubernetes, from container images and Flyway migrations to first start and health endpoints.
+---
+
 # Installation
 
 This chapter takes you from nothing to a running server. All examples use the container images;

@@ -1,3 +1,7 @@
+---
+description: Zo definieer je libraries en directories in Ister en zet je films, series, muziek, boeken, strips en podcasts op schijf zodat de scanner ze herkent.
+---
+
 # Libraries en media-indeling
 
 Een **library** is een benoemde verzameling van één type (`MOVIE`, `SHOW`, `MUSIC`, `BOOK`,

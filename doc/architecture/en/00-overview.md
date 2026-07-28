@@ -1,3 +1,7 @@
+---
+description: Architecture overview of Ister, a Spring Boot self-hosted media server, covering its modules, RabbitMQ event flow, PostgreSQL, transcoding and Typesense search.
+---
+
 # Architecture overview
 
 Ister Server is a self-hosted media server (in the vein of Plex/Jellyfin) built with Spring Boot 4

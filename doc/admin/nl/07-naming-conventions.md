@@ -1,3 +1,7 @@
+---
+description: Volledige naamgevingsreferentie voor Ister-libraries, met de exacte map- en bestandsnaampatronen voor series, films, muziek, boeken en strips.
+---
+
 # Naamconventies per librarytype
 
 De scanner leidt alles af uit paden en bestandsnamen; de juiste namen zijn dus wat een library

@@ -1,3 +1,7 @@
+---
+description: Ister's REST and GraphQL API surface with websocket subscriptions, plus OIDC JWT authentication, stream tokens and epub reading endpoints.
+---
+
 # API and auth
 
 ## REST surface

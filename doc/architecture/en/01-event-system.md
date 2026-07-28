@@ -1,3 +1,7 @@
+---
+description: "How Ister's RabbitMQ event system works: the Handle contract, EventType versus MessageQueue, directory-scoped queues, retries and dead-lettering."
+---
+
 # Event system
 
 Everything significant runs asynchronously through RabbitMQ. A trigger (API call, scheduler, scan)

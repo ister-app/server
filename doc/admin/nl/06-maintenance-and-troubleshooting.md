@@ -1,3 +1,7 @@
+---
+description: "Onderhoudsgids voor de Ister-mediaserver: geplande opschoontaken, back-ups van PostgreSQL, monitoring en de gebruikelijke problemen met hun oplossingen."
+---
+
 # Onderhoud en probleemoplossing
 
 Ister is ontworpen om voor zichzelf te zorgen: caches worden opgeschoond, de

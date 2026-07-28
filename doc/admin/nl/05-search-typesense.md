@@ -1,3 +1,7 @@
+---
+description: Optioneel full-text zoeken met Typesense in Ister inschakelen en onderhouden, van configuratie en de eerste reindex tot talen toevoegen en problemen oplossen.
+---
+
 # Zoeken (Typesense)
 
 Full-text zoeken door alle libraries is optioneel en draait op

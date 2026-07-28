@@ -1,3 +1,7 @@
+---
+description: "How Ister's FFmpeg-based HLS transcoding works: lazy segments, one continuous pass per quality, background pre-transcoding and multi-node segment uploads."
+---
+
 # Transcoding
 
 Streaming is HLS, produced by FFmpeg (via Jaffree) in the transcoder module. `HlsService` +

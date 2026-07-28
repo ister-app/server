@@ -1,3 +1,7 @@
+---
+description: Installeer de zelfgehoste mediaserver Ister met Docker Compose of Kubernetes, van containerimages en Flyway-migraties tot eerste start en health-endpoints.
+---
+
 # Installatie
 
 Dit hoofdstuk brengt je van niets naar een draaiende server. Alle voorbeelden gebruiken de

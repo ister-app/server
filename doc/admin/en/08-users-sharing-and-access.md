@@ -1,3 +1,7 @@
+---
+description: "How Ister handles users and access: OIDC-based admin roles, per-library visibility for restricted libraries, and owner-controlled playback-session sharing."
+---
+
 # Users, sharing, and access
 
 Ister does not own its user accounts — the OIDC provider does ([Introduction](00-introduction.md)).

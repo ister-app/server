@@ -1,3 +1,7 @@
+---
+description: Architectuuroverzicht van Ister, een zelfgehoste mediaserver op Spring Boot, met de modules, RabbitMQ-eventflow, PostgreSQL, transcoding en Typesense-zoeken.
+---
+
 # Architectuuroverzicht
 
 Ister Server is een zelf-gehoste mediaserver (in de geest van Plex/Jellyfin), gebouwd met Spring

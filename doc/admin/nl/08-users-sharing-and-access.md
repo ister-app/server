@@ -1,3 +1,7 @@
+---
+description: "Hoe Ister gebruikers en toegang regelt: adminrollen via OIDC, zichtbaarheid per library voor beperkte libraries en het delen van playback-sessies."
+---
+
 # Gebruikers, delen en toegang
 
 Ister beheert zijn gebruikersaccounts niet zelf — dat doet de OIDC-provider ([Inleiding](00-introduction.md)).

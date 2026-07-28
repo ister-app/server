@@ -1,3 +1,7 @@
+---
+description: How Ister scans media libraries and analyzes them for metadata, from startup bootstrap and file-type routing to per-item reanalysis and the BlurHash sweep.
+---
+
 # Scanning and analysis
 
 Two distinct flows populate the database: **scanning** registers what is on disk, **analyzing**

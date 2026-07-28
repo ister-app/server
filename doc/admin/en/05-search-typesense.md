@@ -1,3 +1,7 @@
+---
+description: Enable and maintain optional Typesense full-text search in Ister, from configuration and the initial reindex to adding languages and troubleshooting.
+---
+
 # Search (Typesense)
 
 Full-text search across all libraries is optional and backed by

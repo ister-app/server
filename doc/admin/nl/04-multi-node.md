@@ -1,3 +1,7 @@
+---
+description: "Draai Ister als zelfgehoste mediaserver op meerdere nodes: gedeelde database en broker, werkrouting per directory en dedicated transcoder-nodes."
+---
+
 # Multi-node
 
 Eén Ister-deployment kan meerdere servers ("nodes") beslaan. Typische redenen: media verspreid

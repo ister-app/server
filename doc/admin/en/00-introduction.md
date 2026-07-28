@@ -1,3 +1,7 @@
+---
+description: Introduction to Ister, a self-hosted media server for movies, shows, music, books, comics and podcasts, covering its services and deployment shapes.
+---
+
 # Introduction
 
 Ister is a self-hosted media server in the spirit of Plex and Jellyfin. You point it at your media
