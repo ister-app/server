@@ -1,8 +1,13 @@
 package app.ister.core.service;
 
+import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.MovieEntity;
+import app.ister.core.entity.PodcastEntity;
+import app.ister.core.entity.ShowEntity;
 import app.ister.core.enums.PlayQueueSourceType;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.BookRepository;
@@ -50,11 +55,11 @@ public class MediaLibraryResolver {
 
     public Optional<LibraryEntity> ofSource(PlayQueueSourceType sourceType, UUID sourceId) {
         return switch (sourceType) {
-            case MOVIE -> movieRepository.findById(sourceId).map(movie -> movie.getLibraryEntity());
-            case SHOW -> showRepository.findById(sourceId).map(show -> show.getLibraryEntity());
-            case ALBUM -> albumRepository.findById(sourceId).map(album -> album.getLibraryEntity());
-            case BOOK -> bookRepository.findById(sourceId).map(book -> book.getLibraryEntity());
-            case PODCAST -> podcastRepository.findById(sourceId).map(podcast -> podcast.getLibraryEntity());
+            case MOVIE -> movieRepository.findById(sourceId).map(MovieEntity::getLibraryEntity);
+            case SHOW -> showRepository.findById(sourceId).map(ShowEntity::getLibraryEntity);
+            case ALBUM -> albumRepository.findById(sourceId).map(AlbumEntity::getLibraryEntity);
+            case BOOK -> bookRepository.findById(sourceId).map(BookEntity::getLibraryEntity);
+            case PODCAST -> podcastRepository.findById(sourceId).map(PodcastEntity::getLibraryEntity);
             case LIBRARY -> libraryRepository.findById(sourceId);
         };
     }

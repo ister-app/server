@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -175,7 +176,7 @@ class PersonControllerGraphQlTest {
                         """.formatted(person.getId()))
                 .execute()
                 .path("personById.topPlayedTracks").entityList(Object.class).hasSize(0));
-        org.mockito.Mockito.verify(trackRepository)
+        verify(trackRepository)
                 .findTopPlayedTrackIdsForPersonInLibraries(eq(person.getId()), any(), anyCollection(), eq(10));
     }
 

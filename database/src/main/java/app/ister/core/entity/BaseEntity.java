@@ -37,8 +37,9 @@ public class BaseEntity {
     private UUID id;
 
     // instanceof instead of getClass(): a Hibernate proxy must compare equal to its entity.
+    // Not final: a lazy proxy overrides these to delegate to the initialized entity.
     @Override
-    public final boolean equals(Object o) {
+    public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof BaseEntity that)) return false;
         return id != null && id.equals(that.getId());
@@ -47,7 +48,7 @@ public class BaseEntity {
     // Constant per class: the id is only assigned on insert, and a hash that changes
     // mid-lifecycle corrupts hash-based collections.
     @Override
-    public final int hashCode() {
+    public int hashCode() {
         return getClass().hashCode();
     }
 }

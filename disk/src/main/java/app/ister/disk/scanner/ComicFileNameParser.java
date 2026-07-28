@@ -25,8 +25,11 @@ public final class ComicFileNameParser {
      */
     private static final Pattern VOLUME = Pattern.compile("(?i)(?<![a-z])vol(?:ume)?[ ._-]*(\\d+(?:\\.\\d+)?)");
     private static final Pattern ISSUE = Pattern.compile("(?i)(?<![a-z])issue[ ._-]*+(\\d++)|#(\\d++)");
-    /** Trailing digits on the basename ("fairytail 3", "chapter12"). */
-    private static final Pattern TRAILING_DIGITS = Pattern.compile("(\\d++)$");
+    /**
+     * Trailing digits on the basename ("fairytail 3", "chapter12"). The lookbehind restricts
+     * matching to the start of a digit run, keeping find() linear on long digit sequences.
+     */
+    private static final Pattern TRAILING_DIGITS = Pattern.compile("(?<!\\d)(\\d++)$");
     /** A trailing "-N": a filesystem dedupe suffix on a re-downloaded file ("...part2-1"). */
     private static final Pattern DEDUPE_SUFFIX = Pattern.compile("-\\d+$");
 

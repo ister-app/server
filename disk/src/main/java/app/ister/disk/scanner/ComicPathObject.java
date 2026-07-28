@@ -8,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.MatchResult;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -30,7 +29,8 @@ import java.util.regex.Pattern;
 @Slf4j
 public class ComicPathObject {
 
-    private static final String REGEX_YEAR = "^(.*?)\\s*+\\((\\d{4})\\)\\s*+$";
+    /** A trailing "(YYYY)"; the part before the match is the series name. Suffix-anchored (no lazy prefix) so matching stays linear. */
+    private static final Pattern YEAR_SUFFIX = Pattern.compile("\\((\\d{4})\\)\\s*+$");
     private static final List<String> COMIC_EXTENSIONS = List.of("cbz", "pdf", "epub");
     private static final List<String> IMAGE_EXTENSIONS = List.of("jpg", "jpeg", "png");
     private static final List<String> SERIES_IMAGE_NAMES = List.of("cover", "folder", "poster", "background");
@@ -105,16 +105,15 @@ public class ComicPathObject {
     }
 
     private String stripYear(String name) {
-        return regex(name).map(m -> m.group(1).strip()).orElse(name.trim());
+        return regex(name).map(m -> name.substring(0, m.start()).strip()).orElse(name.trim());
     }
 
     private int parseYear(String name) {
-        return regex(name).map(m -> Integer.parseInt(m.group(2))).orElse(0);
+        return regex(name).map(m -> Integer.parseInt(m.group(1))).orElse(0);
     }
 
     private Optional<MatchResult> regex(String input) {
-        Matcher matcher = Pattern.compile(REGEX_YEAR).matcher(input);
-        return matcher.results().findFirst();
+        return YEAR_SUFFIX.matcher(input).results().findFirst();
     }
 
     private static boolean lastSegmentHasExtension(String path) {
