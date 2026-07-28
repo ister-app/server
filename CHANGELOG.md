@@ -1,5 +1,24 @@
 # Changelog
 
+## server v2.3.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.3.0` |
+| `ghcr.io/ister-app/migrations` | `2.3.0` |
+
+### Features
+
+- feat: addPlayQueueAlbum mutation to append a whole album to a play queue ([`9624907`](https://github.com/ister-app/server/commit/9624907))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.3.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.2.2...v2.3.0
+
 ## server v2.2.2
 
 | Image | Tag |
