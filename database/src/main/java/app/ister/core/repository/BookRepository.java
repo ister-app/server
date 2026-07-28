@@ -115,4 +115,39 @@ public interface BookRepository extends JpaRepository<BookEntity, UUID> {
                    or not exists (select m from MetadataEntity m
                                   where m.bookEntity = b and m.sourceUri like 'wikidata://%'))""")
     List<BookEntity> findSeriesBooksMissingWikidataInfo(LibraryType libraryType);
+
+    /**
+     * The calling user's most recently read (or listened) books of a library, newest first. A
+     * book's progress lives on its own watch row (epub reading) and on its chapters' rows
+     * (audiobook listening); both count. UNION ALL instead of an OR-join so each branch can use
+     * its own partial index.
+     */
+    @Query(value = """
+            SELECT b.id FROM book_entity b
+            JOIN (
+                SELECT ws.book_entity_id AS book_id, ws.date_updated
+                FROM watch_status_entity ws
+                JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
+                WHERE ws.book_entity_id IS NOT NULL
+                UNION ALL
+                SELECT c.book_entity_id, ws.date_updated
+                FROM watch_status_entity ws
+                JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
+                JOIN chapter_entity c ON c.id = ws.chapter_entity_id
+            ) reads ON reads.book_id = b.id
+            WHERE b.library_entity_id = :libraryId
+            GROUP BY b.id
+            ORDER BY MAX(reads.date_updated) DESC, b.id
+            LIMIT :limit""", nativeQuery = true)
+    List<UUID> findRecentlyReadBookIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit);
+
+    /** The calling user's highest rated books of a library; the most recently (re)rated wins ties. */
+    @Query(value = """
+            SELECT b.id FROM book_entity b
+            JOIN rating_entity r ON r.book_entity_id = b.id
+            JOIN user_entity u ON u.id = r.user_entity_id AND u.external_id = :externalId
+            WHERE b.library_entity_id = :libraryId
+            ORDER BY r.value DESC, r.date_updated DESC, b.id
+            LIMIT :limit""", nativeQuery = true)
+    List<UUID> findHighestRatedBookIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit);
 }

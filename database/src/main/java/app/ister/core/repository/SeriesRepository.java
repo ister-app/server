@@ -37,6 +37,22 @@ public interface SeriesRepository extends JpaRepository<SeriesEntity, UUID> {
     void deleteByBookEntitiesIsEmpty();
 
     /**
+     * The calling user's most recently read series of a (comic) library, newest first, aggregated
+     * over the reading rows of the series' volumes. Comic volumes are read as books, so only the
+     * book watch rows matter here.
+     */
+    @Query(value = """
+            SELECT ser.id FROM series_entity ser
+            JOIN book_entity b ON b.series_entity_id = ser.id
+            JOIN watch_status_entity ws ON ws.book_entity_id = b.id
+            JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
+            WHERE ser.library_entity_id = :libraryId
+            GROUP BY ser.id
+            ORDER BY MAX(ws.date_updated) DESC, ser.id
+            LIMIT :limit""", nativeQuery = true)
+    List<UUID> findRecentlyReadSeriesIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit);
+
+    /**
      * Race-safe comic series create: parallel ComicFileFound consumers scanning one series
      * directory all try to create the same row, so a find-then-save loses and poisons the whole
      * transaction on the {@code series_entity_comic_identity} unique index. Returns 1 when this

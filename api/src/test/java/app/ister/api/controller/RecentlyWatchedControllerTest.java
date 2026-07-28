@@ -89,7 +89,7 @@ class RecentlyWatchedControllerTest {
         when(continueWatchingService.entriesFor(user.getId()))
                 .thenReturn(List.of(episodeEntry, movieEntry, chapterEntry, bookEntry, podcastEntry));
 
-        List<RecentlyWatched> result = subject.recentlyWatched(authentication);
+        List<RecentlyWatched> result = subject.recentlyWatched(java.util.Optional.empty(), authentication);
 
         assertEquals(List.of(MediaType.EPISODE, MediaType.MOVIE, MediaType.CHAPTER, MediaType.BOOK,
                         MediaType.PODCAST_EPISODE),
@@ -115,7 +115,7 @@ class RecentlyWatchedControllerTest {
         bookEntry.setChapterEntity(chapter);
         when(continueWatchingService.entriesFor(user.getId())).thenReturn(List.of(bookEntry));
 
-        RecentlyWatched result = subject.recentlyWatched(authentication).getFirst();
+        RecentlyWatched result = subject.recentlyWatched(java.util.Optional.empty(), authentication).getFirst();
 
         assertEquals(MediaType.BOOK, result.type());
         assertSame(book, result.book());
@@ -133,7 +133,7 @@ class RecentlyWatchedControllerTest {
         bookEntry.setChapterEntity(chapter);
         when(continueWatchingService.entriesFor(user.getId())).thenReturn(List.of(bookEntry));
 
-        RecentlyWatched result = subject.recentlyWatched(authentication).getFirst();
+        RecentlyWatched result = subject.recentlyWatched(java.util.Optional.empty(), authentication).getFirst();
 
         assertEquals(MediaType.BOOK, result.type());
         assertSame(chapter, result.chapter());
@@ -146,7 +146,30 @@ class RecentlyWatchedControllerTest {
         when(continueWatchingService.entriesFor(user.getId()))
                 .thenReturn(List.of(entry(MediaType.BOOK, minutesAgo(1))));
 
-        assertTrue(subject.recentlyWatched(authentication).isEmpty());
+        assertTrue(subject.recentlyWatched(java.util.Optional.empty(), authentication).isEmpty());
+    }
+
+    /** The Discover view asks for one library's entries; everything else is filtered out. */
+    @Test
+    void libraryIdNarrowsTheListToThatLibrary() {
+        app.ister.core.entity.LibraryEntity libraryA = app.ister.core.entity.LibraryEntity.builder().name("A").build();
+        libraryA.setId(UUID.randomUUID());
+        app.ister.core.entity.LibraryEntity libraryB = app.ister.core.entity.LibraryEntity.builder().name("B").build();
+        libraryB.setId(UUID.randomUUID());
+        MovieEntity movieA = MovieEntity.builder().name("In A").releaseYear(2024).libraryEntity(libraryA).build();
+        movieA.setId(UUID.randomUUID());
+        MovieEntity movieB = MovieEntity.builder().name("In B").releaseYear(2024).libraryEntity(libraryB).build();
+        movieB.setId(UUID.randomUUID());
+        ContinueWatchingEntity entryA = entry(MediaType.MOVIE, minutesAgo(1));
+        entryA.setMovieEntity(movieA);
+        ContinueWatchingEntity entryB = entry(MediaType.MOVIE, minutesAgo(2));
+        entryB.setMovieEntity(movieB);
+        when(continueWatchingService.entriesFor(user.getId())).thenReturn(List.of(entryA, entryB));
+
+        List<RecentlyWatched> result = subject.recentlyWatched(java.util.Optional.of(libraryA.getId()), authentication);
+
+        assertEquals(1, result.size());
+        assertSame(movieA, result.getFirst().movie());
     }
 
     /** The media was deleted after the entry was written; the foreign key nulled the reference out. */
@@ -155,7 +178,7 @@ class RecentlyWatchedControllerTest {
         when(continueWatchingService.entriesFor(user.getId()))
                 .thenReturn(List.of(entry(MediaType.EPISODE, minutesAgo(1))));
 
-        assertTrue(subject.recentlyWatched(authentication).isEmpty());
+        assertTrue(subject.recentlyWatched(java.util.Optional.empty(), authentication).isEmpty());
     }
 
     private ContinueWatchingEntity entry(MediaType type, Instant lastWatched) {

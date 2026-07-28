@@ -2,7 +2,10 @@ type Query {
     getServerInfo: ServerInfo
     "Initial state for the serverActivity/nowPlaying subscriptions: last known cluster-wide status."
     serverActivitySnapshot: ServerActivitySnapshot!
-    recentlyWatched: [RecentlyWatched!]
+    "Continue-watching entries, optionally narrowed to one library."
+    recentlyWatched(libraryId: ID): [RecentlyWatched!]
+    "One library by id; null when it does not exist or the caller may not access it."
+    libraryById(id: ID!): Library
     episodeById(id: ID): Episode
     seasonById(id: ID): Season
     shows(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): ShowPage
@@ -473,6 +476,25 @@ type Library {
     sortingOrder: SortingOrder!
     "Whether every user may see this library. Admins always see everything."
     visibleToAll: Boolean!
+    # Discover top-lists: the calling user's ranked lists, scoped to this library. Empty when the
+    # library holds no matching content (including a library of another type) or the user has no
+    # play history/ratings yet. Only select these under libraryById — under `libraries` they fan
+    # out into one set of aggregate queries per library.
+    recentlyPlayedMovies(limit: Int): [Movie!]!
+    mostPlayedMovies(limit: Int): [Movie!]!
+    highestRatedMovies(limit: Int): [Movie!]!
+    recentlyPlayedShows(limit: Int): [Show!]!
+    mostPlayedShows(limit: Int): [Show!]!
+    highestRatedShows(limit: Int): [Show!]!
+    recentlyPlayedAlbums(limit: Int): [Album!]!
+    mostPlayedAlbums(limit: Int): [Album!]!
+    highestRatedAlbums(limit: Int): [Album!]!
+    recentlyReadBooks(limit: Int): [Book!]!
+    highestRatedBooks(limit: Int): [Book!]!
+    recentlyReadSeries(limit: Int): [Series!]!
+    recentlyPlayedPodcasts(limit: Int): [Podcast!]!
+    mostPlayedPodcasts(limit: Int): [Podcast!]!
+    highestRatedPodcasts(limit: Int): [Podcast!]!
 }
 
 "The calling user, as seen by the server."

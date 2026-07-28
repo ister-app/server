@@ -107,6 +107,15 @@ class PostgresRepositoryIntegrationTest {
     @Autowired
     private CreditRepository creditRepository;
 
+    @Autowired
+    private ShowRepository showRepository;
+
+    @Autowired
+    private AlbumRepository albumRepository;
+
+    @Autowired
+    private PodcastRepository podcastRepository;
+
     /**
      * The blur-hash sweep walks a directory in chunks, resuming from the last id of the previous
      * chunk. Note that PostgreSQL orders {@code uuid} as unsigned bytes while
@@ -559,6 +568,165 @@ class PostgresRepositoryIntegrationTest {
                 trackRepository.findTopPlayedTrackIdsForPersonInLibraries(albumArtist.getId(), "listener-top", List.of(library.getId()), 10));
         assertEquals(2, trackRepository.findTopPlayedTrackIdsForPerson(artist.getId(), "listener-top", 2).size(),
                 "limit is applied");
+    }
+
+    // --- library Discover top-lists ---
+
+    /**
+     * Movie plays only count once watched or past two minutes: a movie's watch row is created
+     * the moment playback starts, and an abandoned start must not surface in Discover.
+     */
+    @Test
+    void discoverMovieQueriesApplyThePlayedThresholdAndRankByPlaysRecencyAndRating() {
+        UserEntity user = em.persist(UserEntity.builder().externalId("viewer-d1").build());
+        UserEntity other = em.persist(UserEntity.builder().externalId("viewer-d2").build());
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.MOVIE).name("Movies-d").build());
+        LibraryEntity otherLibrary = em.persist(LibraryEntity.builder().libraryType(LibraryType.MOVIE).name("Movies-d2").build());
+        MovieEntity twicePlayed = em.persist(MovieEntity.builder().libraryEntity(library).name("Twice").releaseYear(2020).build());
+        MovieEntity oncePlayed = em.persist(MovieEntity.builder().libraryEntity(library).name("Once").releaseYear(2021).build());
+        MovieEntity abandoned = em.persist(MovieEntity.builder().libraryEntity(library).name("Abandoned").releaseYear(2022).build());
+        MovieEntity elsewhere = em.persist(MovieEntity.builder().libraryEntity(otherLibrary).name("Elsewhere").releaseYear(2023).build());
+        em.persist(moviePlay(user, twicePlayed, true, 0));
+        em.persistAndFlush(moviePlay(user, twicePlayed, true, 0));
+        // Later play, but fewer: recency ranks it first, play count ranks it behind.
+        em.persistAndFlush(moviePlay(user, oncePlayed, false, 600_000));
+        em.persist(moviePlay(user, abandoned, false, 30_000));
+        em.persist(moviePlay(user, elsewhere, true, 0));
+        em.persist(moviePlay(other, abandoned, true, 0));
+        em.persist(app.ister.core.entity.RatingEntity.builder().userEntity(user).movieEntity(oncePlayed).value(7).build());
+        em.persist(app.ister.core.entity.RatingEntity.builder().userEntity(user).movieEntity(abandoned).value(9).build());
+        em.flush();
+
+        assertEquals(List.of(oncePlayed.getId(), twicePlayed.getId()),
+                movieRepository.findRecentlyPlayedMovieIdsForLibrary(library.getId(), "viewer-d1", 10),
+                "abandoned start and other library/user must not appear");
+        assertEquals(List.of(twicePlayed.getId(), oncePlayed.getId()),
+                movieRepository.findMostPlayedMovieIdsForLibrary(library.getId(), "viewer-d1", 10));
+        assertEquals(List.of(abandoned.getId(), oncePlayed.getId()),
+                movieRepository.findHighestRatedMovieIdsForLibrary(library.getId(), "viewer-d1", 10),
+                "ratings rank regardless of plays");
+        assertEquals(1, movieRepository.findMostPlayedMovieIdsForLibrary(library.getId(), "viewer-d1", 1).size(),
+                "limit is applied");
+    }
+
+    /** Show lists aggregate episode plays; album lists aggregate track plays. */
+    @Test
+    void discoverShowAndAlbumQueriesAggregateOverEpisodesAndTracks() {
+        UserEntity user = em.persist(UserEntity.builder().externalId("viewer-d3").build());
+        LibraryEntity showLibrary = em.persist(LibraryEntity.builder().libraryType(LibraryType.SHOW).name("Shows-d").build());
+        ShowEntity bingeShow = em.persist(ShowEntity.builder().libraryEntity(showLibrary).name("Binge").releaseYear(2020).build());
+        ShowEntity casualShow = em.persist(ShowEntity.builder().libraryEntity(showLibrary).name("Casual").releaseYear(2021).build());
+        SeasonEntity bingeSeason = em.persist(SeasonEntity.builder().showEntity(bingeShow).number(1).build());
+        SeasonEntity casualSeason = em.persist(SeasonEntity.builder().showEntity(casualShow).number(1).build());
+        EpisodeEntity binge1 = em.persist(EpisodeEntity.builder().showEntity(bingeShow).seasonEntity(bingeSeason).number(1).build());
+        EpisodeEntity binge2 = em.persist(EpisodeEntity.builder().showEntity(bingeShow).seasonEntity(bingeSeason).number(2).build());
+        EpisodeEntity casual1 = em.persist(EpisodeEntity.builder().showEntity(casualShow).seasonEntity(casualSeason).number(1).build());
+        em.persist(watchStatus(user, binge1, null));
+        em.persistAndFlush(watchStatus(user, binge2, null));
+        em.persistAndFlush(watchStatus(user, casual1, null));
+        em.persist(app.ister.core.entity.RatingEntity.builder().userEntity(user).showEntity(casualShow).value(8).build());
+
+        LibraryEntity musicLibrary = em.persist(LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music-d").build());
+        PersonEntity artist = em.persist(PersonEntity.builder().name("Artist-d").build());
+        AlbumEntity heavyAlbum = em.persist(AlbumEntity.builder().libraryEntity(musicLibrary).personEntity(artist).name("Heavy").releaseYear(2020).build());
+        AlbumEntity lightAlbum = em.persist(AlbumEntity.builder().libraryEntity(musicLibrary).personEntity(artist).name("Light").releaseYear(2021).build());
+        TrackEntity heavyTrack = em.persist(TrackEntity.builder().albumEntity(heavyAlbum).personEntity(artist).number(1).discNumber(1).build());
+        TrackEntity lightTrack = em.persist(TrackEntity.builder().albumEntity(lightAlbum).personEntity(artist).number(1).discNumber(1).build());
+        em.persist(trackPlay(user, heavyTrack));
+        em.persistAndFlush(trackPlay(user, heavyTrack));
+        em.persistAndFlush(trackPlay(user, lightTrack));
+        em.flush();
+
+        assertEquals(List.of(casualShow.getId(), bingeShow.getId()),
+                showRepository.findRecentlyPlayedShowIdsForLibrary(showLibrary.getId(), "viewer-d3", 10));
+        assertEquals(List.of(bingeShow.getId(), casualShow.getId()),
+                showRepository.findMostPlayedShowIdsForLibrary(showLibrary.getId(), "viewer-d3", 10),
+                "two episode plays outrank one");
+        assertEquals(List.of(casualShow.getId()),
+                showRepository.findHighestRatedShowIdsForLibrary(showLibrary.getId(), "viewer-d3", 10));
+        assertEquals(List.of(lightAlbum.getId(), heavyAlbum.getId()),
+                albumRepository.findRecentlyPlayedAlbumIdsForLibrary(musicLibrary.getId(), "viewer-d3", 10));
+        assertEquals(List.of(heavyAlbum.getId(), lightAlbum.getId()),
+                albumRepository.findMostPlayedAlbumIdsForLibrary(musicLibrary.getId(), "viewer-d3", 10));
+    }
+
+    /**
+     * A book's reading progress lives on its own watch row (epub) and on its chapters' rows
+     * (audiobook); both must surface the book. Comic series aggregate their volumes' reading rows.
+     */
+    @Test
+    void discoverBookAndSeriesQueriesCoverReadingAndListeningRows() {
+        UserEntity user = em.persist(UserEntity.builder().externalId("reader-d1").build());
+        LibraryEntity bookLibrary = em.persist(LibraryEntity.builder().libraryType(LibraryType.BOOK).name("Books-d").build());
+        app.ister.core.entity.BookEntity epub = em.persist(app.ister.core.entity.BookEntity.builder()
+                .libraryEntity(bookLibrary).name("Epub").build());
+        app.ister.core.entity.BookEntity audiobook = em.persist(app.ister.core.entity.BookEntity.builder()
+                .libraryEntity(bookLibrary).name("Audio").build());
+        app.ister.core.entity.ChapterEntity chapter = em.persist(app.ister.core.entity.ChapterEntity.builder()
+                .bookEntity(audiobook).number(1).build());
+        em.persistAndFlush(WatchStatusEntity.builder()
+                .playQueueItemId(epub.getId()).userEntity(user).bookEntity(epub)
+                .readingProgress(0.4).build());
+        em.persistAndFlush(WatchStatusEntity.builder()
+                .playQueueItemId(chapter.getId()).userEntity(user).chapterEntity(chapter)
+                .progressInMilliseconds(90_000).build());
+
+        LibraryEntity comicLibrary = em.persist(LibraryEntity.builder().libraryType(LibraryType.COMIC).name("Comics-d").build());
+        SeriesEntity series = em.persist(SeriesEntity.builder().libraryEntity(comicLibrary).name("Series-d").startYear(2009).build());
+        app.ister.core.entity.BookEntity volume = em.persist(app.ister.core.entity.BookEntity.builder()
+                .libraryEntity(comicLibrary).seriesEntity(series).name("Vol 1").build());
+        em.persistAndFlush(WatchStatusEntity.builder()
+                .playQueueItemId(volume.getId()).userEntity(user).bookEntity(volume)
+                .readingProgress(0.2).build());
+        em.flush();
+
+        assertEquals(List.of(audiobook.getId(), epub.getId()),
+                bookRepository.findRecentlyReadBookIdsForLibrary(bookLibrary.getId(), "reader-d1", 10),
+                "the chapter listen is newer than the epub read");
+        assertEquals(List.of(series.getId()),
+                seriesRepository.findRecentlyReadSeriesIdsForLibrary(comicLibrary.getId(), "reader-d1", 10));
+    }
+
+    /** Podcast lists aggregate episode plays with the same threshold, and skip inactive feeds. */
+    @Test
+    void discoverPodcastQueriesSkipInactiveFeedsAndAbandonedStarts() {
+        UserEntity user = em.persist(UserEntity.builder().externalId("listener-d1").build());
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.PODCAST).name("Podcasts-d").build());
+        app.ister.core.entity.PodcastEntity active = em.persist(app.ister.core.entity.PodcastEntity.builder()
+                .libraryEntity(library).feedUrl("https://feed/active").title("Active").active(true).build());
+        app.ister.core.entity.PodcastEntity unsubscribed = em.persist(app.ister.core.entity.PodcastEntity.builder()
+                .libraryEntity(library).feedUrl("https://feed/old").title("Old").active(false).build());
+        app.ister.core.entity.PodcastEpisodeEntity activeEpisode = em.persist(app.ister.core.entity.PodcastEpisodeEntity.builder()
+                .podcastEntity(active).guid("g1").build());
+        app.ister.core.entity.PodcastEpisodeEntity abandonedEpisode = em.persist(app.ister.core.entity.PodcastEpisodeEntity.builder()
+                .podcastEntity(active).guid("g2").build());
+        app.ister.core.entity.PodcastEpisodeEntity unsubscribedEpisode = em.persist(app.ister.core.entity.PodcastEpisodeEntity.builder()
+                .podcastEntity(unsubscribed).guid("g3").build());
+        em.persist(WatchStatusEntity.builder().playQueueItemId(UUID.randomUUID()).userEntity(user)
+                .podcastEpisodeEntity(activeEpisode).progressInMilliseconds(300_000).build());
+        em.persist(WatchStatusEntity.builder().playQueueItemId(UUID.randomUUID()).userEntity(user)
+                .podcastEpisodeEntity(abandonedEpisode).progressInMilliseconds(10_000).build());
+        em.persist(WatchStatusEntity.builder().playQueueItemId(UUID.randomUUID()).userEntity(user)
+                .podcastEpisodeEntity(unsubscribedEpisode).watched(true).build());
+        em.persist(app.ister.core.entity.RatingEntity.builder().userEntity(user).podcastEntity(active).value(8).build());
+        em.flush();
+
+        assertEquals(List.of(active.getId()),
+                podcastRepository.findRecentlyPlayedPodcastIdsForLibrary(library.getId(), "listener-d1", 10));
+        assertEquals(List.of(active.getId()),
+                podcastRepository.findMostPlayedPodcastIdsForLibrary(library.getId(), "listener-d1", 10));
+        assertEquals(List.of(active.getId()),
+                podcastRepository.findHighestRatedPodcastIdsForLibrary(library.getId(), "listener-d1", 10));
+    }
+
+    private static WatchStatusEntity moviePlay(UserEntity user, MovieEntity movie, boolean watched, long progressMs) {
+        return WatchStatusEntity.builder()
+                .playQueueItemId(UUID.randomUUID())
+                .userEntity(user)
+                .movieEntity(movie)
+                .watched(watched)
+                .progressInMilliseconds(progressMs)
+                .build();
     }
 
     private static WatchStatusEntity trackPlay(UserEntity user, TrackEntity track) {

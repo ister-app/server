@@ -42,5 +42,43 @@ public interface AlbumRepository extends JpaRepository<AlbumEntity, UUID> {
 
     List<AlbumEntity> findByLibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(LibraryType libraryType);
 
+    /**
+     * The calling user's most recently played albums of a library, newest first, aggregated over
+     * the tracks' watch rows. Track watch rows only exist for real plays (the 30-second threshold
+     * is applied when they are written), so no progress predicate is needed here.
+     */
+    @Query(value = """
+            SELECT a.id FROM album_entity a
+            JOIN track_entity t ON t.album_entity_id = a.id
+            JOIN watch_status_entity ws ON ws.track_entity_id = t.id
+            JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
+            WHERE a.library_entity_id = :libraryId
+            GROUP BY a.id
+            ORDER BY MAX(ws.date_updated) DESC, a.id
+            LIMIT :limit""", nativeQuery = true)
+    List<UUID> findRecentlyPlayedAlbumIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit);
+
+    /** The calling user's most played albums of a library (track plays). */
+    @Query(value = """
+            SELECT a.id FROM album_entity a
+            JOIN track_entity t ON t.album_entity_id = a.id
+            JOIN watch_status_entity ws ON ws.track_entity_id = t.id
+            JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
+            WHERE a.library_entity_id = :libraryId
+            GROUP BY a.id
+            ORDER BY COUNT(ws.id) DESC, MAX(ws.date_updated) DESC, a.id
+            LIMIT :limit""", nativeQuery = true)
+    List<UUID> findMostPlayedAlbumIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit);
+
+    /** The calling user's highest rated albums of a library; the most recently (re)rated wins ties. */
+    @Query(value = """
+            SELECT a.id FROM album_entity a
+            JOIN rating_entity r ON r.album_entity_id = a.id
+            JOIN user_entity u ON u.id = r.user_entity_id AND u.external_id = :externalId
+            WHERE a.library_entity_id = :libraryId
+            ORDER BY r.value DESC, r.date_updated DESC, a.id
+            LIMIT :limit""", nativeQuery = true)
+    List<UUID> findHighestRatedAlbumIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit);
+
     List<AlbumEntity> findByLibraryEntity_LibraryTypeAndImageEntitiesIsEmpty(LibraryType libraryType);
 }

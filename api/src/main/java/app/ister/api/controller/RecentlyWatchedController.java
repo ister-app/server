@@ -13,6 +13,7 @@ import app.ister.core.service.LibraryAccessService;
 import app.ister.core.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Controller;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * The "continue watching" list. It is not computed here: {@link ContinueWatchingService} keeps a
@@ -38,14 +40,20 @@ public class RecentlyWatchedController {
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public List<RecentlyWatched> recentlyWatched(Authentication authentication) {
+    public List<RecentlyWatched> recentlyWatched(@Argument Optional<UUID> libraryId, Authentication authentication) {
         log.debug("Getting recently watched for user: {}", authentication.getName());
         UserEntity userEntity = userService.getOrCreateUser(authentication);
 
         return continueWatchingService.entriesFor(userEntity.getId()).stream()
                 .filter(entry -> libraryAccessService.canAccess(libraryOf(entry), authentication))
+                .filter(entry -> libraryId.map(id -> inLibrary(entry, id)).orElse(true))
                 .flatMap(entry -> toRecentlyWatched(entry).stream())
                 .toList();
+    }
+
+    private boolean inLibrary(ContinueWatchingEntity entry, UUID libraryId) {
+        LibraryEntity library = libraryOf(entry);
+        return library != null && libraryId.equals(library.getId());
     }
 
     /** The library the entry's media lives in; null when the media was deleted since. */
