@@ -18,7 +18,7 @@ services:
       timeout: 5s
       retries: 10
   rabbitMQ:
-    image: rabbitmq:3-management
+    image: rabbitmq:4-management
     restart: always
     ports:
       - "5672:5672"

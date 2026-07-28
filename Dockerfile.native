@@ -1,4 +1,4 @@
-FROM fedora:43 AS subtile-ocr-builder
+FROM fedora:44 AS subtile-ocr-builder
 RUN dnf install -y \
     rust \
     cargo \
@@ -8,12 +8,12 @@ RUN dnf install -y \
     && dnf clean all
 RUN cargo install subtile-ocr
 
-FROM fedora:43
+FROM fedora:44
 WORKDIR /home/app
 EXPOSE 8080
 RUN dnf install -y \
-    https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-43.noarch.rpm \
-    https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-43.noarch.rpm \
+    https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
+    https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm \
     && dnf install -y \
     mkvtoolnix \
     ffmpeg \
