@@ -1,5 +1,38 @@
 # Changelog
 
+## server v2.4.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.4.0` |
+| `ghcr.io/ister-app/migrations` | `2.4.0` |
+
+### Features
+
+- feat: library discover top-lists, libraryById and library-scoped recentlyWatched ([`6e397f1`](https://github.com/ister-app/server/commit/6e397f1))
+- feat: count track plays and expose per-artist top track lists ([`05b1ccf`](https://github.com/ister-app/server/commit/05b1ccf))
+
+### Fixes
+
+- fix: resolve sonar S8947 entity-final and S8786 regex findings ([`24475ea`](https://github.com/ister-app/server/commit/24475ea))
+
+### Dependency updates
+
+- chore(deps): update github actions, flyway v13, fedora 44, rabbitmq 4 and graalvm ce 25.2.4 ([`ea7520f`](https://github.com/ister-app/server/commit/ea7520f))
+
+### Other
+
+- test: satisfy required chapter narrator and podcast enclosure in discover fixtures ([`030e45e`](https://github.com/ister-app/server/commit/030e45e))
+- docs: add SEO descriptions and link the published docs site ([`c934859`](https://github.com/ister-app/server/commit/c934859))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.4.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.3.0...v2.4.0
+
 ## server v2.3.0
 
 | Image | Tag |
