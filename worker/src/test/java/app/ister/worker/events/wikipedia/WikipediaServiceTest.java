@@ -8,6 +8,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -37,6 +38,22 @@ class WikipediaServiceTest {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
         ReflectionTestUtils.setField(subject, "restClient", builder.build());
+    }
+
+    // ===== labelMatches =====
+
+    /**
+     * Wikidata consolidates labels that are identical across languages into the "mul" pseudo-language
+     * (deleting the per-language ones), so an entity like the "Harry Potter" book series may carry no
+     * en/nl label at all anymore — the mul label must count as a match.
+     */
+    @Test
+    void aLabelOnlyPresentAsMulStillMatches() {
+        Map<String, Object> entity = Map.of("entities", Map.of("Q8337", Map.of(
+                "labels", Map.of("mul", Map.of("value", "Harry Potter")))));
+
+        assertTrue(subject.labelMatches(entity, "Q8337", "harrypotter", EN_NL));
+        assertFalse(subject.labelMatches(entity, "Q8337", "harrypotterfilmserie", EN_NL));
     }
 
     // ===== fetchContentForSeries =====

@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static app.ister.worker.events.musicbrainz.MusicBrainzService.namesMatch;
 import static app.ister.worker.events.musicbrainz.MusicBrainzService.normalizeTitle;
@@ -207,9 +208,13 @@ public class WikipediaService {
         if (!(entityField(wikidata, wikidataId, "labels") instanceof Map<?, ?> labels)) {
             return false;
         }
-        return languageTags.stream().anyMatch(tag -> labels.get(tag) instanceof Map<?, ?> label
-                && label.get("value") instanceof String value
-                && namesMatch(wantedName, value));
+        // "mul" is Wikidata's default-for-all-languages label. Bots are consolidating labels that
+        // are identical across languages into it (deleting the per-language ones), so an entity like
+        // the "Harry Potter" book series may carry no en/nl label at all anymore.
+        return Stream.concat(languageTags.stream(), Stream.of("mul"))
+                .anyMatch(tag -> labels.get(tag) instanceof Map<?, ?> label
+                        && label.get("value") instanceof String value
+                        && namesMatch(wantedName, value));
     }
 
     /**

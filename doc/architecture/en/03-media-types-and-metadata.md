@@ -72,6 +72,9 @@ type to create chapters instead of tracks.
   (`WikidataBookSeriesService.discoverSeries`, run from `BOOK_FOUND`) links a series-less book into
   one of the author's *existing* series via its P179 (part of series) statement — it never creates
   a series, and requires a P50 (author) label match so the same-titled film or game can never link.
+  Label matching accepts Wikidata's `mul` (default-for-all-languages) label next to the configured
+  languages: bots consolidate labels that are identical across languages into it, deleting the
+  per-language ones.
   Discovery covers what the other two can't see: titles without a separator ("Harry Potter en de
   steen der wijzen") and audiobook-only books without epub metadata. When epub metadata *creates* a
   series, `BOOK_FOUND` re-fires once for the author's series-less books, so discovery converges
