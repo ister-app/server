@@ -138,8 +138,25 @@ public interface BookRepository extends JpaRepository<BookEntity, UUID> {
             WHERE b.library_entity_id = :libraryId
             GROUP BY b.id
             ORDER BY MAX(reads.date_updated) DESC, b.id
-            LIMIT :limit""", nativeQuery = true)
-    List<UUID> findRecentlyReadBookIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit);
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findRecentlyReadBookIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit, @Param("offset") int offset);
+
+    /** Total for the recently read page: same read/listen branches as the query above. */
+    @Query(value = """
+            SELECT COUNT(DISTINCT b.id) FROM book_entity b
+            JOIN (
+                SELECT ws.book_entity_id AS book_id
+                FROM watch_status_entity ws
+                JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
+                WHERE ws.book_entity_id IS NOT NULL
+                UNION ALL
+                SELECT c.book_entity_id
+                FROM watch_status_entity ws
+                JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
+                JOIN chapter_entity c ON c.id = ws.chapter_entity_id
+            ) reads ON reads.book_id = b.id
+            WHERE b.library_entity_id = :libraryId""", nativeQuery = true)
+    long countReadBooksForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId);
 
     /** The calling user's highest rated books of a library; the most recently (re)rated wins ties. */
     @Query(value = """
@@ -148,6 +165,14 @@ public interface BookRepository extends JpaRepository<BookEntity, UUID> {
             JOIN user_entity u ON u.id = r.user_entity_id AND u.external_id = :externalId
             WHERE b.library_entity_id = :libraryId
             ORDER BY r.value DESC, r.date_updated DESC, b.id
-            LIMIT :limit""", nativeQuery = true)
-    List<UUID> findHighestRatedBookIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit);
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findHighestRatedBookIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit, @Param("offset") int offset);
+
+    /** Total for the highest rated page: same rating join as the query above. */
+    @Query(value = """
+            SELECT COUNT(DISTINCT b.id) FROM book_entity b
+            JOIN rating_entity r ON r.book_entity_id = b.id
+            JOIN user_entity u ON u.id = r.user_entity_id AND u.external_id = :externalId
+            WHERE b.library_entity_id = :libraryId""", nativeQuery = true)
+    long countRatedBooksForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId);
 }

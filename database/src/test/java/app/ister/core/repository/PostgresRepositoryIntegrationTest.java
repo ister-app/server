@@ -598,15 +598,44 @@ class PostgresRepositoryIntegrationTest {
         em.flush();
 
         assertEquals(List.of(oncePlayed.getId(), twicePlayed.getId()),
-                movieRepository.findRecentlyPlayedMovieIdsForLibrary(library.getId(), "viewer-d1", 10),
+                movieRepository.findRecentlyPlayedMovieIdsForLibrary(library.getId(), "viewer-d1", 10, 0),
                 "abandoned start and other library/user must not appear");
         assertEquals(List.of(twicePlayed.getId(), oncePlayed.getId()),
-                movieRepository.findMostPlayedMovieIdsForLibrary(library.getId(), "viewer-d1", 10));
+                movieRepository.findMostPlayedMovieIdsForLibrary(library.getId(), "viewer-d1", 10, 0));
         assertEquals(List.of(abandoned.getId(), oncePlayed.getId()),
-                movieRepository.findHighestRatedMovieIdsForLibrary(library.getId(), "viewer-d1", 10),
+                movieRepository.findHighestRatedMovieIdsForLibrary(library.getId(), "viewer-d1", 10, 0),
                 "ratings rank regardless of plays");
-        assertEquals(1, movieRepository.findMostPlayedMovieIdsForLibrary(library.getId(), "viewer-d1", 1).size(),
+        assertEquals(1, movieRepository.findMostPlayedMovieIdsForLibrary(library.getId(), "viewer-d1", 1, 0).size(),
                 "limit is applied");
+    }
+
+    /** The "show all" grids page the ranked lists: offset slices, count totals the same filter. */
+    @Test
+    void discoverMovieQueriesPageWithOffsetAndCountTheirTotals() {
+        UserEntity user = em.persist(UserEntity.builder().externalId("viewer-d4").build());
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.MOVIE).name("Movies-d4").build());
+        MovieEntity newest = em.persist(MovieEntity.builder().libraryEntity(library).name("Newest").releaseYear(2020).build());
+        MovieEntity middle = em.persist(MovieEntity.builder().libraryEntity(library).name("Middle").releaseYear(2021).build());
+        MovieEntity oldest = em.persist(MovieEntity.builder().libraryEntity(library).name("Oldest").releaseYear(2022).build());
+        MovieEntity abandoned = em.persist(MovieEntity.builder().libraryEntity(library).name("Abandoned").releaseYear(2023).build());
+        em.persistAndFlush(moviePlay(user, oldest, true, 0));
+        em.persistAndFlush(moviePlay(user, middle, true, 0));
+        em.persistAndFlush(moviePlay(user, newest, true, 0));
+        em.persist(moviePlay(user, abandoned, false, 30_000));
+        em.persist(app.ister.core.entity.RatingEntity.builder().userEntity(user).movieEntity(newest).value(9).build());
+        em.persist(app.ister.core.entity.RatingEntity.builder().userEntity(user).movieEntity(oldest).value(7).build());
+        em.flush();
+
+        assertEquals(List.of(newest.getId(), middle.getId()),
+                movieRepository.findRecentlyPlayedMovieIdsForLibrary(library.getId(), "viewer-d4", 2, 0));
+        assertEquals(List.of(oldest.getId()),
+                movieRepository.findRecentlyPlayedMovieIdsForLibrary(library.getId(), "viewer-d4", 2, 2),
+                "the second page continues where the first ended");
+        assertEquals(3, movieRepository.countPlayedMoviesForLibrary(library.getId(), "viewer-d4"),
+                "the abandoned start counts for neither the pages nor the total");
+        assertEquals(List.of(oldest.getId()),
+                movieRepository.findHighestRatedMovieIdsForLibrary(library.getId(), "viewer-d4", 5, 1));
+        assertEquals(2, movieRepository.countRatedMoviesForLibrary(library.getId(), "viewer-d4"));
     }
 
     /** Show lists aggregate episode plays; album lists aggregate track plays. */
@@ -638,16 +667,16 @@ class PostgresRepositoryIntegrationTest {
         em.flush();
 
         assertEquals(List.of(casualShow.getId(), bingeShow.getId()),
-                showRepository.findRecentlyPlayedShowIdsForLibrary(showLibrary.getId(), "viewer-d3", 10));
+                showRepository.findRecentlyPlayedShowIdsForLibrary(showLibrary.getId(), "viewer-d3", 10, 0));
         assertEquals(List.of(bingeShow.getId(), casualShow.getId()),
-                showRepository.findMostPlayedShowIdsForLibrary(showLibrary.getId(), "viewer-d3", 10),
+                showRepository.findMostPlayedShowIdsForLibrary(showLibrary.getId(), "viewer-d3", 10, 0),
                 "two episode plays outrank one");
         assertEquals(List.of(casualShow.getId()),
-                showRepository.findHighestRatedShowIdsForLibrary(showLibrary.getId(), "viewer-d3", 10));
+                showRepository.findHighestRatedShowIdsForLibrary(showLibrary.getId(), "viewer-d3", 10, 0));
         assertEquals(List.of(lightAlbum.getId(), heavyAlbum.getId()),
-                albumRepository.findRecentlyPlayedAlbumIdsForLibrary(musicLibrary.getId(), "viewer-d3", 10));
+                albumRepository.findRecentlyPlayedAlbumIdsForLibrary(musicLibrary.getId(), "viewer-d3", 10, 0));
         assertEquals(List.of(heavyAlbum.getId(), lightAlbum.getId()),
-                albumRepository.findMostPlayedAlbumIdsForLibrary(musicLibrary.getId(), "viewer-d3", 10));
+                albumRepository.findMostPlayedAlbumIdsForLibrary(musicLibrary.getId(), "viewer-d3", 10, 0));
     }
 
     /**
@@ -682,10 +711,10 @@ class PostgresRepositoryIntegrationTest {
         em.flush();
 
         assertEquals(List.of(audiobook.getId(), epub.getId()),
-                bookRepository.findRecentlyReadBookIdsForLibrary(bookLibrary.getId(), "reader-d1", 10),
+                bookRepository.findRecentlyReadBookIdsForLibrary(bookLibrary.getId(), "reader-d1", 10, 0),
                 "the chapter listen is newer than the epub read");
         assertEquals(List.of(series.getId()),
-                seriesRepository.findRecentlyReadSeriesIdsForLibrary(comicLibrary.getId(), "reader-d1", 10));
+                seriesRepository.findRecentlyReadSeriesIdsForLibrary(comicLibrary.getId(), "reader-d1", 10, 0));
     }
 
     /** Podcast lists aggregate episode plays with the same threshold, and skip inactive feeds. */
@@ -713,11 +742,11 @@ class PostgresRepositoryIntegrationTest {
         em.flush();
 
         assertEquals(List.of(active.getId()),
-                podcastRepository.findRecentlyPlayedPodcastIdsForLibrary(library.getId(), "listener-d1", 10));
+                podcastRepository.findRecentlyPlayedPodcastIdsForLibrary(library.getId(), "listener-d1", 10, 0));
         assertEquals(List.of(active.getId()),
-                podcastRepository.findMostPlayedPodcastIdsForLibrary(library.getId(), "listener-d1", 10));
+                podcastRepository.findMostPlayedPodcastIdsForLibrary(library.getId(), "listener-d1", 10, 0));
         assertEquals(List.of(active.getId()),
-                podcastRepository.findHighestRatedPodcastIdsForLibrary(library.getId(), "listener-d1", 10));
+                podcastRepository.findHighestRatedPodcastIdsForLibrary(library.getId(), "listener-d1", 10, 0));
     }
 
     private static WatchStatusEntity moviePlay(UserEntity user, MovieEntity movie, boolean watched, long progressMs) {

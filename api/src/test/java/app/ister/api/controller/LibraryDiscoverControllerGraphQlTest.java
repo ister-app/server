@@ -86,11 +86,11 @@ class LibraryDiscoverControllerGraphQlTest {
         MovieEntity second = movie("Second");
         when(libraryRepository.findById(library.getId())).thenReturn(java.util.Optional.of(library));
         // Repository ranks first before second; findAllById returns them in the other order.
-        when(movieRepository.findMostPlayedMovieIdsForLibrary(eq(library.getId()), any(), eq(15)))
+        when(movieRepository.findMostPlayedMovieIdsForLibrary(eq(library.getId()), any(), eq(15), eq(0)))
                 .thenReturn(List.of(first.getId(), second.getId()));
-        when(movieRepository.findRecentlyPlayedMovieIdsForLibrary(eq(library.getId()), any(), eq(5)))
+        when(movieRepository.findRecentlyPlayedMovieIdsForLibrary(eq(library.getId()), any(), eq(5), eq(0)))
                 .thenReturn(List.of(second.getId()));
-        when(movieRepository.findHighestRatedMovieIdsForLibrary(eq(library.getId()), any(), eq(15)))
+        when(movieRepository.findHighestRatedMovieIdsForLibrary(eq(library.getId()), any(), eq(15), eq(0)))
                 .thenReturn(List.of());
         when(movieRepository.findAllById(anyCollection())).thenAnswer(invocation -> {
             java.util.Collection<UUID> ids = invocation.getArgument(0);
@@ -120,20 +120,20 @@ class LibraryDiscoverControllerGraphQlTest {
         AlbumEntity album = new AlbumEntity();
         album.setId(UUID.randomUUID());
         when(libraryRepository.findById(library.getId())).thenReturn(java.util.Optional.of(library));
-        when(showRepository.findRecentlyPlayedShowIdsForLibrary(eq(library.getId()), any(), eq(15)))
+        when(showRepository.findRecentlyPlayedShowIdsForLibrary(eq(library.getId()), any(), eq(15), eq(0)))
                 .thenReturn(List.of(show.getId()));
         when(showRepository.findAllById(anyCollection())).thenReturn(List.of(show));
-        when(albumRepository.findMostPlayedAlbumIdsForLibrary(eq(library.getId()), any(), eq(15)))
+        when(albumRepository.findMostPlayedAlbumIdsForLibrary(eq(library.getId()), any(), eq(15), eq(0)))
                 .thenReturn(List.of(album.getId()));
         when(albumRepository.findAllById(anyCollection())).thenReturn(List.of(album));
-        when(bookRepository.findRecentlyReadBookIdsForLibrary(eq(library.getId()), any(), eq(15))).thenReturn(List.of());
-        when(bookRepository.findHighestRatedBookIdsForLibrary(eq(library.getId()), any(), eq(15))).thenReturn(List.of());
+        when(bookRepository.findRecentlyReadBookIdsForLibrary(eq(library.getId()), any(), eq(15), eq(0))).thenReturn(List.of());
+        when(bookRepository.findHighestRatedBookIdsForLibrary(eq(library.getId()), any(), eq(15), eq(0))).thenReturn(List.of());
         when(bookRepository.findAllById(anyCollection())).thenReturn(List.of());
-        when(seriesRepository.findRecentlyReadSeriesIdsForLibrary(eq(library.getId()), any(), eq(15))).thenReturn(List.of());
+        when(seriesRepository.findRecentlyReadSeriesIdsForLibrary(eq(library.getId()), any(), eq(15), eq(0))).thenReturn(List.of());
         when(seriesRepository.findAllById(anyCollection())).thenReturn(List.of());
-        when(podcastRepository.findRecentlyPlayedPodcastIdsForLibrary(eq(library.getId()), any(), eq(15))).thenReturn(List.of());
-        when(podcastRepository.findMostPlayedPodcastIdsForLibrary(eq(library.getId()), any(), eq(15))).thenReturn(List.of());
-        when(podcastRepository.findHighestRatedPodcastIdsForLibrary(eq(library.getId()), any(), eq(15))).thenReturn(List.of());
+        when(podcastRepository.findRecentlyPlayedPodcastIdsForLibrary(eq(library.getId()), any(), eq(15), eq(0))).thenReturn(List.of());
+        when(podcastRepository.findMostPlayedPodcastIdsForLibrary(eq(library.getId()), any(), eq(15), eq(0))).thenReturn(List.of());
+        when(podcastRepository.findHighestRatedPodcastIdsForLibrary(eq(library.getId()), any(), eq(15), eq(0))).thenReturn(List.of());
         when(podcastRepository.findAllById(anyCollection())).thenReturn(List.of());
 
         assertDoesNotThrow(() -> graphQlTester.document("""
@@ -154,6 +154,83 @@ class LibraryDiscoverControllerGraphQlTest {
                 .path("libraryById.recentlyReadBooks").entityList(Object.class).hasSize(0)
                 .path("libraryById.recentlyReadSeries").entityList(Object.class).hasSize(0)
                 .path("libraryById.recentlyPlayedPodcasts").entityList(Object.class).hasSize(0));
+    }
+
+    @Test
+    void rankedMoviesPageCarriesTotalsAndOffset() {
+        MovieEntity first = movie("First");
+        MovieEntity second = movie("Second");
+        when(libraryRepository.findById(library.getId())).thenReturn(java.util.Optional.of(library));
+        when(movieRepository.findMostPlayedMovieIdsForLibrary(eq(library.getId()), any(), eq(2), eq(2)))
+                .thenReturn(List.of(second.getId(), first.getId()));
+        when(movieRepository.countPlayedMoviesForLibrary(eq(library.getId()), any())).thenReturn(7L);
+        when(movieRepository.findAllById(anyCollection())).thenReturn(List.of(first, second));
+
+        assertDoesNotThrow(() -> graphQlTester.document("""
+                        { libraryById(id: "%s") {
+                            rankedMovies(kind: MOST_PLAYED, page: 1, size: 2) {
+                                number size totalElements totalPages
+                                content { id }
+                            }
+                        } }
+                        """.formatted(library.getId()))
+                .execute()
+                .path("libraryById.rankedMovies.number").entity(Integer.class).isEqualTo(1)
+                .path("libraryById.rankedMovies.size").entity(Integer.class).isEqualTo(2)
+                .path("libraryById.rankedMovies.totalElements").entity(Integer.class).isEqualTo(7)
+                .path("libraryById.rankedMovies.totalPages").entity(Integer.class).isEqualTo(4)
+                // Repository ranks second before first; the page must preserve that order.
+                .path("libraryById.rankedMovies.content[0].id").entity(String.class).isEqualTo(second.getId().toString())
+                .path("libraryById.rankedMovies.content[1].id").entity(String.class).isEqualTo(first.getId().toString()));
+    }
+
+    @Test
+    void everyRankedFieldResolves() {
+        when(libraryRepository.findById(library.getId())).thenReturn(java.util.Optional.of(library));
+        when(showRepository.findRecentlyPlayedShowIdsForLibrary(eq(library.getId()), any(), eq(15), eq(0))).thenReturn(List.of());
+        when(showRepository.countPlayedShowsForLibrary(eq(library.getId()), any())).thenReturn(0L);
+        when(showRepository.findAllById(anyCollection())).thenReturn(List.of());
+        when(albumRepository.findHighestRatedAlbumIdsForLibrary(eq(library.getId()), any(), eq(15), eq(0))).thenReturn(List.of());
+        when(albumRepository.countRatedAlbumsForLibrary(eq(library.getId()), any())).thenReturn(0L);
+        when(albumRepository.findAllById(anyCollection())).thenReturn(List.of());
+        when(bookRepository.findRecentlyReadBookIdsForLibrary(eq(library.getId()), any(), eq(15), eq(0))).thenReturn(List.of());
+        when(bookRepository.countReadBooksForLibrary(eq(library.getId()), any())).thenReturn(0L);
+        when(bookRepository.findAllById(anyCollection())).thenReturn(List.of());
+        when(seriesRepository.findRecentlyReadSeriesIdsForLibrary(eq(library.getId()), any(), eq(15), eq(0))).thenReturn(List.of());
+        when(seriesRepository.countReadSeriesForLibrary(eq(library.getId()), any())).thenReturn(0L);
+        when(seriesRepository.findAllById(anyCollection())).thenReturn(List.of());
+        when(podcastRepository.findMostPlayedPodcastIdsForLibrary(eq(library.getId()), any(), eq(15), eq(0))).thenReturn(List.of());
+        when(podcastRepository.countPlayedPodcastsForLibrary(eq(library.getId()), any())).thenReturn(0L);
+        when(podcastRepository.findAllById(anyCollection())).thenReturn(List.of());
+
+        assertDoesNotThrow(() -> graphQlTester.document("""
+                        { libraryById(id: "%s") {
+                            rankedShows(kind: RECENTLY_PLAYED) { totalElements content { id } }
+                            rankedAlbums(kind: HIGHEST_RATED) { totalElements content { id } }
+                            rankedBooks(kind: RECENTLY_PLAYED) { totalElements content { id } }
+                            rankedSeries(kind: RECENTLY_PLAYED) { totalElements content { id } }
+                            rankedPodcasts(kind: MOST_PLAYED) { totalElements content { id } }
+                        } }
+                        """.formatted(library.getId()))
+                .execute()
+                .path("libraryById.rankedShows.content").entityList(Object.class).hasSize(0)
+                .path("libraryById.rankedPodcasts.totalElements").entity(Integer.class).isEqualTo(0));
+    }
+
+    @Test
+    void unsupportedRankKindReturnsEmptyPage() {
+        when(libraryRepository.findById(library.getId())).thenReturn(java.util.Optional.of(library));
+
+        assertDoesNotThrow(() -> graphQlTester.document("""
+                        { libraryById(id: "%s") {
+                            rankedBooks(kind: MOST_PLAYED) { totalElements totalPages content { id } }
+                            rankedSeries(kind: HIGHEST_RATED) { totalElements content { id } }
+                        } }
+                        """.formatted(library.getId()))
+                .execute()
+                .path("libraryById.rankedBooks.totalElements").entity(Integer.class).isEqualTo(0)
+                .path("libraryById.rankedBooks.content").entityList(Object.class).hasSize(0)
+                .path("libraryById.rankedSeries.content").entityList(Object.class).hasSize(0));
     }
 
     @Test

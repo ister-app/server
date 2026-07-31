@@ -300,6 +300,13 @@ enum SortingOrder {
     ASCENDING
 }
 
+"Ranking of the library Discover top-lists. For books and series RECENTLY_PLAYED means recently read."
+enum RankKind {
+    RECENTLY_PLAYED
+    MOST_PLAYED
+    HIGHEST_RATED
+}
+
 "Page order of a comic/manga series: western comics read LTR, unflipped manga RTL."
 enum ReadingDirection {
     LTR
@@ -495,6 +502,14 @@ type Library {
     recentlyPlayedPodcasts(limit: Int): [Podcast!]!
     mostPlayedPodcasts(limit: Int): [Podcast!]!
     highestRatedPodcasts(limit: Int): [Podcast!]!
+    # Paged variants of the top-lists above, for "show all" grids. A kind a type does not support
+    # (MOST_PLAYED books, MOST_PLAYED/HIGHEST_RATED series) returns an empty page.
+    rankedMovies(kind: RankKind!, page: Int, size: Int): MoviePage!
+    rankedShows(kind: RankKind!, page: Int, size: Int): ShowPage!
+    rankedAlbums(kind: RankKind!, page: Int, size: Int): AlbumPage!
+    rankedBooks(kind: RankKind!, page: Int, size: Int): BookPage!
+    rankedSeries(kind: RankKind!, page: Int, size: Int): SeriesPage!
+    rankedPodcasts(kind: RankKind!, page: Int, size: Int): PodcastPage!
 }
 
 "The calling user, as seen by the server."

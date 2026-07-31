@@ -55,8 +55,17 @@ public interface AlbumRepository extends JpaRepository<AlbumEntity, UUID> {
             WHERE a.library_entity_id = :libraryId
             GROUP BY a.id
             ORDER BY MAX(ws.date_updated) DESC, a.id
-            LIMIT :limit""", nativeQuery = true)
-    List<UUID> findRecentlyPlayedAlbumIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit);
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findRecentlyPlayedAlbumIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit, @Param("offset") int offset);
+
+    /** Total for the recently/most played pages: same track-play join as the two queries above. */
+    @Query(value = """
+            SELECT COUNT(DISTINCT a.id) FROM album_entity a
+            JOIN track_entity t ON t.album_entity_id = a.id
+            JOIN watch_status_entity ws ON ws.track_entity_id = t.id
+            JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
+            WHERE a.library_entity_id = :libraryId""", nativeQuery = true)
+    long countPlayedAlbumsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId);
 
     /** The calling user's most played albums of a library (track plays). */
     @Query(value = """
@@ -67,8 +76,8 @@ public interface AlbumRepository extends JpaRepository<AlbumEntity, UUID> {
             WHERE a.library_entity_id = :libraryId
             GROUP BY a.id
             ORDER BY COUNT(ws.id) DESC, MAX(ws.date_updated) DESC, a.id
-            LIMIT :limit""", nativeQuery = true)
-    List<UUID> findMostPlayedAlbumIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit);
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findMostPlayedAlbumIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit, @Param("offset") int offset);
 
     /** The calling user's highest rated albums of a library; the most recently (re)rated wins ties. */
     @Query(value = """
@@ -77,8 +86,16 @@ public interface AlbumRepository extends JpaRepository<AlbumEntity, UUID> {
             JOIN user_entity u ON u.id = r.user_entity_id AND u.external_id = :externalId
             WHERE a.library_entity_id = :libraryId
             ORDER BY r.value DESC, r.date_updated DESC, a.id
-            LIMIT :limit""", nativeQuery = true)
-    List<UUID> findHighestRatedAlbumIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit);
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findHighestRatedAlbumIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit, @Param("offset") int offset);
+
+    /** Total for the highest rated page: same rating join as the query above. */
+    @Query(value = """
+            SELECT COUNT(DISTINCT a.id) FROM album_entity a
+            JOIN rating_entity r ON r.album_entity_id = a.id
+            JOIN user_entity u ON u.id = r.user_entity_id AND u.external_id = :externalId
+            WHERE a.library_entity_id = :libraryId""", nativeQuery = true)
+    long countRatedAlbumsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId);
 
     List<AlbumEntity> findByLibraryEntity_LibraryTypeAndImageEntitiesIsEmpty(LibraryType libraryType);
 }

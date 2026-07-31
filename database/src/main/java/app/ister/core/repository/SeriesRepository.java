@@ -49,8 +49,17 @@ public interface SeriesRepository extends JpaRepository<SeriesEntity, UUID> {
             WHERE ser.library_entity_id = :libraryId
             GROUP BY ser.id
             ORDER BY MAX(ws.date_updated) DESC, ser.id
-            LIMIT :limit""", nativeQuery = true)
-    List<UUID> findRecentlyReadSeriesIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit);
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findRecentlyReadSeriesIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit, @Param("offset") int offset);
+
+    /** Total for the recently read page: same volume-read join as the query above. */
+    @Query(value = """
+            SELECT COUNT(DISTINCT ser.id) FROM series_entity ser
+            JOIN book_entity b ON b.series_entity_id = ser.id
+            JOIN watch_status_entity ws ON ws.book_entity_id = b.id
+            JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
+            WHERE ser.library_entity_id = :libraryId""", nativeQuery = true)
+    long countReadSeriesForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId);
 
     /**
      * Race-safe comic series create: parallel ComicFileFound consumers scanning one series

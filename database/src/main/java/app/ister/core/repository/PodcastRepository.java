@@ -38,8 +38,18 @@ public interface PodcastRepository extends JpaRepository<PodcastEntity, UUID> {
               AND (ws.watched OR ws.progress_in_milliseconds >= 120000)
             GROUP BY p.id
             ORDER BY MAX(ws.date_updated) DESC, p.id
-            LIMIT :limit""", nativeQuery = true)
-    List<UUID> findRecentlyPlayedPodcastIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit);
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findRecentlyPlayedPodcastIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit, @Param("offset") int offset);
+
+    /** Total for the recently/most played pages: same play filter as the two queries above. */
+    @Query(value = """
+            SELECT COUNT(DISTINCT p.id) FROM podcast_entity p
+            JOIN podcast_episode_entity pe ON pe.podcast_entity_id = p.id
+            JOIN watch_status_entity ws ON ws.podcast_episode_entity_id = pe.id
+            JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
+            WHERE p.library_entity_id = :libraryId AND p.active
+              AND (ws.watched OR ws.progress_in_milliseconds >= 120000)""", nativeQuery = true)
+    long countPlayedPodcastsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId);
 
     /** The calling user's most played podcasts of a library (episode plays); threshold as above. */
     @Query(value = """
@@ -51,8 +61,8 @@ public interface PodcastRepository extends JpaRepository<PodcastEntity, UUID> {
               AND (ws.watched OR ws.progress_in_milliseconds >= 120000)
             GROUP BY p.id
             ORDER BY COUNT(ws.id) DESC, MAX(ws.date_updated) DESC, p.id
-            LIMIT :limit""", nativeQuery = true)
-    List<UUID> findMostPlayedPodcastIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit);
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findMostPlayedPodcastIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit, @Param("offset") int offset);
 
     /** The calling user's highest rated podcasts of a library; the most recently (re)rated wins ties. */
     @Query(value = """
@@ -61,6 +71,14 @@ public interface PodcastRepository extends JpaRepository<PodcastEntity, UUID> {
             JOIN user_entity u ON u.id = r.user_entity_id AND u.external_id = :externalId
             WHERE p.library_entity_id = :libraryId AND p.active
             ORDER BY r.value DESC, r.date_updated DESC, p.id
-            LIMIT :limit""", nativeQuery = true)
-    List<UUID> findHighestRatedPodcastIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit);
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findHighestRatedPodcastIdsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId, @Param("limit") int limit, @Param("offset") int offset);
+
+    /** Total for the highest rated page: same rating join as the query above. */
+    @Query(value = """
+            SELECT COUNT(DISTINCT p.id) FROM podcast_entity p
+            JOIN rating_entity r ON r.podcast_entity_id = p.id
+            JOIN user_entity u ON u.id = r.user_entity_id AND u.external_id = :externalId
+            WHERE p.library_entity_id = :libraryId AND p.active""", nativeQuery = true)
+    long countRatedPodcastsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId);
 }
