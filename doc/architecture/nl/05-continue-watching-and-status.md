@@ -25,6 +25,14 @@ Zie het [continue-watching-flow-diagram](../diagrams/continue-watching-flow.md).
   over aan de volgende ongekeken episode/chapter, gevonden met één geïndexeerde query
   (`EpisodeRepository.findNextUnwatchedEpisodeId`, `ChapterRepository.findNextUnfinishedChapterId`)
   — nooit door een hele show te laden.
+- **Een boek is als geheel voltooid.** De enkele `BOOK`-rij van een boek heeft twee onafhankelijke
+  slots — audio (`chapter_entity_id`) en epub (`book_entity_id`) — maar het laatste hoofdstuk
+  uitluisteren maakt *beide* leeg: het einde van het audioboek bereiken betekent dat het boek af
+  is, en een oudere achtergebleven epub-leespositie mag het niet in de lijst houden. De rebuild
+  past dezelfde regel toe op tijdstempel: een leespositie ouder dan het moment waarop het laatste
+  hoofdstuk voltooid werd, geldt als verouderd. Daarna een eerder hoofdstuk starten (de heartbeat
+  zet zijn `watched` terug op false) of nieuwe leesvoortgang syncen is een nieuwe start en zet het
+  boek terug in de lijst.
 - **Rijen met alleen NULL-targets blijven staan.** Als er niets meer te vervolgen valt, gaan alle
   target-kolommen op NULL, maar de rij blijft bewust bestaan. Voegt de scanner later een episode
   toe, dan maakt `recomputeForShow` (aangeroepen vanuit `ScannerHelperService.getOrCreateEpisode`;

@@ -23,6 +23,13 @@ See the [continue-watching-flow diagram](../diagrams/continue-watching-flow.md).
   unwatched episode/chapter, found with a single indexed query
   (`EpisodeRepository.findNextUnwatchedEpisodeId`, `ChapterRepository.findNextUnfinishedChapterId`)
   — never by loading a whole show.
+- **A book completes as a whole.** A book's single `BOOK` row has two independent slots — audio
+  (`chapter_entity_id`) and epub (`book_entity_id`) — but finishing the last chapter clears *both*:
+  reaching the end of the audiobook means the book is done, and an epub position left behind from
+  before must not keep it in the list. The rebuild applies the same rule by timestamp: a reading
+  position older than the moment the last chapter was finished is treated as stale. Starting an
+  earlier chapter (the heartbeat flips its `watched` back to false) or syncing new reading progress
+  afterwards is a fresh start and puts the book back.
 - **All-NULL targets survive.** When nothing is left to continue with, all target columns go NULL
   but the row deliberately stays. When the scanner later adds an episode, `recomputeForShow` (called
   from `ScannerHelperService.getOrCreateEpisode`; `recomputeForBook` for chapters) makes the new

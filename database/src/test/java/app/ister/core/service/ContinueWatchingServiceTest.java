@@ -165,6 +165,23 @@ class ContinueWatchingServiceTest {
         subject.onWatchStatusChanged(status);
 
         verify(continueWatchingRepository).upsertBookAudio(eq(user.getId()), eq(book.getId()), eq(nextId), any());
+        verify(continueWatchingRepository, never()).upsertBookEpub(any(), any(), any(), any());
+    }
+
+    /** Reaching the end of the audiobook completes the book: a stale epub position must not keep it. */
+    @Test
+    void finishingTheLastChapterAlsoClearsTheEpubSlot() {
+        BookEntity book = book();
+        ChapterEntity chapter = chapter(book, 44);
+        when(chapterRepository.findNextUnfinishedChapterId(book.getId(), user.getId(), 44))
+                .thenReturn(List.of());
+
+        WatchStatusEntity status = WatchStatusEntity.builder()
+                .userEntity(user).playQueueItemId(chapter.getId()).chapterEntity(chapter).watched(true).build();
+        subject.onWatchStatusChanged(status);
+
+        verify(continueWatchingRepository).upsertBookAudio(eq(user.getId()), eq(book.getId()), isNull(), any());
+        verify(continueWatchingRepository).upsertBookEpub(eq(user.getId()), eq(book.getId()), isNull(), any());
     }
 
     // ===== recomputeForBook: a newly scanned chapter revives a book, but only for listeners =====
@@ -415,7 +432,59 @@ class ContinueWatchingServiceTest {
                 eq(nextId), isNull(), isNull(), isNull(), isNull(), eq(lastWatched));
     }
 
+    /** The rebuild reproduces the completion rule: an epub position older than the audio finish is stale. */
+    @Test
+    void rebuildDropsAReadingPositionOlderThanTheAudiobookFinish() {
+        ReflectionTestUtils.setField(subject, "historyDays", 150);
+        BookEntity book = book();
+        ChapterEntity lastChapter = chapter(book, 44);
+        Instant finishedAt = Instant.now().minusSeconds(60);
+        stubEmptyRecentEntries();
+        when(watchStatusRepository.findRecentChapterEntries(eq(user.getId()), any()))
+                .thenReturn(List.of(recentEntry(lastChapter.getId(), book.getId(), finishedAt, true)));
+        when(chapterRepository.findById(lastChapter.getId())).thenReturn(Optional.of(lastChapter));
+        when(chapterRepository.findNextUnfinishedChapterId(book.getId(), user.getId(), 44))
+                .thenReturn(List.of());
+        when(watchStatusRepository.findRecentBookEntries(eq(user.getId()), any()))
+                .thenReturn(List.of(recentEntry(book.getId(), book.getId(),
+                        finishedAt.minusSeconds(3600), false, 0.19)));
+
+        subject.rebuildForUser(user);
+
+        verify(continueWatchingRepository).upsertBookAudio(eq(user.getId()), eq(book.getId()), isNull(), eq(finishedAt));
+        verify(continueWatchingRepository).upsertBookEpub(eq(user.getId()), eq(book.getId()), isNull(), any());
+    }
+
+    /** Reading again after finishing the audiobook is a fresh start: the book comes back. */
+    @Test
+    void rebuildKeepsAReadingPositionNewerThanTheAudiobookFinish() {
+        ReflectionTestUtils.setField(subject, "historyDays", 150);
+        BookEntity book = book();
+        ChapterEntity lastChapter = chapter(book, 44);
+        Instant finishedAt = Instant.now().minusSeconds(3600);
+        stubEmptyRecentEntries();
+        when(watchStatusRepository.findRecentChapterEntries(eq(user.getId()), any()))
+                .thenReturn(List.of(recentEntry(lastChapter.getId(), book.getId(), finishedAt, true)));
+        when(chapterRepository.findById(lastChapter.getId())).thenReturn(Optional.of(lastChapter));
+        when(chapterRepository.findNextUnfinishedChapterId(book.getId(), user.getId(), 44))
+                .thenReturn(List.of());
+        when(watchStatusRepository.findRecentBookEntries(eq(user.getId()), any()))
+                .thenReturn(List.of(recentEntry(book.getId(), book.getId(),
+                        finishedAt.plusSeconds(60), false, 0.05)));
+
+        subject.rebuildForUser(user);
+
+        verify(continueWatchingRepository).upsertBookEpub(eq(user.getId()), eq(book.getId()), eq(book.getId()), any());
+    }
+
     // ===== Helpers =====
+
+    /** The rebuild sources not under test in the book-rebuild scenarios. */
+    private void stubEmptyRecentEntries() {
+        when(watchStatusRepository.findRecentEpisodeEntries(eq(user.getId()), any())).thenReturn(List.of());
+        when(watchStatusRepository.findRecentMovieEntries(eq(user.getId()), any())).thenReturn(List.of());
+        when(watchStatusRepository.findRecentPodcastEpisodeEntries(eq(user.getId()), any())).thenReturn(List.of());
+    }
 
     private UUID upsertedEpisodeId() {
         ArgumentCaptor<UUID> episodeId = ArgumentCaptor.forClass(UUID.class);
@@ -497,6 +566,11 @@ class ContinueWatchingServiceTest {
 
     private static WatchStatusRepository.RecentEntry recentEntry(UUID itemId, UUID groupId, Instant lastWatched,
                                                                  boolean watched) {
+        return recentEntry(itemId, groupId, lastWatched, watched, null);
+    }
+
+    private static WatchStatusRepository.RecentEntry recentEntry(UUID itemId, UUID groupId, Instant lastWatched,
+                                                                 boolean watched, Double readingProgress) {
         return new WatchStatusRepository.RecentEntry() {
             @Override
             public UUID getItemId() {
@@ -525,7 +599,7 @@ class ContinueWatchingServiceTest {
 
             @Override
             public Double getReadingProgress() {
-                return null;
+                return readingProgress;
             }
         };
     }

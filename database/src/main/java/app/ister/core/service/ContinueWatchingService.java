@@ -23,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -104,6 +106,12 @@ public class ContinueWatchingService {
                 ? nextUnfinishedChapter(bookId, user.getId(), chapter.getNumber()).orElse(null)
                 : chapter.getId();
         upsertChapter(user, bookId, target, lastWatched);
+        if (status.isWatched() && target == null) {
+            // Reached the end of the audiobook: the book as a whole is finished, so an epub position
+            // left behind from before must not keep it in the list. Reading (or listening) again
+            // after this point re-adds the book through the normal heartbeat paths.
+            upsertBook(user, bookId, null, lastWatched);
+        }
     }
 
     private void onBookChanged(WatchStatusEntity status, UserEntity user, Instant lastWatched) {
@@ -157,15 +165,22 @@ public class ContinueWatchingService {
         for (RecentEntry entry : watchStatusRepository.findRecentEpisodeEntries(userId, cutoff)) {
             upsertEpisode(user, entry.getGroupId(), episodeTarget(userId, entry), entry.getLastWatched());
         }
+        // Books whose latest chapter activity was reaching the end; the timestamp decides below
+        // whether an epub position is stale (predates finishing) or a genuine re-read.
+        Map<UUID, Instant> audioFinishedAt = new HashMap<>();
         for (RecentEntry entry : watchStatusRepository.findRecentChapterEntries(userId, cutoff)) {
-            upsertChapter(user, entry.getGroupId(), chapterTarget(userId, entry), entry.getLastWatched());
+            UUID target = chapterTarget(userId, entry);
+            if (entry.getWatched() && target == null) {
+                audioFinishedAt.put(entry.getGroupId(), entry.getLastWatched());
+            }
+            upsertChapter(user, entry.getGroupId(), target, entry.getLastWatched());
         }
         for (RecentEntry entry : watchStatusRepository.findRecentMovieEntries(userId, cutoff)) {
             upsertMovie(user, entry.getGroupId(), entry.getWatched() ? null : entry.getItemId(), entry.getLastWatched());
         }
         for (RecentEntry entry : watchStatusRepository.findRecentBookEntries(userId, cutoff)) {
-            boolean started = !entry.getWatched() && entry.getReadingProgress() != null && entry.getReadingProgress() > 0;
-            upsertBook(user, entry.getGroupId(), started ? entry.getItemId() : null, entry.getLastWatched());
+            upsertBook(user, entry.getGroupId(),
+                    epubTarget(entry, audioFinishedAt.get(entry.getGroupId())), entry.getLastWatched());
         }
         for (RecentEntry entry : watchStatusRepository.findRecentComicEntries(userId, cutoff)) {
             upsertComicVolume(user, entry.getGroupId(), comicTarget(userId, entry), entry.getLastWatched());
@@ -242,6 +257,17 @@ public class ContinueWatchingService {
         return chapterRepository.findById(entry.getItemId())
                 .flatMap(chapter -> nextUnfinishedChapter(entry.getGroupId(), userId, chapter.getNumber()))
                 .orElse(null);
+    }
+
+    /**
+     * The rebuild twin of the completion rule in {@code onChapterChanged}: a reading position only
+     * counts when it is newer than the moment the user finished the audiobook — an older one is a
+     * leftover of the listen-through, not a read in progress.
+     */
+    private static UUID epubTarget(RecentEntry entry, Instant audioFinishedAt) {
+        boolean started = !entry.getWatched() && entry.getReadingProgress() != null && entry.getReadingProgress() > 0;
+        boolean staleAfterFinish = audioFinishedAt != null && !entry.getLastWatched().isAfter(audioFinishedAt);
+        return started && !staleAfterFinish ? entry.getItemId() : null;
     }
 
     private UUID podcastTarget(UUID userId, RecentEntry entry) {

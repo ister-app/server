@@ -218,6 +218,60 @@ class ContinueWatchingIntegrationTest {
         assertEquals(book.getId(), entry.getBookEntity().getId(), "reading slot set");
     }
 
+    /** Finishing the last chapter completes the book: an older epub position must not keep it listed. */
+    @Test
+    void finishingTheLastChapterCompletesTheBookDespiteAStaleReadingPosition() {
+        LibraryEntity library = em.persist(LibraryEntity.builder()
+                .libraryType(LibraryType.BOOK).name("Books-" + UUID.randomUUID()).build());
+        PersonEntity author = em.persist(PersonEntity.builder().name("Author").build());
+        BookEntity book = em.persist(BookEntity.builder()
+                .libraryEntity(library).personEntity(author).name("Book").releaseYear(2021).build());
+        ChapterEntity chapter1 = em.persist(ChapterEntity.builder()
+                .bookEntity(book).personEntity(author).number(1).build());
+        ChapterEntity chapter2 = em.persist(ChapterEntity.builder()
+                .bookEntity(book).personEntity(author).number(2).build());
+        em.flush();
+
+        // Read a bit of the epub, then listen the audiobook through to the end.
+        WatchStatusEntity reading = em.persistAndFlush(WatchStatusEntity.builder()
+                .userEntity(user).playQueueItemId(book.getId()).bookEntity(book)
+                .readingProgress(0.19).watched(false).build());
+        subject.onWatchStatusChanged(reading);
+        em.flush();
+        em.clear();
+        WatchStatusEntity chapter1Status = playedChapter(chapter1, true);
+        playedChapter(chapter2, true);
+
+        assertTrue(subject.entriesFor(user.getId()).isEmpty(),
+                "audiobook finished: the stale reading position must not keep the book in the list");
+
+        // Starting an earlier chapter again is a fresh start: the real heartbeat reuses the row
+        // (one watch status per user+chapter) and flips watched back — the book returns.
+        WatchStatusEntity restarted = em.find(WatchStatusEntity.class, chapter1Status.getId());
+        restarted.setWatched(false);
+        restarted.setProgressInMilliseconds(10_000);
+        subject.onWatchStatusChanged(restarted);
+        em.flush();
+        em.clear();
+
+        ContinueWatchingEntity entry = onlyEntry();
+        assertEquals(chapter1.getId(), entry.getChapterEntity().getId());
+    }
+
+    private WatchStatusEntity playedChapter(ChapterEntity chapter, boolean watched) {
+        WatchStatusEntity status = em.persistAndFlush(WatchStatusEntity.builder()
+                .userEntity(user)
+                .playQueueItemId(UUID.randomUUID())
+                .chapterEntity(chapter)
+                .progressInMilliseconds(30_000)
+                .watched(watched)
+                .build());
+        subject.onWatchStatusChanged(status);
+        em.flush();
+        em.clear();
+        return status;
+    }
+
     private WatchStatusEntity playedPodcast(PodcastEpisodeEntity episode, boolean watched) {
         WatchStatusEntity status = em.persistAndFlush(WatchStatusEntity.builder()
                 .userEntity(user)
