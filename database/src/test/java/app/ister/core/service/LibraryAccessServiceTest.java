@@ -59,7 +59,8 @@ class LibraryAccessServiceTest {
     private void givenNonAdminJwtUser(String name) {
         when(authentication.getName()).thenReturn(name);
         doReturn(List.of(new SimpleGrantedAuthority("ROLE_user"))).when(authentication).getAuthorities();
-        lenient().when(authentication.getPrincipal()).thenReturn(mock(Jwt.class));
+        Jwt jwt = mock(Jwt.class);
+        lenient().when(authentication.getPrincipal()).thenReturn(jwt);
     }
 
     @Test

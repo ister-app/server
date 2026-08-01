@@ -75,7 +75,8 @@ class EpubResourceControllerTest {
         }
 
         MediaFileEntity mediaFile = mock(MediaFileEntity.class);
-        lenient().when(mediaFile.getBookEntity()).thenReturn(mock(BookEntity.class));
+        BookEntity book = mock(BookEntity.class);
+        lenient().when(mediaFile.getBookEntity()).thenReturn(book);
         lenient().when(mediaFile.getPath()).thenReturn(epub.toString());
         lenient().when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
     }
@@ -170,7 +171,8 @@ class EpubResourceControllerTest {
     void nonEpubMediaFileIs404() throws IOException {
         UUID otherId = UUID.randomUUID();
         MediaFileEntity mp3 = mock(MediaFileEntity.class);
-        when(mp3.getBookEntity()).thenReturn(mock(BookEntity.class));
+        BookEntity book = mock(BookEntity.class);
+        when(mp3.getBookEntity()).thenReturn(book);
         when(mp3.getPath()).thenReturn(tempDir.resolve("chapter.mp3").toString());
         when(mediaFileRepository.findById(otherId)).thenReturn(Optional.of(mp3));
 
@@ -182,7 +184,8 @@ class EpubResourceControllerTest {
     void missingEpubOnDiskIs404() throws IOException {
         UUID otherId = UUID.randomUUID();
         MediaFileEntity gone = mock(MediaFileEntity.class);
-        when(gone.getBookEntity()).thenReturn(mock(BookEntity.class));
+        BookEntity book = mock(BookEntity.class);
+        when(gone.getBookEntity()).thenReturn(book);
         when(gone.getPath()).thenReturn(tempDir.resolve("gone.epub").toString());
         when(mediaFileRepository.findById(otherId)).thenReturn(Optional.of(gone));
 

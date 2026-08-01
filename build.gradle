@@ -14,6 +14,12 @@ sonar {
 		property "sonar.organization", "ister-app"
 		property "sonar.host.url", "https://sonarcloud.io"
 		property "sonar.coverage.exclusions", "**/tmdbapi/**,**/core/entity/**,**/core/enums/**,**/core/eventdata/**,**/config/**,**/server/**,**/disk/StartupTasks*"
+		// S2160 ("override equals in subclass"): BaseEntity's id-only equals is deliberate for JPA
+		// entities — subclass fields must NOT participate, and it cannot be final because a lazy
+		// Hibernate proxy overrides equals to delegate to the initialized entity.
+		property "sonar.issue.ignore.multicriteria", "entityEquals"
+		property "sonar.issue.ignore.multicriteria.entityEquals.ruleKey", "java:S2160"
+		property "sonar.issue.ignore.multicriteria.entityEquals.resourceKey", "**/core/entity/**"
 	}
 }
 

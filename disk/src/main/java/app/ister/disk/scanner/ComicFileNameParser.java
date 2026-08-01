@@ -25,11 +25,6 @@ public final class ComicFileNameParser {
      */
     private static final Pattern VOLUME = Pattern.compile("(?i)(?<![a-z])vol(?:ume)?[ ._-]*(\\d+(?:\\.\\d+)?)");
     private static final Pattern ISSUE = Pattern.compile("(?i)(?<![a-z])issue[ ._-]*+(\\d++)|#(\\d++)");
-    /**
-     * Trailing digits on the basename ("fairytail 3", "chapter12"). The lookbehind restricts
-     * matching to the start of a digit run, keeping find() linear on long digit sequences.
-     */
-    private static final Pattern TRAILING_DIGITS = Pattern.compile("(?<!\\d)(\\d++)$");
     /** A trailing "-N": a filesystem dedupe suffix on a re-downloaded file ("...part2-1"). */
     private static final Pattern DEDUPE_SUFFIX = Pattern.compile("-\\d+$");
 
@@ -60,12 +55,29 @@ public final class ComicFileNameParser {
             String subtitle = subtitleAfter(identity, issue.end());
             return new ComicName(identity, number, subtitle != null ? subtitle : "Issue " + formatNumber(number));
         }
-        Matcher trailing = TRAILING_DIGITS.matcher(identity);
-        if (trailing.find() && trailing.start() > 0) {
-            return new ComicName(identity, Double.valueOf(trailing.group(1)),
-                    humanize(identity.substring(0, trailing.start())) + " " + trailing.group(1));
+        int digitsStart = trailingDigitsStart(identity);
+        if (digitsStart > 0 && digitsStart < identity.length()) {
+            String digits = identity.substring(digitsStart);
+            return new ComicName(identity, Double.valueOf(digits),
+                    humanize(identity.substring(0, digitsStart)) + " " + digits);
         }
         return new ComicName(identity, null, humanize(identity));
+    }
+
+    /**
+     * Start of the trailing digit run ("fairytail 3", "chapter12"), or {@code length()} when the
+     * name does not end in a digit.
+     */
+    private static int trailingDigitsStart(String value) {
+        int start = value.length();
+        while (start > 0 && isAsciiDigit(value.charAt(start - 1))) {
+            start--;
+        }
+        return start;
+    }
+
+    private static boolean isAsciiDigit(char c) {
+        return c >= '0' && c <= '9';
     }
 
     /**

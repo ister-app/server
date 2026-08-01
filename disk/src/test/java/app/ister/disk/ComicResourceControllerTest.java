@@ -72,7 +72,8 @@ class ComicResourceControllerTest {
         }
 
         MediaFileEntity mediaFile = mock(MediaFileEntity.class);
-        lenient().when(mediaFile.getBookEntity()).thenReturn(mock(BookEntity.class));
+        BookEntity book = mock(BookEntity.class);
+        lenient().when(mediaFile.getBookEntity()).thenReturn(book);
         lenient().when(mediaFile.getPath()).thenReturn(cbz.toString());
         lenient().when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
     }

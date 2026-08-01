@@ -15,8 +15,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -33,12 +31,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
 public class BookSeriesService {
-
-    /**
-     * " - ", " – ", " — " (spaced dashes) or ": " — the first one splits series from title. The
-     * lookbehind restricts matching to the start of a whitespace run, keeping find() linear.
-     */
-    private static final Pattern SEPARATOR = Pattern.compile("(?<!\\s)(?:\\s++[-–—]\\s++|\\s*+:\\s++)");
 
     private final SeriesRepository seriesRepository;
     private final BookRepository bookRepository;
@@ -149,21 +141,56 @@ public class BookSeriesService {
             return null;
         }
         String remainder = name.substring(seriesName.length());
-        Matcher separator = SEPARATOR.matcher(remainder);
-        if (!separator.lookingAt()) {
+        int[] separator = findSeparator(remainder);
+        if (separator == null || separator[0] != 0) {
             return null;
         }
-        String title = remainder.substring(separator.end()).strip();
+        String title = remainder.substring(separator[1]).strip();
         return title.isEmpty() ? null : title;
     }
 
     /** The part of the name before the first separator, or null when there is none. */
     private String prefixOf(String name) {
-        Matcher separator = SEPARATOR.matcher(name);
-        if (!separator.find() || separator.start() == 0) {
+        int[] separator = findSeparator(name);
+        if (separator == null || separator[0] == 0) {
             return null;
         }
-        return name.substring(0, separator.start()).strip();
+        return name.substring(0, separator[0]).strip();
+    }
+
+    /**
+     * First series/title separator: a spaced dash (" - ", " – ", " — ") or a colon (whitespace
+     * allowed before, required after). Hand-rolled rather than a regex: the "start of a whitespace
+     * run" restriction needs a lookbehind, which Sonar's backtracking analysis cannot see through.
+     *
+     * @return {@code {start, end}} of the separator including its surrounding whitespace, or null
+     */
+    private static int[] findSeparator(String value) {
+        int length = value.length();
+        for (int i = 0; i < length; i++) {
+            if (i > 0 && Character.isWhitespace(value.charAt(i - 1))) {
+                continue; // a separator match starts at the beginning of a whitespace run
+            }
+            int mark = i;
+            while (mark < length && Character.isWhitespace(value.charAt(mark))) {
+                mark++;
+            }
+            if (mark == length) {
+                return null; // trailing whitespace, nothing can follow
+            }
+            char c = value.charAt(mark);
+            boolean spacedDash = mark > i && (c == '-' || c == '–' || c == '—');
+            if (spacedDash || c == ':') {
+                int end = mark + 1;
+                while (end < length && Character.isWhitespace(value.charAt(end))) {
+                    end++;
+                }
+                if (end > mark + 1) {
+                    return new int[]{i, end};
+                }
+            }
+        }
+        return null;
     }
 
     private String normalize(String prefix) {
