@@ -145,7 +145,7 @@ jobs:
             || { echo "release version still carries -SNAPSHOT" >&2; exit 1; }
           git --no-pager diff build.gradle
 
-      - uses: graalvm/setup-graalvm@8c5543b71f44568342e106336639979e94a8f6de # v1.6.1
+      - uses: graalvm/setup-graalvm@0def53c0fd8534bc13416c9469f5be45265824fd # v1.6.3
         with:
           version: '25.2.4' # GraalVM CE innovation release, jdk 25.0.4
           java-version: '25'
@@ -175,7 +175,7 @@ jobs:
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - name: Log into registry ${{ env.REGISTRY }}
-        uses: docker/login-action@371161bbe7024a29a25c5e19bfcbc0804fe9ad2c # v4.5.2
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
