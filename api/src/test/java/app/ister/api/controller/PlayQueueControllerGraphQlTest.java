@@ -1,0 +1,116 @@
+package app.ister.api.controller;
+
+import app.ister.core.entity.PlayQueueEntity;
+import app.ister.core.repository.ChapterRepository;
+import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.ImageRepository;
+import app.ister.core.repository.MediaFileRepository;
+import app.ister.core.repository.MovieRepository;
+import app.ister.core.repository.PlayQueueControlGrantRepository;
+import app.ister.core.repository.PodcastEpisodeRepository;
+import app.ister.core.repository.TrackRepository;
+import app.ister.core.service.PlayQueuePrefetchService;
+import app.ister.core.service.PlayQueueService;
+import app.ister.core.status.PlaybackCommandService;
+import app.ister.core.status.PlaybackSessionRegistry;
+import app.ister.core.status.PlaybackStatusService;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.graphql.test.autoconfigure.GraphQlTest;
+import org.springframework.graphql.test.tester.GraphQlTester;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+
+/**
+ * Schema-wiring test for getPlayQueue: the queue's own resume state
+ * (currentItemId + progressInMilliseconds) must round-trip to the client.
+ */
+@GraphQlTest(PlayQueueController.class)
+class PlayQueueControllerGraphQlTest {
+
+    @Autowired
+    private GraphQlTester graphQlTester;
+
+    @MockitoBean
+    private PlayQueueService playQueueService;
+
+    @MockitoBean
+    private EpisodeRepository episodeRepository;
+
+    @MockitoBean
+    private MovieRepository movieRepository;
+
+    @MockitoBean
+    private TrackRepository trackRepository;
+
+    @MockitoBean
+    private ChapterRepository chapterRepository;
+
+    @MockitoBean
+    private PodcastEpisodeRepository podcastEpisodeRepository;
+
+    @MockitoBean
+    private MediaFileRepository mediaFileRepository;
+
+    @MockitoBean
+    private ImageRepository imageRepository;
+
+    @MockitoBean
+    private PlayQueuePrefetchService playQueuePrefetchService;
+
+    @MockitoBean
+    private PlaybackStatusService playbackStatusService;
+
+    @MockitoBean
+    private PlaybackSessionRegistry playbackSessionRegistry;
+
+    @MockitoBean
+    private PlaybackCommandService playbackCommandService;
+
+    @MockitoBean
+    private PlayQueueControlGrantRepository playQueueControlGrantRepository;
+
+    @BeforeEach
+    void authenticateAsUser() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        "test-user", null,
+                        List.of(new SimpleGrantedAuthority("ROLE_user"))));
+    }
+
+    @AfterEach
+    void clearAuthentication() {
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void getPlayQueueExposesCurrentItemAndProgress() {
+        UUID currentItemId = UUID.randomUUID();
+        PlayQueueEntity queue = PlayQueueEntity.builder()
+                .currentItem(currentItemId)
+                .progressInMilliseconds(42_000)
+                .build();
+        queue.setId(UUID.randomUUID());
+        when(playQueueService.getPlayQueue(eq(queue.getId()), any())).thenReturn(Optional.of(queue));
+
+        assertDoesNotThrow(() -> graphQlTester.document("""
+                        { getPlayQueue(id: "%s") { id currentItemId progressInMilliseconds } }
+                        """.formatted(queue.getId()))
+                .execute()
+                .path("getPlayQueue.currentItemId").entity(String.class).isEqualTo(currentItemId.toString())
+                .path("getPlayQueue.progressInMilliseconds").entity(Integer.class).isEqualTo(42_000));
+    }
+}

@@ -578,6 +578,8 @@ type PlayQueue {
     id: ID!
     currentItemId: String
     currentItem: PlayQueueItem
+    "Last progress within the current item, as reported via updatePlayQueue."
+    progressInMilliseconds: Int!
     shuffle: Boolean!
     sourceType: PlayQueueSourceType
     "True when the source has no more items to append; the visible queue is the whole queue."
