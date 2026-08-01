@@ -78,7 +78,10 @@ type to create chapters instead of tracks.
   Discovery covers what the other two can't see: titles without a separator ("Harry Potter en de
   steen der wijzen") and audiobook-only books without epub metadata. When epub metadata *creates* a
   series, `BOOK_FOUND` re-fires once for the author's series-less books, so discovery converges
-  within one scan regardless of scan order.
+  within one scan regardless of scan order. The analyze backfill also re-dispatches `BOOK_FOUND`
+  for every series-less book whose author has a series — a rescan skips already-known files, so
+  without this a book whose discovery ran too early (or failed against Wikidata at the time) would
+  stay out of its series forever.
 - Epubs are read lazily by the client through `GET /epub/{mediaFileId}/resource/{entry}` ([chapter
   7](07-api-and-auth.md)); reading position is a `WatchStatusEntity` with `readingLocation`
   (epubcfi) + `readingProgress`.

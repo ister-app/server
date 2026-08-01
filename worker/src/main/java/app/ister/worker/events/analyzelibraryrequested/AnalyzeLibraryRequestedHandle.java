@@ -149,7 +149,8 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
      * <p>Books without an Open Library metadata row get their epubs re-parsed (EPUB_FILE_FOUND
      * writes the release date and ISBN, then chains BOOK_FOUND itself — dispatching BOOK_FOUND
      * directly would race the Open Library lookup against the ISBN being stored). Books without
-     * any epub file (audiobook-only) and books without a cover go straight to BOOK_FOUND. Finally
+     * any epub file (audiobook-only), books without a cover, series books with missing Wikidata
+     * info and series-less books whose author has a series go straight to BOOK_FOUND. Finally
      * the series heuristic runs per author, so pre-existing libraries converge without a rescan.
      */
     private void dispatchMissingBookMetadataEvents() {
@@ -183,6 +184,15 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
         // Series books with an unknown position or unresolved original year retry the Wikidata
         // lookup (the BOOK_FOUND handler runs it after the Open Library part).
         bookRepository.findSeriesBooksMissingWikidataInfo(LibraryType.BOOK).stream()
+                .map(BookEntity::getId)
+                .filter(dispatched::add)
+                .forEach(this::sendBookFound);
+
+        // Series-less books whose author has a series retry Wikidata series discovery: theirs may
+        // have run before the series existed, or failed against Wikidata at the time. Without this
+        // an already-enriched book (Open Library row + cover) is never dispatched again and stays
+        // out of its series forever.
+        bookRepository.findSerieslessBooksOfAuthorsWithSeries(LibraryType.BOOK).stream()
                 .map(BookEntity::getId)
                 .filter(dispatched::add)
                 .forEach(this::sendBookFound);

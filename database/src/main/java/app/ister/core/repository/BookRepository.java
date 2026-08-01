@@ -117,6 +117,21 @@ public interface BookRepository extends JpaRepository<BookEntity, UUID> {
     List<BookEntity> findSeriesBooksMissingWikidataInfo(LibraryType libraryType);
 
     /**
+     * Series-less books whose author already has a series — the set Wikidata series discovery
+     * exists for (it only ever links into an existing series). The analyze backfill re-dispatches
+     * these: their discovery may have run before the author's series existed, or failed against
+     * Wikidata at the time. A book genuinely outside every series stays in this set and is retried
+     * per analyze, mirroring the two sets above.
+     */
+    @Query("""
+            select b from BookEntity b
+            where b.libraryEntity.libraryType = :libraryType
+              and b.seriesEntity is null
+              and b.personEntity is not null
+              and exists (select s from SeriesEntity s where s.personEntity = b.personEntity)""")
+    List<BookEntity> findSerieslessBooksOfAuthorsWithSeries(LibraryType libraryType);
+
+    /**
      * The calling user's most recently read (or listened) books of a library, newest first. A
      * book's progress lives on its own watch row (epub reading) and on its chapters' rows
      * (audiobook listening); both count. UNION ALL instead of an OR-join so each branch can use

@@ -219,6 +219,26 @@ class AnalyzeLibraryRequestedHandleTest {
     }
 
     @Test
+    void handleSendsBookFoundForSerieslessBooksOfAuthorsWithSeries() {
+        NodeEntity nodeEntity = NodeEntity.builder().name("TestServer").build();
+        PersonEntity author = PersonEntity.builder().id(UUID.randomUUID()).name("Author").build();
+        // Already enriched (Open Library row + cover), so it appears in no other backfill set —
+        // this dispatch is the only way its Wikidata series discovery ever runs again.
+        BookEntity seriesless = BookEntity.builder().id(UUID.randomUUID())
+                .personEntity(author).name("Seriesless").build();
+
+        when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(nodeEntity);
+        when(bookRepository.findSerieslessBooksOfAuthorsWithSeries(LibraryType.BOOK))
+                .thenReturn(List.of(seriesless));
+
+        subject.handle(AnalyzeLibraryRequestedData.builder().eventType(EventType.ANALYZE_LIBRARY_REQUEST).build());
+
+        ArgumentCaptor<BookFoundData> captor = ArgumentCaptor.forClass(BookFoundData.class);
+        verify(messageSender).sendBookFound(captor.capture());
+        assertEquals(seriesless.getId(), captor.getValue().getBookId());
+    }
+
+    @Test
     void handleStartsEachSweepAtTheBeginningOfItsDirectory() {
         NodeEntity nodeEntity = NodeEntity.builder().name("TestServer").build();
         DirectoryEntity directory = DirectoryEntity.builder()

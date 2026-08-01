@@ -80,7 +80,10 @@ audiobook-mp3's via `ChapterEntity` (gestreamd over hetzelfde audio-only HLS-pad
   ("Harry Potter en de steen der wijzen") en audiobook-only boeken zonder epub-metadata. Wanneer
   epub-metadata een reeks *aanmaakt*, wordt `BOOK_FOUND` eenmalig opnieuw afgevuurd voor de
   reeksloze boeken van de auteur, zodat ontdekking binnen één scan convergeert ongeacht de
-  scanvolgorde.
+  scanvolgorde. De analyze-backfill dispatcht `BOOK_FOUND` bovendien opnieuw voor elk reeksloos
+  boek waarvan de auteur een reeks heeft — een herscan slaat al bekende bestanden over, dus zonder
+  dit zou een boek waarvan de ontdekking te vroeg draaide (of destijds tegen Wikidata faalde) voor
+  altijd buiten zijn reeks blijven.
 - Epubs worden door de client lazy gelezen via `GET /epub/{mediaFileId}/resource/{entry}`
   ([hoofdstuk 7](07-api-and-auth.md)); de leespositie is een `WatchStatusEntity` met
   `readingLocation` (epubcfi) + `readingProgress`.
