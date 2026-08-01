@@ -11,7 +11,25 @@
   "semanticCommitType": "fix",
   "semanticCommitScope": "deps",
 
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Fedora base image via endoflife.date instead of the docker registry: the fedora:<next> tag exists on the registry months before the release is stable, endoflife.date only lists a release once it actually shipped.",
+      "managerFilePatterns": ["/(^|/)Dockerfile\\.native$/"],
+      "matchStrings": ["FROM fedora:(?<currentValue>\\d+)"],
+      "depNameTemplate": "fedora",
+      "datasourceTemplate": "endoflife-date",
+      "versioningTemplate": "loose"
+    }
+  ],
+
   "packageRules": [
+    {
+      "description": "The custom manager above owns fedora; without this the docker manager would still propose pre-release tags like fedora:45.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["fedora"],
+      "enabled": false
+    },
     {
       "description": "Patch and digest bumps are automerged. They land before the 02:00 release run, so they ship the same night.",
       "matchUpdateTypes": ["patch", "digest"],
