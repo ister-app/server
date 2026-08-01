@@ -1,5 +1,29 @@
 # Changelog
 
+## server v2.5.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.5.0` |
+| `ghcr.io/ister-app/migrations` | `2.5.0` |
+
+### Features
+
+- feat: paged rankedX top-lists on Library for the show-all grids ([`617635e`](https://github.com/ister-app/server/commit/617635e))
+
+### Fixes
+
+- fix(worker): accept Wikidata mul labels when matching entities ([`86bf8cc`](https://github.com/ister-app/server/commit/86bf8cc))
+- fix(continue-watching): finishing the audiobook completes the book despite a stale epub position ([`c3bd3fe`](https://github.com/ister-app/server/commit/c3bd3fe))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.5.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.4.0...v2.5.0
+
 ## server v2.4.0
 
 | Image | Tag |
