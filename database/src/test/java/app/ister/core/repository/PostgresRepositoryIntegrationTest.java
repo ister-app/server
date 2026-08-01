@@ -556,18 +556,33 @@ class PostgresRepositoryIntegrationTest {
         em.flush();
 
         assertEquals(List.of(trackA.getId(), hiddenTrack.getId(), trackB.getId()),
-                trackRepository.findTopPlayedTrackIdsForPerson(artist.getId(), "listener-top", 10));
+                trackRepository.findTopPlayedTrackIdsForPerson(artist.getId(), "listener-top", Instant.now(), 10, 0));
         assertEquals(List.of(trackA.getId(), trackB.getId()),
-                trackRepository.findTopPlayedTrackIdsForPersonInLibraries(artist.getId(), "listener-top", List.of(library.getId()), 10));
+                trackRepository.findTopPlayedTrackIdsForPersonInLibraries(artist.getId(), "listener-top", List.of(library.getId()), Instant.now(), 10, 0));
         assertEquals(List.of(hiddenTrack.getId(), trackB.getId(), trackA.getId()),
-                trackRepository.findRecentlyPlayedTrackIdsForPerson(artist.getId(), "listener-top", 10));
+                trackRepository.findRecentlyPlayedTrackIdsForPerson(artist.getId(), "listener-top", Instant.now(), 10, 0));
         assertEquals(List.of(trackB.getId(), trackA.getId()),
-                trackRepository.findTopRatedTrackIdsForPerson(artist.getId(), "listener-top", 10));
+                trackRepository.findTopRatedTrackIdsForPerson(artist.getId(), "listener-top", 10, 0));
         // Album-artist match: the album's artist sees the album's tracks too.
         assertEquals(List.of(trackA.getId(), trackB.getId()),
-                trackRepository.findTopPlayedTrackIdsForPersonInLibraries(albumArtist.getId(), "listener-top", List.of(library.getId()), 10));
-        assertEquals(2, trackRepository.findTopPlayedTrackIdsForPerson(artist.getId(), "listener-top", 2).size(),
+                trackRepository.findTopPlayedTrackIdsForPersonInLibraries(albumArtist.getId(), "listener-top", List.of(library.getId()), Instant.now(), 10, 0));
+        assertEquals(2, trackRepository.findTopPlayedTrackIdsForPerson(artist.getId(), "listener-top", Instant.now(), 2, 0).size(),
                 "limit is applied");
+
+        // The ranking is frozen at asOf: plays recorded later don't count, so an ARTIST play
+        // queue paging with its creation time keeps a deterministic order while it is played.
+        Instant asOf = Instant.now();
+        em.persistAndFlush(trackPlay(user, trackB));
+        em.persistAndFlush(trackPlay(user, trackB));
+        assertEquals(List.of(trackB.getId(), trackA.getId(), hiddenTrack.getId()),
+                trackRepository.findTopPlayedTrackIdsForPerson(artist.getId(), "listener-top", Instant.now(), 10, 0),
+                "a fresh asOf sees the new plays");
+        assertEquals(List.of(trackA.getId(), hiddenTrack.getId(), trackB.getId()),
+                trackRepository.findTopPlayedTrackIdsForPerson(artist.getId(), "listener-top", asOf, 10, 0),
+                "the frozen asOf does not");
+        assertEquals(List.of(hiddenTrack.getId(), trackB.getId()),
+                trackRepository.findTopPlayedTrackIdsForPerson(artist.getId(), "listener-top", asOf, 10, 1),
+                "offset pages the frozen ranking");
     }
 
     // --- library Discover top-lists ---

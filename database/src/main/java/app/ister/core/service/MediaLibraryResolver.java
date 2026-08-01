@@ -61,6 +61,9 @@ public class MediaLibraryResolver {
             case BOOK -> bookRepository.findById(sourceId).map(BookEntity::getLibraryEntity);
             case PODCAST -> podcastRepository.findById(sourceId).map(PodcastEntity::getLibraryEntity);
             case LIBRARY -> libraryRepository.findById(sourceId);
+            // An artist spans libraries; ARTIST queue access is enforced per chunk through the
+            // library-filtered ranked-track queries instead.
+            case ARTIST -> Optional.empty();
         };
     }
 

@@ -29,6 +29,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -123,8 +124,8 @@ public class PersonController {
         return tracksInOrder(libraryAccessService.allowedLibraryIds(authentication)
                 .map(allowed -> allowed.isEmpty()
                         ? List.<UUID>of()
-                        : trackRepository.findTopPlayedTrackIdsForPersonInLibraries(personEntity.getId(), authentication.getName(), allowed, max))
-                .orElseGet(() -> trackRepository.findTopPlayedTrackIdsForPerson(personEntity.getId(), authentication.getName(), max)));
+                        : trackRepository.findTopPlayedTrackIdsForPersonInLibraries(personEntity.getId(), authentication.getName(), allowed, Instant.now(), max, 0))
+                .orElseGet(() -> trackRepository.findTopPlayedTrackIdsForPerson(personEntity.getId(), authentication.getName(), Instant.now(), max, 0)));
     }
 
     @SchemaMapping(typeName = "Person", field = "recentlyPlayedTracks")
@@ -133,8 +134,8 @@ public class PersonController {
         return tracksInOrder(libraryAccessService.allowedLibraryIds(authentication)
                 .map(allowed -> allowed.isEmpty()
                         ? List.<UUID>of()
-                        : trackRepository.findRecentlyPlayedTrackIdsForPersonInLibraries(personEntity.getId(), authentication.getName(), allowed, max))
-                .orElseGet(() -> trackRepository.findRecentlyPlayedTrackIdsForPerson(personEntity.getId(), authentication.getName(), max)));
+                        : trackRepository.findRecentlyPlayedTrackIdsForPersonInLibraries(personEntity.getId(), authentication.getName(), allowed, Instant.now(), max, 0))
+                .orElseGet(() -> trackRepository.findRecentlyPlayedTrackIdsForPerson(personEntity.getId(), authentication.getName(), Instant.now(), max, 0)));
     }
 
     @SchemaMapping(typeName = "Person", field = "topRatedTracks")
@@ -143,8 +144,8 @@ public class PersonController {
         return tracksInOrder(libraryAccessService.allowedLibraryIds(authentication)
                 .map(allowed -> allowed.isEmpty()
                         ? List.<UUID>of()
-                        : trackRepository.findTopRatedTrackIdsForPersonInLibraries(personEntity.getId(), authentication.getName(), allowed, max))
-                .orElseGet(() -> trackRepository.findTopRatedTrackIdsForPerson(personEntity.getId(), authentication.getName(), max)));
+                        : trackRepository.findTopRatedTrackIdsForPersonInLibraries(personEntity.getId(), authentication.getName(), allowed, max, 0))
+                .orElseGet(() -> trackRepository.findTopRatedTrackIdsForPerson(personEntity.getId(), authentication.getName(), max, 0)));
     }
 
     private static int clampLimit(Optional<Integer> limit) {

@@ -4,6 +4,7 @@ import app.ister.core.entity.*;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayQueueSourceType;
+import app.ister.core.enums.RankKind;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.enums.SubtitleFormat;
 import app.ister.core.repository.*;
@@ -18,9 +19,11 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.IntStream;
 
@@ -114,11 +117,14 @@ class PlayQueueServiceTest {
     }
 
     /**
-     * Simulates JPA assigning IDs to new items on save.
+     * Simulates JPA assigning IDs to new items and auditing stamping dateCreated on save.
      */
     private void mockSaveAssignsItemIds() {
         when(playQueueRepository.save(any(PlayQueueEntity.class))).thenAnswer(inv -> {
             PlayQueueEntity queue = inv.getArgument(0);
+            if (queue.getDateCreated() == null) {
+                queue.setDateCreated(Instant.now());
+            }
             queue.getItems().stream()
                     .filter(item -> item.getId() == null)
                     .forEach(item -> item.setId(UUID.randomUUID()));
@@ -250,7 +256,7 @@ class PlayQueueServiceTest {
         List<UUID> episodeIds = IntStream.range(0, 50).mapToObj(i -> UUID.randomUUID()).toList();
         when(episodeRepository.findEpisodeIdsForShowOrdered(showId, 50, 0)).thenReturn(episodeIds);
 
-        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.SHOW, showId, null, false, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.SHOW, showId, null, false, null, authentication);
 
         assertEquals(50, result.getItems().size());
         assertEquals(episodeIds.getFirst(), result.getItems().getFirst().getEpisodeEntityId());
@@ -272,7 +278,7 @@ class PlayQueueServiceTest {
         when(podcastEpisodeRepository.findEpisodeIdsForPodcastOrderedAsc(podcastId, 50, 0))
                 .thenReturn(oldestFirst);
 
-        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.PODCAST, podcastId, null, false, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.PODCAST, podcastId, null, false, null, authentication);
 
         assertTrue(result.isSourceAscending());
         assertEquals(oldestFirst.getFirst(), result.getItems().getFirst().getPodcastEpisodeEntityId());
@@ -289,7 +295,7 @@ class PlayQueueServiceTest {
         when(podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(podcastId, 50, 0))
                 .thenReturn(List.of(UUID.randomUUID()));
 
-        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.PODCAST, podcastId, null, false, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.PODCAST, podcastId, null, false, null, authentication);
 
         assertFalse(result.isSourceAscending());
     }
@@ -340,7 +346,7 @@ class PlayQueueServiceTest {
         when(episodeRepository.findEpisodeIdsForShowOrdered(showId, 50, 0))
                 .thenReturn(List.of(UUID.randomUUID(), UUID.randomUUID()));
 
-        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.SHOW, showId, null, false, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.SHOW, showId, null, false, null, authentication);
 
         assertEquals(2, result.getItems().size());
         assertTrue(result.isSourceExhausted());
@@ -359,7 +365,7 @@ class PlayQueueServiceTest {
         when(episodeRepository.findIdsOnlyByShowEntityId(eq(showId), any(Sort.class))).thenReturn(idOnlies);
         when(episodeRepository.findEpisodeIdsForShowOrdered(showId, 50, 30)).thenReturn(allIds.subList(30, 80));
 
-        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.SHOW, showId, startId, false, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.SHOW, showId, startId, false, null, authentication);
 
         assertEquals(50, result.getItems().size());
         assertEquals(80, result.getSourceOffset());
@@ -377,7 +383,7 @@ class PlayQueueServiceTest {
 
         UUID startId = UUID.randomUUID();
         assertThrows(IllegalArgumentException.class,
-                () -> subject.createPlayQueue(PlayQueueSourceType.SHOW, showId, startId, false, authentication));
+                () -> subject.createPlayQueue(PlayQueueSourceType.SHOW, showId, startId, false, null, authentication));
     }
 
     @Test
@@ -386,7 +392,7 @@ class PlayQueueServiceTest {
         mockSaveAssignsItemIds();
         UUID movieId = UUID.randomUUID();
 
-        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.MOVIE, movieId, null, false, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.MOVIE, movieId, null, false, null, authentication);
 
         assertEquals(1, result.getItems().size());
         assertEquals(movieId, result.getItems().getFirst().getMovieEntityId());
@@ -402,7 +408,7 @@ class PlayQueueServiceTest {
         List<UUID> trackIds = List.of(UUID.randomUUID(), UUID.randomUUID());
         when(trackRepository.findTrackIdsForAlbumOrdered(albumId, 50, 0)).thenReturn(trackIds);
 
-        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.ALBUM, albumId, null, false, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.ALBUM, albumId, null, false, null, authentication);
 
         assertEquals(2, result.getItems().size());
         assertEquals(MediaType.TRACK, result.getItems().getFirst().getType());
@@ -415,7 +421,7 @@ class PlayQueueServiceTest {
         UUID libraryId = UUID.randomUUID();
 
         assertThrows(IllegalArgumentException.class,
-                () -> subject.createPlayQueue(PlayQueueSourceType.LIBRARY, libraryId, null, false, authentication));
+                () -> subject.createPlayQueue(PlayQueueSourceType.LIBRARY, libraryId, null, false, null, authentication));
     }
 
     @Test
@@ -426,7 +432,7 @@ class PlayQueueServiceTest {
                 .thenReturn(Optional.of(LibraryEntity.builder().libraryType(LibraryType.SHOW).build()));
 
         assertThrows(IllegalArgumentException.class,
-                () -> subject.createPlayQueue(PlayQueueSourceType.LIBRARY, libraryId, null, true, authentication));
+                () -> subject.createPlayQueue(PlayQueueSourceType.LIBRARY, libraryId, null, true, null, authentication));
     }
 
     @Test
@@ -440,7 +446,7 @@ class PlayQueueServiceTest {
         when(trackRepository.findTrackIdsForLibraryShuffled(eq(libraryId), anyString(), eq(NIL_UUID), eq(50), eq(0)))
                 .thenReturn(trackIds);
 
-        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.LIBRARY, libraryId, null, true, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.LIBRARY, libraryId, null, true, null, authentication);
 
         assertTrue(result.isShuffle());
         assertNotNull(result.getShuffleSeed());
@@ -458,7 +464,7 @@ class PlayQueueServiceTest {
         when(movieRepository.findMovieIdsForLibraryShuffled(eq(libraryId), anyString(), eq(NIL_UUID), eq(50), eq(0)))
                 .thenReturn(List.of(UUID.randomUUID()));
 
-        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.LIBRARY, libraryId, null, true, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.LIBRARY, libraryId, null, true, null, authentication);
 
         assertEquals(MediaType.MOVIE, result.getItems().getFirst().getType());
     }
@@ -473,7 +479,7 @@ class PlayQueueServiceTest {
         when(episodeRepository.findEpisodeIdsForShowShuffled(eq(showId), anyString(), eq(startId), eq(50), eq(0)))
                 .thenReturn(chunkIds);
 
-        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.SHOW, showId, startId, true, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.SHOW, showId, startId, true, null, authentication);
 
         assertEquals(3, result.getItems().size());
         assertEquals(startId, result.getItems().getFirst().getEpisodeEntityId());
@@ -485,6 +491,142 @@ class PlayQueueServiceTest {
                 .filter(item -> item.getId().equals(result.getCurrentItem()))
                 .findFirst().orElseThrow();
         assertEquals(startId, current.getEpisodeEntityId());
+    }
+
+    // --- ARTIST (ranked artist list) queues ---
+
+    @Test
+    void createPlayQueueForArtistUsesRankedOrderFrozenAtCreation() {
+        user = UserEntity.builder().id(UUID.randomUUID()).externalId("listener").build();
+        mockUser();
+        mockSaveAssignsItemIds();
+        UUID personId = UUID.randomUUID();
+        List<UUID> trackIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+        when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.empty());
+        when(trackRepository.findTopPlayedTrackIdsForPerson(eq(personId), eq("listener"), any(Instant.class), eq(50), eq(0)))
+                .thenReturn(trackIds);
+
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.ARTIST, personId, null, false, RankKind.MOST_PLAYED, authentication);
+
+        assertEquals(2, result.getItems().size());
+        assertEquals(MediaType.TRACK, result.getItems().getFirst().getType());
+        assertEquals(trackIds.getFirst(), result.getItems().getFirst().getTrackEntityId());
+        assertEquals(RankKind.MOST_PLAYED, result.getRankKind());
+        assertTrue(result.isSourceExhausted());
+        // The ranking's freeze point is the queue's own creation time.
+        verify(trackRepository).findTopPlayedTrackIdsForPerson(personId, "listener", result.getDateCreated(), 50, 0);
+    }
+
+    @Test
+    void createPlayQueueForArtistStartsAtStartIdWithBackWindow() {
+        user = UserEntity.builder().id(UUID.randomUUID()).externalId("listener").build();
+        mockUser();
+        mockSaveAssignsItemIds();
+        UUID personId = UUID.randomUUID();
+        List<UUID> ranked = IntStream.range(0, 30).mapToObj(i -> UUID.randomUUID()).toList();
+        UUID startId = ranked.get(20);
+        when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.empty());
+        when(trackRepository.findRecentlyPlayedTrackIdsForPerson(eq(personId), eq("listener"), any(Instant.class), eq(Integer.MAX_VALUE), eq(0)))
+                .thenReturn(ranked);
+        when(trackRepository.findRecentlyPlayedTrackIdsForPerson(eq(personId), eq("listener"), any(Instant.class), eq(50), eq(10)))
+                .thenReturn(ranked.subList(10, 30));
+
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.ARTIST, personId, startId, false, RankKind.RECENTLY_PLAYED, authentication);
+
+        // The materialized window starts BACK_WINDOW items before the start item.
+        assertEquals(20, result.getItems().size());
+        assertEquals(ranked.get(10), result.getItems().getFirst().getTrackEntityId());
+        assertTrue(result.isSourceExhausted());
+        PlayQueueItemEntity current = result.getItems().stream()
+                .filter(item -> item.getId().equals(result.getCurrentItem()))
+                .findFirst().orElseThrow();
+        assertEquals(startId, current.getTrackEntityId());
+    }
+
+    @Test
+    void createPlayQueueForArtistFiltersToAllowedLibraries() {
+        user = UserEntity.builder().id(UUID.randomUUID()).externalId("listener").build();
+        mockUser();
+        mockSaveAssignsItemIds();
+        UUID personId = UUID.randomUUID();
+        UUID trackId = UUID.randomUUID();
+        Set<UUID> allowed = Set.of(UUID.randomUUID());
+        when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.of(allowed));
+        when(trackRepository.findTopRatedTrackIdsForPersonInLibraries(personId, "listener", allowed, 50, 0))
+                .thenReturn(List.of(trackId));
+
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.ARTIST, personId, null, false, RankKind.HIGHEST_RATED, authentication);
+
+        assertEquals(1, result.getItems().size());
+        assertEquals(trackId, result.getItems().getFirst().getTrackEntityId());
+    }
+
+    @Test
+    void createPlayQueueForArtistWithoutAnyAllowedLibraryThrows() {
+        mockUser();
+        mockSaveAssignsItemIds();
+        UUID personId = UUID.randomUUID();
+        when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.of(Set.of()));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> subject.createPlayQueue(PlayQueueSourceType.ARTIST, personId, null, false, RankKind.MOST_PLAYED, authentication));
+    }
+
+    @Test
+    void createPlayQueueForArtistRejectsShuffle() {
+        mockUser();
+        UUID personId = UUID.randomUUID();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> subject.createPlayQueue(PlayQueueSourceType.ARTIST, personId, null, true, RankKind.MOST_PLAYED, authentication));
+    }
+
+    @Test
+    void createPlayQueueForArtistRequiresRankKind() {
+        UUID personId = UUID.randomUUID();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> subject.createPlayQueue(PlayQueueSourceType.ARTIST, personId, null, false, null, authentication));
+    }
+
+    @Test
+    void createPlayQueueRejectsRankKindForOtherSources() {
+        UUID albumId = UUID.randomUUID();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> subject.createPlayQueue(PlayQueueSourceType.ALBUM, albumId, null, false, RankKind.MOST_PLAYED, authentication));
+    }
+
+    @Test
+    void getPlayQueueExtendsArtistQueueWithTheCreationTimeRanking() {
+        user = UserEntity.builder().id(UUID.randomUUID()).externalId("listener").build();
+        mockUser();
+        UUID personId = UUID.randomUUID();
+        Instant asOf = Instant.parse("2026-01-01T00:00:00Z");
+        PlayQueueItemEntity item = buildItem(MediaType.TRACK, UUID.randomUUID(), "1000");
+        PlayQueueEntity queue = PlayQueueEntity.builder()
+                .id(UUID.randomUUID())
+                .userEntity(user)
+                .sourceType(PlayQueueSourceType.ARTIST)
+                .sourceId(personId)
+                .rankKind(RankKind.MOST_PLAYED)
+                .sourceOffset(50)
+                .currentItem(item.getId())
+                .items(new ArrayList<>(List.of(item)))
+                .build();
+        queue.setDateCreated(asOf);
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.empty());
+        // Extension pages with the frozen asOf, not the current time.
+        when(trackRepository.findTopPlayedTrackIdsForPerson(personId, "listener", asOf, 50, 50))
+                .thenReturn(List.of(UUID.randomUUID()));
+
+        subject.getPlayQueue(queue.getId(), authentication);
+
+        assertEquals(2, queue.getItems().size());
+        assertEquals(51, queue.getSourceOffset());
+        assertTrue(queue.isSourceExhausted());
+        verify(playQueueRepository).save(queue);
     }
 
     // --- updatePlayQueue ---
@@ -1088,7 +1230,7 @@ class PlayQueueServiceTest {
         List<UUID> chapterIds = List.of(UUID.randomUUID(), UUID.randomUUID());
         when(chapterRepository.findChapterIdsForBookOrdered(bookId, 50, 0)).thenReturn(chapterIds);
 
-        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.BOOK, bookId, null, false, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.BOOK, bookId, null, false, null, authentication);
 
         assertEquals(MediaType.CHAPTER, result.getItems().getFirst().getType());
         assertEquals(chapterIds.getFirst(), result.getItems().getFirst().getChapterEntityId());
@@ -1112,7 +1254,7 @@ class PlayQueueServiceTest {
         when(chapterRepository.findChapterIdsForBookOrdered(bookId, 50, 0))
                 .thenReturn(chapters.stream().map(ChapterEntity::getId).toList());
 
-        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.BOOK, bookId, startId, false, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.BOOK, bookId, startId, false, null, authentication);
 
         PlayQueueItemEntity current = result.getItems().stream()
                 .filter(item -> item.getId().equals(result.getCurrentItem()))
@@ -1126,7 +1268,7 @@ class PlayQueueServiceTest {
         UUID bookId = UUID.randomUUID();
 
         assertThrows(IllegalArgumentException.class,
-                () -> subject.createPlayQueue(PlayQueueSourceType.BOOK, bookId, null, true, authentication));
+                () -> subject.createPlayQueue(PlayQueueSourceType.BOOK, bookId, null, true, null, authentication));
     }
 
     @Test
@@ -1135,7 +1277,7 @@ class PlayQueueServiceTest {
         UUID podcastId = UUID.randomUUID();
 
         assertThrows(IllegalArgumentException.class,
-                () -> subject.createPlayQueue(PlayQueueSourceType.PODCAST, podcastId, null, true, authentication));
+                () -> subject.createPlayQueue(PlayQueueSourceType.PODCAST, podcastId, null, true, null, authentication));
     }
 
     @Test
@@ -1150,7 +1292,7 @@ class PlayQueueServiceTest {
                 .thenReturn(newestFirst);
         when(podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(podcastId, 50, 0)).thenReturn(newestFirst);
 
-        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.PODCAST, podcastId, startId, false, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.PODCAST, podcastId, startId, false, null, authentication);
 
         PlayQueueItemEntity current = result.getItems().stream()
                 .filter(item -> item.getId().equals(result.getCurrentItem()))
@@ -1170,7 +1312,7 @@ class PlayQueueServiceTest {
                 .thenReturn(oldestFirst);
         when(podcastEpisodeRepository.findEpisodeIdsForPodcastOrderedAsc(podcastId, 50, 0)).thenReturn(oldestFirst);
 
-        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.PODCAST, podcastId, startId, false, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.PODCAST, podcastId, startId, false, null, authentication);
 
         PlayQueueItemEntity current = result.getItems().stream()
                 .filter(item -> item.getId().equals(result.getCurrentItem()))
@@ -1209,7 +1351,7 @@ class PlayQueueServiceTest {
         when(trackRepository.findTrackIdsForAlbumOrdered(albumId, 50, 0))
                 .thenReturn(tracks.stream().map(TrackEntity::getId).toList());
 
-        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.ALBUM, albumId, startId, false, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.ALBUM, albumId, startId, false, null, authentication);
 
         PlayQueueItemEntity current = result.getItems().stream()
                 .filter(item -> item.getId().equals(result.getCurrentItem()))
@@ -1225,7 +1367,7 @@ class PlayQueueServiceTest {
         when(trackRepository.findTrackIdsForAlbumShuffled(eq(albumId), anyString(), eq(NIL_UUID), eq(50), eq(0)))
                 .thenReturn(List.of(UUID.randomUUID()));
 
-        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.ALBUM, albumId, null, true, authentication);
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.ALBUM, albumId, null, true, null, authentication);
 
         assertTrue(result.isShuffle());
         assertNotNull(result.getShuffleSeed());
@@ -1239,7 +1381,7 @@ class PlayQueueServiceTest {
         when(episodeRepository.findEpisodeIdsForShowOrdered(showId, 50, 0)).thenReturn(List.of());
 
         assertThrows(IllegalArgumentException.class,
-                () -> subject.createPlayQueue(PlayQueueSourceType.SHOW, showId, null, false, authentication));
+                () -> subject.createPlayQueue(PlayQueueSourceType.SHOW, showId, null, false, null, authentication));
     }
 
     @Test
@@ -1249,7 +1391,7 @@ class PlayQueueServiceTest {
         when(libraryRepository.findById(libraryId)).thenReturn(Optional.empty());
 
         assertThrows(IllegalArgumentException.class,
-                () -> subject.createPlayQueue(PlayQueueSourceType.LIBRARY, libraryId, null, true, authentication));
+                () -> subject.createPlayQueue(PlayQueueSourceType.LIBRARY, libraryId, null, true, null, authentication));
     }
 
     @Test
@@ -1260,7 +1402,7 @@ class PlayQueueServiceTest {
                 .thenReturn(Optional.of(LibraryEntity.builder().libraryType(LibraryType.BOOK).build()));
 
         assertThrows(IllegalArgumentException.class,
-                () -> subject.createPlayQueue(PlayQueueSourceType.LIBRARY, libraryId, null, true, authentication));
+                () -> subject.createPlayQueue(PlayQueueSourceType.LIBRARY, libraryId, null, true, null, authentication));
     }
 
     @Test
@@ -1271,7 +1413,7 @@ class PlayQueueServiceTest {
                 .thenReturn(Optional.of(LibraryEntity.builder().libraryType(LibraryType.PODCAST).build()));
 
         assertThrows(IllegalArgumentException.class,
-                () -> subject.createPlayQueue(PlayQueueSourceType.LIBRARY, libraryId, null, true, authentication));
+                () -> subject.createPlayQueue(PlayQueueSourceType.LIBRARY, libraryId, null, true, null, authentication));
     }
 
     // --- stream settings & watch status ---

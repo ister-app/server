@@ -354,6 +354,8 @@ enum PlayQueueSourceType {
     LIBRARY
     BOOK
     PODCAST
+    "A ranked track list of an artist (see rankKind), evaluated as of queue creation; grows lazily like other sources."
+    ARTIST
 }
 
 enum SubtitleFormat {
@@ -395,11 +397,14 @@ input UserSettingsInput {
 
 input CreatePlayQueueInput {
     sourceType: PlayQueueSourceType!
+    "The movie/show/album/library/book/podcast to play, or the artist for ARTIST sources."
     sourceId: ID!
     "Episode or track to start at; ignored for MOVIE sources."
     startId: ID
-    "Play the source in a stable random order; defaults to false, required for LIBRARY sources."
+    "Play the source in a stable random order; defaults to false, required for LIBRARY sources, rejected for ARTIST sources."
     shuffle: Boolean
+    "Which ranked track list of the artist to play; required for ARTIST sources, forbidden otherwise."
+    rankKind: RankKind
 }
 
 enum DirectoryType {

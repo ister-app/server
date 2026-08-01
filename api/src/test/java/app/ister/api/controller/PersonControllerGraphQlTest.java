@@ -134,11 +134,11 @@ class PersonControllerGraphQlTest {
         second.setId(UUID.randomUUID());
         when(personRepository.findById(person.getId())).thenReturn(java.util.Optional.of(person));
         // Repository ranks first before second; findAllById returns them in the other order.
-        when(trackRepository.findTopPlayedTrackIdsForPerson(eq(person.getId()), any(), eq(10)))
+        when(trackRepository.findTopPlayedTrackIdsForPerson(eq(person.getId()), any(), any(), eq(10), eq(0)))
                 .thenReturn(List.of(first.getId(), second.getId()));
-        when(trackRepository.findRecentlyPlayedTrackIdsForPerson(eq(person.getId()), any(), eq(5)))
+        when(trackRepository.findRecentlyPlayedTrackIdsForPerson(eq(person.getId()), any(), any(), eq(5), eq(0)))
                 .thenReturn(List.of(second.getId()));
-        when(trackRepository.findTopRatedTrackIdsForPerson(eq(person.getId()), any(), eq(10)))
+        when(trackRepository.findTopRatedTrackIdsForPerson(eq(person.getId()), any(), eq(10), eq(0)))
                 .thenReturn(List.of());
         when(trackRepository.findAllById(anyCollection())).thenAnswer(invocation -> {
             java.util.Collection<UUID> ids = invocation.getArgument(0);
@@ -167,7 +167,7 @@ class PersonControllerGraphQlTest {
         when(personRepository.findById(person.getId())).thenReturn(java.util.Optional.of(person));
         when(libraryAccessService.allowedLibraryIds(any())).thenReturn(java.util.Optional.of(java.util.Set.of(allowedLibrary)));
         when(creditRepository.hasCreditInLibraries(any(), anyCollection())).thenReturn(true);
-        when(trackRepository.findTopPlayedTrackIdsForPersonInLibraries(eq(person.getId()), any(), anyCollection(), eq(10)))
+        when(trackRepository.findTopPlayedTrackIdsForPersonInLibraries(eq(person.getId()), any(), anyCollection(), any(), eq(10), eq(0)))
                 .thenReturn(List.of());
         when(trackRepository.findAllById(anyCollection())).thenReturn(List.of());
 
@@ -177,7 +177,7 @@ class PersonControllerGraphQlTest {
                 .execute()
                 .path("personById.topPlayedTracks").entityList(Object.class).hasSize(0));
         verify(trackRepository)
-                .findTopPlayedTrackIdsForPersonInLibraries(eq(person.getId()), any(), anyCollection(), eq(10));
+                .findTopPlayedTrackIdsForPersonInLibraries(eq(person.getId()), any(), anyCollection(), any(), eq(10), eq(0));
     }
 
     @Test

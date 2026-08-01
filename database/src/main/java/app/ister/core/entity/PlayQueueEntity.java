@@ -1,6 +1,7 @@
 package app.ister.core.entity;
 
 import app.ister.core.enums.PlayQueueSourceType;
+import app.ister.core.enums.RankKind;
 import app.ister.core.enums.RemoteControlScope;
 import app.ister.core.enums.SubtitleFormat;
 import jakarta.persistence.*;
@@ -31,6 +32,11 @@ public class PlayQueueEntity extends BaseEntity {
     private PlayQueueSourceType sourceType;
 
     private UUID sourceId;
+
+    // ARTIST queues only: which ranked track list of the artist the queue plays. The ranking
+    // itself is evaluated as of dateCreated so lazy chunking stays deterministic while playing.
+    @Enumerated(EnumType.STRING)
+    private RankKind rankKind;
 
     @Column(nullable = false)
     private boolean shuffle;

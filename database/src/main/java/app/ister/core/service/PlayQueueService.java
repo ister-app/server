@@ -9,6 +9,7 @@ import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayQueueSourceType;
+import app.ister.core.enums.RankKind;
 import app.ister.core.enums.RemoteControlScope;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.enums.SubtitleFormat;
@@ -31,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -150,20 +152,28 @@ public class PlayQueueService {
      * Creates a play queue from a source. Only an initial window of items is materialized;
      * more items are appended lazily while the user plays through the queue.
      *
-     * @param startId the episode/track to start at (ignored for MOVIE, optional otherwise)
-     * @param shuffle play the source in a stable seeded random order; required for LIBRARY sources
+     * @param startId  the episode/track to start at (ignored for MOVIE, optional otherwise)
+     * @param shuffle  play the source in a stable seeded random order; required for LIBRARY sources
+     * @param rankKind which ranked track list an ARTIST source plays; required for ARTIST, forbidden otherwise
      */
     @Transactional
-    public PlayQueueEntity createPlayQueue(PlayQueueSourceType sourceType, UUID sourceId, UUID startId, boolean shuffle, Authentication authentication) {
-        log.debug("Creating play queue for user: {}, source type: {}, source: {}, shuffle: {}", authentication.getName(), sourceType, sourceId, shuffle);
+    public PlayQueueEntity createPlayQueue(PlayQueueSourceType sourceType, UUID sourceId, UUID startId, boolean shuffle, RankKind rankKind, Authentication authentication) {
+        log.debug("Creating play queue for user: {}, source type: {}, source: {}, shuffle: {}, rank kind: {}", authentication.getName(), sourceType, sourceId, shuffle, rankKind);
         if (!canAccessSource(sourceType, sourceId, authentication)) {
             throw new IllegalArgumentException("Source not found");
+        }
+        if (sourceType == PlayQueueSourceType.ARTIST && rankKind == null) {
+            throw new IllegalArgumentException("Artist play queues require a rankKind");
+        }
+        if (sourceType != PlayQueueSourceType.ARTIST && rankKind != null) {
+            throw new IllegalArgumentException("rankKind only applies to artist play queues");
         }
 
         PlayQueueEntity queue = PlayQueueEntity.builder()
                 .userEntity(userService.getOrCreateUser(authentication))
                 .sourceType(sourceType)
                 .sourceId(sourceId)
+                .rankKind(rankKind)
                 .items(new ArrayList<>())
                 .build();
 
@@ -173,6 +183,11 @@ public class PlayQueueService {
         } else {
             MediaType mediaType = mediaTypeForSource(sourceType, sourceId, shuffle);
             queue.setShuffle(shuffle);
+            if (sourceType == PlayQueueSourceType.ARTIST) {
+                // Persist before fetching the first chunk: dateCreated is the ranking's freeze
+                // point, and the chunk queries (and orderedIndexOf below) need it set.
+                playQueueRepository.save(queue);
+            }
             if (sourceType == PlayQueueSourceType.PODCAST) {
                 // Freeze the user's preferred order onto the queue. The queue materializes its
                 // items in chunks as playback goes on, and re-reading the preference per chunk
@@ -192,7 +207,7 @@ public class PlayQueueService {
                 // Start the materialized window a bit before the start item so the client
                 // still has some back-scroll context. Earlier items are never materialized.
                 queue.setSourceOffset(Math.max(0,
-                        orderedIndexOf(sourceType, sourceId, startId, queue.isSourceAscending()) - BACK_WINDOW));
+                        orderedIndexOf(queue, startId) - BACK_WINDOW));
             }
             appendChunk(queue);
         }
@@ -416,7 +431,7 @@ public class PlayQueueService {
                 case LIBRARY -> mediaType == MediaType.MOVIE
                         ? movieRepository.findMovieIdsForLibraryShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset)
                         : trackRepository.findTrackIdsForLibraryShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset);
-                case MOVIE, BOOK, PODCAST -> List.of();
+                case MOVIE, BOOK, PODCAST, ARTIST -> List.of();
             };
         }
         return switch (queue.getSourceType()) {
@@ -426,7 +441,37 @@ public class PlayQueueService {
             case PODCAST -> queue.isSourceAscending()
                     ? podcastEpisodeRepository.findEpisodeIdsForPodcastOrderedAsc(sourceId, CHUNK_SIZE, offset)
                     : podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(sourceId, CHUNK_SIZE, offset);
+            case ARTIST -> rankedTrackIdsForArtist(queue, CHUNK_SIZE, offset);
             default -> List.of();
+        };
+    }
+
+    /**
+     * A page of the owner's ranked track list for an ARTIST queue. The ranking is frozen at the
+     * queue's creation time (plays recorded after it don't count), so paging stays deterministic
+     * while playing the queue bumps the live ranking. Library access is enforced here per page —
+     * an artist spans libraries, so the queue has no single source library to check up-front.
+     */
+    private List<UUID> rankedTrackIdsForArtist(PlayQueueEntity queue, int limit, int offset) {
+        UUID personId = queue.getSourceId();
+        String externalId = queue.getUserEntity().getExternalId();
+        Instant asOf = queue.getDateCreated();
+        Optional<Set<UUID>> allowed = libraryAccessService.allowedLibraryIdsForUser(queue.getUserEntity());
+        return switch (queue.getRankKind()) {
+            case MOST_PLAYED -> allowed
+                    .map(ids -> ids.isEmpty() ? List.<UUID>of()
+                            : trackRepository.findTopPlayedTrackIdsForPersonInLibraries(personId, externalId, ids, asOf, limit, offset))
+                    .orElseGet(() -> trackRepository.findTopPlayedTrackIdsForPerson(personId, externalId, asOf, limit, offset));
+            case RECENTLY_PLAYED -> allowed
+                    .map(ids -> ids.isEmpty() ? List.<UUID>of()
+                            : trackRepository.findRecentlyPlayedTrackIdsForPersonInLibraries(personId, externalId, ids, asOf, limit, offset))
+                    .orElseGet(() -> trackRepository.findRecentlyPlayedTrackIdsForPerson(personId, externalId, asOf, limit, offset));
+            // Ratings mutate in place, so this ranking cannot be frozen by date; a mid-playback
+            // re-rate can shift later pages (worst case a rare skip or duplicate track).
+            case HIGHEST_RATED -> allowed
+                    .map(ids -> ids.isEmpty() ? List.<UUID>of()
+                            : trackRepository.findTopRatedTrackIdsForPersonInLibraries(personId, externalId, ids, limit, offset))
+                    .orElseGet(() -> trackRepository.findTopRatedTrackIdsForPerson(personId, externalId, limit, offset));
         };
     }
 
@@ -446,6 +491,12 @@ public class PlayQueueService {
                     throw new IllegalArgumentException("Podcast play queues cannot be shuffled; episodes play in the user's chosen order");
                 }
                 yield MediaType.PODCAST_EPISODE;
+            }
+            case ARTIST -> {
+                if (shuffle) {
+                    throw new IllegalArgumentException("Artist play queues cannot be shuffled; the ranking is the order");
+                }
+                yield MediaType.TRACK;
             }
             case LIBRARY -> {
                 if (!shuffle) {
@@ -469,8 +520,9 @@ public class PlayQueueService {
      * Index of the start item in the full natural order of an ordered (non-shuffled) source.
      * [ascending] only applies to podcasts, whose order is the user's choice rather than intrinsic.
      */
-    private int orderedIndexOf(PlayQueueSourceType sourceType, UUID sourceId, UUID startId, boolean ascending) {
-        List<UUID> ids = switch (sourceType) {
+    private int orderedIndexOf(PlayQueueEntity queue, UUID startId) {
+        UUID sourceId = queue.getSourceId();
+        List<UUID> ids = switch (queue.getSourceType()) {
             case SHOW -> episodeRepository
                     .findIdsOnlyByShowEntityId(
                             sourceId,
@@ -489,9 +541,10 @@ public class PlayQueueService {
                     .stream()
                     .map(ChapterEntity::getId)
                     .toList();
-            case PODCAST -> ascending
+            case PODCAST -> queue.isSourceAscending()
                     ? podcastEpisodeRepository.findEpisodeIdsForPodcastOrderedAsc(sourceId, Integer.MAX_VALUE, 0)
                     : podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(sourceId, Integer.MAX_VALUE, 0);
+            case ARTIST -> rankedTrackIdsForArtist(queue, Integer.MAX_VALUE, 0);
             default -> List.of();
         };
         int index = ids.indexOf(startId);

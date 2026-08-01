@@ -1,6 +1,7 @@
 package app.ister.core.service;
 
 import app.ister.core.entity.LibraryEntity;
+import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.UserLibraryAccessEntity;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.UserLibraryAccessRepository;
@@ -72,6 +73,21 @@ public class LibraryAccessService {
         return allowedIds;
     }
 
+    /**
+     * Like {@link #allowedLibraryIds(Authentication)}, for flows that only have the owning user
+     * row at hand (e.g. lazy play-queue extension). The admin bypass uses the snapshot on the
+     * user row, matching the stream-token path of {@link #isAdmin(Authentication)}.
+     */
+    public Optional<Set<UUID>> allowedLibraryIdsForUser(UserEntity user) {
+        CacheEntry entry = cache.get(user.getExternalId());
+        if (entry != null && entry.expiresAt().isAfter(Instant.now())) {
+            return entry.allowedIds();
+        }
+        Optional<Set<UUID>> allowedIds = computeAllowedIdsForUser(user);
+        cache.put(user.getExternalId(), new CacheEntry(allowedIds, Instant.now().plus(CACHE_TTL)));
+        return allowedIds;
+    }
+
     public boolean canAccess(UUID libraryId, Authentication authentication) {
         if (libraryId == null) {
             return false;
@@ -94,10 +110,21 @@ public class LibraryAccessService {
         if (isAdmin(authentication)) {
             return Optional.empty();
         }
+        return Optional.of(grantedLibraryIds(authentication.getName()));
+    }
+
+    private Optional<Set<UUID>> computeAllowedIdsForUser(UserEntity user) {
+        if (user.isAdmin()) {
+            return Optional.empty();
+        }
+        return Optional.of(grantedLibraryIds(user.getExternalId()));
+    }
+
+    private Set<UUID> grantedLibraryIds(String externalId) {
         Set<UUID> allowed = new HashSet<>();
         libraryRepository.findByVisibleToAllTrue().forEach(library -> allowed.add(library.getId()));
-        userLibraryAccessRepository.findByUserEntityExternalId(authentication.getName())
+        userLibraryAccessRepository.findByUserEntityExternalId(externalId)
                 .forEach(access -> allowed.add(access.getLibraryEntity().getId()));
-        return Optional.of(allowed);
+        return allowed;
     }
 }

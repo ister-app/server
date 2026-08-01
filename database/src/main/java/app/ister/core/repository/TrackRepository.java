@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -40,54 +41,56 @@ public interface TrackRepository extends JpaRepository<TrackEntity, UUID> {
 
     /**
      * The calling user's most played tracks of an artist (as track or album artist), most played
-     * first. Plays are watch-status rows: one per played play-queue item.
+     * first. Plays are watch-status rows: one per played play-queue item. Only plays up to
+     * {@code asOf} count (on date_created — progress updates bump date_updated), so a play queue
+     * paging through the ranking with its creation time as {@code asOf} sees a frozen order.
      */
     @Query(value = """
             SELECT t.id FROM track_entity t
             JOIN album_entity a ON t.album_entity_id = a.id
-            JOIN watch_status_entity ws ON ws.track_entity_id = t.id
+            JOIN watch_status_entity ws ON ws.track_entity_id = t.id AND ws.date_created <= :asOf
             JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
             WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId)
             GROUP BY t.id
             ORDER BY COUNT(ws.id) DESC, MAX(ws.date_updated) DESC, t.id
-            LIMIT :limit""", nativeQuery = true)
-    List<UUID> findTopPlayedTrackIdsForPerson(@Param("personId") UUID personId, @Param("externalId") String externalId, @Param("limit") int limit);
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findTopPlayedTrackIdsForPerson(@Param("personId") UUID personId, @Param("externalId") String externalId, @Param("asOf") Instant asOf, @Param("limit") int limit, @Param("offset") int offset);
 
     @Query(value = """
             SELECT t.id FROM track_entity t
             JOIN album_entity a ON t.album_entity_id = a.id
-            JOIN watch_status_entity ws ON ws.track_entity_id = t.id
+            JOIN watch_status_entity ws ON ws.track_entity_id = t.id AND ws.date_created <= :asOf
             JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
             WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId)
               AND a.library_entity_id IN (:libraryIds)
             GROUP BY t.id
             ORDER BY COUNT(ws.id) DESC, MAX(ws.date_updated) DESC, t.id
-            LIMIT :limit""", nativeQuery = true)
-    List<UUID> findTopPlayedTrackIdsForPersonInLibraries(@Param("personId") UUID personId, @Param("externalId") String externalId, @Param("libraryIds") Collection<UUID> libraryIds, @Param("limit") int limit);
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findTopPlayedTrackIdsForPersonInLibraries(@Param("personId") UUID personId, @Param("externalId") String externalId, @Param("libraryIds") Collection<UUID> libraryIds, @Param("asOf") Instant asOf, @Param("limit") int limit, @Param("offset") int offset);
 
-    /** The calling user's most recently played tracks of an artist, newest first. */
+    /** The calling user's most recently played tracks of an artist, newest first, counting plays up to {@code asOf}. */
     @Query(value = """
             SELECT t.id FROM track_entity t
             JOIN album_entity a ON t.album_entity_id = a.id
-            JOIN watch_status_entity ws ON ws.track_entity_id = t.id
+            JOIN watch_status_entity ws ON ws.track_entity_id = t.id AND ws.date_created <= :asOf
             JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
             WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId)
             GROUP BY t.id
             ORDER BY MAX(ws.date_updated) DESC, t.id
-            LIMIT :limit""", nativeQuery = true)
-    List<UUID> findRecentlyPlayedTrackIdsForPerson(@Param("personId") UUID personId, @Param("externalId") String externalId, @Param("limit") int limit);
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findRecentlyPlayedTrackIdsForPerson(@Param("personId") UUID personId, @Param("externalId") String externalId, @Param("asOf") Instant asOf, @Param("limit") int limit, @Param("offset") int offset);
 
     @Query(value = """
             SELECT t.id FROM track_entity t
             JOIN album_entity a ON t.album_entity_id = a.id
-            JOIN watch_status_entity ws ON ws.track_entity_id = t.id
+            JOIN watch_status_entity ws ON ws.track_entity_id = t.id AND ws.date_created <= :asOf
             JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
             WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId)
               AND a.library_entity_id IN (:libraryIds)
             GROUP BY t.id
             ORDER BY MAX(ws.date_updated) DESC, t.id
-            LIMIT :limit""", nativeQuery = true)
-    List<UUID> findRecentlyPlayedTrackIdsForPersonInLibraries(@Param("personId") UUID personId, @Param("externalId") String externalId, @Param("libraryIds") Collection<UUID> libraryIds, @Param("limit") int limit);
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findRecentlyPlayedTrackIdsForPersonInLibraries(@Param("personId") UUID personId, @Param("externalId") String externalId, @Param("libraryIds") Collection<UUID> libraryIds, @Param("asOf") Instant asOf, @Param("limit") int limit, @Param("offset") int offset);
 
     /** The calling user's highest rated tracks of an artist; the most recently (re)rated wins ties. */
     @Query(value = """
@@ -97,8 +100,8 @@ public interface TrackRepository extends JpaRepository<TrackEntity, UUID> {
             JOIN user_entity u ON u.id = r.user_entity_id AND u.external_id = :externalId
             WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId)
             ORDER BY r.value DESC, r.date_updated DESC, t.id
-            LIMIT :limit""", nativeQuery = true)
-    List<UUID> findTopRatedTrackIdsForPerson(@Param("personId") UUID personId, @Param("externalId") String externalId, @Param("limit") int limit);
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findTopRatedTrackIdsForPerson(@Param("personId") UUID personId, @Param("externalId") String externalId, @Param("limit") int limit, @Param("offset") int offset);
 
     @Query(value = """
             SELECT t.id FROM track_entity t
@@ -108,8 +111,8 @@ public interface TrackRepository extends JpaRepository<TrackEntity, UUID> {
             WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId)
               AND a.library_entity_id IN (:libraryIds)
             ORDER BY r.value DESC, r.date_updated DESC, t.id
-            LIMIT :limit""", nativeQuery = true)
-    List<UUID> findTopRatedTrackIdsForPersonInLibraries(@Param("personId") UUID personId, @Param("externalId") String externalId, @Param("libraryIds") Collection<UUID> libraryIds, @Param("limit") int limit);
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findTopRatedTrackIdsForPersonInLibraries(@Param("personId") UUID personId, @Param("externalId") String externalId, @Param("libraryIds") Collection<UUID> libraryIds, @Param("limit") int limit, @Param("offset") int offset);
 
     /**
      * Returns a page of track IDs of a whole library in a deterministic shuffled order derived from the seed.

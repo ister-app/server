@@ -7,4 +7,5 @@ public enum PlayQueueSourceType {
     LIBRARY,
     BOOK,
     PODCAST,
+    ARTIST,
 }
