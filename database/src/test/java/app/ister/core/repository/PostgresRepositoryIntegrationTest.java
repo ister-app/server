@@ -17,15 +17,20 @@ import app.ister.core.entity.ShowEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
+import app.ister.core.entity.MetadataEntity;
 import app.ister.core.enums.CreditType;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.MediaType;
+import app.ister.core.enums.SortingEnum;
+import app.ister.core.enums.SortingOrder;
 import app.ister.core.enums.StreamCodecType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Limit;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
@@ -36,6 +41,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -583,6 +589,91 @@ class PostgresRepositoryIntegrationTest {
         assertEquals(List.of(hiddenTrack.getId(), trackB.getId()),
                 trackRepository.findTopPlayedTrackIdsForPerson(artist.getId(), "listener-top", asOf, 10, 1),
                 "offset pages the frozen ranking");
+    }
+
+    // --- library-wide browse (tracks/episodes) ---
+
+    /**
+     * The library-wide track browse sorts on metadata columns via a left join with MIN aggregates:
+     * a track with several metadata rows must appear once (under its alphabetically first title),
+     * tracks without metadata must sort last in both directions, and other libraries stay out.
+     */
+    @Test
+    void trackBrowseSortsOnMetadataWithoutDuplicatingMultiMetadataTracks() {
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music-browse").build());
+        LibraryEntity otherLibrary = em.persist(LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music-browse-other").build());
+        PersonEntity artist = em.persist(PersonEntity.builder().name("Artist-browse").build());
+        AlbumEntity album = em.persist(AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Album").releaseYear(2020).build());
+        AlbumEntity otherAlbum = em.persist(AlbumEntity.builder().libraryEntity(otherLibrary).personEntity(artist).name("Other").releaseYear(2020).build());
+        TrackEntity apple = em.persist(TrackEntity.builder().albumEntity(album).personEntity(artist).number(1).discNumber(1).build());
+        TrackEntity banana = em.persist(TrackEntity.builder().albumEntity(album).personEntity(artist).number(2).discNumber(1).build());
+        TrackEntity untitled = em.persist(TrackEntity.builder().albumEntity(album).personEntity(artist).number(3).discNumber(1).build());
+        TrackEntity elsewhere = em.persist(TrackEntity.builder().albumEntity(otherAlbum).personEntity(artist).number(1).discNumber(1).build());
+        em.persist(MetadataEntity.builder().trackEntity(apple).title("Apple").released(LocalDate.of(2021, 1, 1)).build());
+        em.persist(MetadataEntity.builder().trackEntity(banana).title("Banana").released(LocalDate.of(2019, 1, 1)).build());
+        em.persist(MetadataEntity.builder().trackEntity(banana).title("Cherry").released(LocalDate.of(2022, 1, 1)).build());
+        em.persist(MetadataEntity.builder().trackEntity(elsewhere).title("Aardvark").build());
+        em.flush();
+
+        Page<TrackEntity> byNameAsc = trackRepository.findInLibraries(List.of(library.getId()),
+                SortingEnum.NAME, SortingOrder.ASCENDING, PageRequest.of(0, 10));
+        assertEquals(3, byNameAsc.getTotalElements(), "multi-metadata tracks count once, other libraries not at all");
+        assertEquals(List.of(apple.getId(), banana.getId(), untitled.getId()), ids(byNameAsc));
+
+        assertEquals(List.of(banana.getId(), apple.getId(), untitled.getId()),
+                ids(trackRepository.findInLibraries(List.of(library.getId()),
+                        SortingEnum.NAME, SortingOrder.DESCENDING, PageRequest.of(0, 10))),
+                "untitled tracks sort last in both directions");
+
+        assertEquals(List.of(banana.getId(), apple.getId(), untitled.getId()),
+                ids(trackRepository.findInLibraries(List.of(library.getId()),
+                        SortingEnum.RELEASE_YEAR, SortingOrder.ASCENDING, PageRequest.of(0, 10))),
+                "release sorts on the earliest metadata date");
+
+        Page<TrackEntity> firstPage = trackRepository.findInLibraries(List.of(library.getId()),
+                SortingEnum.NAME, SortingOrder.ASCENDING, PageRequest.of(0, 2));
+        assertEquals(List.of(apple.getId(), banana.getId()), ids(firstPage));
+        assertEquals(3, firstPage.getTotalElements(), "the count query totals the same filter");
+        assertEquals(List.of(untitled.getId()),
+                ids(trackRepository.findInLibraries(List.of(library.getId()),
+                        SortingEnum.NAME, SortingOrder.ASCENDING, PageRequest.of(1, 2))));
+
+        Page<TrackEntity> newestAdded = trackRepository.findInLibraries(List.of(library.getId()),
+                SortingEnum.DATE_CREATED, SortingOrder.DESCENDING, PageRequest.of(0, 10));
+        assertEquals(3, newestAdded.getTotalElements());
+    }
+
+    /** Same shape for episodes: metadata title/air date across every show of the library. */
+    @Test
+    void episodeBrowseSortsOnMetadataAcrossShows() {
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.SHOW).name("Shows-browse").build());
+        ShowEntity show1 = em.persist(ShowEntity.builder().libraryEntity(library).name("Show-b1").releaseYear(2020).build());
+        ShowEntity show2 = em.persist(ShowEntity.builder().libraryEntity(library).name("Show-b2").releaseYear(2021).build());
+        SeasonEntity season1 = em.persist(SeasonEntity.builder().showEntity(show1).number(1).build());
+        SeasonEntity season2 = em.persist(SeasonEntity.builder().showEntity(show2).number(1).build());
+        EpisodeEntity pilot = em.persist(EpisodeEntity.builder().showEntity(show1).seasonEntity(season1).number(1).build());
+        EpisodeEntity finale = em.persist(EpisodeEntity.builder().showEntity(show2).seasonEntity(season2).number(1).build());
+        EpisodeEntity unnamed = em.persist(EpisodeEntity.builder().showEntity(show1).seasonEntity(season1).number(2).build());
+        em.persist(MetadataEntity.builder().episodeEntity(pilot).title("Pilot").released(LocalDate.of(2020, 1, 1)).build());
+        em.persist(MetadataEntity.builder().episodeEntity(finale).title("Finale").released(LocalDate.of(2020, 6, 1)).build());
+        em.flush();
+
+        assertEquals(List.of(finale.getId(), pilot.getId(), unnamed.getId()),
+                ids(episodeRepository.findInLibraries(List.of(library.getId()),
+                        SortingEnum.NAME, SortingOrder.ASCENDING, PageRequest.of(0, 10))),
+                "episodes sort across shows on the metadata title");
+
+        assertEquals(List.of(finale.getId(), pilot.getId(), unnamed.getId()),
+                ids(episodeRepository.findInLibraries(List.of(library.getId()),
+                        SortingEnum.RELEASE_YEAR, SortingOrder.DESCENDING, PageRequest.of(0, 10))),
+                "air-date sort, undated episodes last");
+
+        assertEquals(3, episodeRepository.findInLibraries(List.of(library.getId()),
+                SortingEnum.DATE_CREATED, SortingOrder.DESCENDING, PageRequest.of(0, 10)).getTotalElements());
+    }
+
+    private static List<UUID> ids(Page<? extends app.ister.core.entity.BaseEntity> page) {
+        return page.getContent().stream().map(app.ister.core.entity.BaseEntity::getId).toList();
     }
 
     // --- library Discover top-lists ---

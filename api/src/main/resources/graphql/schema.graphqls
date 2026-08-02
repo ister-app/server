@@ -7,6 +7,12 @@ type Query {
     "One library by id; null when it does not exist or the caller may not access it."
     libraryById(id: ID!): Library
     episodeById(id: ID): Episode
+    """
+    Episodes of a show library, across shows. Defaults to newest-added first. NAME sorts on the
+    metadata title, RELEASE_YEAR on the earliest metadata release (air) date; episodes without
+    one sort last.
+    """
+    episodes(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): EpisodePage
     seasonById(id: ID): Season
     shows(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): ShowPage
     movies(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): MoviePage
@@ -25,6 +31,11 @@ type Query {
     albums(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, artistId: ID, libraryId: ID): AlbumPage
     albumById(id: ID): Album
     trackById(id: ID): Track
+    """
+    Tracks of a music library, across albums. NAME sorts on the tag/metadata title,
+    RELEASE_YEAR on the earliest metadata release date; tracks without one sort last.
+    """
+    tracks(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): TrackPage
     books(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, authorId: ID, libraryId: ID): BookPage
     bookById(id: ID): Book
     seriesById(id: ID): Series
@@ -648,6 +659,22 @@ type Season {
 
 type MoviePage {
     content: [Movie!]!
+    totalPages: Int!
+    totalElements: Int!
+    number: Int!
+    size: Int!
+}
+
+type EpisodePage {
+    content: [Episode!]!
+    totalPages: Int!
+    totalElements: Int!
+    number: Int!
+    size: Int!
+}
+
+type TrackPage {
+    content: [Track!]!
     totalPages: Int!
     totalElements: Int!
     number: Int!

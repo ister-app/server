@@ -17,6 +17,15 @@ final class Paging {
     private Paging() {
     }
 
+    /**
+     * Page/size resolution without a sort, for queries whose ORDER BY is baked into the repository
+     * method (the metadata-based sorts of {@code tracks}/{@code episodes}).
+     */
+    static Pageable unsorted(Optional<Integer> page, Optional<Integer> size, int defaultSize) {
+        int pageSize = Math.clamp(size.orElse(defaultSize), 1, MAX_PAGE_SIZE);
+        return PageRequest.of(Math.max(page.orElse(0), 0), pageSize);
+    }
+
     static Pageable pageable(Optional<Integer> page, Optional<Integer> size, int defaultSize,
                              Optional<SortingEnum> sorting, SortingEnum defaultSorting,
                              Optional<SortingOrder> sortingOrder, SortingOrder defaultOrder) {

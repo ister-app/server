@@ -6,6 +6,9 @@ import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.TrackEntity;
+import app.ister.core.enums.SortingEnum;
+import app.ister.core.enums.SortingOrder;
+import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.LibraryAccessService;
@@ -14,10 +17,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -37,6 +44,9 @@ class TrackControllerTest {
 
     @Mock
     private LibraryAccessService libraryAccessService;
+
+    @Mock
+    private LibraryRepository libraryRepository;
 
     @Mock
     private Authentication authentication;
@@ -67,6 +77,66 @@ class TrackControllerTest {
         when(trackRepository.findById(id)).thenReturn(Optional.empty());
 
         assertTrue(subject.trackById(id, authentication).isEmpty());
+    }
+
+    @Test
+    void tracksWithAccessibleLibraryDefaultsToNameAscending() {
+        UUID libraryId = UUID.randomUUID();
+        when(libraryAccessService.canAccess(libraryId, authentication)).thenReturn(true);
+        Page<TrackEntity> page = new PageImpl<>(List.of(TrackEntity.builder().number(1).discNumber(1).build()));
+        when(trackRepository.findInLibraries(eq(List.of(libraryId)),
+                eq(SortingEnum.NAME), eq(SortingOrder.ASCENDING), any(Pageable.class)))
+                .thenReturn(page);
+
+        Page<TrackEntity> result = subject.tracks(Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.of(libraryId), authentication);
+
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void tracksWithInaccessibleLibraryIsEmpty() {
+        UUID libraryId = UUID.randomUUID();
+        when(libraryAccessService.canAccess(libraryId, authentication)).thenReturn(false);
+
+        Page<TrackEntity> result = subject.tracks(Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.of(libraryId), authentication);
+
+        assertTrue(result.isEmpty());
+        verify(trackRepository, never()).findInLibraries(any(), any(), any(), any());
+    }
+
+    @Test
+    void tracksWithoutLibraryScopesToAllowedLibraries() {
+        UUID allowed = UUID.randomUUID();
+        when(libraryAccessService.allowedLibraryIds(authentication)).thenReturn(Optional.of(Set.of(allowed)));
+        when(trackRepository.findInLibraries(eq(Set.of(allowed)),
+                eq(SortingEnum.DATE_CREATED), eq(SortingOrder.DESCENDING), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        subject.tracks(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.DATE_CREATED),
+                Optional.of(SortingOrder.DESCENDING), Optional.empty(), authentication);
+
+        verify(trackRepository).findInLibraries(eq(Set.of(allowed)),
+                eq(SortingEnum.DATE_CREATED), eq(SortingOrder.DESCENDING), any(Pageable.class));
+        verify(libraryRepository, never()).findAll();
+    }
+
+    @Test
+    void tracksForAdminSpanAllLibraries() {
+        LibraryEntity library = LibraryEntity.builder().name("Music").build();
+        library.setId(UUID.randomUUID());
+        when(libraryAccessService.allowedLibraryIds(authentication)).thenReturn(Optional.empty());
+        when(libraryRepository.findAll()).thenReturn(List.of(library));
+        when(trackRepository.findInLibraries(eq(List.of(library.getId())),
+                eq(SortingEnum.NAME), eq(SortingOrder.ASCENDING), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        subject.tracks(Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), authentication);
+
+        verify(trackRepository).findInLibraries(eq(List.of(library.getId())),
+                eq(SortingEnum.NAME), eq(SortingOrder.ASCENDING), any(Pageable.class));
     }
 
     @Test

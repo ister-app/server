@@ -8,7 +8,10 @@ import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.SeasonEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.entity.WatchStatusEntity;
+import app.ister.core.enums.SortingEnum;
+import app.ister.core.enums.SortingOrder;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import app.ister.core.service.LibraryAccessService;
 import org.junit.jupiter.api.Test;
@@ -16,12 +19,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -43,6 +50,9 @@ class EpisodeControllerTest {
 
     @Mock
     private LibraryAccessService libraryAccessService;
+
+    @Mock
+    private LibraryRepository libraryRepository;
 
     @Mock
     private Authentication authentication;
@@ -70,6 +80,66 @@ class EpisodeControllerTest {
         Optional<EpisodeEntity> result = subject.episodeById(id, authentication);
 
         assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void episodesWithAccessibleLibraryDefaultsToNewestAdded() {
+        UUID libraryId = UUID.randomUUID();
+        when(libraryAccessService.canAccess(libraryId, authentication)).thenReturn(true);
+        Page<EpisodeEntity> page = new PageImpl<>(List.of(EpisodeEntity.builder().number(1).build()));
+        when(episodeRepository.findInLibraries(eq(List.of(libraryId)),
+                eq(SortingEnum.DATE_CREATED), eq(SortingOrder.DESCENDING), any(Pageable.class)))
+                .thenReturn(page);
+
+        Page<EpisodeEntity> result = subject.episodes(Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.of(libraryId), authentication);
+
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void episodesWithInaccessibleLibraryIsEmpty() {
+        UUID libraryId = UUID.randomUUID();
+        when(libraryAccessService.canAccess(libraryId, authentication)).thenReturn(false);
+
+        Page<EpisodeEntity> result = subject.episodes(Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.of(libraryId), authentication);
+
+        assertTrue(result.isEmpty());
+        verify(episodeRepository, never()).findInLibraries(any(), any(), any(), any());
+    }
+
+    @Test
+    void episodesWithoutLibraryScopesToAllowedLibraries() {
+        UUID allowed = UUID.randomUUID();
+        when(libraryAccessService.allowedLibraryIds(authentication)).thenReturn(Optional.of(Set.of(allowed)));
+        when(episodeRepository.findInLibraries(eq(Set.of(allowed)),
+                eq(SortingEnum.NAME), eq(SortingOrder.ASCENDING), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        subject.episodes(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME),
+                Optional.of(SortingOrder.ASCENDING), Optional.empty(), authentication);
+
+        verify(episodeRepository).findInLibraries(eq(Set.of(allowed)),
+                eq(SortingEnum.NAME), eq(SortingOrder.ASCENDING), any(Pageable.class));
+        verify(libraryRepository, never()).findAll();
+    }
+
+    @Test
+    void episodesForAdminSpanAllLibraries() {
+        var library = app.ister.core.entity.LibraryEntity.builder().name("Shows").build();
+        library.setId(UUID.randomUUID());
+        when(libraryAccessService.allowedLibraryIds(authentication)).thenReturn(Optional.empty());
+        when(libraryRepository.findAll()).thenReturn(List.of(library));
+        when(episodeRepository.findInLibraries(eq(List.of(library.getId())),
+                eq(SortingEnum.DATE_CREATED), eq(SortingOrder.DESCENDING), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        subject.episodes(Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), authentication);
+
+        verify(episodeRepository).findInLibraries(eq(List.of(library.getId())),
+                eq(SortingEnum.DATE_CREATED), eq(SortingOrder.DESCENDING), any(Pageable.class));
     }
 
     @Test
