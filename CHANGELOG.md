@@ -1,5 +1,39 @@
 # Changelog
 
+## server v2.6.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.6.0` |
+| `ghcr.io/ister-app/migrations` | `2.6.0` |
+
+### Features
+
+- feat(api): expose progressInMilliseconds on the PlayQueue type ([`826f99c`](https://github.com/ister-app/server/commit/826f99c))
+- feat(playqueue): support artist ranked-list (ARTIST) play queue sources ([`eeeeeab`](https://github.com/ister-app/server/commit/eeeeeab))
+
+### Fixes
+
+- fix(worker): retry Wikidata series discovery for seriesless books on analyze ([`724f610`](https://github.com/ister-app/server/commit/724f610))
+
+### Dependency updates
+
+- chore(deps): update github actions (actions/setup-java, docker/login-action, graalvm/setup-graalvm) ([`2d97d5a`](https://github.com/ister-app/server/commit/2d97d5a))
+- fix(deps): update docker.io/flyway/flyway docker tag to v13.1.0 ([`7ef42af`](https://github.com/ister-app/server/commit/7ef42af))
+
+### Other
+
+- refactor: resolve open SonarCloud issues (S8786, S9016, S2160 exclusion) ([`1873bf8`](https://github.com/ister-app/server/commit/1873bf8))
+- chore(renovate): only propose stable fedora releases via endoflife.date ([`dae3bec`](https://github.com/ister-app/server/commit/dae3bec))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.6.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.5.0...v2.6.0
+
 ## server v2.5.0
 
 | Image | Tag |
