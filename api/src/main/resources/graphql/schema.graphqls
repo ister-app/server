@@ -561,6 +561,9 @@ input CreatePlayQueueInput {
     filterKind: FilterKind
     "Optional library scope for an inline FILTER source."
     libraryId: ID
+    "Play order of an inline FILTER source (ignored with shuffle); a saved view carries its own."
+    sorting: SortingEnum
+    sortingOrder: SortingOrder
 }
 
 enum DirectoryType {

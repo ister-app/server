@@ -130,9 +130,9 @@ class PlayQueueControllerTest {
     void createPlayQueueDelegatesToService() {
         UUID showId = UUID.randomUUID();
         UUID episodeId = UUID.randomUUID();
-        CreatePlayQueueInput input = new CreatePlayQueueInput(PlayQueueSourceType.SHOW, showId, episodeId, true, null, null, null, null);
+        CreatePlayQueueInput input = new CreatePlayQueueInput(PlayQueueSourceType.SHOW, showId, episodeId, true, null, null, null, null, null, null);
         PlayQueueEntity queue = PlayQueueEntity.builder().build();
-        when(playQueueService.createPlayQueue(PlayQueueSourceType.SHOW, showId, episodeId, true, null, null, null, null, authentication)).thenReturn(queue);
+        when(playQueueService.createPlayQueue(PlayQueueSourceType.SHOW, showId, episodeId, true, null, null, null, null, null, null, authentication)).thenReturn(queue);
 
         PlayQueueEntity result = subject.createPlayQueue(input, authentication);
 
@@ -142,9 +142,9 @@ class PlayQueueControllerTest {
     @Test
     void createPlayQueueDefaultsShuffleToFalse() {
         UUID movieId = UUID.randomUUID();
-        CreatePlayQueueInput input = new CreatePlayQueueInput(PlayQueueSourceType.MOVIE, movieId, null, null, null, null, null, null);
+        CreatePlayQueueInput input = new CreatePlayQueueInput(PlayQueueSourceType.MOVIE, movieId, null, null, null, null, null, null, null, null);
         PlayQueueEntity queue = PlayQueueEntity.builder().build();
-        when(playQueueService.createPlayQueue(PlayQueueSourceType.MOVIE, movieId, null, false, null, null, null, null, authentication)).thenReturn(queue);
+        when(playQueueService.createPlayQueue(PlayQueueSourceType.MOVIE, movieId, null, false, null, null, null, null, null, null, authentication)).thenReturn(queue);
 
         PlayQueueEntity result = subject.createPlayQueue(input, authentication);
 
@@ -155,9 +155,9 @@ class PlayQueueControllerTest {
     void createPlayQueuePassesRankKind() {
         UUID personId = UUID.randomUUID();
         UUID trackId = UUID.randomUUID();
-        CreatePlayQueueInput input = new CreatePlayQueueInput(PlayQueueSourceType.ARTIST, personId, trackId, null, RankKind.MOST_PLAYED, null, null, null);
+        CreatePlayQueueInput input = new CreatePlayQueueInput(PlayQueueSourceType.ARTIST, personId, trackId, null, RankKind.MOST_PLAYED, null, null, null, null, null);
         PlayQueueEntity queue = PlayQueueEntity.builder().build();
-        when(playQueueService.createPlayQueue(PlayQueueSourceType.ARTIST, personId, trackId, false, RankKind.MOST_PLAYED, null, null, null, authentication)).thenReturn(queue);
+        when(playQueueService.createPlayQueue(PlayQueueSourceType.ARTIST, personId, trackId, false, RankKind.MOST_PLAYED, null, null, null, null, null, authentication)).thenReturn(queue);
 
         assertEquals(queue, subject.createPlayQueue(input, authentication));
     }

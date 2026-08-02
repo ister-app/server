@@ -176,11 +176,11 @@ public class PlayQueueService {
     /** Convenience overload for the non-FILTER sources. */
     @Transactional
     public PlayQueueEntity createPlayQueue(PlayQueueSourceType sourceType, UUID sourceId, UUID startId, boolean shuffle, RankKind rankKind, Authentication authentication) {
-        return createPlayQueue(sourceType, sourceId, startId, shuffle, rankKind, null, null, null, authentication);
+        return createPlayQueue(sourceType, sourceId, startId, shuffle, rankKind, null, null, null, null, null, authentication);
     }
 
     @Transactional
-    public PlayQueueEntity createPlayQueue(PlayQueueSourceType sourceType, UUID sourceId, UUID startId, boolean shuffle, RankKind rankKind, MediaFilter filter, FilterKind filterKind, UUID libraryId, Authentication authentication) {
+    public PlayQueueEntity createPlayQueue(PlayQueueSourceType sourceType, UUID sourceId, UUID startId, boolean shuffle, RankKind rankKind, MediaFilter filter, FilterKind filterKind, UUID libraryId, SortingEnum sorting, SortingOrder sortingOrder, Authentication authentication) {
         log.debug("Creating play queue for user: {}, source type: {}, source: {}, shuffle: {}, rank kind: {}", authentication.getName(), sourceType, sourceId, shuffle, rankKind);
         if (!canAccessSource(sourceType, sourceId, authentication)) {
             throw new IllegalArgumentException("Source not found");
@@ -191,8 +191,9 @@ public class PlayQueueService {
         if (sourceType != PlayQueueSourceType.ARTIST && rankKind != null) {
             throw new IllegalArgumentException("rankKind only applies to artist play queues");
         }
-        if (sourceType != PlayQueueSourceType.FILTER && (filter != null || filterKind != null || libraryId != null)) {
-            throw new IllegalArgumentException("filter, filterKind and libraryId only apply to FILTER play queues");
+        if (sourceType != PlayQueueSourceType.FILTER
+                && (filter != null || filterKind != null || libraryId != null || sorting != null || sortingOrder != null)) {
+            throw new IllegalArgumentException("filter, filterKind, libraryId and sorting only apply to FILTER play queues");
         }
         if (sourceType != PlayQueueSourceType.FILTER && sourceId == null) {
             throw new IllegalArgumentException("sourceId is required for " + sourceType + " play queues");
@@ -204,7 +205,7 @@ public class PlayQueueService {
                 // exactly the full-materialization a filter source is designed to avoid.
                 throw new IllegalArgumentException("Filter play queues cannot start at a specific item");
             }
-            pinned = resolvePinnedFilter(sourceId, filter, filterKind, libraryId, authentication);
+            pinned = resolvePinnedFilter(sourceId, filter, filterKind, libraryId, sorting, sortingOrder, authentication);
         }
 
         PlayQueueEntity queue = PlayQueueEntity.builder()
@@ -517,7 +518,8 @@ public class PlayQueueService {
      * running queues alone.
      */
     private PinnedFilter resolvePinnedFilter(UUID savedViewId, MediaFilter filter, FilterKind filterKind,
-                                             UUID libraryId, Authentication authentication) {
+                                             UUID libraryId, SortingEnum sorting, SortingOrder sortingOrder,
+                                             Authentication authentication) {
         if (savedViewId != null) {
             if (filter != null || filterKind != null) {
                 throw new IllegalArgumentException("Give either a saved view id or an inline filter, not both");
@@ -536,7 +538,7 @@ public class PlayQueueService {
             throw new IllegalArgumentException("Library not found");
         }
         filterQueryService.validate(filterKind, filter);
-        return new PinnedFilter(filterKind, filter, libraryId, null, null);
+        return new PinnedFilter(filterKind, filter, libraryId, sorting, sortingOrder);
     }
 
     /**

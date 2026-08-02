@@ -86,7 +86,7 @@ public class PlayQueueController {
     @PreAuthorize("hasRole('user')")
     @MutationMapping
     public PlayQueueEntity createPlayQueue(@Argument CreatePlayQueueInput input, Authentication authentication) {
-        return playQueueService.createPlayQueue(input.sourceType(), input.sourceId(), input.startId(), Boolean.TRUE.equals(input.shuffle()), input.rankKind(), input.filter(), input.filterKind(), input.libraryId(), authentication);
+        return playQueueService.createPlayQueue(input.sourceType(), input.sourceId(), input.startId(), Boolean.TRUE.equals(input.shuffle()), input.rankKind(), input.filter(), input.filterKind(), input.libraryId(), input.sorting(), input.sortingOrder(), authentication);
     }
 
     @PreAuthorize("hasRole('user')")

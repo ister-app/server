@@ -5,8 +5,13 @@ import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayQueueSourceType;
 import app.ister.core.enums.RankKind;
+import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.enums.SubtitleFormat;
+import app.ister.core.filter.FilterJson;
+import app.ister.core.filter.FilterKind;
+import app.ister.core.filter.FilterMatch;
+import app.ister.core.filter.MediaFilter;
 import app.ister.core.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +34,7 @@ import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -1565,5 +1571,111 @@ class PlayQueueServiceTest {
         subject.updatePlayQueue(queue.getId(), 90000L, item.getId(), null, authentication);
 
         verifyNoInteractions(watchStatusService, watchStatusRepository);
+    }
+
+    // --- FILTER sources ---
+
+    private static MediaFilter emptyFilter() {
+        return new MediaFilter(FilterMatch.ALL, List.of(), List.of(), null);
+    }
+
+    @Test
+    void createFilterPlayQueueMaterializesAChunkAndPinsTheDefinition() {
+        List<UUID> trackIds = IntStream.range(0, 50).mapToObj(i -> UUID.randomUUID()).toList();
+        when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.empty());
+        when(filterQueryService.chunkIds(eq(FilterKind.TRACK), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), eq(50), eq(0))).thenReturn(trackIds);
+
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.FILTER, null, null, false,
+                null, emptyFilter(), FilterKind.TRACK, null, null, null, authentication);
+
+        assertEquals(50, result.getItems().size());
+        assertTrue(result.getItems().stream().allMatch(i -> i.getType() == MediaType.TRACK));
+        assertFalse(result.isSourceExhausted(), "a full chunk leaves the source open");
+        assertEquals(50, result.getSourceOffset());
+        assertNotNull(result.getSourceFilter(), "the definition is pinned onto the queue");
+        assertEquals(FilterKind.TRACK, FilterJson.readPinned(result.getSourceFilter()).kind());
+        verify(filterQueryService).validate(eq(FilterKind.TRACK), any());
+    }
+
+    @Test
+    void createFilterPlayQueueMarksAShortChunkExhausted() {
+        when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.empty());
+        when(filterQueryService.chunkIds(any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(List.of(UUID.randomUUID(), UUID.randomUUID()));
+
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.FILTER, null, null, true,
+                null, emptyFilter(), FilterKind.MOVIE, null, null, null, authentication);
+
+        assertEquals(2, result.getItems().size());
+        assertTrue(result.isSourceExhausted());
+        assertTrue(result.isShuffle());
+        assertNotNull(result.getShuffleSeed(), "a shuffled filter queue gets its seed");
+    }
+
+    @Test
+    void createFilterPlayQueueRejectsAStartItem() {
+        assertThrows(IllegalArgumentException.class, () -> subject.createPlayQueue(
+                PlayQueueSourceType.FILTER, null, UUID.randomUUID(), false, null,
+                emptyFilter(), FilterKind.TRACK, null, null, null, authentication));
+    }
+
+    @Test
+    void createFilterPlayQueueRejectsUnplayableKinds() {
+        assertThrows(IllegalArgumentException.class, () -> subject.createPlayQueue(
+                PlayQueueSourceType.FILTER, null, null, false, null,
+                emptyFilter(), FilterKind.ALBUM, null, null, null, authentication));
+    }
+
+    @Test
+    void createFilterPlayQueueRejectsAViewIdCombinedWithAnInlineFilter() {
+        assertThrows(IllegalArgumentException.class, () -> subject.createPlayQueue(
+                PlayQueueSourceType.FILTER, UUID.randomUUID(), null, false, null,
+                emptyFilter(), FilterKind.TRACK, null, null, null, authentication));
+    }
+
+    @Test
+    void createFilterPlayQueueRejectsSomeoneElsesOrMissingView() {
+        UUID viewId = UUID.randomUUID();
+        when(savedViewService.ownedView(authentication, viewId)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> subject.createPlayQueue(
+                PlayQueueSourceType.FILTER, viewId, null, false, null,
+                null, null, null, null, null, authentication));
+    }
+
+    @Test
+    void createFilterPlayQueueFromASavedViewPinsTheViewsDefinition() {
+        UUID viewId = UUID.randomUUID();
+        SavedViewEntity view = SavedViewEntity.builder()
+                .userEntity(user).name("Never played").kind(FilterKind.TRACK)
+                .filter(FilterJson.writeFilter(emptyFilter()))
+                .sorting(SortingEnum.NAME).sortingOrder(SortingOrder.ASCENDING)
+                .build();
+        when(savedViewService.ownedView(authentication, viewId)).thenReturn(Optional.of(view));
+        when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.empty());
+        when(filterQueryService.chunkIds(any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), anyInt(), anyInt())).thenReturn(List.of(UUID.randomUUID()));
+
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.FILTER, viewId, null, false,
+                null, null, null, null, null, null, authentication);
+
+        assertEquals(viewId, result.getSourceId());
+        assertEquals(FilterKind.TRACK, FilterJson.readPinned(result.getSourceFilter()).kind());
+        assertEquals(SortingEnum.NAME, FilterJson.readPinned(result.getSourceFilter()).sorting());
+    }
+
+    @Test
+    void createPlayQueueRejectsFilterArgumentsOnOtherSources() {
+        assertThrows(IllegalArgumentException.class, () -> subject.createPlayQueue(
+                PlayQueueSourceType.SHOW, UUID.randomUUID(), null, false, null,
+                emptyFilter(), null, null, null, null, authentication));
+    }
+
+    @Test
+    void createPlayQueueRejectsAMissingSourceIdOnNonFilterSources() {
+        assertThrows(IllegalArgumentException.class, () -> subject.createPlayQueue(
+                PlayQueueSourceType.SHOW, null, null, false, null, authentication));
     }
 }
