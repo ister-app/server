@@ -101,7 +101,7 @@ class ReadingProgressControllerTest {
         when(bookRepository.findById(book.getId())).thenReturn(Optional.of(book));
         when(watchStatusService.getOrCreateForBook(any(), any()))
                 .thenReturn(WatchStatusEntity.builder().bookEntity(book).watched(false).build());
-        when(watchStatusService.getOrCreateForChapter(any(), any(ChapterEntity.class)))
+        when(watchStatusService.getOrCreateForChapter(any(Authentication.class), any(ChapterEntity.class)))
                 .thenAnswer(call -> chapterStatuses.get(((ChapterEntity) call.getArgument(1)).getId()));
         chapters.forEach(chapter ->
                 when(chapterRepository.findById(chapter.getId())).thenReturn(Optional.of(chapter)));
@@ -186,7 +186,7 @@ class ReadingProgressControllerTest {
                 book.getId(), "epubcfi(/6/4)", 0.4, foreign.getId(), 90_000L, null), authentication);
 
         chapterStatuses.values().forEach(status -> assertEquals(0L, status.getProgressInMilliseconds()));
-        verify(watchStatusService, never()).getOrCreateForChapter(any(), any(ChapterEntity.class));
+        verify(watchStatusService, never()).getOrCreateForChapter(any(Authentication.class), any(ChapterEntity.class));
     }
 
     @Test
@@ -197,7 +197,7 @@ class ReadingProgressControllerTest {
         subject.updateReadingProgress(new ReadingProgressController.ReadingProgressRequest(
                 book.getId(), "epubcfi(/6/4)", 0.4, unknown, 90_000L, null), authentication);
 
-        verify(watchStatusService, never()).getOrCreateForChapter(any(), any(ChapterEntity.class));
+        verify(watchStatusService, never()).getOrCreateForChapter(any(Authentication.class), any(ChapterEntity.class));
     }
 
     @Test

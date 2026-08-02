@@ -7,6 +7,7 @@ import app.ister.core.entity.PlayQueueItemEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
+import app.ister.core.enums.FollowResult;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayQueueSourceType;
 import app.ister.core.enums.RankKind;
@@ -28,6 +29,7 @@ import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.PlayQueueRepository;
 import app.ister.core.repository.TrackRepository;
+import app.ister.core.repository.UserRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
@@ -42,7 +44,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -71,6 +75,8 @@ public class PlayQueueService {
     private final LibraryRepository libraryRepository;
 
     private final UserService userService;
+
+    private final UserRepository userRepository;
 
     private final WatchStatusRepository watchStatusRepository;
 
@@ -108,7 +114,7 @@ public class PlayQueueService {
 
     private final SavedViewService savedViewService;
 
-    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, ChapterRepository chapterRepository, PodcastEpisodeRepository podcastEpisodeRepository, LibraryRepository libraryRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService, ContinueWatchingService continueWatchingService, PodcastPreferenceService podcastPreferenceService, LibraryAccessService libraryAccessService, MediaLibraryResolver mediaLibraryResolver, PlaybackSharingService playbackSharingService, PlayQueueControlGrantRepository playQueueControlGrantRepository, FilterQueryService filterQueryService, SavedViewService savedViewService) {
+    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, ChapterRepository chapterRepository, PodcastEpisodeRepository podcastEpisodeRepository, LibraryRepository libraryRepository, UserService userService, UserRepository userRepository, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService, ContinueWatchingService continueWatchingService, PodcastPreferenceService podcastPreferenceService, LibraryAccessService libraryAccessService, MediaLibraryResolver mediaLibraryResolver, PlaybackSharingService playbackSharingService, PlayQueueControlGrantRepository playQueueControlGrantRepository, FilterQueryService filterQueryService, SavedViewService savedViewService) {
         this.playQueueRepository = playQueueRepository;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
@@ -117,6 +123,7 @@ public class PlayQueueService {
         this.podcastEpisodeRepository = podcastEpisodeRepository;
         this.libraryRepository = libraryRepository;
         this.userService = userService;
+        this.userRepository = userRepository;
         this.watchStatusRepository = watchStatusRepository;
         this.watchStatusService = watchStatusService;
         this.continueWatchingService = continueWatchingService;
@@ -144,6 +151,26 @@ public class PlayQueueService {
                 .filter(queue -> canControl(queue, authentication));
         playQueueEntityOptional.ifPresent(this::maybeExtend);
         return playQueueEntityOptional;
+    }
+
+    /**
+     * Whether the caller may follow (listen along with) this queue's session. Unlike
+     * {@link #getPlayQueue}, control permission is checked <em>before</em> library access: the
+     * distinct NO_LIBRARY_ACCESS result may only be revealed to a caller who has already proven
+     * control rights (they can see the session via now-playing anyway), so a caller without them
+     * gets the same NOT_FOUND a missing queue gives (deny-as-not-found).
+     */
+    @Transactional
+    public FollowResult checkFollowAccess(UUID id, Authentication authentication) {
+        Optional<PlayQueueEntity> queue = playQueueRepository.findById(id)
+                .filter(candidate -> canControl(candidate, authentication));
+        if (queue.isEmpty()) {
+            return FollowResult.NOT_FOUND;
+        }
+        if (!canAccessSource(queue.get().getSourceType(), queue.get().getSourceId(), authentication)) {
+            return FollowResult.NO_LIBRARY_ACCESS;
+        }
+        return FollowResult.OK;
     }
 
     /**
@@ -261,20 +288,40 @@ public class PlayQueueService {
     /**
      * Find the PlayQueue and then update it.
      *
-     * @param streamSettings what the client is currently playing with; stored on the queue
-     *                       and used to prefetch the next item in the same format (may be null)
+     * @param streamSettings  what the client is currently playing with; stored on the queue
+     *                        and used to prefetch the next item in the same format (may be null)
+     * @param followerUserIds users currently following (listening along with) this session; their
+     *                        watch status is written alongside the owner's, since followers never
+     *                        report progress themselves (may be null or empty)
      */
     @Transactional
-    public Optional<PlayQueueEntity> updatePlayQueue(UUID id, long progressInMilliseconds, UUID playQueueItemId, StreamSettings streamSettings, Authentication authentication) {
+    public Optional<PlayQueueEntity> updatePlayQueue(UUID id, long progressInMilliseconds, UUID playQueueItemId, StreamSettings streamSettings, Set<UUID> followerUserIds, Authentication authentication) {
         log.debug("Updating play queue for user: {}", authentication.getName());
         // Update the current playing episode
         Optional<PlayQueueEntity> playQueueEntityOptional = playQueueRepository.findById(id);
         playQueueEntityOptional.ifPresent(playQueueEntity -> {
             checkOwnership(playQueueEntity, authentication);
             applyStreamSettings(playQueueEntity, streamSettings);
-            updatePlayQueueItemWithProgress(progressInMilliseconds, playQueueItemId, authentication, playQueueEntity);
+            updatePlayQueueItemWithProgress(progressInMilliseconds, playQueueItemId, listeners(authentication, followerUserIds), playQueueEntity);
         });
         return playQueueEntityOptional;
+    }
+
+    /**
+     * The reporting owner plus every currently-following user, deduplicated by user id: a user
+     * listening on two devices gets exactly one watch-status write per heartbeat, and the unique
+     * constraint on watch-status rows keeps it at one row per user per queue item.
+     */
+    private List<UserEntity> listeners(Authentication authentication, Set<UUID> followerUserIds) {
+        UserEntity owner = userService.getOrCreateUser(authentication);
+        Map<UUID, UserEntity> byId = new LinkedHashMap<>();
+        byId.put(owner.getId(), owner);
+        if (followerUserIds != null) {
+            followerUserIds.stream()
+                    .filter(userId -> !byId.containsKey(userId))
+                    .forEach(userId -> userRepository.findById(userId).ifPresent(user -> byId.put(userId, user)));
+        }
+        return List.copyOf(byId.values());
     }
 
     private void applyStreamSettings(PlayQueueEntity queue, StreamSettings streamSettings) {
@@ -825,7 +872,7 @@ public class PlayQueueService {
         }
     }
 
-    private void updatePlayQueueItemWithProgress(long progressInMilliseconds, UUID playQueueItemId, Authentication authentication, PlayQueueEntity playQueueEntity) {
+    private void updatePlayQueueItemWithProgress(long progressInMilliseconds, UUID playQueueItemId, List<UserEntity> listeners, PlayQueueEntity playQueueEntity) {
         playQueueEntity.getItems().stream().filter(item -> item.getId().equals(playQueueItemId)).findAny().ifPresent(playQueueItemEntity -> {
             playQueueEntity.setCurrentItem(playQueueItemEntity.getId());
             playQueueEntity.setProgressInMilliseconds(progressInMilliseconds);
@@ -834,31 +881,35 @@ public class PlayQueueService {
             // Update the watch status of an episode if it's played for more then one minute.
             // Audiobook chapters use a lower threshold: their position is shared with the reader,
             // so the first minute of a chapter has to be recoverable when switching to text.
+            // The status is written for every listener: the owner plus each following user —
+            // only the owner ever reports progress, so followers cannot flip it back themselves.
             MediaType type = playQueueItemEntity.getType();
             long minimumProgress = type == MediaType.CHAPTER ? CHAPTER_PROGRESS_THRESHOLD_MS : 60000;
-            if (progressInMilliseconds > minimumProgress) {
-                if (type == MediaType.EPISODE) {
-                    updateEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
-                } else if (type == MediaType.MOVIE) {
-                    updateMovieWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
-                } else if (type == MediaType.CHAPTER) {
-                    updateChapterWatchStatus(progressInMilliseconds, authentication, playQueueItemEntity);
-                } else if (type == MediaType.PODCAST_EPISODE) {
-                    updatePodcastEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
+            for (UserEntity listener : listeners) {
+                if (progressInMilliseconds > minimumProgress) {
+                    if (type == MediaType.EPISODE) {
+                        updateEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, listener, playQueueItemEntity);
+                    } else if (type == MediaType.MOVIE) {
+                        updateMovieWatchStatus(progressInMilliseconds, playQueueItemId, listener, playQueueItemEntity);
+                    } else if (type == MediaType.CHAPTER) {
+                        updateChapterWatchStatus(progressInMilliseconds, listener, playQueueItemEntity);
+                    } else if (type == MediaType.PODCAST_EPISODE) {
+                        updatePodcastEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, listener, playQueueItemEntity);
+                    }
                 }
-            }
-            // Tracks have their own, shorter threshold (many are barely longer than a minute):
-            // a play counts once 30 seconds — or half of a short track — has been heard.
-            if (type == MediaType.TRACK) {
-                updateTrackWatchStatus(progressInMilliseconds, playQueueItemId, authentication, playQueueItemEntity);
+                // Tracks have their own, shorter threshold (many are barely longer than a minute):
+                // a play counts once 30 seconds — or half of a short track — has been heard.
+                if (type == MediaType.TRACK) {
+                    updateTrackWatchStatus(progressInMilliseconds, playQueueItemId, listener, playQueueItemEntity);
+                }
             }
         });
     }
 
-    private void updateTrackWatchStatus(long progressInMilliseconds, UUID playQueueItemId, Authentication authentication, PlayQueueItemEntity playQueueItemEntity) {
+    private void updateTrackWatchStatus(long progressInMilliseconds, UUID playQueueItemId, UserEntity listener, PlayQueueItemEntity playQueueItemEntity) {
         trackRepository.findById(playQueueItemEntity.getTrackEntityId()).ifPresent(trackEntity -> {
             if (progressInMilliseconds > trackPlayThreshold(trackEntity)) {
-                WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreateForTrack(authentication, playQueueItemId, trackEntity);
+                WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreateForTrack(listener, playQueueItemId, trackEntity);
                 updateWatchStatus(progressInMilliseconds, watchStatusEntity, trackEntity.getMediaFileEntities());
             }
         });
@@ -871,30 +922,30 @@ public class PlayQueueService {
                 .orElse(TRACK_PLAY_THRESHOLD_MS);
     }
 
-    private void updateEpisodeWatchStatus(long progressInMilliseconds, UUID playQueueItemId, Authentication authentication, PlayQueueItemEntity playQueueItemEntity) {
+    private void updateEpisodeWatchStatus(long progressInMilliseconds, UUID playQueueItemId, UserEntity listener, PlayQueueItemEntity playQueueItemEntity) {
         episodeRepository.findById(playQueueItemEntity.getEpisodeEntityId()).ifPresent(episodeEntity -> {
-            WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreate(authentication, playQueueItemId, episodeEntity, null);
+            WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreate(listener, playQueueItemId, episodeEntity, null);
             updateWatchStatus(progressInMilliseconds, watchStatusEntity, episodeEntity.getMediaFileEntities());
         });
     }
 
-    private void updateMovieWatchStatus(long progressInMilliseconds, UUID playQueueItemId, Authentication authentication, PlayQueueItemEntity playQueueItemEntity) {
+    private void updateMovieWatchStatus(long progressInMilliseconds, UUID playQueueItemId, UserEntity listener, PlayQueueItemEntity playQueueItemEntity) {
         movieRepository.findById(playQueueItemEntity.getMovieEntityId()).ifPresent(movieEntity -> {
-            WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreate(authentication, playQueueItemId, null, movieEntity);
+            WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreate(listener, playQueueItemId, null, movieEntity);
             updateWatchStatus(progressInMilliseconds, watchStatusEntity, movieEntity.getMediaFileEntities());
         });
     }
 
-    private void updateChapterWatchStatus(long progressInMilliseconds, Authentication authentication, PlayQueueItemEntity playQueueItemEntity) {
+    private void updateChapterWatchStatus(long progressInMilliseconds, UserEntity listener, PlayQueueItemEntity playQueueItemEntity) {
         chapterRepository.findById(playQueueItemEntity.getChapterEntityId()).ifPresent(chapterEntity -> {
-            WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreateForChapter(authentication, chapterEntity);
+            WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreateForChapter(listener, chapterEntity);
             updateWatchStatus(progressInMilliseconds, watchStatusEntity, chapterEntity.getMediaFileEntities());
         });
     }
 
-    private void updatePodcastEpisodeWatchStatus(long progressInMilliseconds, UUID playQueueItemId, Authentication authentication, PlayQueueItemEntity playQueueItemEntity) {
+    private void updatePodcastEpisodeWatchStatus(long progressInMilliseconds, UUID playQueueItemId, UserEntity listener, PlayQueueItemEntity playQueueItemEntity) {
         podcastEpisodeRepository.findById(playQueueItemEntity.getPodcastEpisodeEntityId()).ifPresent(episodeEntity -> {
-            WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreateForPodcastEpisode(authentication, playQueueItemId, episodeEntity);
+            WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreateForPodcastEpisode(listener, playQueueItemId, episodeEntity);
             updateWatchStatus(progressInMilliseconds, watchStatusEntity, episodeEntity.getMediaFileEntities());
         });
     }

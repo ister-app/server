@@ -6,17 +6,22 @@ import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MovieEntity;
+import app.ister.core.entity.PlayQueueItemEntity;
 import app.ister.core.entity.PodcastEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.enums.PlayQueueSourceType;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.BookRepository;
+import app.ister.core.repository.ChapterRepository;
+import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MovieRepository;
+import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.PodcastRepository;
 import app.ister.core.repository.ShowRepository;
+import app.ister.core.repository.TrackRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +46,10 @@ public class MediaLibraryResolver {
     private final LibraryRepository libraryRepository;
     private final MediaFileRepository mediaFileRepository;
     private final ImageRepository imageRepository;
+    private final EpisodeRepository episodeRepository;
+    private final TrackRepository trackRepository;
+    private final ChapterRepository chapterRepository;
+    private final PodcastEpisodeRepository podcastEpisodeRepository;
 
     /** Transactional so the lazy parent chain can be walked outside an open web session. */
     @Transactional(readOnly = true)
@@ -67,6 +76,32 @@ public class MediaLibraryResolver {
             // A filter's sourceId is a saved view, not media; access is enforced per chunk
             // through the caller's allowed-library set, like ARTIST.
             case FILTER -> Optional.empty();
+        };
+    }
+
+    /**
+     * The library a play-queue item's media belongs to. Empty when the media row was deleted
+     * since — callers treat that as accessible, matching the source-access behaviour of
+     * play queues (remaining items keep playing).
+     */
+    @Transactional(readOnly = true)
+    public Optional<LibraryEntity> ofPlayQueueItem(PlayQueueItemEntity item) {
+        return switch (item.getType()) {
+            case MOVIE -> item.getMovieEntityId() == null ? Optional.empty()
+                    : movieRepository.findById(item.getMovieEntityId()).map(MovieEntity::getLibraryEntity);
+            case EPISODE -> item.getEpisodeEntityId() == null ? Optional.empty()
+                    : episodeRepository.findById(item.getEpisodeEntityId())
+                            .map(episode -> episode.getShowEntity().getLibraryEntity());
+            case TRACK -> item.getTrackEntityId() == null ? Optional.empty()
+                    : trackRepository.findById(item.getTrackEntityId())
+                            .map(track -> track.getAlbumEntity().getLibraryEntity());
+            case CHAPTER -> item.getChapterEntityId() == null ? Optional.empty()
+                    : chapterRepository.findById(item.getChapterEntityId())
+                            .map(chapter -> chapter.getBookEntity().getLibraryEntity());
+            case PODCAST_EPISODE -> item.getPodcastEpisodeEntityId() == null ? Optional.empty()
+                    : podcastEpisodeRepository.findById(item.getPodcastEpisodeEntityId())
+                            .map(episode -> episode.getPodcastEntity().getLibraryEntity());
+            case BOOK, COMIC -> Optional.empty();
         };
     }
 

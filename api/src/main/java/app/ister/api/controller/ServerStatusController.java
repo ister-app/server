@@ -9,6 +9,7 @@ import app.ister.core.eventdata.PlaybackStatusData;
 import app.ister.core.eventdata.QueueStatsStatusData;
 import app.ister.core.service.PlaybackSharingService;
 import app.ister.core.service.UserService;
+import app.ister.core.status.FollowerRegistry;
 import app.ister.core.status.NodeActivityRegistry;
 import app.ister.core.status.PlaybackSessionRegistry;
 import app.ister.core.status.QueueStatsRegistry;
@@ -42,18 +43,20 @@ public class ServerStatusController {
     private final QueueStatsRegistry queueStatsRegistry;
     private final RecentFailuresBuffer recentFailuresBuffer;
     private final PlaybackSessionRegistry playbackSessionRegistry;
+    private final FollowerRegistry followerRegistry;
     private final PlaybackSharingService playbackSharingService;
     private final UserService userService;
 
     public ServerStatusController(ServerStatusBroadcaster broadcaster, NodeActivityRegistry nodeActivityRegistry,
                                   QueueStatsRegistry queueStatsRegistry, RecentFailuresBuffer recentFailuresBuffer,
-                                  PlaybackSessionRegistry playbackSessionRegistry,
+                                  PlaybackSessionRegistry playbackSessionRegistry, FollowerRegistry followerRegistry,
                                   PlaybackSharingService playbackSharingService, UserService userService) {
         this.broadcaster = broadcaster;
         this.nodeActivityRegistry = nodeActivityRegistry;
         this.queueStatsRegistry = queueStatsRegistry;
         this.recentFailuresBuffer = recentFailuresBuffer;
         this.playbackSessionRegistry = playbackSessionRegistry;
+        this.followerRegistry = followerRegistry;
         this.playbackSharingService = playbackSharingService;
         this.userService = userService;
     }
@@ -95,7 +98,8 @@ public class ServerStatusController {
     private List<PlaybackSession> visibleSessions(List<PlaybackStatusData> sessions, UUID viewerId) {
         return sessions.stream()
                 .filter(session -> playbackSharingService.canView(viewerId, session.getUserId()))
-                .map(session -> PlaybackSession.from(session, controllable(viewerId, session)))
+                .map(session -> PlaybackSession.from(session, controllable(viewerId, session),
+                        followerRegistry.deviceCount(session.getPlayQueueId())))
                 .toList();
     }
 

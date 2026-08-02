@@ -9,7 +9,8 @@ import java.time.Duration;
  * Considers a playback session stopped when no heartbeat arrived for 60s (clients
  * update every ~5-15s; 60s tolerates jitter and a missed update). Runs on every node
  * independently — all nodes see the same heartbeats, so their views converge without
- * any cross-node stop coordination.
+ * any cross-node stop coordination. Followers (listen-along devices) expire on the
+ * same timeout; their follow heartbeat arrives every ~20s.
  */
 @Component
 public class PlaybackSessionSweeper {
@@ -17,16 +18,21 @@ public class PlaybackSessionSweeper {
     static final Duration SESSION_TIMEOUT = Duration.ofSeconds(60);
 
     private final PlaybackSessionRegistry registry;
+    private final FollowerRegistry followerRegistry;
     private final ServerStatusBroadcaster broadcaster;
 
-    public PlaybackSessionSweeper(PlaybackSessionRegistry registry, ServerStatusBroadcaster broadcaster) {
+    public PlaybackSessionSweeper(PlaybackSessionRegistry registry, FollowerRegistry followerRegistry,
+                                  ServerStatusBroadcaster broadcaster) {
         this.registry = registry;
+        this.followerRegistry = followerRegistry;
         this.broadcaster = broadcaster;
     }
 
     @Scheduled(fixedDelay = 15000)
     public void sweep() {
-        if (registry.removeExpired(SESSION_TIMEOUT)) {
+        boolean sessionsExpired = registry.removeExpired(SESSION_TIMEOUT);
+        boolean followersExpired = followerRegistry.removeExpired(SESSION_TIMEOUT);
+        if (sessionsExpired || followersExpired) {
             broadcaster.emitNowPlaying(registry.snapshot());
         }
     }

@@ -1,6 +1,7 @@
 package app.ister.core.status;
 
 import app.ister.core.eventdata.EventFailureStatusData;
+import app.ister.core.eventdata.FollowerStatusData;
 import app.ister.core.eventdata.NodeActivityStatusData;
 import app.ister.core.eventdata.PlaybackCommandData;
 import app.ister.core.eventdata.PlaybackStatusData;
@@ -21,7 +22,8 @@ import org.springframework.stereotype.Component;
 @Component
 // Jackson binding of the @RabbitHandler payloads in the GraalVM native image.
 @RegisterReflectionForBinding({NodeActivityStatusData.class, QueueStatsStatusData.class,
-        EventFailureStatusData.class, PlaybackStatusData.class, PlaybackCommandData.class})
+        EventFailureStatusData.class, PlaybackStatusData.class, PlaybackCommandData.class,
+        FollowerStatusData.class})
 @RabbitListener(queues = "#{statusQueue.name}")
 public class StatusEventListener {
 
@@ -29,15 +31,17 @@ public class StatusEventListener {
     private final QueueStatsRegistry queueStatsRegistry;
     private final RecentFailuresBuffer recentFailuresBuffer;
     private final PlaybackSessionRegistry playbackSessionRegistry;
+    private final FollowerRegistry followerRegistry;
     private final ServerStatusBroadcaster broadcaster;
 
     public StatusEventListener(NodeActivityRegistry nodeActivityRegistry, QueueStatsRegistry queueStatsRegistry,
                                RecentFailuresBuffer recentFailuresBuffer, PlaybackSessionRegistry playbackSessionRegistry,
-                               ServerStatusBroadcaster broadcaster) {
+                               FollowerRegistry followerRegistry, ServerStatusBroadcaster broadcaster) {
         this.nodeActivityRegistry = nodeActivityRegistry;
         this.queueStatsRegistry = queueStatsRegistry;
         this.recentFailuresBuffer = recentFailuresBuffer;
         this.playbackSessionRegistry = playbackSessionRegistry;
+        this.followerRegistry = followerRegistry;
         this.broadcaster = broadcaster;
     }
 
@@ -68,5 +72,12 @@ public class StatusEventListener {
     @RabbitHandler
     public void onPlaybackCommand(PlaybackCommandData data) {
         broadcaster.emitCommand(data);
+    }
+
+    @RabbitHandler
+    public void onFollower(FollowerStatusData data) {
+        followerRegistry.update(data);
+        // The follower count rides on the now-playing sessions; re-emit so cards refresh live.
+        broadcaster.emitNowPlaying(playbackSessionRegistry.snapshot());
     }
 }

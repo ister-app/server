@@ -10,6 +10,7 @@ import app.ister.core.eventdata.QueueStatsStatusData;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.service.PlaybackSharingService;
 import app.ister.core.service.UserService;
+import app.ister.core.status.FollowerRegistry;
 import app.ister.core.status.NodeActivityRegistry;
 import app.ister.core.status.PlaybackSessionRegistry;
 import app.ister.core.status.QueueStatsRegistry;
@@ -40,6 +41,7 @@ class ServerStatusControllerTest {
     private QueueStatsRegistry queueStatsRegistry;
     private RecentFailuresBuffer recentFailuresBuffer;
     private PlaybackSessionRegistry playbackSessionRegistry;
+    private FollowerRegistry followerRegistry;
     private PlaybackSharingService playbackSharingService;
     private UserService userService;
     private ServerStatusController controller;
@@ -53,6 +55,7 @@ class ServerStatusControllerTest {
         queueStatsRegistry = new QueueStatsRegistry();
         recentFailuresBuffer = new RecentFailuresBuffer();
         playbackSessionRegistry = new PlaybackSessionRegistry();
+        followerRegistry = new FollowerRegistry();
         playbackSharingService = mock(PlaybackSharingService.class);
         userService = mock(UserService.class);
         when(userService.getOrCreateUser(authentication)).thenReturn(UserEntity.builder().id(viewerId).build());
@@ -60,7 +63,7 @@ class ServerStatusControllerTest {
         lenient().when(playbackSharingService.canView(any(), any())).thenReturn(true);
         lenient().when(playbackSharingService.canControl(any(), any(), any(), any())).thenReturn(true);
         controller = new ServerStatusController(broadcaster, nodeActivityRegistry, queueStatsRegistry,
-                recentFailuresBuffer, playbackSessionRegistry, playbackSharingService, userService);
+                recentFailuresBuffer, playbackSessionRegistry, followerRegistry, playbackSharingService, userService);
     }
 
     private static PlaybackStatusData playback(UUID playQueueId) {
@@ -179,5 +182,20 @@ class ServerStatusControllerTest {
         assertEquals(1, snapshot.queueStats().size());
         assertEquals(1, snapshot.recentFailures().size());
         assertEquals(1, snapshot.nowPlaying().size());
+    }
+
+    @Test
+    void snapshotStampsTheFollowerDeviceCountOnEachSession() {
+        UUID queueId = UUID.randomUUID();
+        playbackSessionRegistry.update(playback(queueId));
+        followerRegistry.update(app.ister.core.eventdata.FollowerStatusData.builder()
+                .playQueueId(queueId).deviceId("device-a").userId(UUID.randomUUID()).active(true).build());
+        followerRegistry.update(app.ister.core.eventdata.FollowerStatusData.builder()
+                .playQueueId(queueId).deviceId("device-b").userId(UUID.randomUUID()).active(true).build());
+
+        ServerActivitySnapshot snapshot = controller.serverActivitySnapshot(authentication);
+
+        assertEquals(1, snapshot.nowPlaying().size());
+        assertEquals(2, snapshot.nowPlaying().getFirst().followerCount());
     }
 }

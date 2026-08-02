@@ -24,10 +24,13 @@ public class WatchStatusService {
     private final UserService userService;
     private final WatchStatusRepository watchStatusRepository;
 
+    public WatchStatusEntity getOrCreate(Authentication authentication, UUID playQueueItemId, EpisodeEntity episodeEntity, MovieEntity movieEntity) {
+        return getOrCreate(userService.getOrCreateUser(authentication), playQueueItemId, episodeEntity, movieEntity);
+    }
+
     // Sonar FP: Lombok @SuperBuilder declares builder() on the subclass itself
     @SuppressWarnings("java:S3252")
-    public WatchStatusEntity getOrCreate(Authentication authentication, UUID playQueueItemId, EpisodeEntity episodeEntity, MovieEntity movieEntity) {
-        UserEntity userEntity = userService.getOrCreateUser(authentication);
+    public WatchStatusEntity getOrCreate(UserEntity userEntity, UUID playQueueItemId, EpisodeEntity episodeEntity, MovieEntity movieEntity) {
         Optional<WatchStatusEntity> user = watchStatusRepository.findByUserEntityAndPlayQueueItemIdAndEpisodeEntity(userEntity, playQueueItemId, episodeEntity);
         if (user.isPresent()) {
             return user.get();
@@ -49,9 +52,12 @@ public class WatchStatusService {
      * {@code Chapter.watchStatus} expecting a single row. The chapter id doubles as the play queue
      * item id, exactly like {@link #getOrCreateForBook} does with the book id.
      */
-    @SuppressWarnings("java:S3252")
     public WatchStatusEntity getOrCreateForChapter(Authentication authentication, ChapterEntity chapterEntity) {
-        UserEntity userEntity = userService.getOrCreateUser(authentication);
+        return getOrCreateForChapter(userService.getOrCreateUser(authentication), chapterEntity);
+    }
+
+    @SuppressWarnings("java:S3252")
+    public WatchStatusEntity getOrCreateForChapter(UserEntity userEntity, ChapterEntity chapterEntity) {
         return watchStatusRepository.findByUserEntityAndChapterEntity(userEntity, chapterEntity)
                 .orElseGet(() -> watchStatusRepository.save(WatchStatusEntity.builder()
                         .userEntity(userEntity)
@@ -60,9 +66,12 @@ public class WatchStatusService {
                         .watched(false).build()));
     }
 
-    @SuppressWarnings("java:S3252")
     public WatchStatusEntity getOrCreateForPodcastEpisode(Authentication authentication, UUID playQueueItemId, PodcastEpisodeEntity podcastEpisodeEntity) {
-        UserEntity userEntity = userService.getOrCreateUser(authentication);
+        return getOrCreateForPodcastEpisode(userService.getOrCreateUser(authentication), playQueueItemId, podcastEpisodeEntity);
+    }
+
+    @SuppressWarnings("java:S3252")
+    public WatchStatusEntity getOrCreateForPodcastEpisode(UserEntity userEntity, UUID playQueueItemId, PodcastEpisodeEntity podcastEpisodeEntity) {
         return watchStatusRepository.findByUserEntityAndPlayQueueItemIdAndPodcastEpisodeEntity(userEntity, playQueueItemId, podcastEpisodeEntity)
                 .orElseGet(() -> watchStatusRepository.save(WatchStatusEntity.builder()
                         .userEntity(userEntity)
@@ -75,9 +84,12 @@ public class WatchStatusService {
      * A music track play. Scoped to the play queue item: replaying a track (a new queue item)
      * creates a new row, so a user's play count for a track is their number of rows.
      */
-    @SuppressWarnings("java:S3252")
     public WatchStatusEntity getOrCreateForTrack(Authentication authentication, UUID playQueueItemId, TrackEntity trackEntity) {
-        UserEntity userEntity = userService.getOrCreateUser(authentication);
+        return getOrCreateForTrack(userService.getOrCreateUser(authentication), playQueueItemId, trackEntity);
+    }
+
+    @SuppressWarnings("java:S3252")
+    public WatchStatusEntity getOrCreateForTrack(UserEntity userEntity, UUID playQueueItemId, TrackEntity trackEntity) {
         return watchStatusRepository.findByUserEntityAndPlayQueueItemIdAndTrackEntity(userEntity, playQueueItemId, trackEntity)
                 .orElseGet(() -> watchStatusRepository.save(WatchStatusEntity.builder()
                         .userEntity(userEntity)

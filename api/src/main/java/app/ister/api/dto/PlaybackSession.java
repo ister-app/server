@@ -22,13 +22,15 @@ public record PlaybackSession(
         String nodeName,
         String updatedAt,
         /** Whether the requesting user may remote-control this session (computed per viewer). */
-        boolean controllable) {
+        boolean controllable,
+        /** Number of devices currently following (listening along with) this session. */
+        int followerCount) {
 
-    public static PlaybackSession from(PlaybackStatusData data, boolean controllable) {
+    public static PlaybackSession from(PlaybackStatusData data, boolean controllable, int followerCount) {
         return new PlaybackSession(data.getPlayQueueId(), data.getPlayQueueItemId(), data.getUserId(),
                 data.getUserName(), data.getMediaType(), data.getMediaId(), data.getTitle(),
                 data.getDurationInMilliseconds(), data.getArtworkImageId(),
                 data.getProgressInMilliseconds(), data.getPlayState(), data.getNodeName(),
-                String.valueOf(data.getTimestamp()), controllable);
+                String.valueOf(data.getTimestamp()), controllable, followerCount);
     }
 }

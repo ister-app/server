@@ -83,6 +83,15 @@ class PlayQueueControllerGraphQlTest {
     @MockitoBean
     private PlayQueueControlGrantRepository playQueueControlGrantRepository;
 
+    @MockitoBean
+    private app.ister.core.status.FollowerRegistry followerRegistry;
+
+    @MockitoBean
+    private app.ister.core.service.LibraryAccessService libraryAccessService;
+
+    @MockitoBean
+    private app.ister.core.service.MediaLibraryResolver mediaLibraryResolver;
+
     @BeforeEach
     void authenticateAsUser() {
         SecurityContextHolder.getContext().setAuthentication(
@@ -112,5 +121,30 @@ class PlayQueueControllerGraphQlTest {
                 .execute()
                 .path("getPlayQueue.currentItemId").entity(String.class).isEqualTo(currentItemId.toString())
                 .path("getPlayQueue.progressInMilliseconds").entity(Integer.class).isEqualTo(42_000));
+    }
+
+    @Test
+    void playQueueItemsExposeThePerViewerAccessibleFlag() {
+        app.ister.core.entity.PlayQueueItemEntity item = app.ister.core.entity.PlayQueueItemEntity.builder()
+                .type(app.ister.core.enums.MediaType.TRACK)
+                .position(java.math.BigDecimal.ONE)
+                .build();
+        item.setId(UUID.randomUUID());
+        PlayQueueEntity queue = PlayQueueEntity.builder()
+                .items(new java.util.ArrayList<>(List.of(item)))
+                .build();
+        queue.setId(UUID.randomUUID());
+        when(playQueueService.getPlayQueue(eq(queue.getId()), any())).thenReturn(Optional.of(queue));
+        // The caller's allowed set does not contain the item's library: inaccessible, but present.
+        when(libraryAccessService.allowedLibraryIds(any()))
+                .thenReturn(Optional.of(java.util.Set.of(UUID.randomUUID())));
+        when(mediaLibraryResolver.ofPlayQueueItem(item)).thenReturn(Optional.of(
+                app.ister.core.entity.LibraryEntity.builder().id(UUID.randomUUID()).build()));
+
+        graphQlTester.document("""
+                        { getPlayQueue(id: "%s") { playQueueItems { id accessible } } }
+                        """.formatted(queue.getId()))
+                .execute()
+                .path("getPlayQueue.playQueueItems[0].accessible").entity(Boolean.class).isEqualTo(false);
     }
 }

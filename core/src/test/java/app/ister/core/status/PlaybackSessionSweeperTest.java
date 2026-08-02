@@ -17,6 +17,9 @@ class PlaybackSessionSweeperTest {
     private PlaybackSessionRegistry registry;
 
     @Mock
+    private FollowerRegistry followerRegistry;
+
+    @Mock
     private ServerStatusBroadcaster broadcaster;
 
     @InjectMocks
@@ -25,6 +28,18 @@ class PlaybackSessionSweeperTest {
     @Test
     void broadcastsWhenSessionsExpired() {
         when(registry.removeExpired(PlaybackSessionSweeper.SESSION_TIMEOUT)).thenReturn(true);
+        when(followerRegistry.removeExpired(PlaybackSessionSweeper.SESSION_TIMEOUT)).thenReturn(false);
+        when(registry.snapshot()).thenReturn(List.of());
+
+        sweeper.sweep();
+
+        verify(broadcaster).emitNowPlaying(List.of());
+    }
+
+    @Test
+    void broadcastsWhenOnlyFollowersExpired() {
+        when(registry.removeExpired(PlaybackSessionSweeper.SESSION_TIMEOUT)).thenReturn(false);
+        when(followerRegistry.removeExpired(PlaybackSessionSweeper.SESSION_TIMEOUT)).thenReturn(true);
         when(registry.snapshot()).thenReturn(List.of());
 
         sweeper.sweep();
@@ -35,6 +50,7 @@ class PlaybackSessionSweeperTest {
     @Test
     void staysQuietWhenNothingExpired() {
         when(registry.removeExpired(PlaybackSessionSweeper.SESSION_TIMEOUT)).thenReturn(false);
+        when(followerRegistry.removeExpired(PlaybackSessionSweeper.SESSION_TIMEOUT)).thenReturn(false);
 
         sweeper.sweep();
 

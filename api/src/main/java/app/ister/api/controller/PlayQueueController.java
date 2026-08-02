@@ -24,8 +24,11 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.TrackRepository;
+import app.ister.core.service.LibraryAccessService;
+import app.ister.core.service.MediaLibraryResolver;
 import app.ister.core.service.PlayQueuePrefetchService;
 import app.ister.core.service.PlayQueueService;
+import app.ister.core.status.FollowerRegistry;
 import app.ister.core.status.PlaybackCommandService;
 import app.ister.core.status.PlaybackSessionRegistry;
 import app.ister.core.status.PlaybackStatusService;
@@ -44,6 +47,7 @@ import org.springframework.stereotype.Controller;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Controller
@@ -76,6 +80,12 @@ public class PlayQueueController {
 
     private final PlayQueueControlGrantRepository playQueueControlGrantRepository;
 
+    private final FollowerRegistry followerRegistry;
+
+    private final LibraryAccessService libraryAccessService;
+
+    private final MediaLibraryResolver mediaLibraryResolver;
+
     @PreAuthorize("hasRole('user')")
     @QueryMapping
     public Optional<PlayQueueEntity> getPlayQueue(@Argument UUID id, Authentication authentication) {
@@ -96,9 +106,13 @@ public class PlayQueueController {
                                                      Authentication authentication) {
         PlayQueueService.StreamSettings settings = streamSettings == null ? null
                 : new PlayQueueService.StreamSettings(streamSettings.direct(), streamSettings.transcode(), streamSettings.subtitleFormat());
+        // Watch status is written for the owner plus every currently-following user; the follower
+        // registry lives in core (fed by the status fan-out), so resolve the set here and pass it
+        // down — the database module cannot see the registry.
+        Set<UUID> followerUserIds = followerRegistry.activeUserIds(id);
         Optional<PlayQueueEntity> playQueue;
         try {
-            playQueue = playQueueService.updatePlayQueue(id, progressInMilliseconds, playQueueItemId, settings, authentication);
+            playQueue = playQueueService.updatePlayQueue(id, progressInMilliseconds, playQueueItemId, settings, followerUserIds, authentication);
         } catch (DataAccessException | TransactionException ex) {
             // Transient DB trouble (e.g. an exhausted connection pool during a transcode
             // burst) must not silence the now-playing feed: the registry is in-memory, so
@@ -371,6 +385,25 @@ public class PlayQueueController {
         return playQueueEntity.getItems().stream()
                 .filter(item -> item.getId().equals(currentItem))
                 .findFirst();
+    }
+
+    /**
+     * Whether the calling user's own library access allows streaming this item. Items are never
+     * filtered or nulled for a denied viewer — a follower's queue indexes must match the owner's —
+     * only marked, so the client can explain why it stays silent. The allowed-id set is cached per
+     * user (15s) and the media rows are loaded by the sibling resolvers anyway, so this adds no
+     * meaningful query load. A deleted media row resolves empty and stays accessible, matching the
+     * source-access behaviour of play queues.
+     */
+    @SchemaMapping(typeName = "PlayQueueItem", field = "accessible")
+    public boolean accessible(PlayQueueItemEntity playQueueItemEntity, Authentication authentication) {
+        Optional<Set<UUID>> allowed = libraryAccessService.allowedLibraryIds(authentication);
+        if (allowed.isEmpty()) {
+            return true; // admin sentinel: sees everything
+        }
+        return mediaLibraryResolver.ofPlayQueueItem(playQueueItemEntity)
+                .map(library -> allowed.get().contains(library.getId()))
+                .orElse(true);
     }
 
     @SchemaMapping(typeName = "PlayQueueItem", field = "episode")

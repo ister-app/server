@@ -171,6 +171,15 @@ type Mutation {
     """
     sendPlaybackCommand(playQueueId: ID!, command: PlaybackCommandType!, positionInMilliseconds: Int, playQueueItemId: ID): Boolean!
     """
+    Registers (active: true) or deregisters (active: false) this device as a follower of a live
+    playback session: the device plays the same queue along and the following user's watch status
+    is written alongside the owner's — once per user, however many devices they follow on. Allowed
+    for the owner and anyone who may remote-control the session; keep calling every ~20s while
+    following or the registration expires with the session timeout. deviceId is a stable
+    client-generated install id.
+    """
+    followPlayQueue(playQueueId: ID!, deviceId: String!, active: Boolean!): FollowResult!
+    """
     Saves the calling user's playback settings. They apply to every client of that user and steer
     pre-transcoding: only the preferred audio languages (and video variants up to maxVideoHeight)
     are transcoded in the background.
@@ -213,6 +222,17 @@ type Subscription {
     remote controls) to refetch the queue after someone edited it.
     """
     playbackCommands(playQueueId: ID!): PlaybackCommand!
+}
+
+"""
+Result of followPlayQueue. NOT_FOUND covers both a missing queue/session and missing control
+permission (deny-as-not-found); NO_LIBRARY_ACCESS is only distinguished after the caller has
+proven control rights.
+"""
+enum FollowResult {
+    OK
+    NOT_FOUND
+    NO_LIBRARY_ACCESS
 }
 
 enum PlaybackCommandType {
@@ -300,6 +320,8 @@ type PlaybackSession {
     updatedAt: String!
     "Whether the requesting user may remote-control this session (computed per viewer)."
     controllable: Boolean!
+    "Number of devices currently following (listening along with) this session."
+    followerCount: Int!
 }
 
 type ServerActivitySnapshot {
@@ -791,6 +813,12 @@ type PlayQueueItem {
     "Opaque sort key; may be fractional after reordering."
     position: Float!
     type: MediaType!
+    """
+    Whether the calling user's library access allows streaming this item. Items from libraries the
+    caller cannot see stay in the queue (a follower's indexes must match the session owner's) but
+    are marked inaccessible; streaming stays enforced server-side regardless.
+    """
+    accessible: Boolean!
     movie: Movie
     episode: Episode
     track: Track

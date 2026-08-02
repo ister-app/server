@@ -45,6 +45,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.IntStream;
 
@@ -95,6 +96,15 @@ class PlayQueueControllerTest {
 
     @Mock
     private app.ister.core.repository.PlayQueueControlGrantRepository playQueueControlGrantRepository;
+
+    @Mock
+    private app.ister.core.status.FollowerRegistry followerRegistry;
+
+    @Mock
+    private app.ister.core.service.LibraryAccessService libraryAccessService;
+
+    @Mock
+    private app.ister.core.service.MediaLibraryResolver mediaLibraryResolver;
 
     @Mock
     private Authentication authentication;
@@ -220,7 +230,7 @@ class PlayQueueControllerTest {
         UUID id = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
         PlayQueueEntity queue = buildQueueWithUser();
-        when(playQueueService.updatePlayQueue(id, 5000L, itemId, null, authentication)).thenReturn(Optional.of(queue));
+        when(playQueueService.updatePlayQueue(id, 5000L, itemId, null, Set.of(), authentication)).thenReturn(Optional.of(queue));
 
         Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, itemId, null, null, authentication);
 
@@ -235,7 +245,7 @@ class PlayQueueControllerTest {
         PlayQueueEntity queue = buildQueueWithUser();
         StreamSettingsInput input = new StreamSettingsInput(true, false, SubtitleFormat.SRT);
         when(playQueueService.updatePlayQueue(id, 5000L, itemId,
-                new PlayQueueService.StreamSettings(true, false, SubtitleFormat.SRT), authentication))
+                new PlayQueueService.StreamSettings(true, false, SubtitleFormat.SRT), Set.of(), authentication))
                 .thenReturn(Optional.of(queue));
 
         Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, itemId, input, null, authentication);
@@ -248,7 +258,7 @@ class PlayQueueControllerTest {
         UUID id = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
         PlayQueueEntity queue = buildQueueWithUser();
-        when(playQueueService.updatePlayQueue(id, 5000L, itemId, null, authentication)).thenReturn(Optional.of(queue));
+        when(playQueueService.updatePlayQueue(id, 5000L, itemId, null, Set.of(), authentication)).thenReturn(Optional.of(queue));
 
         subject.updatePlayQueue(id, 5000L, itemId, null, PlayState.PAUSED, authentication);
 
@@ -262,7 +272,7 @@ class PlayQueueControllerTest {
         UUID id = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        when(playQueueService.updatePlayQueue(id, 7000L, itemId, null, authentication))
+        when(playQueueService.updatePlayQueue(id, 7000L, itemId, null, Set.of(), authentication))
                 .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("pool exhausted"));
         when(authentication.getName()).thenReturn("sub-123");
         when(playbackSessionRegistry.find(id)).thenReturn(Optional.of(
@@ -284,7 +294,7 @@ class PlayQueueControllerTest {
     void updatePlayQueueSkipsDegradedHeartbeatWhenClientMovedToAnotherItem() {
         UUID id = UUID.randomUUID();
         UUID newItemId = UUID.randomUUID();
-        when(playQueueService.updatePlayQueue(id, 7000L, newItemId, null, authentication))
+        when(playQueueService.updatePlayQueue(id, 7000L, newItemId, null, Set.of(), authentication))
                 .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("pool exhausted"));
         when(authentication.getName()).thenReturn("sub-123");
         when(playbackSessionRegistry.find(id)).thenReturn(Optional.of(
@@ -305,7 +315,7 @@ class PlayQueueControllerTest {
     void updatePlayQueueSkipsDegradedHeartbeatForOtherUsersSession() {
         UUID id = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
-        when(playQueueService.updatePlayQueue(id, 7000L, itemId, null, authentication))
+        when(playQueueService.updatePlayQueue(id, 7000L, itemId, null, Set.of(), authentication))
                 .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("pool exhausted"));
         when(authentication.getName()).thenReturn("sub-of-someone-else");
         when(playbackSessionRegistry.find(id)).thenReturn(Optional.of(
@@ -323,7 +333,7 @@ class PlayQueueControllerTest {
     void updatePlayQueueSkipsPrefetchWhenQueueNotFound() {
         UUID id = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
-        when(playQueueService.updatePlayQueue(id, 5000L, itemId, null, authentication)).thenReturn(Optional.empty());
+        when(playQueueService.updatePlayQueue(id, 5000L, itemId, null, Set.of(), authentication)).thenReturn(Optional.empty());
 
         Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, itemId, null, null, authentication);
 
@@ -542,7 +552,7 @@ class PlayQueueControllerTest {
         UUID id = UUID.randomUUID();
         PlayQueueEntity queue = buildQueueWithUser();
         queue.setItems(new ArrayList<>(List.of(item)));
-        when(playQueueService.updatePlayQueue(id, 1000L, item.getId(), null, authentication))
+        when(playQueueService.updatePlayQueue(id, 1000L, item.getId(), null, Set.of(), authentication))
                 .thenReturn(Optional.of(queue));
 
         subject.updatePlayQueue(id, 1000L, item.getId(), null, PlayState.PLAYING, authentication);
@@ -703,7 +713,7 @@ class PlayQueueControllerTest {
         UUID itemId = UUID.randomUUID();
         PlayQueueEntity queue = buildQueueWithUser();
         queue.setItems(null);
-        when(playQueueService.updatePlayQueue(id, 1000L, itemId, null, authentication))
+        when(playQueueService.updatePlayQueue(id, 1000L, itemId, null, Set.of(), authentication))
                 .thenReturn(Optional.of(queue));
 
         subject.updatePlayQueue(id, 1000L, itemId, null, PlayState.PLAYING, authentication);
@@ -775,5 +785,47 @@ class PlayQueueControllerTest {
 
         assertTrue(subject.playQueueItemPodcastEpisode(item).isEmpty());
         verifyNoInteractions(podcastEpisodeRepository);
+    }
+
+    // --- PlayQueueItem.accessible (per-viewer library gate for follow mode) ---
+
+    @Test
+    void accessibleIsTrueForAdminSentinel() {
+        when(libraryAccessService.allowedLibraryIds(authentication)).thenReturn(Optional.empty());
+
+        assertTrue(subject.accessible(buildItem(UUID.randomUUID()), authentication));
+        verifyNoInteractions(mediaLibraryResolver);
+    }
+
+    @Test
+    void accessibleReflectsTheCallersLibraryGrants() {
+        UUID allowedLibrary = UUID.randomUUID();
+        PlayQueueItemEntity item = buildItem(UUID.randomUUID());
+        app.ister.core.entity.LibraryEntity library =
+                app.ister.core.entity.LibraryEntity.builder().id(allowedLibrary).build();
+        when(libraryAccessService.allowedLibraryIds(authentication)).thenReturn(Optional.of(Set.of(allowedLibrary)));
+        when(mediaLibraryResolver.ofPlayQueueItem(item)).thenReturn(Optional.of(library));
+
+        assertTrue(subject.accessible(item, authentication));
+    }
+
+    @Test
+    void accessibleIsFalseForALibraryTheCallerCannotSee() {
+        PlayQueueItemEntity item = buildItem(UUID.randomUUID());
+        app.ister.core.entity.LibraryEntity library =
+                app.ister.core.entity.LibraryEntity.builder().id(UUID.randomUUID()).build();
+        when(libraryAccessService.allowedLibraryIds(authentication)).thenReturn(Optional.of(Set.of(UUID.randomUUID())));
+        when(mediaLibraryResolver.ofPlayQueueItem(item)).thenReturn(Optional.of(library));
+
+        assertFalse(subject.accessible(item, authentication));
+    }
+
+    @Test
+    void accessibleIsTrueWhenTheMediaRowWasDeleted() {
+        PlayQueueItemEntity item = buildItem(UUID.randomUUID());
+        when(libraryAccessService.allowedLibraryIds(authentication)).thenReturn(Optional.of(Set.of()));
+        when(mediaLibraryResolver.ofPlayQueueItem(item)).thenReturn(Optional.empty());
+
+        assertTrue(subject.accessible(item, authentication));
     }
 }
