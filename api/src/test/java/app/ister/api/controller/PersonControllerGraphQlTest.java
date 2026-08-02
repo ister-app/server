@@ -41,6 +41,9 @@ class PersonControllerGraphQlTest {
     private app.ister.core.service.LibraryAccessService libraryAccessService;
 
     @MockitoBean
+    private app.ister.core.service.FilterQueryService filterQueryService;
+
+    @MockitoBean
     private PersonRepository personRepository;
 
     @MockitoBean

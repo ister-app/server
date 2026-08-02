@@ -95,6 +95,12 @@ class PlayQueueServiceTest {
     private PlayQueueControlGrantRepository playQueueControlGrantRepository;
 
     @Mock
+    private FilterQueryService filterQueryService;
+
+    @Mock
+    private SavedViewService savedViewService;
+
+    @Mock
     private Authentication authentication;
 
     private UserEntity user;

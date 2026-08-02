@@ -177,7 +177,7 @@ class PersonControllerTest {
         Page<PersonEntity> result = subject.persons(
                 Optional.of(0), Optional.of(10),
                 Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.ASCENDING),
-                Optional.empty(), authentication);
+                Optional.empty(), Optional.empty(), authentication);
 
         assertEquals(1, result.getContent().size());
         verify(personRepository).findAll(any(Pageable.class));
@@ -197,7 +197,7 @@ class PersonControllerTest {
         Page<PersonEntity> result = subject.persons(
                 Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(),
-                Optional.of(libraryId), authentication);
+                Optional.of(libraryId), Optional.empty(), authentication);
 
         assertEquals(1, result.getContent().size());
     }

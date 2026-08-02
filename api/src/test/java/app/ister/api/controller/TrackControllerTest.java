@@ -89,7 +89,7 @@ class TrackControllerTest {
                 .thenReturn(page);
 
         Page<TrackEntity> result = subject.tracks(Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.of(libraryId), authentication);
+                Optional.empty(), Optional.empty(), Optional.of(libraryId), Optional.empty(), authentication);
 
         assertEquals(1, result.getTotalElements());
     }
@@ -100,7 +100,7 @@ class TrackControllerTest {
         when(libraryAccessService.canAccess(libraryId, authentication)).thenReturn(false);
 
         Page<TrackEntity> result = subject.tracks(Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.of(libraryId), authentication);
+                Optional.empty(), Optional.empty(), Optional.of(libraryId), Optional.empty(), authentication);
 
         assertTrue(result.isEmpty());
         verify(trackRepository, never()).findInLibraries(any(), any(), any(), any());
@@ -115,7 +115,7 @@ class TrackControllerTest {
                 .thenReturn(Page.empty());
 
         subject.tracks(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.DATE_CREATED),
-                Optional.of(SortingOrder.DESCENDING), Optional.empty(), authentication);
+                Optional.of(SortingOrder.DESCENDING), Optional.empty(), Optional.empty(), authentication);
 
         verify(trackRepository).findInLibraries(eq(Set.of(allowed)),
                 eq(SortingEnum.DATE_CREATED), eq(SortingOrder.DESCENDING), any(Pageable.class));
@@ -133,7 +133,7 @@ class TrackControllerTest {
                 .thenReturn(Page.empty());
 
         subject.tracks(Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), authentication);
+                Optional.empty(), Optional.empty(), Optional.empty(), authentication);
 
         verify(trackRepository).findInLibraries(eq(List.of(library.getId())),
                 eq(SortingEnum.NAME), eq(SortingOrder.ASCENDING), any(Pageable.class));

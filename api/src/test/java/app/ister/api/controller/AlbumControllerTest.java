@@ -92,7 +92,7 @@ class AlbumControllerTest {
 
         Page<AlbumEntity> result = subject.albums(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.of(personId), Optional.empty(), authentication);
+                Optional.of(personId), Optional.empty(), Optional.empty(), authentication);
 
         assertEquals(1, result.getContent().size());
         assertEquals("Abbey Road", result.getContent().get(0).getName());
@@ -105,7 +105,7 @@ class AlbumControllerTest {
 
         Page<AlbumEntity> result = subject.albums(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.of(personId), Optional.empty(), authentication);
+                Optional.of(personId), Optional.empty(), Optional.empty(), authentication);
 
         assertTrue(result.isEmpty());
     }
@@ -120,7 +120,7 @@ class AlbumControllerTest {
 
         Page<AlbumEntity> result = subject.albums(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.of(libraryId), authentication);
+                Optional.empty(), Optional.of(libraryId), Optional.empty(), authentication);
 
         assertEquals(1, result.getContent().size());
     }
@@ -178,7 +178,7 @@ class AlbumControllerTest {
 
         Page<AlbumEntity> result = subject.albums(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), authentication);
+                Optional.empty(), Optional.empty(), Optional.empty(), authentication);
 
         assertEquals(1, result.getContent().size());
     }
@@ -192,7 +192,7 @@ class AlbumControllerTest {
 
         Page<AlbumEntity> result = subject.albums(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(SortingOrder.DESCENDING),
-                Optional.empty(), Optional.empty(), authentication);
+                Optional.empty(), Optional.empty(), Optional.empty(), authentication);
 
         assertEquals(1, result.getContent().size());
     }

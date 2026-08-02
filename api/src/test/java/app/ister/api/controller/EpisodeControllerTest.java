@@ -92,7 +92,7 @@ class EpisodeControllerTest {
                 .thenReturn(page);
 
         Page<EpisodeEntity> result = subject.episodes(Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.of(libraryId), authentication);
+                Optional.empty(), Optional.empty(), Optional.of(libraryId), Optional.empty(), authentication);
 
         assertEquals(1, result.getTotalElements());
     }
@@ -103,7 +103,7 @@ class EpisodeControllerTest {
         when(libraryAccessService.canAccess(libraryId, authentication)).thenReturn(false);
 
         Page<EpisodeEntity> result = subject.episodes(Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.of(libraryId), authentication);
+                Optional.empty(), Optional.empty(), Optional.of(libraryId), Optional.empty(), authentication);
 
         assertTrue(result.isEmpty());
         verify(episodeRepository, never()).findInLibraries(any(), any(), any(), any());
@@ -118,7 +118,7 @@ class EpisodeControllerTest {
                 .thenReturn(Page.empty());
 
         subject.episodes(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME),
-                Optional.of(SortingOrder.ASCENDING), Optional.empty(), authentication);
+                Optional.of(SortingOrder.ASCENDING), Optional.empty(), Optional.empty(), authentication);
 
         verify(episodeRepository).findInLibraries(eq(Set.of(allowed)),
                 eq(SortingEnum.NAME), eq(SortingOrder.ASCENDING), any(Pageable.class));
@@ -136,7 +136,7 @@ class EpisodeControllerTest {
                 .thenReturn(Page.empty());
 
         subject.episodes(Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), authentication);
+                Optional.empty(), Optional.empty(), Optional.empty(), authentication);
 
         verify(episodeRepository).findInLibraries(eq(List.of(library.getId())),
                 eq(SortingEnum.DATE_CREATED), eq(SortingOrder.DESCENDING), any(Pageable.class));

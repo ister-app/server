@@ -12,10 +12,10 @@ type Query {
     metadata title, RELEASE_YEAR on the earliest metadata release (air) date; episodes without
     one sort last.
     """
-    episodes(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): EpisodePage
+    episodes(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID, filter: MediaFilterInput): EpisodePage
     seasonById(id: ID): Season
-    shows(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): ShowPage
-    movies(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): MoviePage
+    shows(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID, filter: MediaFilterInput): ShowPage
+    movies(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID, filter: MediaFilterInput): MoviePage
     movieById(id: ID): Movie
     showById(id: ID): Show
     """
@@ -26,16 +26,16 @@ type Query {
     cast(showId: ID, movieId: ID, episodeId: ID, page: Int, size: Int): CreditPage
     getPlayQueue(id: ID!): PlayQueue
     libraries: [Library!]
-    persons(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): PersonPage
+    persons(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID, filter: MediaFilterInput): PersonPage
     personById(id: ID): Person
-    albums(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, artistId: ID, libraryId: ID): AlbumPage
+    albums(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, artistId: ID, libraryId: ID, filter: MediaFilterInput): AlbumPage
     albumById(id: ID): Album
     trackById(id: ID): Track
     """
     Tracks of a music library, across albums. NAME sorts on the tag/metadata title,
     RELEASE_YEAR on the earliest metadata release date; tracks without one sort last.
     """
-    tracks(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): TrackPage
+    tracks(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID, filter: MediaFilterInput): TrackPage
     books(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, authorId: ID, libraryId: ID): BookPage
     bookById(id: ID): Book
     seriesById(id: ID): Series
@@ -65,6 +65,8 @@ type Query {
     shareableUsers: [ShareableUser!]!
     "External metadata/image providers actually in use on this server, for attribution display."
     attributions: [Attribution!]!
+    "The calling user's custom views (saved filters), by name; optionally narrowed to one library and/or kind."
+    savedViews(libraryId: ID, kind: FilterKind): [SavedView!]!
 }
 
 "The external provider a metadata row or image originated from, for attribution."
@@ -189,6 +191,15 @@ type Mutation {
     session's own control allowlist, used when controlScope is ALLOWLIST. Returns true.
     """
     setSessionSharing(playQueueId: ID!, controlScope: RemoteControlScope, allowedUserIds: [ID!]): Boolean!
+    "Saves a custom view (named filter) for the calling user."
+    createSavedView(input: SavedViewInput!): SavedView!
+    """
+    Updates one of the caller's own views. Play queues created from the view keep playing with
+    the definition they were created with.
+    """
+    updateSavedView(id: ID!, input: SavedViewInput!): SavedView!
+    "Deletes one of the caller's own views. Returns true."
+    deleteSavedView(id: ID!): Boolean!
 }
 
 type Subscription {
@@ -311,6 +322,125 @@ enum SortingOrder {
     ASCENDING
 }
 
+"The media type a custom filter targets; mirrors the browse kinds of a library grid."
+enum FilterKind {
+    ARTIST
+    ALBUM
+    TRACK
+    MOVIE
+    SHOW
+    EPISODE
+}
+
+"How the conditions and subgroups of one filter group combine."
+enum FilterMatch {
+    "Match all of the following (AND)."
+    ALL
+    "Match any of the following (OR)."
+    ANY
+}
+
+"""
+Fields a custom filter can compare on. Which fields apply per FilterKind: TITLE/GENRE/DATE_ADDED
+apply everywhere; ARTIST_NAME to albums and tracks; ALBUM_NAME, PLAY_COUNT, LAST_PLAYED_AT to
+tracks; RELEASE_YEAR to everything except artists (BIRTH_YEAR); RATING to everything except
+artists; DURATION to tracks, movies and episodes; WATCHED to movies and episodes.
+"""
+enum FilterField {
+    TITLE
+    ARTIST_NAME
+    ALBUM_NAME
+    RELEASE_YEAR
+    BIRTH_YEAR
+    "Free-text metadata genre, matched over every metadata row of the item (and its parent)."
+    GENRE
+    "The calling user's own 1-10 rating."
+    RATING
+    "How often the calling user played the track."
+    PLAY_COUNT
+    "When the calling user last played the track."
+    LAST_PLAYED_AT
+    "Duration of the item's media file, in milliseconds."
+    DURATION
+    "Whether the calling user watched the item to the end."
+    WATCHED
+    "When the item was added to the library."
+    DATE_ADDED
+}
+
+"""
+Operators of a filter condition. Strings take EQUALS/NOT_EQUALS/CONTAINS/NOT_CONTAINS, numbers
+EQUALS/NOT_EQUALS/LESS_THAN/GREATER_THAN, dates BEFORE/AFTER/IN_LAST_DAYS, booleans EQUALS;
+IS_SET/IS_NOT_SET apply to everything except booleans.
+"""
+enum FilterOperator {
+    EQUALS
+    NOT_EQUALS
+    CONTAINS
+    NOT_CONTAINS
+    LESS_THAN
+    GREATER_THAN
+    BEFORE
+    AFTER
+    "Within the last N days (value is the number of days)."
+    IN_LAST_DAYS
+    IS_SET
+    IS_NOT_SET
+}
+
+"One row of a filter group. The value is a string; numbers, dates (YYYY-MM-DD) and booleans are parsed server-side. IS_SET/IS_NOT_SET take no value."
+input FilterConditionInput {
+    field: FilterField!
+    operator: FilterOperator!
+    value: String
+}
+
+"""
+A filter group: conditions and nested subgroups combined with match. limit caps the total result
+and is only allowed on the top-level group.
+"""
+input MediaFilterInput {
+    match: FilterMatch!
+    conditions: [FilterConditionInput!]
+    groups: [MediaFilterInput!]
+    limit: Int
+}
+
+"A filter condition as stored on a saved view."
+type FilterConditionValue {
+    field: FilterField!
+    operator: FilterOperator!
+    value: String
+}
+
+"A filter group as stored on a saved view; mirrors MediaFilterInput."
+type FilterGroup {
+    match: FilterMatch!
+    conditions: [FilterConditionValue!]!
+    groups: [FilterGroup!]!
+    limit: Int
+}
+
+"A custom view: the calling user's named filter over one browse kind, optionally scoped to one library."
+type SavedView {
+    id: ID!
+    name: String!
+    kind: FilterKind!
+    libraryId: ID
+    filter: FilterGroup!
+    sorting: SortingEnum
+    sortingOrder: SortingOrder
+}
+
+input SavedViewInput {
+    name: String!
+    kind: FilterKind!
+    libraryId: ID
+    filter: MediaFilterInput!
+    sorting: SortingEnum
+    sortingOrder: SortingOrder
+}
+
 "Ranking of the library Discover top-lists. For books and series RECENTLY_PLAYED means recently read."
 enum RankKind {
     RECENTLY_PLAYED
@@ -367,6 +497,12 @@ enum PlayQueueSourceType {
     PODCAST
     "A ranked track list of an artist (see rankKind), evaluated as of queue creation; grows lazily like other sources."
     ARTIST
+    """
+    A custom filter: a saved view (sourceId) or an inline filter (filter + filterKind). The
+    definition is pinned onto the queue at creation and the play-derived fields are evaluated as
+    of that moment; grows lazily like other sources. Only TRACK, MOVIE and EPISODE filters play.
+    """
+    FILTER
 }
 
 enum SubtitleFormat {
@@ -408,14 +544,23 @@ input UserSettingsInput {
 
 input CreatePlayQueueInput {
     sourceType: PlayQueueSourceType!
-    "The movie/show/album/library/book/podcast to play, or the artist for ARTIST sources."
-    sourceId: ID!
-    "Episode or track to start at; ignored for MOVIE sources."
+    """
+    The movie/show/album/library/book/podcast to play, the artist for ARTIST sources, or the
+    saved view for FILTER sources. Only optional for FILTER sources with an inline filter.
+    """
+    sourceId: ID
+    "Episode or track to start at; ignored for MOVIE sources, unsupported for FILTER sources."
     startId: ID
     "Play the source in a stable random order; defaults to false, required for LIBRARY sources, rejected for ARTIST sources."
     shuffle: Boolean
     "Which ranked track list of the artist to play; required for ARTIST sources, forbidden otherwise."
     rankKind: RankKind
+    "Inline (ad-hoc) filter for FILTER sources without a saved view; requires filterKind."
+    filter: MediaFilterInput
+    "Which browse kind the inline filter targets; only TRACK, MOVIE and EPISODE can be played."
+    filterKind: FilterKind
+    "Optional library scope for an inline FILTER source."
+    libraryId: ID
 }
 
 enum DirectoryType {

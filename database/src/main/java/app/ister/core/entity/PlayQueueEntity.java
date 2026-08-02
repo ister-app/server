@@ -55,6 +55,12 @@ public class PlayQueueEntity extends BaseEntity {
     // Start item that was materialized up-front for a shuffled queue; excluded from chunk queries.
     private UUID sourceStartId;
 
+    // FILTER queues only: the pinned filter definition (kind, groups, limit, sort, library scope)
+    // as JSON. A copy rather than a saved-view reference, so editing or deleting the view never
+    // reshapes a queue that is already playing.
+    @Column(columnDefinition = "text")
+    private String sourceFilter;
+
     // Podcast queues only: built oldest-first, from the user's episode order at creation time.
     // Frozen here rather than re-read per chunk, so changing the preference can't flip a queue
     // that is already playing.

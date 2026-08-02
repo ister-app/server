@@ -11,9 +11,15 @@ import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayQueueSourceType;
 import app.ister.core.enums.RankKind;
 import app.ister.core.enums.RemoteControlScope;
+import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.enums.SubtitleFormat;
+import app.ister.core.filter.FilterJson;
+import app.ister.core.filter.FilterKind;
+import app.ister.core.filter.MediaFilter;
+import app.ister.core.filter.PinnedFilter;
 import app.ister.core.entity.ChapterEntity;
+import app.ister.core.entity.SavedViewEntity;
 import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.PlayQueueControlGrantRepository;
 import app.ister.core.repository.PodcastEpisodeRepository;
@@ -98,7 +104,11 @@ public class PlayQueueService {
 
     private final PlayQueueControlGrantRepository playQueueControlGrantRepository;
 
-    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, ChapterRepository chapterRepository, PodcastEpisodeRepository podcastEpisodeRepository, LibraryRepository libraryRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService, ContinueWatchingService continueWatchingService, PodcastPreferenceService podcastPreferenceService, LibraryAccessService libraryAccessService, MediaLibraryResolver mediaLibraryResolver, PlaybackSharingService playbackSharingService, PlayQueueControlGrantRepository playQueueControlGrantRepository) {
+    private final FilterQueryService filterQueryService;
+
+    private final SavedViewService savedViewService;
+
+    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, ChapterRepository chapterRepository, PodcastEpisodeRepository podcastEpisodeRepository, LibraryRepository libraryRepository, UserService userService, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService, ContinueWatchingService continueWatchingService, PodcastPreferenceService podcastPreferenceService, LibraryAccessService libraryAccessService, MediaLibraryResolver mediaLibraryResolver, PlaybackSharingService playbackSharingService, PlayQueueControlGrantRepository playQueueControlGrantRepository, FilterQueryService filterQueryService, SavedViewService savedViewService) {
         this.playQueueRepository = playQueueRepository;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
@@ -115,6 +125,8 @@ public class PlayQueueService {
         this.mediaLibraryResolver = mediaLibraryResolver;
         this.playbackSharingService = playbackSharingService;
         this.playQueueControlGrantRepository = playQueueControlGrantRepository;
+        this.filterQueryService = filterQueryService;
+        this.savedViewService = savedViewService;
     }
 
     /**
@@ -152,12 +164,23 @@ public class PlayQueueService {
      * Creates a play queue from a source. Only an initial window of items is materialized;
      * more items are appended lazily while the user plays through the queue.
      *
-     * @param startId  the episode/track to start at (ignored for MOVIE, optional otherwise)
-     * @param shuffle  play the source in a stable seeded random order; required for LIBRARY sources
-     * @param rankKind which ranked track list an ARTIST source plays; required for ARTIST, forbidden otherwise
+     * @param startId    the episode/track to start at (ignored for MOVIE, optional otherwise,
+     *                   unsupported for FILTER)
+     * @param shuffle    play the source in a stable seeded random order; required for LIBRARY sources
+     * @param rankKind   which ranked track list an ARTIST source plays; required for ARTIST, forbidden otherwise
+     * @param filter     inline filter definition for an ad-hoc FILTER source (alternative to a
+     *                   saved view id in sourceId)
+     * @param filterKind which browse kind an inline filter targets; required with filter
+     * @param libraryId  optional library scope for an inline FILTER source
      */
+    /** Convenience overload for the non-FILTER sources. */
     @Transactional
     public PlayQueueEntity createPlayQueue(PlayQueueSourceType sourceType, UUID sourceId, UUID startId, boolean shuffle, RankKind rankKind, Authentication authentication) {
+        return createPlayQueue(sourceType, sourceId, startId, shuffle, rankKind, null, null, null, authentication);
+    }
+
+    @Transactional
+    public PlayQueueEntity createPlayQueue(PlayQueueSourceType sourceType, UUID sourceId, UUID startId, boolean shuffle, RankKind rankKind, MediaFilter filter, FilterKind filterKind, UUID libraryId, Authentication authentication) {
         log.debug("Creating play queue for user: {}, source type: {}, source: {}, shuffle: {}, rank kind: {}", authentication.getName(), sourceType, sourceId, shuffle, rankKind);
         if (!canAccessSource(sourceType, sourceId, authentication)) {
             throw new IllegalArgumentException("Source not found");
@@ -168,12 +191,28 @@ public class PlayQueueService {
         if (sourceType != PlayQueueSourceType.ARTIST && rankKind != null) {
             throw new IllegalArgumentException("rankKind only applies to artist play queues");
         }
+        if (sourceType != PlayQueueSourceType.FILTER && (filter != null || filterKind != null || libraryId != null)) {
+            throw new IllegalArgumentException("filter, filterKind and libraryId only apply to FILTER play queues");
+        }
+        if (sourceType != PlayQueueSourceType.FILTER && sourceId == null) {
+            throw new IllegalArgumentException("sourceId is required for " + sourceType + " play queues");
+        }
+        PinnedFilter pinned = null;
+        if (sourceType == PlayQueueSourceType.FILTER) {
+            if (startId != null) {
+                // Locating a start item would need the full ordered id list (see orderedIndexOf),
+                // exactly the full-materialization a filter source is designed to avoid.
+                throw new IllegalArgumentException("Filter play queues cannot start at a specific item");
+            }
+            pinned = resolvePinnedFilter(sourceId, filter, filterKind, libraryId, authentication);
+        }
 
         PlayQueueEntity queue = PlayQueueEntity.builder()
                 .userEntity(userService.getOrCreateUser(authentication))
                 .sourceType(sourceType)
                 .sourceId(sourceId)
                 .rankKind(rankKind)
+                .sourceFilter(pinned != null ? FilterJson.write(pinned) : null)
                 .items(new ArrayList<>())
                 .build();
 
@@ -181,11 +220,11 @@ public class PlayQueueService {
             addItem(queue, buildItem(queue, MediaType.MOVIE, sourceId, GAP));
             queue.setSourceExhausted(true);
         } else {
-            MediaType mediaType = mediaTypeForSource(sourceType, sourceId, shuffle);
+            MediaType mediaType = mediaTypeForSource(sourceType, sourceId, shuffle, pinned);
             queue.setShuffle(shuffle);
-            if (sourceType == PlayQueueSourceType.ARTIST) {
-                // Persist before fetching the first chunk: dateCreated is the ranking's freeze
-                // point, and the chunk queries (and orderedIndexOf below) need it set.
+            if (sourceType == PlayQueueSourceType.ARTIST || sourceType == PlayQueueSourceType.FILTER) {
+                // Persist before fetching the first chunk: dateCreated is the ranking's/filter's
+                // freeze point, and the chunk queries (and orderedIndexOf below) need it set.
                 playQueueRepository.save(queue);
             }
             if (sourceType == PlayQueueSourceType.PODCAST) {
@@ -383,7 +422,7 @@ public class PlayQueueService {
      * Marks the source exhausted when it returns fewer items than a full chunk.
      */
     private void appendChunk(PlayQueueEntity queue) {
-        MediaType mediaType = mediaTypeForSource(queue.getSourceType(), queue.getSourceId(), queue.isShuffle());
+        MediaType mediaType = mediaTypeForSource(queue.getSourceType(), queue.getSourceId(), queue.isShuffle(), pinnedFilterOf(queue));
         List<UUID> mediaIds = fetchNextChunk(queue, mediaType);
         BigDecimal position = maxPosition(queue);
         for (UUID mediaId : mediaIds) {
@@ -431,6 +470,7 @@ public class PlayQueueService {
                 case LIBRARY -> mediaType == MediaType.MOVIE
                         ? movieRepository.findMovieIdsForLibraryShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset)
                         : trackRepository.findTrackIdsForLibraryShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset);
+                case FILTER -> filterChunkIds(queue, CHUNK_SIZE, offset);
                 case MOVIE, BOOK, PODCAST, ARTIST -> List.of();
             };
         }
@@ -442,8 +482,61 @@ public class PlayQueueService {
                     ? podcastEpisodeRepository.findEpisodeIdsForPodcastOrderedAsc(sourceId, CHUNK_SIZE, offset)
                     : podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(sourceId, CHUNK_SIZE, offset);
             case ARTIST -> rankedTrackIdsForArtist(queue, CHUNK_SIZE, offset);
+            case FILTER -> filterChunkIds(queue, CHUNK_SIZE, offset);
             default -> List.of();
         };
+    }
+
+    /**
+     * A page of matching ids for a FILTER queue, in the pinned sort (or the seeded shuffle
+     * order). The filter is evaluated as of queue creation where the data allows (play-derived
+     * fields); library access is enforced here per chunk, like ARTIST — a filter can span
+     * libraries, so the queue has no single source library to check up-front.
+     */
+    private List<UUID> filterChunkIds(PlayQueueEntity queue, int limit, int offset) {
+        PinnedFilter pinned = pinnedFilterOf(queue);
+        if (pinned == null) {
+            return List.of();
+        }
+        Set<UUID> allowed = libraryAccessService.allowedLibraryIdsForUser(queue.getUserEntity()).orElse(null);
+        return filterQueryService.chunkIds(pinned.kind(), pinned.filter(),
+                pinned.sorting() != null ? pinned.sorting() : SortingEnum.NAME,
+                pinned.sortingOrder() != null ? pinned.sortingOrder() : SortingOrder.ASCENDING,
+                queue.isShuffle() ? queue.getShuffleSeed() : null,
+                null, allowed, pinned.libraryId(),
+                queue.getUserEntity().getExternalId(), queue.getDateCreated(), limit, offset);
+    }
+
+    private PinnedFilter pinnedFilterOf(PlayQueueEntity queue) {
+        return queue.getSourceFilter() == null ? null : FilterJson.readPinned(queue.getSourceFilter());
+    }
+
+    /**
+     * The definition a new FILTER queue pins: the caller's own saved view (sourceId), or an
+     * inline ad-hoc filter. A copy is stored on the queue, so later edits to the view leave
+     * running queues alone.
+     */
+    private PinnedFilter resolvePinnedFilter(UUID savedViewId, MediaFilter filter, FilterKind filterKind,
+                                             UUID libraryId, Authentication authentication) {
+        if (savedViewId != null) {
+            if (filter != null || filterKind != null) {
+                throw new IllegalArgumentException("Give either a saved view id or an inline filter, not both");
+            }
+            SavedViewEntity view = savedViewService.ownedView(authentication, savedViewId)
+                    .orElseThrow(() -> new IllegalArgumentException("Saved view not found"));
+            MediaFilter viewFilter = FilterJson.readFilter(view.getFilter());
+            filterQueryService.validate(view.getKind(), viewFilter);
+            UUID scope = view.getLibraryEntity() != null ? view.getLibraryEntity().getId() : libraryId;
+            return new PinnedFilter(view.getKind(), viewFilter, scope, view.getSorting(), view.getSortingOrder());
+        }
+        if (filter == null || filterKind == null) {
+            throw new IllegalArgumentException("A FILTER play queue needs a saved view id, or a filter with filterKind");
+        }
+        if (libraryId != null && !libraryAccessService.canAccess(libraryId, authentication)) {
+            throw new IllegalArgumentException("Library not found");
+        }
+        filterQueryService.validate(filterKind, filter);
+        return new PinnedFilter(filterKind, filter, libraryId, null, null);
     }
 
     /**
@@ -475,9 +568,21 @@ public class PlayQueueService {
         };
     }
 
-    private MediaType mediaTypeForSource(PlayQueueSourceType sourceType, UUID sourceId, boolean shuffle) {
+    private MediaType mediaTypeForSource(PlayQueueSourceType sourceType, UUID sourceId, boolean shuffle, PinnedFilter pinned) {
         return switch (sourceType) {
             case MOVIE -> MediaType.MOVIE;
+            case FILTER -> {
+                if (pinned == null) {
+                    throw new IllegalArgumentException("Filter play queue without a pinned filter");
+                }
+                yield switch (pinned.kind()) {
+                    case TRACK -> MediaType.TRACK;
+                    case MOVIE -> MediaType.MOVIE;
+                    case EPISODE -> MediaType.EPISODE;
+                    case ALBUM, ARTIST, SHOW -> throw new IllegalArgumentException(
+                            "A " + pinned.kind() + " filter cannot be played directly; filter on tracks, movies or episodes instead");
+                };
+            }
             case SHOW -> MediaType.EPISODE;
             case ALBUM -> MediaType.TRACK;
             case BOOK -> {

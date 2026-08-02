@@ -64,6 +64,9 @@ public class MediaLibraryResolver {
             // An artist spans libraries; ARTIST queue access is enforced per chunk through the
             // library-filtered ranked-track queries instead.
             case ARTIST -> Optional.empty();
+            // A filter's sourceId is a saved view, not media; access is enforced per chunk
+            // through the caller's allowed-library set, like ARTIST.
+            case FILTER -> Optional.empty();
         };
     }
 

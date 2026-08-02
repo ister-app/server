@@ -65,6 +65,9 @@ class ShowControllerGraphQlTest {
     @MockitoBean
     private LibraryAccessService libraryAccessService;
 
+    @MockitoBean
+    private app.ister.core.service.FilterQueryService filterQueryService;
+
     @Test
     void showsQueryResolvesPageAndBatchedEpisodes() {
         ShowEntity show = ShowEntity.builder().name("Test show").releaseYear(2020).build();

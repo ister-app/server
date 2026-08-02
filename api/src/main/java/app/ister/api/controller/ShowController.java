@@ -3,10 +3,13 @@ package app.ister.api.controller;
 import app.ister.core.entity.*;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
+import app.ister.core.filter.FilterKind;
+import app.ister.core.filter.MediaFilter;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.ShowRepository;
+import app.ister.core.service.FilterQueryService;
 import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +39,7 @@ public class ShowController {
     private final ImageRepository imageRepository;
     private final LibraryRepository libraryRepository;
     private final LibraryAccessService libraryAccessService;
+    private final FilterQueryService filterQueryService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -52,9 +56,16 @@ public class ShowController {
             @Argument Optional<SortingEnum> sorting,
             @Argument Optional<SortingOrder> sortingOrder,
             @Argument Optional<UUID> libraryId,
+            @Argument Optional<MediaFilter> filter,
             Authentication authentication) {
         Pageable pageable = Paging.pageable(page, size, 10,
                 sorting, SortingEnum.NAME, sortingOrder, SortingOrder.ASCENDING);
+        Optional<Page<ShowEntity>> filtered = FilteredBrowse.page(filterQueryService, libraryAccessService,
+                FilterKind.SHOW, filter, sorting.orElse(SortingEnum.NAME),
+                sortingOrder.orElse(SortingOrder.ASCENDING), libraryId, pageable, authentication);
+        if (filtered.isPresent()) {
+            return filtered.get();
+        }
         if (libraryId.isPresent()) {
             return libraryId.filter(id -> libraryAccessService.canAccess(id, authentication))
                     .flatMap(libraryRepository::findById)

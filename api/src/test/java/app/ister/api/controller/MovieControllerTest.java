@@ -60,7 +60,7 @@ class MovieControllerTest {
         when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
         when(movieRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        Page<MovieEntity> result = subject.movies(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), authentication);
+        Page<MovieEntity> result = subject.movies(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), authentication);
 
         assertNotNull(result);
         verify(movieRepository).findAll(any(Pageable.class));
@@ -73,7 +73,7 @@ class MovieControllerTest {
         when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
         when(movieRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        Page<MovieEntity> result = subject.movies(Optional.of(2), Optional.of(5), Optional.empty(), Optional.empty(), Optional.empty(), authentication);
+        Page<MovieEntity> result = subject.movies(Optional.of(2), Optional.of(5), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), authentication);
 
         assertEquals(1, result.getContent().size());
     }
@@ -84,7 +84,7 @@ class MovieControllerTest {
         when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
         when(movieRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        subject.movies(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.ASCENDING), Optional.empty(), authentication);
+        subject.movies(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.ASCENDING), Optional.empty(), Optional.empty(), authentication);
 
         verify(movieRepository).findAll(any(Pageable.class));
     }
@@ -95,7 +95,7 @@ class MovieControllerTest {
         when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
         when(movieRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        subject.movies(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.DESCENDING), Optional.empty(), authentication);
+        subject.movies(Optional.empty(), Optional.empty(), Optional.of(SortingEnum.NAME), Optional.of(SortingOrder.DESCENDING), Optional.empty(), Optional.empty(), authentication);
 
         verify(movieRepository).findAll(any(Pageable.class));
     }
@@ -110,7 +110,7 @@ class MovieControllerTest {
         when(libraryRepository.findById(libraryId)).thenReturn(Optional.of(library));
         when(movieRepository.findByLibraryEntity(eq(library), any(Pageable.class))).thenReturn(page);
 
-        Page<MovieEntity> result = subject.movies(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(libraryId), authentication);
+        Page<MovieEntity> result = subject.movies(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(libraryId), Optional.empty(), authentication);
 
         assertNotNull(result);
         verify(movieRepository).findByLibraryEntity(eq(library), any(Pageable.class));
@@ -123,7 +123,7 @@ class MovieControllerTest {
         when(libraryAccessService.canAccess(any(UUID.class), any())).thenReturn(true);
         when(libraryRepository.findById(libraryId)).thenReturn(Optional.empty());
 
-        Page<MovieEntity> result = subject.movies(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(libraryId), authentication);
+        Page<MovieEntity> result = subject.movies(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(libraryId), Optional.empty(), authentication);
 
         assertTrue(result.isEmpty());
         verify(movieRepository, never()).findAll(any(Pageable.class));

@@ -8,10 +8,13 @@ import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
+import app.ister.core.filter.FilterKind;
+import app.ister.core.filter.MediaFilter;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.FilterQueryService;
 import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +46,7 @@ public class TrackController {
     private final WatchStatusRepository watchStatusRepository;
     private final LibraryAccessService libraryAccessService;
     private final LibraryRepository libraryRepository;
+    private final FilterQueryService filterQueryService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -59,10 +63,16 @@ public class TrackController {
             @Argument Optional<Integer> size,
             @Argument Optional<SortingEnum> sorting,
             @Argument Optional<SortingOrder> sortingOrder,
-            @Argument Optional<UUID> libraryId, Authentication authentication) {
+            @Argument Optional<UUID> libraryId,
+            @Argument Optional<MediaFilter> filter, Authentication authentication) {
         Pageable pageable = Paging.unsorted(page, size, 20);
         SortingEnum sort = sorting.orElse(SortingEnum.NAME);
         SortingOrder order = sortingOrder.orElse(SortingOrder.ASCENDING);
+        Optional<Page<TrackEntity>> filtered = FilteredBrowse.page(filterQueryService, libraryAccessService,
+                FilterKind.TRACK, filter, sort, order, libraryId, pageable, authentication);
+        if (filtered.isPresent()) {
+            return filtered.get();
+        }
         if (libraryId.isPresent()) {
             return libraryId.filter(id -> libraryAccessService.canAccess(id, authentication))
                     .map(id -> trackRepository.findInLibraries(List.of(id), sort, order, pageable))

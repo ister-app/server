@@ -8,4 +8,6 @@ public enum PlayQueueSourceType {
     BOOK,
     PODCAST,
     ARTIST,
+    /** A custom filter (saved view or ad-hoc); the definition is pinned on the queue as JSON. */
+    FILTER,
 }

@@ -7,9 +7,12 @@ import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
+import app.ister.core.filter.FilterKind;
+import app.ister.core.filter.MediaFilter;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.ImageRepository;
+import app.ister.core.service.FilterQueryService;
 import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +42,7 @@ public class AlbumController {
     private final PersonRepository personRepository;
     private final ImageRepository imageRepository;
     private final LibraryAccessService libraryAccessService;
+    private final FilterQueryService filterQueryService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -55,9 +59,16 @@ public class AlbumController {
             @Argument Optional<SortingEnum> sorting,
             @Argument Optional<SortingOrder> sortingOrder,
             @Argument Optional<UUID> artistId,
-            @Argument Optional<UUID> libraryId, Authentication authentication) {
+            @Argument Optional<UUID> libraryId,
+            @Argument Optional<MediaFilter> filter, Authentication authentication) {
         Pageable pageable = Paging.pageable(page, size, 20,
                 sorting, SortingEnum.NAME, sortingOrder, SortingOrder.ASCENDING);
+        Optional<Page<AlbumEntity>> filtered = FilteredBrowse.page(filterQueryService, libraryAccessService,
+                FilterKind.ALBUM, filter, sorting.orElse(SortingEnum.NAME),
+                sortingOrder.orElse(SortingOrder.ASCENDING), libraryId, pageable, authentication);
+        if (filtered.isPresent()) {
+            return filtered.get();
+        }
         if (artistId.isPresent()) {
             return personRepository.findById(artistId.get())
                     .map(artist -> libraryAccessService.allowedLibraryIds(authentication)

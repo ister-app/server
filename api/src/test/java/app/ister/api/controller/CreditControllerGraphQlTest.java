@@ -38,6 +38,9 @@ class CreditControllerGraphQlTest {
     private app.ister.core.service.LibraryAccessService libraryAccessService;
 
     @MockitoBean
+    private app.ister.core.service.FilterQueryService filterQueryService;
+
+    @MockitoBean
     private MovieRepository movieRepository;
 
     @MockitoBean

@@ -16,6 +16,9 @@ dependencies {
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-database-postgresql'
 
+    // Filter definitions (saved views, pinned play-queue filters) are persisted as JSON.
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'

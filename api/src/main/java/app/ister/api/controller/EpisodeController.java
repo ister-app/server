@@ -3,9 +3,12 @@ package app.ister.api.controller;
 import app.ister.core.entity.*;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
+import app.ister.core.filter.FilterKind;
+import app.ister.core.filter.MediaFilter;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.FilterQueryService;
 import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -33,6 +36,7 @@ public class EpisodeController {
     private final WatchStatusRepository watchStatusRepository;
     private final LibraryAccessService libraryAccessService;
     private final LibraryRepository libraryRepository;
+    private final FilterQueryService filterQueryService;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -50,10 +54,16 @@ public class EpisodeController {
             @Argument Optional<Integer> size,
             @Argument Optional<SortingEnum> sorting,
             @Argument Optional<SortingOrder> sortingOrder,
-            @Argument Optional<UUID> libraryId, Authentication authentication) {
+            @Argument Optional<UUID> libraryId,
+            @Argument Optional<MediaFilter> filter, Authentication authentication) {
         Pageable pageable = Paging.unsorted(page, size, 20);
         SortingEnum sort = sorting.orElse(SortingEnum.DATE_CREATED);
         SortingOrder order = sortingOrder.orElse(SortingOrder.DESCENDING);
+        Optional<Page<EpisodeEntity>> filtered = FilteredBrowse.page(filterQueryService, libraryAccessService,
+                FilterKind.EPISODE, filter, sort, order, libraryId, pageable, authentication);
+        if (filtered.isPresent()) {
+            return filtered.get();
+        }
         if (libraryId.isPresent()) {
             return libraryId.filter(id -> libraryAccessService.canAccess(id, authentication))
                     .map(id -> episodeRepository.findInLibraries(List.of(id), sort, order, pageable))
