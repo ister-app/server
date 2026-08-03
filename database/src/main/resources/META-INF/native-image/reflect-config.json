@@ -1,0 +1,50 @@
+[
+  {
+    "name" : "app.ister.core.filter.PinnedFilter",
+    "allDeclaredConstructors" : true,
+    "allDeclaredMethods" : true,
+    "allDeclaredFields" : true
+  },
+  {
+    "name" : "app.ister.core.filter.MediaFilter",
+    "allDeclaredConstructors" : true,
+    "allDeclaredMethods" : true,
+    "allDeclaredFields" : true
+  },
+  {
+    "name" : "app.ister.core.filter.FilterCondition",
+    "allDeclaredConstructors" : true,
+    "allDeclaredMethods" : true,
+    "allDeclaredFields" : true
+  },
+  {
+    "name" : "app.ister.core.filter.FilterKind",
+    "allDeclaredMethods" : true,
+    "allDeclaredFields" : true
+  },
+  {
+    "name" : "app.ister.core.filter.FilterMatch",
+    "allDeclaredMethods" : true,
+    "allDeclaredFields" : true
+  },
+  {
+    "name" : "app.ister.core.filter.FilterField",
+    "allDeclaredMethods" : true,
+    "allDeclaredFields" : true
+  },
+  {
+    "name" : "app.ister.core.filter.FilterOperator",
+    "allDeclaredMethods" : true,
+    "allDeclaredFields" : true
+  },
+  {
+    "name" : "app.ister.core.enums.SortingEnum",
+    "allDeclaredMethods" : true,
+    "allDeclaredFields" : true
+  },
+  {
+    "name" : "app.ister.core.enums.SortingOrder",
+    "allDeclaredMethods" : true,
+    "allDeclaredFields" : true
+  }
+]
