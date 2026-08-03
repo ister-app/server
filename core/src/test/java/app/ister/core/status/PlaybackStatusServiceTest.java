@@ -40,7 +40,8 @@ class PlaybackStatusServiceTest {
 
         subject.publishHeartbeat(queueId, itemId, userId, "external-id", "Gerben", MediaType.EPISODE,
                 mediaId, "Title", 1000L, artworkId, 500L, playState,
-                RemoteControlScope.ALLOWLIST, java.util.List.of(UUID.randomUUID()));
+                RemoteControlScope.ALLOWLIST, java.util.List.of(UUID.randomUUID()),
+                480L, 1_760_000_000_000L);
 
         ArgumentCaptor<PlaybackStatusData> captor = ArgumentCaptor.forClass(PlaybackStatusData.class);
         verify(messageSender).sendStatus(captor.capture());
@@ -61,6 +62,8 @@ class PlaybackStatusServiceTest {
         assertEquals(PlayState.PAUSED, data.getPlayState());
         assertEquals(RemoteControlScope.ALLOWLIST, data.getControlScopeOverride());
         assertEquals(1, data.getControlAllowedUserIds().size());
+        assertEquals(480L, data.getAnchorPositionMs());
+        assertEquals(1_760_000_000_000L, data.getAnchorServerTimeMs());
         assertNotNull(data.getTimestamp());
     }
 

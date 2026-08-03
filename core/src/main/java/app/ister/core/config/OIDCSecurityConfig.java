@@ -56,6 +56,9 @@ public class OIDCSecurityConfig {
                         .requestMatchers("/graphql").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/.well-known/ister").permitAll()
+                        // Clock probe for listen-along sync: must stay auth-free
+                        // so the RTT measurement is as light as possible.
+                        .requestMatchers("/time").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

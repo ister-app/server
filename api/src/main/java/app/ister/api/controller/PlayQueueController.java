@@ -103,9 +103,13 @@ public class PlayQueueController {
     @MutationMapping
     public Optional<PlayQueueEntity> updatePlayQueue(@Argument UUID id, @Argument long progressInMilliseconds, @Argument UUID playQueueItemId,
                                                      @Argument StreamSettingsInput streamSettings, @Argument PlayState playState,
+                                                     @Argument Integer anchorPositionMs, @Argument Double anchorServerTimeMs,
                                                      Authentication authentication) {
         PlayQueueService.StreamSettings settings = streamSettings == null ? null
                 : new PlayQueueService.StreamSettings(streamSettings.direct(), streamSettings.transcode(), streamSettings.subtitleFormat());
+        // Epoch ms exceeds GraphQL Int, so the wire type is Float; internally it is a Long.
+        Long anchorPosition = anchorPositionMs == null ? null : anchorPositionMs.longValue();
+        Long anchorServerTime = anchorServerTimeMs == null ? null : (long) (double) anchorServerTimeMs;
         // Watch status is written for the owner plus every currently-following user; the follower
         // registry lives in core (fed by the status fan-out), so resolve the set here and pass it
         // down — the database module cannot see the registry.
@@ -118,12 +122,14 @@ public class PlayQueueController {
             // burst) must not silence the now-playing feed: the registry is in-memory, so
             // re-publish the last known session with the fresh progress/state, then
             // surface the error so the client retries the persistent update.
-            republishLastKnownSession(id, playQueueItemId, progressInMilliseconds, playState, authentication);
+            republishLastKnownSession(id, playQueueItemId, progressInMilliseconds, playState,
+                    anchorPosition, anchorServerTime, authentication);
             throw ex;
         }
         playQueue.ifPresent(queue -> {
             playQueuePrefetchService.maybePrefetchNext(queue, playQueueItemId, progressInMilliseconds);
-            publishPlaybackHeartbeat(queue, playQueueItemId, progressInMilliseconds, playState);
+            publishPlaybackHeartbeat(queue, playQueueItemId, progressInMilliseconds, playState,
+                    anchorPosition, anchorServerTime);
         });
         return playQueue;
     }
@@ -137,7 +143,8 @@ public class PlayQueueController {
      * the stale media fields would then describe the wrong track.
      */
     private void republishLastKnownSession(UUID playQueueId, UUID playQueueItemId, long progressInMilliseconds,
-                                           PlayState playState, Authentication authentication) {
+                                           PlayState playState, Long anchorPositionMs, Long anchorServerTimeMs,
+                                           Authentication authentication) {
         playbackSessionRegistry.find(playQueueId)
                 .filter(last -> authentication.getName() != null
                         && authentication.getName().equals(last.getUserExternalId()))
@@ -147,7 +154,8 @@ public class PlayQueueController {
                         last.getUserName(), last.getMediaType(), last.getMediaId(), last.getTitle(),
                         last.getDurationInMilliseconds(), last.getArtworkImageId(),
                         progressInMilliseconds, playState,
-                        last.getControlScopeOverride(), last.getControlAllowedUserIds()));
+                        last.getControlScopeOverride(), last.getControlAllowedUserIds(),
+                        anchorPositionMs, anchorServerTimeMs));
     }
 
     /**
@@ -155,7 +163,8 @@ public class PlayQueueController {
      * Hibernate session), so the lazy user/media associations may be navigated here;
      * only plain values go into the heartbeat message.
      */
-    private void publishPlaybackHeartbeat(PlayQueueEntity queue, UUID playQueueItemId, long progressInMilliseconds, PlayState playState) {
+    private void publishPlaybackHeartbeat(PlayQueueEntity queue, UUID playQueueItemId, long progressInMilliseconds,
+                                          PlayState playState, Long anchorPositionMs, Long anchorServerTimeMs) {
         Optional<PlayQueueItemEntity> item = Optional.ofNullable(queue.getItems()).orElse(List.of()).stream()
                 .filter(candidate -> candidate.getId().equals(playQueueItemId))
                 .findFirst();
@@ -179,7 +188,9 @@ public class PlayQueueController {
                 progressInMilliseconds,
                 playState,
                 controlScopeOverride,
-                controlAllowedUserIds);
+                controlAllowedUserIds,
+                anchorPositionMs,
+                anchorServerTimeMs);
     }
 
     /** Duration of the playing item's media file; the longest one wins if there are several. */

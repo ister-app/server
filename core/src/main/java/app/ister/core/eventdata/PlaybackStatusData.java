@@ -47,4 +47,10 @@ public class PlaybackStatusData {
     /** Grantee user ids of this session's per-session control allowlist; used when
      * {@link #controlScopeOverride} is ALLOWLIST. Empty when there is no override list. */
     private List<UUID> controlAllowedUserIds;
+    /** Tight-sync anchor: playback position (ms) at {@link #anchorServerTimeMs}. Null when
+     * the playing client doesn't report one (older clients, or clock sync unavailable). */
+    private Long anchorPositionMs;
+    /** Server-clock instant (epoch ms) the anchor position was sampled at, as computed by the
+     * playing client from its measured clock offset. */
+    private Long anchorServerTimeMs;
 }

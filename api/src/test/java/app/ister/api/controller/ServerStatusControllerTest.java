@@ -198,4 +198,18 @@ class ServerStatusControllerTest {
         assertEquals(1, snapshot.nowPlaying().size());
         assertEquals(2, snapshot.nowPlaying().getFirst().followerCount());
     }
+
+    @Test
+    void snapshotExposesTheTightSyncAnchorWhenReported() {
+        UUID queueId = UUID.randomUUID();
+        PlaybackStatusData session = playback(queueId);
+        session.setAnchorPositionMs(1234L);
+        session.setAnchorServerTimeMs(1_760_000_000_000L);
+        playbackSessionRegistry.update(session);
+
+        ServerActivitySnapshot snapshot = controller.serverActivitySnapshot(authentication);
+
+        assertEquals(1234L, snapshot.nowPlaying().getFirst().anchorPositionMs());
+        assertEquals(1_760_000_000_000d, snapshot.nowPlaying().getFirst().anchorServerTimeMs());
+    }
 }
