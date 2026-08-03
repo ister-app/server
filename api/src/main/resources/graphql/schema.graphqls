@@ -67,6 +67,10 @@ type Query {
     attributions: [Attribution!]!
     "The calling user's custom views (saved filters), by name; optionally narrowed to one library and/or kind."
     savedViews(libraryId: ID, kind: FilterKind): [SavedView!]!
+    "The calling user's playlists, by name; optionally narrowed to one library."
+    playlists(libraryId: ID): [Playlist!]!
+    "One of the caller's own playlists; null for an unknown id and for someone else's playlist."
+    playlistById(id: ID!): Playlist
 }
 
 "The external provider a metadata row or image originated from, for attribution."
@@ -212,6 +216,24 @@ type Mutation {
     updateSavedView(id: ID!, input: SavedViewInput!): SavedView!
     "Deletes one of the caller's own views. Returns true."
     deleteSavedView(id: ID!): Boolean!
+    "Creates a playlist for the calling user, over exactly one library."
+    createPlaylist(input: PlaylistInput!): Playlist!
+    """
+    Updates one of the caller's own playlists. The library and type are immutable. Play queues
+    created from the playlist keep playing with the items/filter they were created with.
+    """
+    updatePlaylist(id: ID!, input: PlaylistInput!): Playlist!
+    "Deletes one of the caller's own playlists. Running play queues keep their items. Returns true."
+    deletePlaylist(id: ID!): Boolean!
+    """
+    Appends a playable item of the playlist's library, at the end or directly after an existing
+    entry. The item kind follows from the library type (track, movie, episode, podcast episode or
+    book); an item from another library is rejected as not-found. MANUAL playlists only.
+    """
+    addPlaylistItem(playlistId: ID!, mediaId: ID!, afterPlaylistItemId: ID): Playlist!
+    "Moves an entry to directly after another entry, or to the front when afterPlaylistItemId is null."
+    movePlaylistItem(playlistId: ID!, playlistItemId: ID!, afterPlaylistItemId: ID): Playlist!
+    removePlaylistItem(playlistId: ID!, playlistItemId: ID!): Playlist!
 }
 
 type Subscription {
@@ -470,6 +492,65 @@ input SavedViewInput {
     sortingOrder: SortingOrder
 }
 
+"Whether a playlist's contents are hand-picked or produced by an embedded filter."
+enum PlaylistType {
+    MANUAL
+    SMART
+}
+
+"""
+A private, per-user playlist over exactly one library. MANUAL playlists hold explicit items
+(tracks, movies, episodes, podcast episodes or books, per the library type); SMART playlists
+embed their own filter (TRACK, MOVIE or EPISODE kinds, matching the library type) and resolve
+it live when browsed. Playing one pins the filter on the queue, like FILTER sources.
+"""
+type Playlist {
+    id: ID!
+    name: String!
+    type: PlaylistType!
+    libraryId: ID!
+    libraryType: LibraryType!
+    "MANUAL only: number of entries. Null for SMART playlists (resolve via the filtered browse queries)."
+    itemCount: Int
+    "SMART only: which browse kind the embedded filter targets."
+    filterKind: FilterKind
+    "SMART only: the embedded filter definition."
+    filter: FilterGroup
+    "SMART only: play/browse order of the resolved items."
+    sorting: SortingEnum
+    sortingOrder: SortingOrder
+    "MANUAL entries in play order; empty for SMART playlists."
+    items: [PlaylistItem!]!
+}
+
+"One entry of a MANUAL playlist. Exactly one media field is set, matching type."
+type PlaylistItem {
+    id: ID!
+    "Opaque sort key; may be fractional after reordering."
+    position: Float!
+    type: MediaType!
+    movie: Movie
+    episode: Episode
+    track: Track
+    book: Book
+    podcastEpisode: PodcastEpisode
+}
+
+input PlaylistInput {
+    name: String!
+    "The one library this playlist belongs to; immutable after creation."
+    libraryId: ID!
+    "Immutable after creation."
+    type: PlaylistType!
+    "SMART only; required together with filterKind."
+    filter: MediaFilterInput
+    "SMART only: TRACK, MOVIE or EPISODE, matching the library type."
+    filterKind: FilterKind
+    "SMART only: play/browse order of the resolved items."
+    sorting: SortingEnum
+    sortingOrder: SortingOrder
+}
+
 "Ranking of the library Discover top-lists. For books and series RECENTLY_PLAYED means recently read."
 enum RankKind {
     RECENTLY_PLAYED
@@ -532,6 +613,12 @@ enum PlayQueueSourceType {
     of that moment; grows lazily like other sources. Only TRACK, MOVIE and EPISODE filters play.
     """
     FILTER
+    """
+    One of the caller's own playlists (sourceId). MANUAL playlists play their entries in order or
+    seeded-shuffled; SMART playlists pin their embedded filter at creation, like FILTER. A BOOK
+    library's playlist expands each book to its chapters and cannot shuffle.
+    """
+    PLAYLIST
 }
 
 enum SubtitleFormat {
@@ -574,11 +661,15 @@ input UserSettingsInput {
 input CreatePlayQueueInput {
     sourceType: PlayQueueSourceType!
     """
-    The movie/show/album/library/book/podcast to play, the artist for ARTIST sources, or the
-    saved view for FILTER sources. Only optional for FILTER sources with an inline filter.
+    The movie/show/album/library/book/podcast to play, the artist for ARTIST sources, the saved
+    view for FILTER sources, or the playlist for PLAYLIST sources. Only optional for FILTER
+    sources with an inline filter.
     """
     sourceId: ID
-    "Episode or track to start at; ignored for MOVIE sources, unsupported for FILTER sources."
+    """
+    Episode or track to start at; ignored for MOVIE sources, unsupported for FILTER sources and
+    SMART playlists. For a BOOK library's playlist a book id starts at that book's first chapter.
+    """
     startId: ID
     "Play the source in a stable random order; defaults to false, required for LIBRARY sources, rejected for ARTIST sources."
     shuffle: Boolean
@@ -703,6 +794,8 @@ type Library {
     rankedBooks(kind: RankKind!, page: Int, size: Int): BookPage!
     rankedSeries(kind: RankKind!, page: Int, size: Int): SeriesPage!
     rankedPodcasts(kind: RankKind!, page: Int, size: Int): PodcastPage!
+    "The calling user's playlists scoped to this library, by name. Batch-resolved, safe under `libraries`."
+    playlists: [Playlist!]!
 }
 
 "The calling user, as seen by the server."

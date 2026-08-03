@@ -7,6 +7,7 @@ import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PlayQueueItemEntity;
+import app.ister.core.entity.PlaylistEntity;
 import app.ister.core.entity.PodcastEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.enums.PlayQueueSourceType;
@@ -18,6 +19,7 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MovieRepository;
+import app.ister.core.repository.PlaylistRepository;
 import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.PodcastRepository;
 import app.ister.core.repository.ShowRepository;
@@ -50,6 +52,7 @@ public class MediaLibraryResolver {
     private final TrackRepository trackRepository;
     private final ChapterRepository chapterRepository;
     private final PodcastEpisodeRepository podcastEpisodeRepository;
+    private final PlaylistRepository playlistRepository;
 
     /** Transactional so the lazy parent chain can be walked outside an open web session. */
     @Transactional(readOnly = true)
@@ -76,6 +79,8 @@ public class MediaLibraryResolver {
             // A filter's sourceId is a saved view, not media; access is enforced per chunk
             // through the caller's allowed-library set, like ARTIST.
             case FILTER -> Optional.empty();
+            // A deleted playlist resolves empty, so a running queue keeps playing its items.
+            case PLAYLIST -> playlistRepository.findById(sourceId).map(PlaylistEntity::getLibraryEntity);
         };
     }
 

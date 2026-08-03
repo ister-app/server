@@ -4,6 +4,7 @@ import app.ister.core.entity.*;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayQueueSourceType;
+import app.ister.core.enums.PlaylistType;
 import app.ister.core.enums.RankKind;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
@@ -108,6 +109,15 @@ class PlayQueueServiceTest {
 
     @Mock
     private SavedViewService savedViewService;
+
+    @Mock
+    private PlaylistService playlistService;
+
+    @Mock
+    private PlaylistRepository playlistRepository;
+
+    @Mock
+    private PlaylistItemRepository playlistItemRepository;
 
     @Mock
     private Authentication authentication;
@@ -1687,5 +1697,172 @@ class PlayQueueServiceTest {
     void createPlayQueueRejectsAMissingSourceIdOnNonFilterSources() {
         assertThrows(IllegalArgumentException.class, () -> subject.createPlayQueue(
                 PlayQueueSourceType.SHOW, null, null, false, null, authentication));
+    }
+
+    private PlaylistEntity buildPlaylist(app.ister.core.enums.PlaylistType type, LibraryType libraryType) {
+        PlaylistEntity playlist = PlaylistEntity.builder()
+                .userEntity(user)
+                .libraryEntity(LibraryEntity.builder().id(UUID.randomUUID()).libraryType(libraryType).build())
+                .name("Mine")
+                .type(type)
+                .build();
+        playlist.setId(UUID.randomUUID());
+        return playlist;
+    }
+
+    @Test
+    void createManualPlaylistQueueMaterializesAnOrderedChunk() {
+        PlaylistEntity playlist = buildPlaylist(PlaylistType.MANUAL, LibraryType.MUSIC);
+        List<UUID> trackIds = IntStream.range(0, 50).mapToObj(i -> UUID.randomUUID()).toList();
+        when(playlistService.ownedPlaylist(authentication, playlist.getId())).thenReturn(Optional.of(playlist));
+        when(playlistRepository.findById(playlist.getId())).thenReturn(Optional.of(playlist));
+        when(playlistItemRepository.findMediaIdsForPlaylistOrdered(playlist.getId(), 50, 0)).thenReturn(trackIds);
+
+        PlayQueueEntity result = subject.createPlayQueue(
+                PlayQueueSourceType.PLAYLIST, playlist.getId(), null, false, null, authentication);
+
+        assertEquals(50, result.getItems().size());
+        assertTrue(result.getItems().stream().allMatch(i -> i.getType() == MediaType.TRACK));
+        assertEquals(50, result.getSourceOffset());
+        assertFalse(result.isSourceExhausted(), "a full chunk leaves the source open");
+        assertNull(result.getSourceFilter(), "a manual playlist pins no filter");
+    }
+
+    @Test
+    void createManualPlaylistQueueShuffles() {
+        PlaylistEntity playlist = buildPlaylist(PlaylistType.MANUAL, LibraryType.MUSIC);
+        when(playlistService.ownedPlaylist(authentication, playlist.getId())).thenReturn(Optional.of(playlist));
+        when(playlistRepository.findById(playlist.getId())).thenReturn(Optional.of(playlist));
+        when(playlistItemRepository.findMediaIdsForPlaylistShuffled(eq(playlist.getId()), anyString(), eq(NIL_UUID), eq(50), eq(0)))
+                .thenReturn(List.of(UUID.randomUUID(), UUID.randomUUID()));
+
+        PlayQueueEntity result = subject.createPlayQueue(
+                PlayQueueSourceType.PLAYLIST, playlist.getId(), null, true, null, authentication);
+
+        assertEquals(2, result.getItems().size());
+        assertTrue(result.isShuffle());
+        assertNotNull(result.getShuffleSeed());
+        assertTrue(result.isSourceExhausted());
+    }
+
+    @Test
+    void createSmartPlaylistQueuePinsTheEmbeddedFilter() {
+        PlaylistEntity playlist = buildPlaylist(PlaylistType.SMART, LibraryType.MUSIC);
+        playlist.setFilterKind(FilterKind.TRACK);
+        playlist.setFilter(FilterJson.writeFilter(emptyFilter()));
+        playlist.setSorting(SortingEnum.NAME);
+        when(playlistService.ownedPlaylist(authentication, playlist.getId())).thenReturn(Optional.of(playlist));
+        when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.empty());
+        when(filterQueryService.chunkIds(eq(FilterKind.TRACK), any(), any(), any(),
+                argThat(scope -> playlist.getLibraryEntity().getId().equals(scope.libraryId())), any()))
+                .thenReturn(List.of(UUID.randomUUID()));
+
+        PlayQueueEntity result = subject.createPlayQueue(
+                PlayQueueSourceType.PLAYLIST, playlist.getId(), null, false, null, authentication);
+
+        assertEquals(1, result.getItems().size());
+        assertEquals(MediaType.TRACK, result.getItems().getFirst().getType());
+        assertNotNull(result.getSourceFilter(), "the smart playlist's definition is pinned onto the queue");
+        assertEquals(FilterKind.TRACK, FilterJson.readPinned(result.getSourceFilter()).kind());
+        assertEquals(playlist.getLibraryEntity().getId(), FilterJson.readPinned(result.getSourceFilter()).libraryId());
+        verify(filterQueryService).validate(eq(FilterKind.TRACK), any());
+    }
+
+    @Test
+    void createSmartPlaylistQueueRejectsAStartItem() {
+        PlaylistEntity playlist = buildPlaylist(PlaylistType.SMART, LibraryType.MUSIC);
+        playlist.setFilterKind(FilterKind.TRACK);
+        playlist.setFilter(FilterJson.writeFilter(emptyFilter()));
+        when(playlistService.ownedPlaylist(authentication, playlist.getId())).thenReturn(Optional.of(playlist));
+
+        assertThrows(IllegalArgumentException.class, () -> subject.createPlayQueue(
+                PlayQueueSourceType.PLAYLIST, playlist.getId(), UUID.randomUUID(), false, null, authentication));
+    }
+
+    @Test
+    void createPlaylistQueueRejectsSomeoneElsesOrMissingPlaylist() {
+        UUID playlistId = UUID.randomUUID();
+        when(playlistService.ownedPlaylist(authentication, playlistId)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> subject.createPlayQueue(
+                PlayQueueSourceType.PLAYLIST, playlistId, null, false, null, authentication));
+    }
+
+    @Test
+    void createBookPlaylistQueueExpandsBooksToChaptersAndCountsBooks() {
+        PlaylistEntity playlist = buildPlaylist(PlaylistType.MANUAL, LibraryType.BOOK);
+        UUID book1 = UUID.randomUUID();
+        UUID book2 = UUID.randomUUID();
+        List<UUID> chapters1 = List.of(UUID.randomUUID(), UUID.randomUUID());
+        List<UUID> chapters2 = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+        when(playlistService.ownedPlaylist(authentication, playlist.getId())).thenReturn(Optional.of(playlist));
+        when(playlistRepository.findById(playlist.getId())).thenReturn(Optional.of(playlist));
+        when(playlistItemRepository.findMediaIdsForPlaylistOrdered(playlist.getId(), 50, 0)).thenReturn(List.of(book1, book2));
+        when(chapterRepository.findChapterIdsForBookOrdered(book1, Integer.MAX_VALUE, 0)).thenReturn(chapters1);
+        when(chapterRepository.findChapterIdsForBookOrdered(book2, Integer.MAX_VALUE, 0)).thenReturn(chapters2);
+
+        PlayQueueEntity result = subject.createPlayQueue(
+                PlayQueueSourceType.PLAYLIST, playlist.getId(), null, false, null, authentication);
+
+        assertEquals(5, result.getItems().size());
+        assertTrue(result.getItems().stream().allMatch(i -> i.getType() == MediaType.CHAPTER));
+        assertEquals(2, result.getSourceOffset(), "the cursor advances by books, not by appended chapters");
+        assertTrue(result.isSourceExhausted());
+    }
+
+    @Test
+    void createBookPlaylistQueueRejectsShuffle() {
+        PlaylistEntity playlist = buildPlaylist(PlaylistType.MANUAL, LibraryType.BOOK);
+        when(playlistService.ownedPlaylist(authentication, playlist.getId())).thenReturn(Optional.of(playlist));
+        when(playlistRepository.findById(playlist.getId())).thenReturn(Optional.of(playlist));
+
+        assertThrows(IllegalArgumentException.class, () -> subject.createPlayQueue(
+                PlayQueueSourceType.PLAYLIST, playlist.getId(), null, true, null, authentication));
+    }
+
+    @Test
+    void createBookPlaylistQueueStartsABookAtItsFirstChapter() {
+        PlaylistEntity playlist = buildPlaylist(PlaylistType.MANUAL, LibraryType.BOOK);
+        UUID book1 = UUID.randomUUID();
+        UUID firstChapter = UUID.randomUUID();
+        ChapterEntity chapter = ChapterEntity.builder().bookEntity(BookEntity.builder().id(book1).build()).build();
+        chapter.setId(firstChapter);
+        when(playlistService.ownedPlaylist(authentication, playlist.getId())).thenReturn(Optional.of(playlist));
+        when(playlistRepository.findById(playlist.getId())).thenReturn(Optional.of(playlist));
+        when(chapterRepository.findChapterIdsForBookOrdered(book1, 1, 0)).thenReturn(List.of(firstChapter));
+        when(chapterRepository.findById(firstChapter)).thenReturn(Optional.of(chapter));
+        when(playlistItemRepository.findMediaIdsForPlaylistOrdered(playlist.getId(), Integer.MAX_VALUE, 0))
+                .thenReturn(List.of(book1));
+        when(playlistItemRepository.findMediaIdsForPlaylistOrdered(playlist.getId(), 50, 0)).thenReturn(List.of(book1));
+        when(chapterRepository.findChapterIdsForBookOrdered(book1, Integer.MAX_VALUE, 0)).thenReturn(List.of(firstChapter));
+
+        PlayQueueEntity result = subject.createPlayQueue(
+                PlayQueueSourceType.PLAYLIST, playlist.getId(), book1, false, null, authentication);
+
+        assertTrue(result.getItems().stream().anyMatch(i -> firstChapter.equals(i.getChapterEntityId())),
+                "the start book's first chapter is materialized and startable");
+    }
+
+    @Test
+    void getPlayQueueStopsExtendingWhenTheManualPlaylistWasDeleted() {
+        mockUser();
+        PlayQueueItemEntity item = buildItem(MediaType.TRACK, UUID.randomUUID(), "1000");
+        PlayQueueEntity queue = PlayQueueEntity.builder()
+                .id(UUID.randomUUID())
+                .userEntity(user)
+                .sourceType(PlayQueueSourceType.PLAYLIST)
+                .sourceId(UUID.randomUUID())
+                .sourceOffset(1)
+                .currentItem(item.getId())
+                .items(new ArrayList<>(List.of(item)))
+                .build();
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        when(playlistRepository.findById(queue.getSourceId())).thenReturn(Optional.empty());
+
+        Optional<PlayQueueEntity> result = subject.getPlayQueue(queue.getId(), authentication);
+
+        assertTrue(result.isPresent(), "the queue keeps playing its materialized items");
+        assertEquals(1, queue.getItems().size());
+        assertTrue(queue.isSourceExhausted());
     }
 }

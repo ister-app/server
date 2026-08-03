@@ -18,7 +18,7 @@ import java.util.UUID;
 @Setter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
-public class PlayQueueItemEntity extends BaseEntity {
+public class PlayQueueItemEntity extends BaseEntity implements Positioned {
 
     @ManyToOne(optional = false)
     private PlayQueueEntity playQueueEntity;

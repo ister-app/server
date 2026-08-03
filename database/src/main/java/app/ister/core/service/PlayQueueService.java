@@ -20,8 +20,13 @@ import app.ister.core.filter.FilterKind;
 import app.ister.core.filter.MediaFilter;
 import app.ister.core.filter.PinnedFilter;
 import app.ister.core.entity.ChapterEntity;
+import app.ister.core.entity.PlaylistEntity;
 import app.ister.core.entity.SavedViewEntity;
+import app.ister.core.enums.LibraryType;
+import app.ister.core.enums.PlaylistType;
 import app.ister.core.repository.ChapterRepository;
+import app.ister.core.repository.PlaylistItemRepository;
+import app.ister.core.repository.PlaylistRepository;
 import app.ister.core.repository.PlayQueueControlGrantRepository;
 import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.EpisodeRepository;
@@ -39,7 +44,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -90,9 +94,7 @@ public class PlayQueueService {
     public record StreamSettings(Boolean direct, Boolean transcode, SubtitleFormat subtitleFormat) {
     }
 
-    private static final BigDecimal GAP = new BigDecimal("1000");
-    private static final BigDecimal TWO = new BigDecimal("2");
-    private static final int POSITION_SCALE = 10;
+    private static final BigDecimal GAP = GapPositions.GAP;
     // Number of source items materialized per append.
     private static final int CHUNK_SIZE = 50;
     // Append a new chunk when fewer than this many items remain after the current item.
@@ -114,7 +116,13 @@ public class PlayQueueService {
 
     private final SavedViewService savedViewService;
 
-    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, ChapterRepository chapterRepository, PodcastEpisodeRepository podcastEpisodeRepository, LibraryRepository libraryRepository, UserService userService, UserRepository userRepository, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService, ContinueWatchingService continueWatchingService, PodcastPreferenceService podcastPreferenceService, LibraryAccessService libraryAccessService, MediaLibraryResolver mediaLibraryResolver, PlaybackSharingService playbackSharingService, PlayQueueControlGrantRepository playQueueControlGrantRepository, FilterQueryService filterQueryService, SavedViewService savedViewService) {
+    private final PlaylistService playlistService;
+
+    private final PlaylistRepository playlistRepository;
+
+    private final PlaylistItemRepository playlistItemRepository;
+
+    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, ChapterRepository chapterRepository, PodcastEpisodeRepository podcastEpisodeRepository, LibraryRepository libraryRepository, UserService userService, UserRepository userRepository, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService, ContinueWatchingService continueWatchingService, PodcastPreferenceService podcastPreferenceService, LibraryAccessService libraryAccessService, MediaLibraryResolver mediaLibraryResolver, PlaybackSharingService playbackSharingService, PlayQueueControlGrantRepository playQueueControlGrantRepository, FilterQueryService filterQueryService, SavedViewService savedViewService, PlaylistService playlistService, PlaylistRepository playlistRepository, PlaylistItemRepository playlistItemRepository) {
         this.playQueueRepository = playQueueRepository;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
@@ -134,6 +142,9 @@ public class PlayQueueService {
         this.playQueueControlGrantRepository = playQueueControlGrantRepository;
         this.filterQueryService = filterQueryService;
         this.savedViewService = savedViewService;
+        this.playlistService = playlistService;
+        this.playlistRepository = playlistRepository;
+        this.playlistItemRepository = playlistItemRepository;
     }
 
     /**
@@ -226,9 +237,29 @@ public class PlayQueueService {
             throw new IllegalArgumentException("Source not found");
         }
         validateCreateRequest(request);
-        PinnedFilter pinned = request.sourceType() == PlayQueueSourceType.FILTER
-                ? resolvePinnedFilter(request.sourceId(), request.filter(), request.filterKind(), request.libraryId(), request.sorting(), request.sortingOrder(), authentication)
-                : null;
+        PinnedFilter pinned = null;
+        if (request.sourceType() == PlayQueueSourceType.FILTER) {
+            pinned = resolvePinnedFilter(request.sourceId(), request.filter(), request.filterKind(), request.libraryId(), request.sorting(), request.sortingOrder(), authentication);
+        } else if (request.sourceType() == PlayQueueSourceType.PLAYLIST) {
+            // Ownership on top of the library access check: someone else's playlist id is not-found.
+            PlaylistEntity playlist = playlistService.ownedPlaylist(authentication, request.sourceId())
+                    .orElseThrow(() -> new IllegalArgumentException("Playlist not found"));
+            if (playlist.getType() == PlaylistType.SMART) {
+                if (request.startId() != null) {
+                    // Same reason FILTER queues reject it: locating a start item would need
+                    // the full ordered id list of the filter.
+                    throw new IllegalArgumentException("Smart playlist play queues cannot start at a specific item");
+                }
+                MediaFilter playlistFilter = FilterJson.readFilter(playlist.getFilter());
+                filterQueryService.validate(playlist.getFilterKind(), playlistFilter);
+                pinned = new PinnedFilter(playlist.getFilterKind(), playlistFilter,
+                        playlist.getLibraryEntity().getId(), playlist.getSorting(), playlist.getSortingOrder());
+            } else if (playlist.getLibraryEntity().getLibraryType() == LibraryType.BOOK && request.startId() != null) {
+                // A book playlist stores books but the queue plays chapters: starting at a book
+                // means starting at its first chapter.
+                request = withStartId(request, resolveBookStart(request.startId()));
+            }
+        }
 
         PlayQueueEntity queue = PlayQueueEntity.builder()
                 .userEntity(userService.getOrCreateUser(authentication))
@@ -278,7 +309,8 @@ public class PlayQueueService {
         UUID startId = request.startId();
         MediaType mediaType = mediaTypeForSource(request.sourceType(), request.sourceId(), request.shuffle(), pinned);
         queue.setShuffle(request.shuffle());
-        if (request.sourceType() == PlayQueueSourceType.ARTIST || request.sourceType() == PlayQueueSourceType.FILTER) {
+        if (request.sourceType() == PlayQueueSourceType.ARTIST || request.sourceType() == PlayQueueSourceType.FILTER
+                || request.sourceType() == PlayQueueSourceType.PLAYLIST) {
             // Persist before fetching the first chunk: dateCreated is the ranking's/filter's
             // freeze point, and the chunk queries (and orderedIndexOf below) need it set.
             playQueueRepository.save(queue);
@@ -484,23 +516,40 @@ public class PlayQueueService {
      * Returns the next position value given the previous one (or null for the first item).
      */
     private BigDecimal nextPosition(BigDecimal previous) {
-        return (previous == null) ? GAP : previous.add(GAP);
+        return GapPositions.nextPosition(previous);
+    }
+
+    /**
+     * One fetched chunk of source media: the ids to append, how many <em>source</em> items were
+     * consumed for them, and whether the source is done. The two counts differ only for a BOOK
+     * playlist, where one consumed source item (a book) appends many chapter ids.
+     */
+    private record SourceChunk(List<UUID> mediaIds, int sourceItemsConsumed, boolean lastChunk) {
+        static SourceChunk of(List<UUID> mediaIds) {
+            return new SourceChunk(mediaIds, mediaIds.size(), mediaIds.size() < CHUNK_SIZE);
+        }
     }
 
     /**
      * Appends the next chunk of source items to the queue and advances the source cursor.
-     * Marks the source exhausted when it returns fewer items than a full chunk.
+     * Marks the source exhausted when the chunk reports itself as the last one.
      */
     private void appendChunk(PlayQueueEntity queue) {
         MediaType mediaType = mediaTypeForSource(queue.getSourceType(), queue.getSourceId(), queue.isShuffle(), pinnedFilterOf(queue));
-        List<UUID> mediaIds = fetchNextChunk(queue, mediaType);
+        if (mediaType == null) {
+            // The queue's manual playlist was deleted mid-play: its materialized items keep
+            // playing, but there is nothing left to extend from.
+            queue.setSourceExhausted(true);
+            return;
+        }
+        SourceChunk chunk = fetchNextChunk(queue, mediaType);
         BigDecimal position = maxPosition(queue);
-        for (UUID mediaId : mediaIds) {
+        for (UUID mediaId : chunk.mediaIds()) {
             position = nextPosition(position);
             addItem(queue, buildItem(queue, mediaType, mediaId, position));
         }
-        queue.setSourceOffset(queue.getSourceOffset() + mediaIds.size());
-        if (mediaIds.size() < CHUNK_SIZE) {
+        queue.setSourceOffset(queue.getSourceOffset() + chunk.sourceItemsConsumed());
+        if (chunk.lastChunk()) {
             queue.setSourceExhausted(true);
         }
     }
@@ -528,33 +577,58 @@ public class PlayQueueService {
         }
     }
 
-    private List<UUID> fetchNextChunk(PlayQueueEntity queue, MediaType mediaType) {
+    private SourceChunk fetchNextChunk(PlayQueueEntity queue, MediaType mediaType) {
         UUID sourceId = queue.getSourceId();
         int offset = queue.getSourceOffset();
         if (queue.isShuffle()) {
             String seed = queue.getShuffleSeed();
             UUID excludeId = queue.getSourceStartId() != null ? queue.getSourceStartId() : NIL_UUID;
             return switch (queue.getSourceType()) {
-                case SHOW -> episodeRepository.findEpisodeIdsForShowShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset);
-                case ALBUM -> trackRepository.findTrackIdsForAlbumShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset);
-                case LIBRARY -> mediaType == MediaType.MOVIE
+                case SHOW -> SourceChunk.of(episodeRepository.findEpisodeIdsForShowShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset));
+                case ALBUM -> SourceChunk.of(trackRepository.findTrackIdsForAlbumShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset));
+                case LIBRARY -> SourceChunk.of(mediaType == MediaType.MOVIE
                         ? movieRepository.findMovieIdsForLibraryShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset)
-                        : trackRepository.findTrackIdsForLibraryShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset);
-                case FILTER -> filterChunkIds(queue, CHUNK_SIZE, offset);
-                case MOVIE, BOOK, PODCAST, ARTIST -> List.of();
+                        : trackRepository.findTrackIdsForLibraryShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset));
+                case FILTER -> SourceChunk.of(filterChunkIds(queue, CHUNK_SIZE, offset));
+                case PLAYLIST -> pinnedFilterOf(queue) != null
+                        ? SourceChunk.of(filterChunkIds(queue, CHUNK_SIZE, offset))
+                        : SourceChunk.of(playlistItemRepository.findMediaIdsForPlaylistShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset));
+                case MOVIE, BOOK, PODCAST, ARTIST -> SourceChunk.of(List.of());
             };
         }
         return switch (queue.getSourceType()) {
-            case SHOW -> episodeRepository.findEpisodeIdsForShowOrdered(sourceId, CHUNK_SIZE, offset);
-            case ALBUM -> trackRepository.findTrackIdsForAlbumOrdered(sourceId, CHUNK_SIZE, offset);
-            case BOOK -> chapterRepository.findChapterIdsForBookOrdered(sourceId, CHUNK_SIZE, offset);
-            case PODCAST -> queue.isSourceAscending()
+            case SHOW -> SourceChunk.of(episodeRepository.findEpisodeIdsForShowOrdered(sourceId, CHUNK_SIZE, offset));
+            case ALBUM -> SourceChunk.of(trackRepository.findTrackIdsForAlbumOrdered(sourceId, CHUNK_SIZE, offset));
+            case BOOK -> SourceChunk.of(chapterRepository.findChapterIdsForBookOrdered(sourceId, CHUNK_SIZE, offset));
+            case PODCAST -> SourceChunk.of(queue.isSourceAscending()
                     ? podcastEpisodeRepository.findEpisodeIdsForPodcastOrderedAsc(sourceId, CHUNK_SIZE, offset)
-                    : podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(sourceId, CHUNK_SIZE, offset);
-            case ARTIST -> rankedTrackIdsForArtist(queue, CHUNK_SIZE, offset);
-            case FILTER -> filterChunkIds(queue, CHUNK_SIZE, offset);
-            default -> List.of();
+                    : podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(sourceId, CHUNK_SIZE, offset));
+            case ARTIST -> SourceChunk.of(rankedTrackIdsForArtist(queue, CHUNK_SIZE, offset));
+            case FILTER -> SourceChunk.of(filterChunkIds(queue, CHUNK_SIZE, offset));
+            case PLAYLIST -> orderedPlaylistChunk(queue, mediaType, offset);
+            default -> SourceChunk.of(List.of());
         };
+    }
+
+    /**
+     * The next ordered chunk of a PLAYLIST queue. SMART playlists resolve through their pinned
+     * filter; a BOOK library's playlist consumes a chunk of <em>books</em> and appends every
+     * chapter of each, so its cursor advances by books rather than by appended ids.
+     */
+    private SourceChunk orderedPlaylistChunk(PlayQueueEntity queue, MediaType mediaType, int offset) {
+        if (pinnedFilterOf(queue) != null) {
+            return SourceChunk.of(filterChunkIds(queue, CHUNK_SIZE, offset));
+        }
+        UUID sourceId = queue.getSourceId();
+        if (mediaType == MediaType.CHAPTER) {
+            List<UUID> bookIds = playlistItemRepository.findMediaIdsForPlaylistOrdered(sourceId, CHUNK_SIZE, offset);
+            List<UUID> chapterIds = new ArrayList<>();
+            for (UUID bookId : bookIds) {
+                chapterIds.addAll(chapterRepository.findChapterIdsForBookOrdered(bookId, Integer.MAX_VALUE, 0));
+            }
+            return new SourceChunk(chapterIds, bookIds.size(), bookIds.size() < CHUNK_SIZE);
+        }
+        return SourceChunk.of(playlistItemRepository.findMediaIdsForPlaylistOrdered(sourceId, CHUNK_SIZE, offset));
     }
 
     /**
@@ -647,13 +721,27 @@ public class PlayQueueService {
                 if (pinned == null) {
                     throw new IllegalArgumentException("Filter play queue without a pinned filter");
                 }
-                yield switch (pinned.kind()) {
-                    case TRACK -> MediaType.TRACK;
-                    case MOVIE -> MediaType.MOVIE;
-                    case EPISODE -> MediaType.EPISODE;
-                    case ALBUM, ARTIST, SHOW -> throw new IllegalArgumentException(
-                            "A " + pinned.kind() + " filter cannot be played directly; filter on tracks, movies or episodes instead");
-                };
+                yield mediaTypeForFilterKind(pinned.kind());
+            }
+            case PLAYLIST -> {
+                if (pinned != null) {
+                    // SMART: the pinned copy survives edits and deletion of the playlist.
+                    yield mediaTypeForFilterKind(pinned.kind());
+                }
+                PlaylistEntity playlist = playlistRepository.findById(sourceId).orElse(null);
+                if (playlist == null) {
+                    // Deleted mid-play; appendChunk marks the queue exhausted.
+                    yield null;
+                }
+                MediaType itemType = PlaylistService.itemTypeFor(playlist.getLibraryEntity().getLibraryType());
+                if (itemType == MediaType.BOOK) {
+                    if (shuffle) {
+                        throw new IllegalArgumentException("Book playlists cannot be shuffled; chapters only make sense in order");
+                    }
+                    // The playlist stores books; the queue plays their chapters.
+                    yield MediaType.CHAPTER;
+                }
+                yield itemType;
             }
             case SHOW -> MediaType.EPISODE;
             case ALBUM -> MediaType.TRACK;
@@ -693,12 +781,37 @@ public class PlayQueueService {
         };
     }
 
+    /** The playable media type of a filter kind; only the playable kinds pass. */
+    private static MediaType mediaTypeForFilterKind(FilterKind kind) {
+        return switch (kind) {
+            case TRACK -> MediaType.TRACK;
+            case MOVIE -> MediaType.MOVIE;
+            case EPISODE -> MediaType.EPISODE;
+            case ALBUM, ARTIST, SHOW -> throw new IllegalArgumentException(
+                    "A " + kind + " filter cannot be played directly; filter on tracks, movies or episodes instead");
+        };
+    }
+
+    /** The first chapter of a book, or the given id unchanged when it is not a book. */
+    private UUID resolveBookStart(UUID startId) {
+        return chapterRepository.findChapterIdsForBookOrdered(startId, 1, 0).stream().findFirst().orElse(startId);
+    }
+
+    private static CreatePlayQueueRequest withStartId(CreatePlayQueueRequest request, UUID startId) {
+        return new CreatePlayQueueRequest(request.sourceType(), request.sourceId(), startId, request.shuffle(),
+                request.rankKind(), request.filter(), request.filterKind(), request.libraryId(),
+                request.sorting(), request.sortingOrder());
+    }
+
     /**
      * Index of the start item in the full natural order of an ordered (non-shuffled) source.
      * [ascending] only applies to podcasts, whose order is the user's choice rather than intrinsic.
      */
     private int orderedIndexOf(PlayQueueEntity queue, UUID startId) {
         UUID sourceId = queue.getSourceId();
+        if (queue.getSourceType() == PlayQueueSourceType.PLAYLIST) {
+            return playlistOrderedIndexOf(queue, startId);
+        }
         List<UUID> ids = switch (queue.getSourceType()) {
             case SHOW -> episodeRepository
                     .findIdsOnlyByShowEntityId(
@@ -725,6 +838,29 @@ public class PlayQueueService {
             default -> List.of();
         };
         int index = ids.indexOf(startId);
+        if (index == -1) {
+            throw new IllegalArgumentException("Start item not part of the source");
+        }
+        return index;
+    }
+
+    /**
+     * Index of the start item among a MANUAL playlist's entries — the unit of the source cursor.
+     * For a BOOK playlist the entries are books while the start item is a chapter, so the index
+     * is that of the book the chapter belongs to.
+     */
+    private int playlistOrderedIndexOf(PlayQueueEntity queue, UUID startId) {
+        List<UUID> mediaIds = playlistItemRepository.findMediaIdsForPlaylistOrdered(queue.getSourceId(), Integer.MAX_VALUE, 0);
+        boolean bookPlaylist = playlistRepository.findById(queue.getSourceId())
+                .map(playlist -> playlist.getLibraryEntity().getLibraryType() == LibraryType.BOOK)
+                .orElse(false);
+        UUID needle = startId;
+        if (bookPlaylist) {
+            needle = chapterRepository.findById(startId)
+                    .map(chapter -> chapter.getBookEntity().getId())
+                    .orElse(startId);
+        }
+        int index = mediaIds.indexOf(needle);
         if (index == -1) {
             throw new IllegalArgumentException("Start item not part of the source");
         }
@@ -797,10 +933,7 @@ public class PlayQueueService {
     }
 
     private BigDecimal maxPosition(PlayQueueEntity queue) {
-        return queue.getItems().stream()
-                .map(PlayQueueItemEntity::getPosition)
-                .max(Comparator.naturalOrder())
-                .orElse(null);
+        return GapPositions.maxPosition(queue.getItems());
     }
 
     private Optional<PlayQueueItemEntity> itemById(PlayQueueEntity queue, UUID itemId) {
@@ -817,35 +950,7 @@ public class PlayQueueService {
      * exhausted and the queue needs a rebalance first.
      */
     private BigDecimal targetPosition(PlayQueueEntity queue, UUID afterItemId, UUID movingItemId) {
-        List<PlayQueueItemEntity> others = queue.getItems().stream()
-                .filter(item -> !item.getId().equals(movingItemId))
-                .sorted(Comparator.comparing(PlayQueueItemEntity::getPosition))
-                .toList();
-        if (others.isEmpty()) {
-            return GAP;
-        }
-        if (afterItemId == null) {
-            BigDecimal first = others.getFirst().getPosition();
-            BigDecimal candidate = first.divide(TWO, POSITION_SCALE, RoundingMode.HALF_UP);
-            return (candidate.signum() > 0 && candidate.compareTo(first) < 0) ? candidate : null;
-        }
-        int afterIndex = -1;
-        for (int i = 0; i < others.size(); i++) {
-            if (others.get(i).getId().equals(afterItemId)) {
-                afterIndex = i;
-                break;
-            }
-        }
-        if (afterIndex == -1) {
-            throw new IllegalArgumentException("After-item not in queue");
-        }
-        BigDecimal previous = others.get(afterIndex).getPosition();
-        if (afterIndex == others.size() - 1) {
-            return previous.add(GAP);
-        }
-        BigDecimal next = others.get(afterIndex + 1).getPosition();
-        BigDecimal candidate = previous.add(next).divide(TWO, POSITION_SCALE, RoundingMode.HALF_UP);
-        return (candidate.compareTo(previous) > 0 && candidate.compareTo(next) < 0) ? candidate : null;
+        return GapPositions.targetPosition(queue.getItems(), afterItemId, movingItemId);
     }
 
     /**
@@ -853,14 +958,7 @@ public class PlayQueueService {
      */
     private void rebalance(PlayQueueEntity queue) {
         log.debug("Rebalancing positions of play queue {}", queue.getId());
-        List<PlayQueueItemEntity> sorted = queue.getItems().stream()
-                .sorted(Comparator.comparing(PlayQueueItemEntity::getPosition))
-                .toList();
-        BigDecimal position = null;
-        for (PlayQueueItemEntity item : sorted) {
-            position = nextPosition(position);
-            item.setPosition(position);
-        }
+        GapPositions.rebalance(queue.getItems());
     }
 
     /**
