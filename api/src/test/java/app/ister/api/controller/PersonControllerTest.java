@@ -45,6 +45,9 @@ class PersonControllerTest {
     private PersonController subject;
 
     @Mock
+    private FilteredBrowse filteredBrowse;
+
+    @Mock
     private PersonRepository personRepository;
 
     @Mock

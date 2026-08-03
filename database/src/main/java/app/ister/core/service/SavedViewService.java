@@ -47,9 +47,18 @@ public class SavedViewService {
                 .toList();
     }
 
+    /** Everything that defines a saved view; shared by create and update. */
+    public record SavedViewSpec(String name, FilterKind kind, UUID libraryId, MediaFilter filter,
+                                SortingEnum sorting, SortingOrder sortingOrder) {
+    }
+
     /** The caller's own view, or empty for an unknown id and for someone else's view. */
     @Transactional(readOnly = true)
     public Optional<SavedViewEntity> ownedView(Authentication authentication, UUID id) {
+        return findOwnedView(authentication, id);
+    }
+
+    private Optional<SavedViewEntity> findOwnedView(Authentication authentication, UUID id) {
         UserEntity user = userService.getOrCreateUser(authentication);
         return savedViewRepository.findById(id)
                 .filter(view -> view.getUserEntity().getId().equals(user.getId()));
@@ -58,51 +67,47 @@ public class SavedViewService {
     // Sonar FP: Lombok @SuperBuilder declares builder() on the subclass itself
     @SuppressWarnings("java:S3252")
     @Transactional
-    public SavedViewEntity create(Authentication authentication, String name, FilterKind kind, UUID libraryId,
-                                  MediaFilter filter, SortingEnum sorting, SortingOrder sortingOrder) {
+    public SavedViewEntity create(Authentication authentication, SavedViewSpec spec) {
         SavedViewEntity view = SavedViewEntity.builder()
                 .userEntity(userService.getOrCreateUser(authentication))
                 .build();
-        apply(view, name, kind, libraryId, filter, sorting, sortingOrder, authentication);
+        apply(view, spec, authentication);
         return savedViewRepository.save(view);
     }
 
     @Transactional
-    public SavedViewEntity update(Authentication authentication, UUID id, String name, FilterKind kind,
-                                  UUID libraryId, MediaFilter filter, SortingEnum sorting,
-                                  SortingOrder sortingOrder) {
-        SavedViewEntity view = ownedView(authentication, id)
+    public SavedViewEntity update(Authentication authentication, UUID id, SavedViewSpec spec) {
+        SavedViewEntity view = findOwnedView(authentication, id)
                 .orElseThrow(() -> new IllegalArgumentException("Saved view not found"));
-        apply(view, name, kind, libraryId, filter, sorting, sortingOrder, authentication);
+        apply(view, spec, authentication);
         return savedViewRepository.save(view);
     }
 
     /** Deleting never touches play queues created from the view: they carry their own pinned copy. */
     @Transactional
     public boolean delete(Authentication authentication, UUID id) {
-        SavedViewEntity view = ownedView(authentication, id)
+        SavedViewEntity view = findOwnedView(authentication, id)
                 .orElseThrow(() -> new IllegalArgumentException("Saved view not found"));
         savedViewRepository.delete(view);
         return true;
     }
 
-    private void apply(SavedViewEntity view, String name, FilterKind kind, UUID libraryId, MediaFilter filter,
-                       SortingEnum sorting, SortingOrder sortingOrder, Authentication authentication) {
-        if (name == null || name.isBlank()) {
+    private void apply(SavedViewEntity view, SavedViewSpec spec, Authentication authentication) {
+        if (spec.name() == null || spec.name().isBlank()) {
             throw new IllegalArgumentException("A saved view needs a name");
         }
-        filterQueryService.validate(kind, filter);
+        filterQueryService.validate(spec.kind(), spec.filter());
         LibraryEntity library = null;
-        if (libraryId != null) {
-            library = libraryRepository.findById(libraryId)
+        if (spec.libraryId() != null) {
+            library = libraryRepository.findById(spec.libraryId())
                     .filter(lib -> libraryAccessService.canAccess(lib, authentication))
                     .orElseThrow(() -> new IllegalArgumentException("Library not found"));
         }
-        view.setName(name.trim());
-        view.setKind(kind);
+        view.setName(spec.name().trim());
+        view.setKind(spec.kind());
         view.setLibraryEntity(library);
-        view.setFilter(FilterJson.writeFilter(filter));
-        view.setSorting(sorting);
-        view.setSortingOrder(sortingOrder);
+        view.setFilter(FilterJson.writeFilter(spec.filter()));
+        view.setSorting(spec.sorting());
+        view.setSortingOrder(spec.sortingOrder());
     }
 }

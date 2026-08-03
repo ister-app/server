@@ -188,8 +188,7 @@ public class PlayQueueService {
     }
 
     /**
-     * Creates a play queue from a source. Only an initial window of items is materialized;
-     * more items are appended lazily while the user plays through the queue.
+     * Everything that defines a new play queue.
      *
      * @param startId    the episode/track to start at (ignored for MOVIE, optional otherwise,
      *                   unsupported for FILTER)
@@ -200,89 +199,112 @@ public class PlayQueueService {
      * @param filterKind which browse kind an inline filter targets; required with filter
      * @param libraryId  optional library scope for an inline FILTER source
      */
+    public record CreatePlayQueueRequest(PlayQueueSourceType sourceType, UUID sourceId, UUID startId,
+                                         boolean shuffle, RankKind rankKind, MediaFilter filter,
+                                         FilterKind filterKind, UUID libraryId, SortingEnum sorting,
+                                         SortingOrder sortingOrder) {
+    }
+
     /** Convenience overload for the non-FILTER sources. */
     @Transactional
     public PlayQueueEntity createPlayQueue(PlayQueueSourceType sourceType, UUID sourceId, UUID startId, boolean shuffle, RankKind rankKind, Authentication authentication) {
-        return createPlayQueue(sourceType, sourceId, startId, shuffle, rankKind, null, null, null, null, null, authentication);
+        return doCreatePlayQueue(new CreatePlayQueueRequest(sourceType, sourceId, startId, shuffle, rankKind, null, null, null, null, null), authentication);
     }
 
+    /**
+     * Creates a play queue from a source. Only an initial window of items is materialized;
+     * more items are appended lazily while the user plays through the queue.
+     */
     @Transactional
-    public PlayQueueEntity createPlayQueue(PlayQueueSourceType sourceType, UUID sourceId, UUID startId, boolean shuffle, RankKind rankKind, MediaFilter filter, FilterKind filterKind, UUID libraryId, SortingEnum sorting, SortingOrder sortingOrder, Authentication authentication) {
-        log.debug("Creating play queue for user: {}, source type: {}, source: {}, shuffle: {}, rank kind: {}", authentication.getName(), sourceType, sourceId, shuffle, rankKind);
-        if (!canAccessSource(sourceType, sourceId, authentication)) {
+    public PlayQueueEntity createPlayQueue(CreatePlayQueueRequest request, Authentication authentication) {
+        return doCreatePlayQueue(request, authentication);
+    }
+
+    private PlayQueueEntity doCreatePlayQueue(CreatePlayQueueRequest request, Authentication authentication) {
+        log.debug("Creating play queue for user: {}, source type: {}, source: {}, shuffle: {}, rank kind: {}", authentication.getName(), request.sourceType(), request.sourceId(), request.shuffle(), request.rankKind());
+        if (!canAccessSource(request.sourceType(), request.sourceId(), authentication)) {
             throw new IllegalArgumentException("Source not found");
         }
-        if (sourceType == PlayQueueSourceType.ARTIST && rankKind == null) {
-            throw new IllegalArgumentException("Artist play queues require a rankKind");
-        }
-        if (sourceType != PlayQueueSourceType.ARTIST && rankKind != null) {
-            throw new IllegalArgumentException("rankKind only applies to artist play queues");
-        }
-        if (sourceType != PlayQueueSourceType.FILTER
-                && (filter != null || filterKind != null || libraryId != null || sorting != null || sortingOrder != null)) {
-            throw new IllegalArgumentException("filter, filterKind, libraryId and sorting only apply to FILTER play queues");
-        }
-        if (sourceType != PlayQueueSourceType.FILTER && sourceId == null) {
-            throw new IllegalArgumentException("sourceId is required for " + sourceType + " play queues");
-        }
-        PinnedFilter pinned = null;
-        if (sourceType == PlayQueueSourceType.FILTER) {
-            if (startId != null) {
-                // Locating a start item would need the full ordered id list (see orderedIndexOf),
-                // exactly the full-materialization a filter source is designed to avoid.
-                throw new IllegalArgumentException("Filter play queues cannot start at a specific item");
-            }
-            pinned = resolvePinnedFilter(sourceId, filter, filterKind, libraryId, sorting, sortingOrder, authentication);
-        }
+        validateCreateRequest(request);
+        PinnedFilter pinned = request.sourceType() == PlayQueueSourceType.FILTER
+                ? resolvePinnedFilter(request.sourceId(), request.filter(), request.filterKind(), request.libraryId(), request.sorting(), request.sortingOrder(), authentication)
+                : null;
 
         PlayQueueEntity queue = PlayQueueEntity.builder()
                 .userEntity(userService.getOrCreateUser(authentication))
-                .sourceType(sourceType)
-                .sourceId(sourceId)
-                .rankKind(rankKind)
+                .sourceType(request.sourceType())
+                .sourceId(request.sourceId())
+                .rankKind(request.rankKind())
                 .sourceFilter(pinned != null ? FilterJson.write(pinned) : null)
                 .items(new ArrayList<>())
                 .build();
 
-        if (sourceType == PlayQueueSourceType.MOVIE) {
-            addItem(queue, buildItem(queue, MediaType.MOVIE, sourceId, GAP));
+        if (request.sourceType() == PlayQueueSourceType.MOVIE) {
+            addItem(queue, buildItem(queue, MediaType.MOVIE, request.sourceId(), GAP));
             queue.setSourceExhausted(true);
         } else {
-            MediaType mediaType = mediaTypeForSource(sourceType, sourceId, shuffle, pinned);
-            queue.setShuffle(shuffle);
-            if (sourceType == PlayQueueSourceType.ARTIST || sourceType == PlayQueueSourceType.FILTER) {
-                // Persist before fetching the first chunk: dateCreated is the ranking's/filter's
-                // freeze point, and the chunk queries (and orderedIndexOf below) need it set.
-                playQueueRepository.save(queue);
-            }
-            if (sourceType == PlayQueueSourceType.PODCAST) {
-                // Freeze the user's preferred order onto the queue. The queue materializes its
-                // items in chunks as playback goes on, and re-reading the preference per chunk
-                // would flip a running queue around the moment the user changes the setting.
-                queue.setSourceAscending(podcastPreferenceService.getEpisodeOrder(authentication, sourceId)
-                        == SortingOrder.ASCENDING);
-            }
-            if (shuffle) {
-                queue.setShuffleSeed(UUID.randomUUID().toString());
-                if (startId != null) {
-                    // Materialize the start item up-front; chunk queries exclude it so the
-                    // seeded permutation never emits it again.
-                    queue.setSourceStartId(startId);
-                    addItem(queue, buildItem(queue, mediaType, startId, GAP));
-                }
-            } else if (startId != null) {
-                // Start the materialized window a bit before the start item so the client
-                // still has some back-scroll context. Earlier items are never materialized.
-                queue.setSourceOffset(Math.max(0,
-                        orderedIndexOf(queue, startId) - BACK_WINDOW));
-            }
-            appendChunk(queue);
+            materializeInitialWindow(queue, request, pinned, authentication);
         }
 
         playQueueRepository.save(queue);
-        queue.setCurrentItem(findStartItem(queue, startId).getId());
+        queue.setCurrentItem(findStartItem(queue, request.startId()).getId());
         playQueueRepository.save(queue);
         return queue;
+    }
+
+    private static void validateCreateRequest(CreatePlayQueueRequest request) {
+        if (request.sourceType() == PlayQueueSourceType.ARTIST && request.rankKind() == null) {
+            throw new IllegalArgumentException("Artist play queues require a rankKind");
+        }
+        if (request.sourceType() != PlayQueueSourceType.ARTIST && request.rankKind() != null) {
+            throw new IllegalArgumentException("rankKind only applies to artist play queues");
+        }
+        if (request.sourceType() != PlayQueueSourceType.FILTER
+                && (request.filter() != null || request.filterKind() != null || request.libraryId() != null || request.sorting() != null || request.sortingOrder() != null)) {
+            throw new IllegalArgumentException("filter, filterKind, libraryId and sorting only apply to FILTER play queues");
+        }
+        if (request.sourceType() != PlayQueueSourceType.FILTER && request.sourceId() == null) {
+            throw new IllegalArgumentException("sourceId is required for " + request.sourceType() + " play queues");
+        }
+        if (request.sourceType() == PlayQueueSourceType.FILTER && request.startId() != null) {
+            // Locating a start item would need the full ordered id list (see orderedIndexOf),
+            // exactly the full-materialization a filter source is designed to avoid.
+            throw new IllegalArgumentException("Filter play queues cannot start at a specific item");
+        }
+    }
+
+    /** Materializes the initial window of a non-MOVIE queue and positions its source cursor. */
+    private void materializeInitialWindow(PlayQueueEntity queue, CreatePlayQueueRequest request, PinnedFilter pinned, Authentication authentication) {
+        UUID startId = request.startId();
+        MediaType mediaType = mediaTypeForSource(request.sourceType(), request.sourceId(), request.shuffle(), pinned);
+        queue.setShuffle(request.shuffle());
+        if (request.sourceType() == PlayQueueSourceType.ARTIST || request.sourceType() == PlayQueueSourceType.FILTER) {
+            // Persist before fetching the first chunk: dateCreated is the ranking's/filter's
+            // freeze point, and the chunk queries (and orderedIndexOf below) need it set.
+            playQueueRepository.save(queue);
+        }
+        if (request.sourceType() == PlayQueueSourceType.PODCAST) {
+            // Freeze the user's preferred order onto the queue. The queue materializes its
+            // items in chunks as playback goes on, and re-reading the preference per chunk
+            // would flip a running queue around the moment the user changes the setting.
+            queue.setSourceAscending(podcastPreferenceService.getEpisodeOrder(authentication, request.sourceId())
+                    == SortingOrder.ASCENDING);
+        }
+        if (request.shuffle()) {
+            queue.setShuffleSeed(UUID.randomUUID().toString());
+            if (startId != null) {
+                // Materialize the start item up-front; chunk queries exclude it so the
+                // seeded permutation never emits it again.
+                queue.setSourceStartId(startId);
+                addItem(queue, buildItem(queue, mediaType, startId, GAP));
+            }
+        } else if (startId != null) {
+            // Start the materialized window a bit before the start item so the client
+            // still has some back-scroll context. Earlier items are never materialized.
+            queue.setSourceOffset(Math.max(0,
+                    orderedIndexOf(queue, startId) - BACK_WINDOW));
+        }
+        appendChunk(queue);
     }
 
     /**
@@ -550,9 +572,10 @@ public class PlayQueueService {
         return filterQueryService.chunkIds(pinned.kind(), pinned.filter(),
                 pinned.sorting() != null ? pinned.sorting() : SortingEnum.NAME,
                 pinned.sortingOrder() != null ? pinned.sortingOrder() : SortingOrder.ASCENDING,
-                queue.isShuffle() ? queue.getShuffleSeed() : null,
-                null, allowed, pinned.libraryId(),
-                queue.getUserEntity().getExternalId(), queue.getDateCreated(), limit, offset);
+                new FilterQueryService.FilterScope(allowed, pinned.libraryId(),
+                        queue.getUserEntity().getExternalId()),
+                new FilterQueryService.ChunkPage(queue.isShuffle() ? queue.getShuffleSeed() : null,
+                        null, queue.getDateCreated(), limit, offset));
     }
 
     private PinnedFilter pinnedFilterOf(PlayQueueEntity queue) {
@@ -878,32 +901,38 @@ public class PlayQueueService {
             playQueueEntity.setProgressInMilliseconds(progressInMilliseconds);
             playQueueRepository.save(playQueueEntity);
             maybeExtend(playQueueEntity);
-            // Update the watch status of an episode if it's played for more then one minute.
-            // Audiobook chapters use a lower threshold: their position is shared with the reader,
-            // so the first minute of a chapter has to be recoverable when switching to text.
-            // The status is written for every listener: the owner plus each following user —
-            // only the owner ever reports progress, so followers cannot flip it back themselves.
-            MediaType type = playQueueItemEntity.getType();
-            long minimumProgress = type == MediaType.CHAPTER ? CHAPTER_PROGRESS_THRESHOLD_MS : 60000;
-            for (UserEntity listener : listeners) {
-                if (progressInMilliseconds > minimumProgress) {
-                    if (type == MediaType.EPISODE) {
-                        updateEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, listener, playQueueItemEntity);
-                    } else if (type == MediaType.MOVIE) {
-                        updateMovieWatchStatus(progressInMilliseconds, playQueueItemId, listener, playQueueItemEntity);
-                    } else if (type == MediaType.CHAPTER) {
-                        updateChapterWatchStatus(progressInMilliseconds, listener, playQueueItemEntity);
-                    } else if (type == MediaType.PODCAST_EPISODE) {
-                        updatePodcastEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, listener, playQueueItemEntity);
-                    }
-                }
-                // Tracks have their own, shorter threshold (many are barely longer than a minute):
-                // a play counts once 30 seconds — or half of a short track — has been heard.
-                if (type == MediaType.TRACK) {
-                    updateTrackWatchStatus(progressInMilliseconds, playQueueItemId, listener, playQueueItemEntity);
+            recordWatchStatuses(progressInMilliseconds, playQueueItemId, listeners, playQueueItemEntity);
+        });
+    }
+
+    /**
+     * Update the watch status of an episode if it's played for more then one minute.
+     * Audiobook chapters use a lower threshold: their position is shared with the reader,
+     * so the first minute of a chapter has to be recoverable when switching to text.
+     * The status is written for every listener: the owner plus each following user —
+     * only the owner ever reports progress, so followers cannot flip it back themselves.
+     */
+    private void recordWatchStatuses(long progressInMilliseconds, UUID playQueueItemId, List<UserEntity> listeners, PlayQueueItemEntity playQueueItemEntity) {
+        MediaType type = playQueueItemEntity.getType();
+        long minimumProgress = type == MediaType.CHAPTER ? CHAPTER_PROGRESS_THRESHOLD_MS : 60000;
+        for (UserEntity listener : listeners) {
+            if (progressInMilliseconds > minimumProgress) {
+                if (type == MediaType.EPISODE) {
+                    updateEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, listener, playQueueItemEntity);
+                } else if (type == MediaType.MOVIE) {
+                    updateMovieWatchStatus(progressInMilliseconds, playQueueItemId, listener, playQueueItemEntity);
+                } else if (type == MediaType.CHAPTER) {
+                    updateChapterWatchStatus(progressInMilliseconds, listener, playQueueItemEntity);
+                } else if (type == MediaType.PODCAST_EPISODE) {
+                    updatePodcastEpisodeWatchStatus(progressInMilliseconds, playQueueItemId, listener, playQueueItemEntity);
                 }
             }
-        });
+            // Tracks have their own, shorter threshold (many are barely longer than a minute):
+            // a play counts once 30 seconds — or half of a short track — has been heard.
+            if (type == MediaType.TRACK) {
+                updateTrackWatchStatus(progressInMilliseconds, playQueueItemId, listener, playQueueItemEntity);
+            }
+        }
     }
 
     private void updateTrackWatchStatus(long progressInMilliseconds, UUID playQueueItemId, UserEntity listener, PlayQueueItemEntity playQueueItemEntity) {

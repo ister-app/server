@@ -37,6 +37,9 @@ class TrackControllerTest {
     private TrackController subject;
 
     @Mock
+    private FilteredBrowse filteredBrowse;
+
+    @Mock
     private TrackRepository trackRepository;
 
     @Mock

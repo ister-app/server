@@ -8,7 +8,6 @@ import app.ister.core.filter.MediaFilter;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.WatchStatusRepository;
-import app.ister.core.service.FilterQueryService;
 import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -36,7 +35,7 @@ public class EpisodeController {
     private final WatchStatusRepository watchStatusRepository;
     private final LibraryAccessService libraryAccessService;
     private final LibraryRepository libraryRepository;
-    private final FilterQueryService filterQueryService;
+    private final FilteredBrowse filteredBrowse;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -59,7 +58,7 @@ public class EpisodeController {
         Pageable pageable = Paging.unsorted(page, size, 20);
         SortingEnum sort = sorting.orElse(SortingEnum.DATE_CREATED);
         SortingOrder order = sortingOrder.orElse(SortingOrder.DESCENDING);
-        Optional<Page<EpisodeEntity>> filtered = FilteredBrowse.page(filterQueryService, libraryAccessService,
+        Optional<Page<EpisodeEntity>> filtered = filteredBrowse.page(
                 FilterKind.EPISODE, filter, sort, order, libraryId, pageable, authentication);
         if (filtered.isPresent()) {
             return filtered.get();

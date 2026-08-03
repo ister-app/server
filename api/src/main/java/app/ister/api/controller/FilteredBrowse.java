@@ -6,9 +6,11 @@ import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.service.FilterQueryService;
 import app.ister.core.service.LibraryAccessService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 import java.util.Set;
@@ -20,16 +22,17 @@ import java.util.UUID;
  * library-access semantics as the unfiltered path (explicit libraryId checked up-front, otherwise
  * the caller's allowed set; admins pass null = all).
  */
-final class FilteredBrowse {
+@Component
+@RequiredArgsConstructor
+class FilteredBrowse {
 
-    private FilteredBrowse() {
-    }
+    private final FilterQueryService filterQueryService;
+    private final LibraryAccessService libraryAccessService;
 
     /** Empty when no filter was given: the caller continues on its unfiltered path. */
-    static <T> Optional<Page<T>> page(FilterQueryService filterQueryService,
-                                      LibraryAccessService libraryAccessService, FilterKind kind,
-                                      Optional<MediaFilter> filter, SortingEnum sorting, SortingOrder sortingOrder,
-                                      Optional<UUID> libraryId, Pageable pageable, Authentication authentication) {
+    <T> Optional<Page<T>> page(FilterKind kind, Optional<MediaFilter> filter,
+                               SortingEnum sorting, SortingOrder sortingOrder,
+                               Optional<UUID> libraryId, Pageable pageable, Authentication authentication) {
         if (filter.isEmpty()) {
             return Optional.empty();
         }
@@ -39,6 +42,6 @@ final class FilteredBrowse {
         }
         Set<UUID> allowed = libraryAccessService.allowedLibraryIds(authentication).orElse(null);
         return Optional.of(filterQueryService.page(kind, filter.get(), sorting, sortingOrder,
-                allowed, scope, authentication.getName(), pageable));
+                new FilterQueryService.FilterScope(allowed, scope, authentication.getName()), pageable));
     }
 }

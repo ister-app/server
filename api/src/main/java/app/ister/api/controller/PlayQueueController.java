@@ -37,6 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.TransactionException;
 import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.Arguments;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
@@ -96,20 +97,28 @@ public class PlayQueueController {
     @PreAuthorize("hasRole('user')")
     @MutationMapping
     public PlayQueueEntity createPlayQueue(@Argument CreatePlayQueueInput input, Authentication authentication) {
-        return playQueueService.createPlayQueue(input.sourceType(), input.sourceId(), input.startId(), Boolean.TRUE.equals(input.shuffle()), input.rankKind(), input.filter(), input.filterKind(), input.libraryId(), input.sorting(), input.sortingOrder(), authentication);
+        return playQueueService.createPlayQueue(new PlayQueueService.CreatePlayQueueRequest(input.sourceType(), input.sourceId(), input.startId(), Boolean.TRUE.equals(input.shuffle()), input.rankKind(), input.filter(), input.filterKind(), input.libraryId(), input.sorting(), input.sortingOrder()), authentication);
+    }
+
+    /** All arguments of the {@code updatePlayQueue} mutation, bound as one object off the argument map. */
+    record UpdatePlayQueueArguments(UUID id, long progressInMilliseconds, UUID playQueueItemId,
+                                    StreamSettingsInput streamSettings, PlayState playState,
+                                    Integer anchorPositionMs, Double anchorServerTimeMs) {
     }
 
     @PreAuthorize("hasRole('user')")
     @MutationMapping
-    public Optional<PlayQueueEntity> updatePlayQueue(@Argument UUID id, @Argument long progressInMilliseconds, @Argument UUID playQueueItemId,
-                                                     @Argument StreamSettingsInput streamSettings, @Argument PlayState playState,
-                                                     @Argument Integer anchorPositionMs, @Argument Double anchorServerTimeMs,
-                                                     Authentication authentication) {
+    public Optional<PlayQueueEntity> updatePlayQueue(@Arguments UpdatePlayQueueArguments args, Authentication authentication) {
+        UUID id = args.id();
+        long progressInMilliseconds = args.progressInMilliseconds();
+        UUID playQueueItemId = args.playQueueItemId();
+        PlayState playState = args.playState();
+        StreamSettingsInput streamSettings = args.streamSettings();
         PlayQueueService.StreamSettings settings = streamSettings == null ? null
                 : new PlayQueueService.StreamSettings(streamSettings.direct(), streamSettings.transcode(), streamSettings.subtitleFormat());
         // Epoch ms exceeds GraphQL Int, so the wire type is Float; internally it is a Long.
-        Long anchorPosition = anchorPositionMs == null ? null : anchorPositionMs.longValue();
-        Long anchorServerTime = anchorServerTimeMs == null ? null : (long) (double) anchorServerTimeMs;
+        Long anchorPosition = args.anchorPositionMs() == null ? null : args.anchorPositionMs().longValue();
+        Long anchorServerTime = args.anchorServerTimeMs() == null ? null : (long) (double) args.anchorServerTimeMs();
         // Watch status is written for the owner plus every currently-following user; the follower
         // registry lives in core (fed by the status fan-out), so resolve the set here and pass it
         // down — the database module cannot see the registry.

@@ -36,15 +36,18 @@ public class SavedViewController {
     @PreAuthorize("hasRole('user')")
     @MutationMapping
     public SavedViewEntity createSavedView(@Argument SavedViewInput input, Authentication authentication) {
-        return savedViewService.create(authentication, input.name(), input.kind(), input.libraryId(),
-                input.filter(), input.sorting(), input.sortingOrder());
+        return savedViewService.create(authentication, toSpec(input));
     }
 
     @PreAuthorize("hasRole('user')")
     @MutationMapping
     public SavedViewEntity updateSavedView(@Argument UUID id, @Argument SavedViewInput input,
                                            Authentication authentication) {
-        return savedViewService.update(authentication, id, input.name(), input.kind(), input.libraryId(),
+        return savedViewService.update(authentication, id, toSpec(input));
+    }
+
+    private SavedViewService.SavedViewSpec toSpec(SavedViewInput input) {
+        return new SavedViewService.SavedViewSpec(input.name(), input.kind(), input.libraryId(),
                 input.filter(), input.sorting(), input.sortingOrder());
     }
 

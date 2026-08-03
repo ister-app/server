@@ -8,7 +8,6 @@ import app.ister.core.filter.MediaFilter;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.WatchStatusRepository;
-import app.ister.core.service.FilterQueryService;
 import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +36,7 @@ public class MovieController {
     private final WatchStatusRepository watchStatusRepository;
     private final LibraryRepository libraryRepository;
     private final LibraryAccessService libraryAccessService;
-    private final FilterQueryService filterQueryService;
+    private final FilteredBrowse filteredBrowse;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -50,7 +49,7 @@ public class MovieController {
             @Argument Optional<MediaFilter> filter, Authentication authentication) {
         Pageable pageable = Paging.pageable(page, size, 10,
                 sorting, SortingEnum.DATE_CREATED, sortingOrder, SortingOrder.DESCENDING);
-        Optional<Page<MovieEntity>> filtered = FilteredBrowse.page(filterQueryService, libraryAccessService,
+        Optional<Page<MovieEntity>> filtered = filteredBrowse.page(
                 FilterKind.MOVIE, filter, sorting.orElse(SortingEnum.DATE_CREATED),
                 sortingOrder.orElse(SortingOrder.DESCENDING), libraryId, pageable, authentication);
         if (filtered.isPresent()) {

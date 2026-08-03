@@ -42,6 +42,9 @@ class ShowControllerTest {
     private ShowController subject;
 
     @Mock
+    private FilteredBrowse filteredBrowse;
+
+    @Mock
     private ShowRepository showRepository;
 
     @Mock

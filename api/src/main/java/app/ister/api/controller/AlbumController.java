@@ -12,13 +12,13 @@ import app.ister.core.filter.MediaFilter;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.ImageRepository;
-import app.ister.core.service.FilterQueryService;
 import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.Arguments;
 import org.springframework.graphql.data.method.annotation.BatchMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
@@ -42,7 +42,7 @@ public class AlbumController {
     private final PersonRepository personRepository;
     private final ImageRepository imageRepository;
     private final LibraryAccessService libraryAccessService;
-    private final FilterQueryService filterQueryService;
+    private final FilteredBrowse filteredBrowse;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -51,33 +51,33 @@ public class AlbumController {
                 .filter(album -> libraryAccessService.canAccess(album.getLibraryEntity(), authentication));
     }
 
+    /** All arguments of the {@code albums} query, bound as one object off the argument map. */
+    record AlbumsArguments(Optional<Integer> page, Optional<Integer> size,
+                           Optional<SortingEnum> sorting, Optional<SortingOrder> sortingOrder,
+                           Optional<UUID> artistId, Optional<UUID> libraryId,
+                           Optional<MediaFilter> filter) {
+    }
+
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public Page<AlbumEntity> albums(
-            @Argument Optional<Integer> page,
-            @Argument Optional<Integer> size,
-            @Argument Optional<SortingEnum> sorting,
-            @Argument Optional<SortingOrder> sortingOrder,
-            @Argument Optional<UUID> artistId,
-            @Argument Optional<UUID> libraryId,
-            @Argument Optional<MediaFilter> filter, Authentication authentication) {
-        Pageable pageable = Paging.pageable(page, size, 20,
-                sorting, SortingEnum.NAME, sortingOrder, SortingOrder.ASCENDING);
-        Optional<Page<AlbumEntity>> filtered = FilteredBrowse.page(filterQueryService, libraryAccessService,
-                FilterKind.ALBUM, filter, sorting.orElse(SortingEnum.NAME),
-                sortingOrder.orElse(SortingOrder.ASCENDING), libraryId, pageable, authentication);
+    public Page<AlbumEntity> albums(@Arguments AlbumsArguments args, Authentication authentication) {
+        Pageable pageable = Paging.pageable(args.page(), args.size(), 20,
+                args.sorting(), SortingEnum.NAME, args.sortingOrder(), SortingOrder.ASCENDING);
+        Optional<Page<AlbumEntity>> filtered = filteredBrowse.page(
+                FilterKind.ALBUM, args.filter(), args.sorting().orElse(SortingEnum.NAME),
+                args.sortingOrder().orElse(SortingOrder.ASCENDING), args.libraryId(), pageable, authentication);
         if (filtered.isPresent()) {
             return filtered.get();
         }
-        if (artistId.isPresent()) {
-            return personRepository.findById(artistId.get())
+        if (args.artistId().isPresent()) {
+            return personRepository.findById(args.artistId().get())
                     .map(artist -> libraryAccessService.allowedLibraryIds(authentication)
                             .map(allowed -> albumRepository.findByPersonEntityAndLibraryEntityIdIn(artist, allowed, pageable))
                             .orElseGet(() -> albumRepository.findByPersonEntity(artist, pageable)))
                     .orElseGet(() -> Page.empty(pageable));
         }
-        if (libraryId.isPresent()) {
-            return libraryId.filter(id -> libraryAccessService.canAccess(id, authentication))
+        if (args.libraryId().isPresent()) {
+            return args.libraryId().filter(id -> libraryAccessService.canAccess(id, authentication))
                     .map(id -> albumRepository.findByLibraryEntityId(id, pageable))
                     .orElseGet(() -> Page.empty(pageable));
         }

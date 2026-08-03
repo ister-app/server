@@ -142,7 +142,7 @@ class PlayQueueControllerTest {
         UUID episodeId = UUID.randomUUID();
         CreatePlayQueueInput input = new CreatePlayQueueInput(PlayQueueSourceType.SHOW, showId, episodeId, true, null, null, null, null, null, null);
         PlayQueueEntity queue = PlayQueueEntity.builder().build();
-        when(playQueueService.createPlayQueue(PlayQueueSourceType.SHOW, showId, episodeId, true, null, null, null, null, null, null, authentication)).thenReturn(queue);
+        when(playQueueService.createPlayQueue(new PlayQueueService.CreatePlayQueueRequest(PlayQueueSourceType.SHOW, showId, episodeId, true, null, null, null, null, null, null), authentication)).thenReturn(queue);
 
         PlayQueueEntity result = subject.createPlayQueue(input, authentication);
 
@@ -154,7 +154,7 @@ class PlayQueueControllerTest {
         UUID movieId = UUID.randomUUID();
         CreatePlayQueueInput input = new CreatePlayQueueInput(PlayQueueSourceType.MOVIE, movieId, null, null, null, null, null, null, null, null);
         PlayQueueEntity queue = PlayQueueEntity.builder().build();
-        when(playQueueService.createPlayQueue(PlayQueueSourceType.MOVIE, movieId, null, false, null, null, null, null, null, null, authentication)).thenReturn(queue);
+        when(playQueueService.createPlayQueue(new PlayQueueService.CreatePlayQueueRequest(PlayQueueSourceType.MOVIE, movieId, null, false, null, null, null, null, null, null), authentication)).thenReturn(queue);
 
         PlayQueueEntity result = subject.createPlayQueue(input, authentication);
 
@@ -167,7 +167,7 @@ class PlayQueueControllerTest {
         UUID trackId = UUID.randomUUID();
         CreatePlayQueueInput input = new CreatePlayQueueInput(PlayQueueSourceType.ARTIST, personId, trackId, null, RankKind.MOST_PLAYED, null, null, null, null, null);
         PlayQueueEntity queue = PlayQueueEntity.builder().build();
-        when(playQueueService.createPlayQueue(PlayQueueSourceType.ARTIST, personId, trackId, false, RankKind.MOST_PLAYED, null, null, null, null, null, authentication)).thenReturn(queue);
+        when(playQueueService.createPlayQueue(new PlayQueueService.CreatePlayQueueRequest(PlayQueueSourceType.ARTIST, personId, trackId, false, RankKind.MOST_PLAYED, null, null, null, null, null), authentication)).thenReturn(queue);
 
         assertEquals(queue, subject.createPlayQueue(input, authentication));
     }
@@ -232,7 +232,7 @@ class PlayQueueControllerTest {
         PlayQueueEntity queue = buildQueueWithUser();
         when(playQueueService.updatePlayQueue(id, 5000L, itemId, null, Set.of(), authentication)).thenReturn(Optional.of(queue));
 
-        Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, itemId, null, null, null, null, authentication);
+        Optional<PlayQueueEntity> result = subject.updatePlayQueue(new PlayQueueController.UpdatePlayQueueArguments(id, 5000L, itemId, null, null, null, null), authentication);
 
         assertTrue(result.isPresent());
         verify(playQueuePrefetchService).maybePrefetchNext(queue, itemId, 5000L);
@@ -248,7 +248,7 @@ class PlayQueueControllerTest {
                 new PlayQueueService.StreamSettings(true, false, SubtitleFormat.SRT), Set.of(), authentication))
                 .thenReturn(Optional.of(queue));
 
-        Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, itemId, input, null, null, null, authentication);
+        Optional<PlayQueueEntity> result = subject.updatePlayQueue(new PlayQueueController.UpdatePlayQueueArguments(id, 5000L, itemId, input, null, null, null), authentication);
 
         assertTrue(result.isPresent());
     }
@@ -260,7 +260,7 @@ class PlayQueueControllerTest {
         PlayQueueEntity queue = buildQueueWithUser();
         when(playQueueService.updatePlayQueue(id, 5000L, itemId, null, Set.of(), authentication)).thenReturn(Optional.of(queue));
 
-        subject.updatePlayQueue(id, 5000L, itemId, null, PlayState.PAUSED, null, null, authentication);
+        subject.updatePlayQueue(new PlayQueueController.UpdatePlayQueueArguments(id, 5000L, itemId, null, PlayState.PAUSED, null, null), authentication);
 
         verify(playbackStatusService).publishHeartbeat(queue.getId(), itemId,
                 queue.getUserEntity().getId(), "sub-123", "test-user", null, null, null, null, null, 5000L, PlayState.PAUSED,
@@ -282,7 +282,7 @@ class PlayQueueControllerTest {
                         .mediaType(MediaType.EPISODE).playState(PlayState.PLAYING).build()));
 
         assertThrows(org.springframework.dao.DataAccessResourceFailureException.class,
-                () -> subject.updatePlayQueue(id, 7000L, itemId, null, PlayState.PAUSED, null, null, authentication));
+                () -> subject.updatePlayQueue(new PlayQueueController.UpdatePlayQueueArguments(id, 7000L, itemId, null, PlayState.PAUSED, null, null), authentication));
 
         // The now-playing feed still gets the fresh progress/state, from registry data.
         verify(playbackStatusService).publishHeartbeat(id, itemId, userId, "sub-123", "test-user",
@@ -304,7 +304,7 @@ class PlayQueueControllerTest {
                         .playState(PlayState.PLAYING).build()));
 
         assertThrows(org.springframework.dao.DataAccessResourceFailureException.class,
-                () -> subject.updatePlayQueue(id, 7000L, newItemId, null, PlayState.PLAYING, null, null, authentication));
+                () -> subject.updatePlayQueue(new PlayQueueController.UpdatePlayQueueArguments(id, 7000L, newItemId, null, PlayState.PLAYING, null, null), authentication));
 
         // The registry's media fields describe the previous item; publishing them with the
         // new item's progress would show the wrong track, so nothing is published.
@@ -324,7 +324,7 @@ class PlayQueueControllerTest {
                         .playState(PlayState.PLAYING).build()));
 
         assertThrows(org.springframework.dao.DataAccessResourceFailureException.class,
-                () -> subject.updatePlayQueue(id, 7000L, itemId, null, PlayState.PAUSED, null, null, authentication));
+                () -> subject.updatePlayQueue(new PlayQueueController.UpdatePlayQueueArguments(id, 7000L, itemId, null, PlayState.PAUSED, null, null), authentication));
 
         verifyNoInteractions(playbackStatusService);
     }
@@ -335,7 +335,7 @@ class PlayQueueControllerTest {
         UUID itemId = UUID.randomUUID();
         when(playQueueService.updatePlayQueue(id, 5000L, itemId, null, Set.of(), authentication)).thenReturn(Optional.empty());
 
-        Optional<PlayQueueEntity> result = subject.updatePlayQueue(id, 5000L, itemId, null, null, null, null, authentication);
+        Optional<PlayQueueEntity> result = subject.updatePlayQueue(new PlayQueueController.UpdatePlayQueueArguments(id, 5000L, itemId, null, null, null, null), authentication);
 
         assertTrue(result.isEmpty());
         verifyNoInteractions(playQueuePrefetchService, playbackStatusService);
@@ -555,7 +555,7 @@ class PlayQueueControllerTest {
         when(playQueueService.updatePlayQueue(id, 1000L, item.getId(), null, Set.of(), authentication))
                 .thenReturn(Optional.of(queue));
 
-        subject.updatePlayQueue(id, 1000L, item.getId(), null, PlayState.PLAYING, null, null, authentication);
+        subject.updatePlayQueue(new PlayQueueController.UpdatePlayQueueArguments(id, 1000L, item.getId(), null, PlayState.PLAYING, null, null), authentication);
     }
 
     private static PlayQueueItemEntity identified(PlayQueueItemEntity item) {
@@ -716,7 +716,7 @@ class PlayQueueControllerTest {
         when(playQueueService.updatePlayQueue(id, 1000L, itemId, null, Set.of(), authentication))
                 .thenReturn(Optional.of(queue));
 
-        subject.updatePlayQueue(id, 1000L, itemId, null, PlayState.PLAYING, null, null, authentication);
+        subject.updatePlayQueue(new PlayQueueController.UpdatePlayQueueArguments(id, 1000L, itemId, null, PlayState.PLAYING, null, null), authentication);
 
         verify(playbackStatusService).publishHeartbeat(queue.getId(), itemId, queue.getUserEntity().getId(),
                 "sub-123", "test-user", null, null, null, null, null, 1000L, PlayState.PLAYING,

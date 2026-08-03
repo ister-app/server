@@ -77,6 +77,14 @@ class FilterQueryServiceIntegrationTest {
         return new FilterCondition(field, operator, value);
     }
 
+    private static FilterQueryService.FilterScope scope(List<UUID> libraryIds, UUID libraryId) {
+        return new FilterQueryService.FilterScope(libraryIds, libraryId, LISTENER);
+    }
+
+    private static FilterQueryService.ChunkPage chunk(String shuffleSeed, Instant asOf, int limit, int offset) {
+        return new FilterQueryService.ChunkPage(shuffleSeed, null, asOf, limit, offset);
+    }
+
     private static List<UUID> ids(Page<?> page) {
         return page.getContent().stream()
                 .map(e -> ((app.ister.core.entity.BaseEntity) e).getId())
@@ -120,28 +128,28 @@ class FilterQueryServiceIntegrationTest {
         // the NAME sort runs over the metadata titles ("Glass Onion" < "Heart of Glass").
         assertEquals(List.of(f.pop.getId(), f.rock.getId()),
                 ids(subject.page(FilterKind.TRACK, all(cond(FilterField.TITLE, FilterOperator.CONTAINS, "glass")),
-                        SortingEnum.NAME, SortingOrder.ASCENDING, libraries, null, LISTENER, page)));
+                        SortingEnum.NAME, SortingOrder.ASCENDING, scope(libraries, null), page)));
 
         // NOT_CONTAINS means "no metadata row matches": the metadata-less track qualifies too.
         assertEquals(new HashSet<>(List.of(f.pop.getId(), f.bare.getId())),
                 new HashSet<>(ids(subject.page(FilterKind.TRACK,
                         all(cond(FilterField.TITLE, FilterOperator.NOT_CONTAINS, "heart")),
-                        SortingEnum.NAME, SortingOrder.ASCENDING, libraries, null, LISTENER, page))));
+                        SortingEnum.NAME, SortingOrder.ASCENDING, scope(libraries, null), page))));
 
         // The calling user's rating.
         assertEquals(List.of(f.rock.getId()),
                 ids(subject.page(FilterKind.TRACK, all(cond(FilterField.RATING, FilterOperator.GREATER_THAN, "8")),
-                        SortingEnum.NAME, SortingOrder.ASCENDING, libraries, null, LISTENER, page)));
+                        SortingEnum.NAME, SortingOrder.ASCENDING, scope(libraries, null), page)));
 
         // Play stats: never played = play count 0.
         assertEquals(new HashSet<>(List.of(f.rock.getId(), f.bare.getId())),
                 new HashSet<>(ids(subject.page(FilterKind.TRACK,
                         all(cond(FilterField.PLAY_COUNT, FilterOperator.EQUALS, "0")),
-                        SortingEnum.NAME, SortingOrder.ASCENDING, libraries, null, LISTENER, page))));
+                        SortingEnum.NAME, SortingOrder.ASCENDING, scope(libraries, null), page))));
         assertEquals(List.of(f.pop.getId()),
                 ids(subject.page(FilterKind.TRACK,
                         all(cond(FilterField.LAST_PLAYED_AT, FilterOperator.IN_LAST_DAYS, "1")),
-                        SortingEnum.NAME, SortingOrder.ASCENDING, libraries, null, LISTENER, page)));
+                        SortingEnum.NAME, SortingOrder.ASCENDING, scope(libraries, null), page)));
 
         // ANY group: rated-9 OR pop genre.
         MediaFilter any = new MediaFilter(FilterMatch.ANY, List.of(
@@ -149,7 +157,7 @@ class FilterQueryServiceIntegrationTest {
                 cond(FilterField.GENRE, FilterOperator.CONTAINS, "pop")), List.of(), null);
         assertEquals(new HashSet<>(List.of(f.rock.getId(), f.pop.getId())),
                 new HashSet<>(ids(subject.page(FilterKind.TRACK, any,
-                        SortingEnum.NAME, SortingOrder.ASCENDING, libraries, null, LISTENER, page))));
+                        SortingEnum.NAME, SortingOrder.ASCENDING, scope(libraries, null), page))));
 
         // Nested group: year < 2010 AND (genre rock OR genre pop).
         MediaFilter nested = new MediaFilter(FilterMatch.ALL,
@@ -160,7 +168,7 @@ class FilterQueryServiceIntegrationTest {
                 null);
         assertEquals(new HashSet<>(List.of(f.rock.getId(), f.pop.getId())),
                 new HashSet<>(ids(subject.page(FilterKind.TRACK, nested,
-                        SortingEnum.NAME, SortingOrder.ASCENDING, libraries, null, LISTENER, page))));
+                        SortingEnum.NAME, SortingOrder.ASCENDING, scope(libraries, null), page))));
     }
 
     @Test
@@ -169,7 +177,7 @@ class FilterQueryServiceIntegrationTest {
         MediaFilter limited = new MediaFilter(FilterMatch.ALL, List.of(), List.of(), 2);
 
         Page<Object> first = subject.page(FilterKind.TRACK, limited, SortingEnum.NAME, SortingOrder.ASCENDING,
-                List.of(f.library().getId()), null, LISTENER, PageRequest.of(0, 10));
+                scope(List.of(f.library().getId()), null), PageRequest.of(0, 10));
         assertEquals(2, first.getTotalElements(), "three tracks match, the limit caps at two");
         assertEquals(2, first.getContent().size());
     }
@@ -182,13 +190,13 @@ class FilterQueryServiceIntegrationTest {
 
         // Allowed set: only the first library.
         assertEquals(3, subject.page(FilterKind.TRACK, everything, SortingEnum.NAME, SortingOrder.ASCENDING,
-                List.of(visible.library().getId()), null, LISTENER, PageRequest.of(0, 10)).getTotalElements());
+                scope(List.of(visible.library().getId()), null), PageRequest.of(0, 10)).getTotalElements());
         // Admin (null allowed set) with an explicit scope on the other library.
         assertEquals(3, subject.page(FilterKind.TRACK, everything, SortingEnum.NAME, SortingOrder.ASCENDING,
-                null, other.library().getId(), LISTENER, PageRequest.of(0, 10)).getTotalElements());
+                scope(null, other.library().getId()), PageRequest.of(0, 10)).getTotalElements());
         // Empty allowed set sees nothing.
         assertEquals(0, subject.page(FilterKind.TRACK, everything, SortingEnum.NAME, SortingOrder.ASCENDING,
-                List.of(), null, LISTENER, PageRequest.of(0, 10)).getTotalElements());
+                scope(List.of(), null), PageRequest.of(0, 10)).getTotalElements());
     }
 
     @Test
@@ -213,20 +221,20 @@ class FilterQueryServiceIntegrationTest {
 
         assertEquals(List.of(seen.getId()),
                 ids(subject.page(FilterKind.MOVIE, all(cond(FilterField.WATCHED, FilterOperator.EQUALS, "true")),
-                        SortingEnum.NAME, SortingOrder.ASCENDING, libraries, null, LISTENER, page)));
+                        SortingEnum.NAME, SortingOrder.ASCENDING, scope(libraries, null), page)));
         assertEquals(List.of(unseen.getId()),
                 ids(subject.page(FilterKind.MOVIE, all(cond(FilterField.WATCHED, FilterOperator.EQUALS, "false")),
-                        SortingEnum.NAME, SortingOrder.ASCENDING, libraries, null, LISTENER, page)));
+                        SortingEnum.NAME, SortingOrder.ASCENDING, scope(libraries, null), page)));
         assertEquals(List.of(seen.getId()),
                 ids(subject.page(FilterKind.MOVIE, all(cond(FilterField.RELEASE_YEAR, FilterOperator.LESS_THAN, "2010")),
-                        SortingEnum.NAME, SortingOrder.ASCENDING, libraries, null, LISTENER, page)));
+                        SortingEnum.NAME, SortingOrder.ASCENDING, scope(libraries, null), page)));
         assertEquals(List.of(seen.getId()),
                 ids(subject.page(FilterKind.MOVIE,
                         all(cond(FilterField.DURATION, FilterOperator.GREATER_THAN, String.valueOf(60L * 60000))),
-                        SortingEnum.NAME, SortingOrder.ASCENDING, libraries, null, LISTENER, page)));
+                        SortingEnum.NAME, SortingOrder.ASCENDING, scope(libraries, null), page)));
         assertEquals(2, subject.page(FilterKind.MOVIE,
                         all(cond(FilterField.DATE_ADDED, FilterOperator.IN_LAST_DAYS, "1")),
-                        SortingEnum.NAME, SortingOrder.ASCENDING, libraries, null, LISTENER, page)
+                        SortingEnum.NAME, SortingOrder.ASCENDING, scope(libraries, null), page)
                 .getTotalElements());
     }
 
@@ -248,26 +256,26 @@ class FilterQueryServiceIntegrationTest {
         String seed = "filter-seed";
 
         List<UUID> paged = new ArrayList<>();
-        paged.addAll(subject.chunkIds(FilterKind.TRACK, everything, null, null, seed, null,
-                libraries, null, LISTENER, Instant.now(), 5, 0));
-        paged.addAll(subject.chunkIds(FilterKind.TRACK, everything, null, null, seed, null,
-                libraries, null, LISTENER, Instant.now(), 5, 5));
-        paged.addAll(subject.chunkIds(FilterKind.TRACK, everything, null, null, seed, null,
-                libraries, null, LISTENER, Instant.now(), 5, 10));
-        assertEquals(subject.chunkIds(FilterKind.TRACK, everything, null, null, seed, null,
-                libraries, null, LISTENER, Instant.now(), 12, 0), paged,
+        paged.addAll(subject.chunkIds(FilterKind.TRACK, everything, null, null,
+                scope(libraries, null), chunk(seed, Instant.now(), 5, 0)));
+        paged.addAll(subject.chunkIds(FilterKind.TRACK, everything, null, null,
+                scope(libraries, null), chunk(seed, Instant.now(), 5, 5)));
+        paged.addAll(subject.chunkIds(FilterKind.TRACK, everything, null, null,
+                scope(libraries, null), chunk(seed, Instant.now(), 5, 10)));
+        assertEquals(subject.chunkIds(FilterKind.TRACK, everything, null, null,
+                scope(libraries, null), chunk(seed, Instant.now(), 12, 0)), paged,
                 "chunked pages must continue the same permutation");
         assertEquals(new HashSet<>(trackIds), new HashSet<>(paged), "every track exactly once");
 
         // Ordered chunking follows the pinned sort; the limit truncates the source.
         MediaFilter limited = new MediaFilter(FilterMatch.ALL, List.of(), List.of(), 7);
         assertEquals(5, subject.chunkIds(FilterKind.TRACK, limited, SortingEnum.DATE_CREATED,
-                SortingOrder.ASCENDING, null, null, libraries, null, LISTENER, Instant.now(), 5, 0).size());
+                SortingOrder.ASCENDING, scope(libraries, null), chunk(null, Instant.now(), 5, 0)).size());
         assertEquals(2, subject.chunkIds(FilterKind.TRACK, limited, SortingEnum.DATE_CREATED,
-                        SortingOrder.ASCENDING, null, null, libraries, null, LISTENER, Instant.now(), 5, 5).size(),
+                        SortingOrder.ASCENDING, scope(libraries, null), chunk(null, Instant.now(), 5, 5)).size(),
                 "the second chunk is truncated at the limit, marking the source exhausted");
         assertTrue(subject.chunkIds(FilterKind.TRACK, limited, SortingEnum.DATE_CREATED,
-                        SortingOrder.ASCENDING, null, null, libraries, null, LISTENER, Instant.now(), 5, 7).isEmpty());
+                        SortingOrder.ASCENDING, scope(libraries, null), chunk(null, Instant.now(), 5, 7)).isEmpty());
 
         // The asOf freeze: plays after the freeze point don't change a play-derived filter.
         Instant asOf = Instant.now();
@@ -276,26 +284,30 @@ class FilterQueryServiceIntegrationTest {
                 .trackEntity(em.find(TrackEntity.class, trackIds.getFirst())).watched(true).build());
         MediaFilter neverPlayed = all(cond(FilterField.PLAY_COUNT, FilterOperator.EQUALS, "0"));
         assertEquals(12, subject.chunkIds(FilterKind.TRACK, neverPlayed, SortingEnum.NAME,
-                        SortingOrder.ASCENDING, null, null, libraries, null, LISTENER, asOf, 50, 0).size(),
+                        SortingOrder.ASCENDING, scope(libraries, null), chunk(null, asOf, 50, 0)).size(),
                 "the frozen evaluation does not see the later play");
         assertEquals(11, subject.chunkIds(FilterKind.TRACK, neverPlayed, SortingEnum.NAME,
-                        SortingOrder.ASCENDING, null, null, libraries, null, LISTENER, Instant.now(), 50, 0).size());
+                        SortingOrder.ASCENDING, scope(libraries, null), chunk(null, Instant.now(), 50, 0)).size());
     }
 
     @Test
     void validateRejectsMismatchedFieldsOperatorsAndValues() {
-        assertThrows(IllegalArgumentException.class, () -> subject.validate(FilterKind.MOVIE,
-                all(cond(FilterField.PLAY_COUNT, FilterOperator.EQUALS, "1"))), "play count is track-only");
-        assertThrows(IllegalArgumentException.class, () -> subject.validate(FilterKind.TRACK,
-                all(cond(FilterField.TITLE, FilterOperator.LESS_THAN, "abc"))), "string fields have no less-than");
-        assertThrows(IllegalArgumentException.class, () -> subject.validate(FilterKind.TRACK,
-                all(cond(FilterField.RATING, FilterOperator.EQUALS, "high"))), "rating needs a number");
-        assertThrows(IllegalArgumentException.class, () -> subject.validate(FilterKind.TRACK,
-                all(cond(FilterField.TITLE, FilterOperator.CONTAINS, " "))), "a blank value is no value");
-        assertThrows(IllegalArgumentException.class, () -> subject.validate(FilterKind.TRACK,
-                new MediaFilter(FilterMatch.ALL, List.of(), List.of(
-                        new MediaFilter(FilterMatch.ALL, List.of(), List.of(), 5)), null)),
-                "a limit below the top level is rejected");
+        MediaFilter playCountOnMovie = all(cond(FilterField.PLAY_COUNT, FilterOperator.EQUALS, "1"));
+        assertThrows(IllegalArgumentException.class,
+                () -> subject.validate(FilterKind.MOVIE, playCountOnMovie), "play count is track-only");
+        MediaFilter lessThanOnTitle = all(cond(FilterField.TITLE, FilterOperator.LESS_THAN, "abc"));
+        assertThrows(IllegalArgumentException.class,
+                () -> subject.validate(FilterKind.TRACK, lessThanOnTitle), "string fields have no less-than");
+        MediaFilter nonNumericRating = all(cond(FilterField.RATING, FilterOperator.EQUALS, "high"));
+        assertThrows(IllegalArgumentException.class,
+                () -> subject.validate(FilterKind.TRACK, nonNumericRating), "rating needs a number");
+        MediaFilter blankValue = all(cond(FilterField.TITLE, FilterOperator.CONTAINS, " "));
+        assertThrows(IllegalArgumentException.class,
+                () -> subject.validate(FilterKind.TRACK, blankValue), "a blank value is no value");
+        MediaFilter nestedLimit = new MediaFilter(FilterMatch.ALL, List.of(), List.of(
+                new MediaFilter(FilterMatch.ALL, List.of(), List.of(), 5)), null);
+        assertThrows(IllegalArgumentException.class,
+                () -> subject.validate(FilterKind.TRACK, nestedLimit), "a limit below the top level is rejected");
         // A valid definition passes.
         subject.validate(FilterKind.TRACK, all(cond(FilterField.LAST_PLAYED_AT, FilterOperator.BEFORE, "2024-01-01")));
     }

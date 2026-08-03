@@ -1,11 +1,5 @@
 package app.ister.core.service;
 
-import app.ister.core.entity.AlbumEntity;
-import app.ister.core.entity.EpisodeEntity;
-import app.ister.core.entity.MovieEntity;
-import app.ister.core.entity.PersonEntity;
-import app.ister.core.entity.ShowEntity;
-import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.filter.FilterCondition;
@@ -56,6 +50,13 @@ public class FilterQueryService {
     private static final int MAX_DEPTH = 4;
     private static final int MAX_LIMIT = 10000;
 
+    // Recurring SQL fragments, named once.
+    private static final String AND = " AND ";
+    private static final String LOWER_FN = "LOWER(";
+    private static final String IS_NOT_NULL = " IS NOT NULL";
+    private static final String IS_NULL = " IS NULL";
+    private static final String EXISTS_OPEN = "EXISTS (";
+
     private static final Map<FilterKind, Set<FilterField>> SUPPORTED_FIELDS = new EnumMap<>(Map.of(
             FilterKind.ARTIST, EnumSet.of(FilterField.TITLE, FilterField.BIRTH_YEAR, FilterField.GENRE,
                     FilterField.DATE_ADDED),
@@ -94,23 +95,41 @@ public class FilterQueryService {
     }
 
     /**
-     * One page of entities matching the filter, ordered by the given sort. The filter's own
-     * top-level limit caps the total: with limit 25 the grid ends after 25 items even when more
-     * match.
+     * Who is asking and where they may look, shared by {@link #page} and {@link #chunkIds}.
      *
      * @param libraryIds the caller's allowed libraries (null = all, empty = none)
      * @param libraryId  optional single-library scope on top of the allowed set
+     * @param externalId the calling user, for the per-user fields (rating, play count, watched)
+     */
+    public record FilterScope(Collection<UUID> libraryIds, UUID libraryId, String externalId) {
+    }
+
+    /**
+     * The window a {@link #chunkIds} call materializes: seeded shuffle (or the pinned sort when
+     * the seed is null), an optional excluded id, and the freeze point.
+     *
+     * @param asOf freeze point for the play-derived fields (play count, last played, "in last
+     *             N days"), normally the queue's creation instant
+     */
+    public record ChunkPage(String shuffleSeed, UUID excludeId, Instant asOf, int limit, int offset) {
+    }
+
+    /**
+     * One page of entities matching the filter, ordered by the given sort. The filter's own
+     * top-level limit caps the total: with limit 25 the grid ends after 25 items even when more
+     * match.
      */
     @Transactional(readOnly = true)
-    @SuppressWarnings("unchecked")
+    // S2077: every value is a bind parameter; the SQL identifiers come from closed enums (class javadoc).
+    @SuppressWarnings({"unchecked", "java:S2077"})
     public <T> Page<T> page(FilterKind kind, MediaFilter filter, SortingEnum sorting, SortingOrder sortingOrder,
-                            Collection<UUID> libraryIds, UUID libraryId, String externalId, Pageable pageable) {
+                            FilterScope scope, Pageable pageable) {
         checkLimit(filter.limit());
-        if (libraryIds != null && libraryIds.isEmpty()) {
+        if (scope.libraryIds() != null && scope.libraryIds().isEmpty()) {
             return Page.empty(pageable);
         }
         Params params = new Params();
-        String fromWhere = buildFromWhere(kind, filter, libraryIds, libraryId, externalId, null, params);
+        String fromWhere = buildFromWhere(kind, filter, scope, null, params);
 
         long total = ((Number) withParams(entityManager.createNativeQuery("SELECT COUNT(*)" + fromWhere), params)
                 .getSingleResult()).longValue();
@@ -135,39 +154,36 @@ public class FilterQueryService {
      * stable seeded permutation (as the other queue sources use); otherwise the pinned sort.
      * The filter's top-level limit bounds the source: past it the chunk comes back short/empty,
      * which is what marks the queue exhausted.
-     *
-     * @param asOf freeze point for the play-derived fields (play count, last played, "in last
-     *             N days"), normally the queue's creation instant
      */
     @Transactional(readOnly = true)
-    @SuppressWarnings("unchecked")
+    // S2077: every value is a bind parameter; the SQL identifiers come from closed enums (class javadoc).
+    @SuppressWarnings({"unchecked", "java:S2077"})
     public List<UUID> chunkIds(FilterKind kind, MediaFilter filter, SortingEnum sorting, SortingOrder sortingOrder,
-                               String shuffleSeed, UUID excludeId, Collection<UUID> libraryIds, UUID libraryId,
-                               String externalId, Instant asOf, int limit, int offset) {
-        if (libraryIds != null && libraryIds.isEmpty()) {
+                               FilterScope scope, ChunkPage chunk) {
+        if (scope.libraryIds() != null && scope.libraryIds().isEmpty()) {
             return List.of();
         }
-        int effectiveLimit = limit;
+        int effectiveLimit = chunk.limit();
         if (filter.limit() != null) {
-            effectiveLimit = (int) Math.min(limit, (long) filter.limit() - offset);
+            effectiveLimit = (int) Math.min(chunk.limit(), (long) filter.limit() - chunk.offset());
             if (effectiveLimit <= 0) {
                 return List.of();
             }
         }
         Params params = new Params();
-        String fromWhere = buildFromWhere(kind, filter, libraryIds, libraryId, externalId, asOf, params);
+        String fromWhere = buildFromWhere(kind, filter, scope, chunk.asOf(), params);
         StringBuilder sql = new StringBuilder("SELECT x.id").append(fromWhere);
-        if (excludeId != null) {
+        if (chunk.excludeId() != null) {
             sql.append(" AND x.id <> :excludeId");
-            params.values.put("excludeId", excludeId);
+            params.values.put("excludeId", chunk.excludeId());
         }
-        if (shuffleSeed != null) {
+        if (chunk.shuffleSeed() != null) {
             sql.append(" ORDER BY md5(x.id::text || :shuffleSeed), x.id");
-            params.values.put("shuffleSeed", shuffleSeed);
+            params.values.put("shuffleSeed", chunk.shuffleSeed());
         } else {
             sql.append(" ORDER BY ").append(orderExpression(kind, sorting, sortingOrder));
         }
-        sql.append(" LIMIT ").append(effectiveLimit).append(" OFFSET ").append(offset);
+        sql.append(" LIMIT ").append(effectiveLimit).append(" OFFSET ").append(chunk.offset());
         return ((List<Object>) withParams(entityManager.createNativeQuery(sql.toString()), params).getResultList())
                 .stream().map(UUID.class::cast).toList();
     }
@@ -191,23 +207,23 @@ public class FilterQueryService {
     private record Context(String externalId, Instant asOf, Instant reference) {
     }
 
-    private String buildFromWhere(FilterKind kind, MediaFilter filter, Collection<UUID> libraryIds, UUID libraryId,
-                                  String externalId, Instant asOf, Params params) {
-        Context ctx = new Context(externalId, asOf, asOf != null ? asOf : Instant.now());
+    private String buildFromWhere(FilterKind kind, MediaFilter filter, FilterScope scope, Instant asOf,
+                                  Params params) {
+        Context ctx = new Context(scope.externalId(), asOf, asOf != null ? asOf : Instant.now());
         StringBuilder sql = new StringBuilder(" FROM ").append(fromClause(kind)).append(" WHERE ");
-        if (libraryIds != null) {
+        if (scope.libraryIds() != null) {
             sql.append(libraryColumn(kind)).append(" IN (:libraryIds)");
-            params.values.put("libraryIds", libraryIds);
+            params.values.put("libraryIds", scope.libraryIds());
         } else {
             sql.append("TRUE");
         }
-        if (libraryId != null) {
-            sql.append(" AND ").append(libraryColumn(kind)).append(" = :scopeLibraryId");
-            params.values.put("scopeLibraryId", libraryId);
+        if (scope.libraryId() != null) {
+            sql.append(AND).append(libraryColumn(kind)).append(" = :scopeLibraryId");
+            params.values.put("scopeLibraryId", scope.libraryId());
         }
-        sql.append(" AND ").append(renderGroup(kind, filter, true, params, ctx, 1, new int[]{0}));
+        sql.append(AND).append(renderGroup(kind, filter, true, params, ctx, 1, new int[]{0}));
         if (params.needsUser) {
-            params.values.put("externalId", externalId);
+            params.values.put("externalId", scope.externalId());
         }
         return sql.toString();
     }
@@ -236,7 +252,7 @@ public class FilterQueryService {
         if (parts.isEmpty()) {
             return "TRUE";
         }
-        return "(" + String.join(group.match() == FilterMatch.ALL ? " AND " : " OR ", parts) + ")";
+        return "(" + String.join(group.match() == FilterMatch.ALL ? AND : " OR ", parts) + ")";
     }
 
     private String renderCondition(FilterKind kind, FilterCondition c, Params params, Context ctx) {
@@ -344,12 +360,12 @@ public class FilterQueryService {
 
     private String stringPredicate(String column, FilterCondition c, Params params) {
         return switch (c.operator()) {
-            case EQUALS -> "LOWER(" + column + ") = LOWER(:" + params.add(c.value()) + ")";
-            case NOT_EQUALS -> "LOWER(" + column + ") <> LOWER(:" + params.add(c.value()) + ")";
+            case EQUALS -> LOWER_FN + column + ") = LOWER(:" + params.add(c.value()) + ")";
+            case NOT_EQUALS -> LOWER_FN + column + ") <> LOWER(:" + params.add(c.value()) + ")";
             case CONTAINS -> column + " ILIKE :" + params.add(likePattern(c.value()));
             case NOT_CONTAINS -> column + " NOT ILIKE :" + params.add(likePattern(c.value()));
-            case IS_SET -> column + " IS NOT NULL";
-            case IS_NOT_SET -> column + " IS NULL";
+            case IS_SET -> column + IS_NOT_NULL;
+            case IS_NOT_SET -> column + IS_NULL;
             default -> throw new IllegalArgumentException("Operator " + c.operator() + " does not apply here");
         };
     }
@@ -361,9 +377,9 @@ public class FilterQueryService {
      */
     private String metadataStringPredicate(String joinCondition, String column, FilterCondition c, Params params) {
         String inner = switch (c.operator()) {
-            case EQUALS, NOT_EQUALS -> "LOWER(" + column + ") = LOWER(:" + params.add(c.value()) + ")";
+            case EQUALS, NOT_EQUALS -> LOWER_FN + column + ") = LOWER(:" + params.add(c.value()) + ")";
             case CONTAINS, NOT_CONTAINS -> column + " ILIKE :" + params.add(likePattern(c.value()));
-            case IS_SET, IS_NOT_SET -> column + " IS NOT NULL";
+            case IS_SET, IS_NOT_SET -> column + IS_NOT_NULL;
             default -> throw new IllegalArgumentException("Operator " + c.operator() + " does not apply here");
         };
         boolean negated = c.operator() == FilterOperator.NOT_EQUALS
@@ -391,8 +407,8 @@ public class FilterQueryService {
             case NOT_EQUALS -> column + " <> :" + params.add(parseNumber(c));
             case LESS_THAN -> column + " < :" + params.add(parseNumber(c));
             case GREATER_THAN -> column + " > :" + params.add(parseNumber(c));
-            case IS_SET -> column + " IS NOT NULL";
-            case IS_NOT_SET -> column + " IS NULL";
+            case IS_SET -> column + IS_NOT_NULL;
+            case IS_NOT_SET -> column + IS_NULL;
             default -> throw new IllegalArgumentException("Operator " + c.operator() + " does not apply here");
         };
     }
@@ -402,11 +418,11 @@ public class FilterQueryService {
         String base = "SELECT 1 FROM rating_entity r JOIN user_entity u ON u.id = r.user_entity_id"
                 + " AND u.external_id = :externalId WHERE " + fkColumn + " = x.id";
         return switch (c.operator()) {
-            case EQUALS -> "EXISTS (" + base + " AND r.value = :" + params.add(parseNumber(c)) + ")";
-            case NOT_EQUALS -> "EXISTS (" + base + " AND r.value <> :" + params.add(parseNumber(c)) + ")";
-            case LESS_THAN -> "EXISTS (" + base + " AND r.value < :" + params.add(parseNumber(c)) + ")";
-            case GREATER_THAN -> "EXISTS (" + base + " AND r.value > :" + params.add(parseNumber(c)) + ")";
-            case IS_SET -> "EXISTS (" + base + ")";
+            case EQUALS -> EXISTS_OPEN + base + " AND r.value = :" + params.add(parseNumber(c)) + ")";
+            case NOT_EQUALS -> EXISTS_OPEN + base + " AND r.value <> :" + params.add(parseNumber(c)) + ")";
+            case LESS_THAN -> EXISTS_OPEN + base + " AND r.value < :" + params.add(parseNumber(c)) + ")";
+            case GREATER_THAN -> EXISTS_OPEN + base + " AND r.value > :" + params.add(parseNumber(c)) + ")";
+            case IS_SET -> EXISTS_OPEN + base + ")";
             case IS_NOT_SET -> "NOT EXISTS (" + base + ")";
             default -> throw new IllegalArgumentException("Operator " + c.operator() + " does not apply here");
         };
@@ -454,11 +470,11 @@ public class FilterQueryService {
     private String durationPredicate(String fkColumn, FilterCondition c, Params params) {
         String base = "SELECT 1 FROM media_file_entity mf WHERE " + fkColumn + " = x.id";
         return switch (c.operator()) {
-            case EQUALS -> "EXISTS (" + base + " AND mf.duration_in_milliseconds = :" + params.add(parseNumber(c)) + ")";
-            case NOT_EQUALS -> "EXISTS (" + base + " AND mf.duration_in_milliseconds <> :" + params.add(parseNumber(c)) + ")";
-            case LESS_THAN -> "EXISTS (" + base + " AND mf.duration_in_milliseconds < :" + params.add(parseNumber(c)) + ")";
-            case GREATER_THAN -> "EXISTS (" + base + " AND mf.duration_in_milliseconds > :" + params.add(parseNumber(c)) + ")";
-            case IS_SET -> "EXISTS (" + base + " AND mf.duration_in_milliseconds IS NOT NULL)";
+            case EQUALS -> EXISTS_OPEN + base + " AND mf.duration_in_milliseconds = :" + params.add(parseNumber(c)) + ")";
+            case NOT_EQUALS -> EXISTS_OPEN + base + " AND mf.duration_in_milliseconds <> :" + params.add(parseNumber(c)) + ")";
+            case LESS_THAN -> EXISTS_OPEN + base + " AND mf.duration_in_milliseconds < :" + params.add(parseNumber(c)) + ")";
+            case GREATER_THAN -> EXISTS_OPEN + base + " AND mf.duration_in_milliseconds > :" + params.add(parseNumber(c)) + ")";
+            case IS_SET -> EXISTS_OPEN + base + " AND mf.duration_in_milliseconds IS NOT NULL)";
             case IS_NOT_SET -> "NOT EXISTS (" + base + " AND mf.duration_in_milliseconds IS NOT NULL)";
             default -> throw new IllegalArgumentException("Operator " + c.operator() + " does not apply here");
         };
@@ -481,8 +497,8 @@ public class FilterQueryService {
             case BEFORE -> column + " < :" + params.add(parseInstant(c));
             case AFTER -> column + " > :" + params.add(parseInstant(c));
             case IN_LAST_DAYS -> column + " >= :" + params.add(daysCutoff(c, ctx));
-            case IS_SET -> column + " IS NOT NULL";
-            case IS_NOT_SET -> column + " IS NULL";
+            case IS_SET -> column + IS_NOT_NULL;
+            case IS_NOT_SET -> column + IS_NULL;
             default -> throw new IllegalArgumentException("Operator " + c.operator() + " does not apply here");
         };
     }
@@ -499,7 +515,7 @@ public class FilterQueryService {
     private long parseNumber(FilterCondition c) {
         try {
             return Long.parseLong(c.value().trim());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             throw new IllegalArgumentException("Value for " + c.field() + " is not a number: " + c.value());
         }
     }
@@ -520,10 +536,10 @@ public class FilterQueryService {
         String value = c.value().trim();
         try {
             return Instant.parse(value);
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeParseException _) {
             try {
                 return LocalDate.parse(value).atStartOfDay(ZoneOffset.UTC).toInstant();
-            } catch (DateTimeParseException e2) {
+            } catch (DateTimeParseException _) {
                 throw new IllegalArgumentException("Value for " + c.field() + " is not a date: " + c.value());
             }
         }
@@ -571,16 +587,17 @@ public class FilterQueryService {
         if (ids.isEmpty()) {
             return List.of();
         }
-        Class<?> entityClass = switch (kind) {
-            case TRACK -> TrackEntity.class;
-            case ALBUM -> AlbumEntity.class;
-            case ARTIST -> PersonEntity.class;
-            case MOVIE -> MovieEntity.class;
-            case SHOW -> ShowEntity.class;
-            case EPISODE -> EpisodeEntity.class;
+        // Constant JPQL per kind, so createQuery never sees a concatenated string (S2077).
+        String jpql = switch (kind) {
+            case TRACK -> "SELECT e FROM TrackEntity e WHERE e.id IN :ids";
+            case ALBUM -> "SELECT e FROM AlbumEntity e WHERE e.id IN :ids";
+            case ARTIST -> "SELECT e FROM PersonEntity e WHERE e.id IN :ids";
+            case MOVIE -> "SELECT e FROM MovieEntity e WHERE e.id IN :ids";
+            case SHOW -> "SELECT e FROM ShowEntity e WHERE e.id IN :ids";
+            case EPISODE -> "SELECT e FROM EpisodeEntity e WHERE e.id IN :ids";
         };
         Map<UUID, Object> byId = entityManager
-                .createQuery("SELECT e FROM " + entityClass.getSimpleName() + " e WHERE e.id IN :ids", Object.class)
+                .createQuery(jpql, Object.class)
                 .setParameter("ids", ids)
                 .getResultList().stream()
                 .collect(Collectors.toMap(e -> ((app.ister.core.entity.BaseEntity) e).getId(), Function.identity()));

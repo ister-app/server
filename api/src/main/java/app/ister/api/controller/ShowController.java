@@ -9,7 +9,6 @@ import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.ShowRepository;
-import app.ister.core.service.FilterQueryService;
 import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,7 +38,7 @@ public class ShowController {
     private final ImageRepository imageRepository;
     private final LibraryRepository libraryRepository;
     private final LibraryAccessService libraryAccessService;
-    private final FilterQueryService filterQueryService;
+    private final FilteredBrowse filteredBrowse;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -60,7 +59,7 @@ public class ShowController {
             Authentication authentication) {
         Pageable pageable = Paging.pageable(page, size, 10,
                 sorting, SortingEnum.NAME, sortingOrder, SortingOrder.ASCENDING);
-        Optional<Page<ShowEntity>> filtered = FilteredBrowse.page(filterQueryService, libraryAccessService,
+        Optional<Page<ShowEntity>> filtered = filteredBrowse.page(
                 FilterKind.SHOW, filter, sorting.orElse(SortingEnum.NAME),
                 sortingOrder.orElse(SortingOrder.ASCENDING), libraryId, pageable, authentication);
         if (filtered.isPresent()) {

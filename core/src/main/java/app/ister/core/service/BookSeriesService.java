@@ -142,7 +142,7 @@ public class BookSeriesService {
         }
         String remainder = name.substring(seriesName.length());
         int[] separator = findSeparator(remainder);
-        if (separator == null || separator[0] != 0) {
+        if (separator.length == 0 || separator[0] != 0) {
             return null;
         }
         String title = remainder.substring(separator[1]).strip();
@@ -152,18 +152,21 @@ public class BookSeriesService {
     /** The part of the name before the first separator, or null when there is none. */
     private String prefixOf(String name) {
         int[] separator = findSeparator(name);
-        if (separator == null || separator[0] == 0) {
+        if (separator.length == 0 || separator[0] == 0) {
             return null;
         }
         return name.substring(0, separator[0]).strip();
     }
+
+    private static final int[] NO_SEPARATOR = new int[0];
 
     /**
      * First series/title separator: a spaced dash (" - ", " – ", " — ") or a colon (whitespace
      * allowed before, required after). Hand-rolled rather than a regex: the "start of a whitespace
      * run" restriction needs a lookbehind, which Sonar's backtracking analysis cannot see through.
      *
-     * @return {@code {start, end}} of the separator including its surrounding whitespace, or null
+     * @return {@code {start, end}} of the separator including its surrounding whitespace, or an
+     *         empty array when there is none
      */
     private static int[] findSeparator(String value) {
         int length = value.length();
@@ -171,26 +174,40 @@ public class BookSeriesService {
             if (i > 0 && Character.isWhitespace(value.charAt(i - 1))) {
                 continue; // a separator match starts at the beginning of a whitespace run
             }
-            int mark = i;
-            while (mark < length && Character.isWhitespace(value.charAt(mark))) {
-                mark++;
-            }
+            int mark = skipWhitespace(value, i);
             if (mark == length) {
-                return null; // trailing whitespace, nothing can follow
+                return NO_SEPARATOR; // trailing whitespace, nothing can follow
             }
-            char c = value.charAt(mark);
-            boolean spacedDash = mark > i && (c == '-' || c == '–' || c == '—');
-            if (spacedDash || c == ':') {
-                int end = mark + 1;
-                while (end < length && Character.isWhitespace(value.charAt(end))) {
-                    end++;
-                }
-                if (end > mark + 1) {
-                    return new int[]{i, end};
-                }
+            int end = separatorEnd(value, i, mark);
+            if (end >= 0) {
+                return new int[]{i, end};
             }
         }
-        return null;
+        return NO_SEPARATOR;
+    }
+
+    /** Index of the first non-whitespace character at or after {@code from}. */
+    private static int skipWhitespace(String value, int from) {
+        int mark = from;
+        while (mark < value.length() && Character.isWhitespace(value.charAt(mark))) {
+            mark++;
+        }
+        return mark;
+    }
+
+    /**
+     * End of a separator whose whitespace run starts at {@code start} and whose separator
+     * character sits at {@code mark} (a dash needs whitespace before it, a colon does not; both
+     * need whitespace after), or -1 when there is no separator here.
+     */
+    private static int separatorEnd(String value, int start, int mark) {
+        char c = value.charAt(mark);
+        boolean spacedDash = mark > start && (c == '-' || c == '–' || c == '—');
+        if (!spacedDash && c != ':') {
+            return -1;
+        }
+        int end = skipWhitespace(value, mark + 1);
+        return end > mark + 1 ? end : -1;
     }
 
     private String normalize(String prefix) {

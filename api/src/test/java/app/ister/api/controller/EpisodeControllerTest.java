@@ -43,6 +43,9 @@ class EpisodeControllerTest {
     private EpisodeController subject;
 
     @Mock
+    private FilteredBrowse filteredBrowse;
+
+    @Mock
     private EpisodeRepository episodeRepository;
 
     @Mock

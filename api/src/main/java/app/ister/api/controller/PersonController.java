@@ -17,7 +17,6 @@ import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.TrackRepository;
-import app.ister.core.service.FilterQueryService;
 import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,7 +51,7 @@ public class PersonController {
     private final BookRepository bookRepository;
     private final TrackRepository trackRepository;
     private final LibraryAccessService libraryAccessService;
-    private final FilterQueryService filterQueryService;
+    private final FilteredBrowse filteredBrowse;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -88,7 +87,7 @@ public class PersonController {
             @Argument Optional<MediaFilter> filter, Authentication authentication) {
         Pageable pageable = Paging.pageable(page, size, 10,
                 sorting, SortingEnum.NAME, sortingOrder, SortingOrder.ASCENDING);
-        Optional<Page<PersonEntity>> filtered = FilteredBrowse.page(filterQueryService, libraryAccessService,
+        Optional<Page<PersonEntity>> filtered = filteredBrowse.page(
                 FilterKind.ARTIST, filter, sorting.orElse(SortingEnum.NAME),
                 sortingOrder.orElse(SortingOrder.ASCENDING), libraryId, pageable, authentication);
         if (filtered.isPresent()) {

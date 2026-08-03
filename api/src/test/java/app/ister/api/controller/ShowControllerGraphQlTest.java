@@ -66,7 +66,7 @@ class ShowControllerGraphQlTest {
     private LibraryAccessService libraryAccessService;
 
     @MockitoBean
-    private app.ister.core.service.FilterQueryService filterQueryService;
+    private FilteredBrowse filteredBrowse;
 
     @Test
     void showsQueryResolvesPageAndBatchedEpisodes() {

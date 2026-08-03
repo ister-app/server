@@ -14,7 +14,6 @@ import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.repository.WatchStatusRepository;
-import app.ister.core.service.FilterQueryService;
 import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,7 +45,7 @@ public class TrackController {
     private final WatchStatusRepository watchStatusRepository;
     private final LibraryAccessService libraryAccessService;
     private final LibraryRepository libraryRepository;
-    private final FilterQueryService filterQueryService;
+    private final FilteredBrowse filteredBrowse;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -68,7 +67,7 @@ public class TrackController {
         Pageable pageable = Paging.unsorted(page, size, 20);
         SortingEnum sort = sorting.orElse(SortingEnum.NAME);
         SortingOrder order = sortingOrder.orElse(SortingOrder.ASCENDING);
-        Optional<Page<TrackEntity>> filtered = FilteredBrowse.page(filterQueryService, libraryAccessService,
+        Optional<Page<TrackEntity>> filtered = filteredBrowse.page(
                 FilterKind.TRACK, filter, sort, order, libraryId, pageable, authentication);
         if (filtered.isPresent()) {
             return filtered.get();

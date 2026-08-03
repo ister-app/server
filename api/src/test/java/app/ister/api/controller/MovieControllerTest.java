@@ -40,6 +40,9 @@ class MovieControllerTest {
     private MovieController subject;
 
     @Mock
+    private FilteredBrowse filteredBrowse;
+
+    @Mock
     private MovieRepository movieRepository;
 
     @Mock

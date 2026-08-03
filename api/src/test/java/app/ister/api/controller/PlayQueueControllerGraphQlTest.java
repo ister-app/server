@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -123,6 +124,31 @@ class PlayQueueControllerGraphQlTest {
                 .path("getPlayQueue.progressInMilliseconds").entity(Integer.class).isEqualTo(42_000));
     }
 
+    /**
+     * The updatePlayQueue arguments are bound as one object off the argument map
+     * (@Arguments record); this executes the real mutation so that binding — including
+     * the absent optional arguments — is actually exercised.
+     */
+    @Test
+    void updatePlayQueueBindsArgumentsOffTheArgumentMap() {
+        UUID id = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        PlayQueueEntity queue = PlayQueueEntity.builder()
+                .userEntity(app.ister.core.entity.UserEntity.builder()
+                        .externalId("test-user").name("Test user").build())
+                .progressInMilliseconds(5_000)
+                .build();
+        queue.setId(id);
+        when(playQueueService.updatePlayQueue(eq(id), eq(5_000L), eq(itemId), any(), any(), any()))
+                .thenReturn(Optional.of(queue));
+
+        assertDoesNotThrow(() -> graphQlTester.document("""
+                        mutation { updatePlayQueue(id: "%s", progressInMilliseconds: 5000, playQueueItemId: "%s") { id } }
+                        """.formatted(id, itemId))
+                .execute()
+                .path("updatePlayQueue.id").entity(String.class).isEqualTo(id.toString()));
+    }
+
     @Test
     void playQueueItemsExposeThePerViewerAccessibleFlag() {
         app.ister.core.entity.PlayQueueItemEntity item = app.ister.core.entity.PlayQueueItemEntity.builder()
@@ -141,10 +167,11 @@ class PlayQueueControllerGraphQlTest {
         when(mediaLibraryResolver.ofPlayQueueItem(item)).thenReturn(Optional.of(
                 app.ister.core.entity.LibraryEntity.builder().id(UUID.randomUUID()).build()));
 
-        graphQlTester.document("""
+        Boolean accessible = graphQlTester.document("""
                         { getPlayQueue(id: "%s") { playQueueItems { id accessible } } }
                         """.formatted(queue.getId()))
                 .execute()
-                .path("getPlayQueue.playQueueItems[0].accessible").entity(Boolean.class).isEqualTo(false);
+                .path("getPlayQueue.playQueueItems[0].accessible").entity(Boolean.class).get();
+        assertFalse(accessible, "an item outside the caller's allowed libraries is not accessible");
     }
 }

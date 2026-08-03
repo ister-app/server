@@ -15,6 +15,7 @@ import app.ister.core.status.PlaybackSessionRegistry;
 import app.ister.core.status.QueueStatsRegistry;
 import app.ister.core.status.RecentFailuresBuffer;
 import app.ister.core.status.ServerStatusBroadcaster;
+import lombok.RequiredArgsConstructor;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SubscriptionMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -36,6 +37,7 @@ import java.util.UUID;
  * initial state to render before the first update.
  */
 @Controller
+@RequiredArgsConstructor
 public class ServerStatusController {
 
     private final ServerStatusBroadcaster broadcaster;
@@ -46,20 +48,6 @@ public class ServerStatusController {
     private final FollowerRegistry followerRegistry;
     private final PlaybackSharingService playbackSharingService;
     private final UserService userService;
-
-    public ServerStatusController(ServerStatusBroadcaster broadcaster, NodeActivityRegistry nodeActivityRegistry,
-                                  QueueStatsRegistry queueStatsRegistry, RecentFailuresBuffer recentFailuresBuffer,
-                                  PlaybackSessionRegistry playbackSessionRegistry, FollowerRegistry followerRegistry,
-                                  PlaybackSharingService playbackSharingService, UserService userService) {
-        this.broadcaster = broadcaster;
-        this.nodeActivityRegistry = nodeActivityRegistry;
-        this.queueStatsRegistry = queueStatsRegistry;
-        this.recentFailuresBuffer = recentFailuresBuffer;
-        this.playbackSessionRegistry = playbackSessionRegistry;
-        this.followerRegistry = followerRegistry;
-        this.playbackSharingService = playbackSharingService;
-        this.userService = userService;
-    }
 
     @PreAuthorize("hasRole('user')")
     @SubscriptionMapping

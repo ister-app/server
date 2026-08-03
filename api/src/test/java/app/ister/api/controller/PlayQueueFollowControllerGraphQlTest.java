@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -78,10 +79,11 @@ class PlayQueueFollowControllerGraphQlTest {
         UUID queueId = UUID.randomUUID();
         when(playbackSessionRegistry.find(queueId)).thenReturn(Optional.empty());
 
-        graphQlTester.document("""
+        String result = graphQlTester.document("""
                         mutation { followPlayQueue(playQueueId: "%s", deviceId: "device-a", active: true) }
                         """.formatted(queueId))
                 .execute()
-                .path("followPlayQueue").entity(String.class).isEqualTo("NOT_FOUND");
+                .path("followPlayQueue").entity(String.class).get();
+        assertEquals("NOT_FOUND", result);
     }
 }

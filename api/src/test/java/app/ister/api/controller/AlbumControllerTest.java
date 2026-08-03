@@ -38,6 +38,9 @@ class AlbumControllerTest {
     private AlbumController subject;
 
     @Mock
+    private FilteredBrowse filteredBrowse;
+
+    @Mock
     private AlbumRepository albumRepository;
 
     @Mock
@@ -90,9 +93,9 @@ class AlbumControllerTest {
         when(albumRepository.findByPersonEntity(eq(artist), any(Pageable.class))).thenReturn(page);
         when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
 
-        Page<AlbumEntity> result = subject.albums(
+        Page<AlbumEntity> result = subject.albums(new AlbumController.AlbumsArguments(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.of(personId), Optional.empty(), Optional.empty(), authentication);
+                Optional.of(personId), Optional.empty(), Optional.empty()), authentication);
 
         assertEquals(1, result.getContent().size());
         assertEquals("Abbey Road", result.getContent().get(0).getName());
@@ -103,9 +106,9 @@ class AlbumControllerTest {
         UUID personId = UUID.randomUUID();
         when(personRepository.findById(personId)).thenReturn(Optional.empty());
 
-        Page<AlbumEntity> result = subject.albums(
+        Page<AlbumEntity> result = subject.albums(new AlbumController.AlbumsArguments(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.of(personId), Optional.empty(), Optional.empty(), authentication);
+                Optional.of(personId), Optional.empty(), Optional.empty()), authentication);
 
         assertTrue(result.isEmpty());
     }
@@ -118,9 +121,9 @@ class AlbumControllerTest {
         when(albumRepository.findByLibraryEntityId(eq(libraryId), any(Pageable.class))).thenReturn(page);
         when(libraryAccessService.canAccess(any(UUID.class), any())).thenReturn(true);
 
-        Page<AlbumEntity> result = subject.albums(
+        Page<AlbumEntity> result = subject.albums(new AlbumController.AlbumsArguments(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.of(libraryId), Optional.empty(), authentication);
+                Optional.empty(), Optional.of(libraryId), Optional.empty()), authentication);
 
         assertEquals(1, result.getContent().size());
     }
@@ -176,9 +179,9 @@ class AlbumControllerTest {
         when(albumRepository.findAll(any(Pageable.class))).thenReturn(page);
         when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
 
-        Page<AlbumEntity> result = subject.albums(
+        Page<AlbumEntity> result = subject.albums(new AlbumController.AlbumsArguments(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), authentication);
+                Optional.empty(), Optional.empty(), Optional.empty()), authentication);
 
         assertEquals(1, result.getContent().size());
     }
@@ -190,9 +193,9 @@ class AlbumControllerTest {
         when(albumRepository.findAll(any(Pageable.class))).thenReturn(page);
         when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
 
-        Page<AlbumEntity> result = subject.albums(
+        Page<AlbumEntity> result = subject.albums(new AlbumController.AlbumsArguments(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(SortingOrder.DESCENDING),
-                Optional.empty(), Optional.empty(), Optional.empty(), authentication);
+                Optional.empty(), Optional.empty(), Optional.empty()), authentication);
 
         assertEquals(1, result.getContent().size());
     }
