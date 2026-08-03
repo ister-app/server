@@ -1,5 +1,27 @@
 # Changelog
 
+## server v2.7.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.7.0` |
+| `ghcr.io/ister-app/migrations` | `2.7.0` |
+
+### Features
+
+- feat(api): listen-along follow mode for play-queue sessions ([`450c038`](https://github.com/ister-app/server/commit/450c038))
+- feat(api): play-order input and tests for FILTER play queues ([`7914fcc`](https://github.com/ister-app/server/commit/7914fcc))
+- feat(api): custom media filters, saved views and FILTER play queues ([`b159a74`](https://github.com/ister-app/server/commit/b159a74))
+- feat(api): add library-wide paged tracks and episodes queries ([`7916870`](https://github.com/ister-app/server/commit/7916870))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.7.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.6.0...v2.7.0
+
 ## server v2.6.0
 
 | Image | Tag |
