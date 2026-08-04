@@ -667,8 +667,10 @@ input CreatePlayQueueInput {
     """
     sourceId: ID
     """
-    Episode or track to start at; ignored for MOVIE sources, unsupported for FILTER sources and
-    SMART playlists. For a BOOK library's playlist a book id starts at that book's first chapter.
+    Episode or track to start at; ignored for MOVIE sources. Filter-backed sources (FILTER and
+    SMART playlists) accept it as well, but not together with shuffle: the item must match the
+    filter, and only its own position in the result is resolved — the items before it are never
+    materialized. For a BOOK library's playlist a book id starts at that book's first chapter.
     """
     startId: ID
     "Play the source in a stable random order; defaults to false, required for LIBRARY sources, rejected for ARTIST sources."

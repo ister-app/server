@@ -291,6 +291,56 @@ class FilterQueryServiceIntegrationTest {
     }
 
     @Test
+    void indexOfRanksAnItemInTheFilterOrderWithoutReturningTheOnesBeforeIt() {
+        em.persist(UserEntity.builder().externalId(LISTENER).build());
+        LibraryEntity library = em.persist(LibraryEntity.builder()
+                .libraryType(LibraryType.MUSIC).name("Music-index").build());
+        PersonEntity artist = em.persist(PersonEntity.builder().name("Index Artist").build());
+        AlbumEntity album = em.persist(AlbumEntity.builder()
+                .libraryEntity(library).personEntity(artist).name("Indexes").releaseYear(2010).build());
+        // Titles sort as "Track 00" … "Track 19", so position N is track N.
+        List<UUID> trackIds = IntStream.range(0, 20)
+                .mapToObj(i -> {
+                    TrackEntity track = em.persist(TrackEntity.builder()
+                            .albumEntity(album).personEntity(artist).number(i + 1).discNumber(1).build());
+                    em.persist(MetadataEntity.builder().trackEntity(track)
+                            .title(String.format("Track %02d", i)).build());
+                    return track.getId();
+                })
+                .toList();
+        em.flush();
+        MediaFilter everything = new MediaFilter(FilterMatch.ALL, List.of(), List.of(), null);
+        List<UUID> libraries = List.of(library.getId());
+        Instant asOf = Instant.now();
+
+        assertEquals(0, subject.indexOf(FilterKind.TRACK, everything, SortingEnum.NAME, SortingOrder.ASCENDING,
+                scope(libraries, null), asOf, trackIds.getFirst()));
+        assertEquals(17, subject.indexOf(FilterKind.TRACK, everything, SortingEnum.NAME, SortingOrder.ASCENDING,
+                scope(libraries, null), asOf, trackIds.get(17)));
+        assertEquals(2, subject.indexOf(FilterKind.TRACK, everything, SortingEnum.NAME, SortingOrder.DESCENDING,
+                        scope(libraries, null), asOf, trackIds.get(17)),
+                "the position follows the pinned sort direction");
+
+        // A per-user field binds the caller inside the wrapped ranking query too.
+        MediaFilter neverPlayed = all(cond(FilterField.PLAY_COUNT, FilterOperator.EQUALS, "0"));
+        assertEquals(9, subject.indexOf(FilterKind.TRACK, neverPlayed, SortingEnum.NAME, SortingOrder.ASCENDING,
+                scope(libraries, null), asOf, trackIds.get(9)));
+
+        // Not matching, out of the library scope, and past the filter's own limit all read as absent.
+        MediaFilter onlyTrack00 = all(cond(FilterField.TITLE, FilterOperator.CONTAINS, "Track 00"));
+        assertEquals(-1, subject.indexOf(FilterKind.TRACK, onlyTrack00, SortingEnum.NAME, SortingOrder.ASCENDING,
+                scope(libraries, null), asOf, trackIds.get(5)));
+        assertEquals(-1, subject.indexOf(FilterKind.TRACK, everything, SortingEnum.NAME, SortingOrder.ASCENDING,
+                scope(List.of(), null), asOf, trackIds.getFirst()));
+        MediaFilter firstFive = new MediaFilter(FilterMatch.ALL, List.of(), List.of(), 5);
+        assertEquals(4, subject.indexOf(FilterKind.TRACK, firstFive, SortingEnum.NAME, SortingOrder.ASCENDING,
+                scope(libraries, null), asOf, trackIds.get(4)));
+        assertEquals(-1, subject.indexOf(FilterKind.TRACK, firstFive, SortingEnum.NAME, SortingOrder.ASCENDING,
+                        scope(libraries, null), asOf, trackIds.get(5)),
+                "the limit cuts the source short, so item 5 is not part of it");
+    }
+
+    @Test
     void validateRejectsMismatchedFieldsOperatorsAndValues() {
         MediaFilter playCountOnMovie = all(cond(FilterField.PLAY_COUNT, FilterOperator.EQUALS, "1"));
         assertThrows(IllegalArgumentException.class,

@@ -1629,9 +1629,45 @@ class PlayQueueServiceTest {
     }
 
     @Test
-    void createFilterPlayQueueRejectsAStartItem() {
+    void createFilterPlayQueueWithStartIdStartsWindowBeforeStartItem() {
+        mockSaveAssignsItemIds();
+        List<UUID> trackIds = IntStream.range(0, 50).mapToObj(i -> UUID.randomUUID()).toList();
+        UUID startId = trackIds.get(10);
+        when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.empty());
+        // Position 40 in the filter's result: the window opens BACK_WINDOW items earlier.
+        when(filterQueryService.indexOf(eq(FilterKind.TRACK), any(), any(), any(), any(), any(), eq(startId)))
+                .thenReturn(40);
+        when(filterQueryService.chunkIds(eq(FilterKind.TRACK), any(), any(), any(), any(),
+                argThat(c -> c.limit() == 50 && c.offset() == 30))).thenReturn(trackIds);
+
+        PlayQueueEntity result = subject.createPlayQueue(new PlayQueueService.CreatePlayQueueRequest(
+                PlayQueueSourceType.FILTER, null, startId, false,
+                null, emptyFilter(), FilterKind.TRACK, null, null, null), authentication);
+
+        assertEquals(50, result.getItems().size());
+        assertEquals(80, result.getSourceOffset(), "the cursor sits past the materialized window");
+        PlayQueueItemEntity current = result.getItems().stream()
+                .filter(item -> item.getId().equals(result.getCurrentItem()))
+                .findFirst().orElseThrow();
+        assertEquals(startId, current.getTrackEntityId());
+    }
+
+    @Test
+    void createFilterPlayQueueRejectsAStartItemOutsideTheFilter() {
+        UUID startId = UUID.randomUUID();
+        when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.empty());
+        when(filterQueryService.indexOf(any(), any(), any(), any(), any(), any(), eq(startId))).thenReturn(-1);
+
         PlayQueueService.CreatePlayQueueRequest request = new PlayQueueService.CreatePlayQueueRequest(
-                PlayQueueSourceType.FILTER, null, UUID.randomUUID(), false, null,
+                PlayQueueSourceType.FILTER, null, startId, false, null,
+                emptyFilter(), FilterKind.TRACK, null, null, null);
+        assertThrows(IllegalArgumentException.class, () -> subject.createPlayQueue(request, authentication));
+    }
+
+    @Test
+    void createFilterPlayQueueRejectsAStartItemWithShuffle() {
+        PlayQueueService.CreatePlayQueueRequest request = new PlayQueueService.CreatePlayQueueRequest(
+                PlayQueueSourceType.FILTER, null, UUID.randomUUID(), true, null,
                 emptyFilter(), FilterKind.TRACK, null, null, null);
         assertThrows(IllegalArgumentException.class, () -> subject.createPlayQueue(request, authentication));
     }
@@ -1769,14 +1805,39 @@ class PlayQueueServiceTest {
     }
 
     @Test
-    void createSmartPlaylistQueueRejectsAStartItem() {
+    void createSmartPlaylistQueueStartsAtTheRequestedTrack() {
+        mockSaveAssignsItemIds();
+        PlaylistEntity playlist = buildPlaylist(PlaylistType.SMART, LibraryType.MUSIC);
+        playlist.setFilterKind(FilterKind.TRACK);
+        playlist.setFilter(FilterJson.writeFilter(emptyFilter()));
+        List<UUID> trackIds = IntStream.range(0, 50).mapToObj(i -> UUID.randomUUID()).toList();
+        UUID startId = trackIds.get(25);
+        when(playlistService.ownedPlaylist(authentication, playlist.getId())).thenReturn(Optional.of(playlist));
+        when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.empty());
+        when(filterQueryService.indexOf(eq(FilterKind.TRACK), any(), any(), any(), any(), any(), eq(startId)))
+                .thenReturn(500);
+        when(filterQueryService.chunkIds(eq(FilterKind.TRACK), any(), any(), any(), any(),
+                argThat(c -> c.offset() == 490))).thenReturn(trackIds);
+
+        PlayQueueEntity result = subject.createPlayQueue(
+                PlayQueueSourceType.PLAYLIST, playlist.getId(), startId, false, null, authentication);
+
+        PlayQueueItemEntity current = result.getItems().stream()
+                .filter(item -> item.getId().equals(result.getCurrentItem()))
+                .findFirst().orElseThrow();
+        assertEquals(startId, current.getTrackEntityId(),
+                "a track deep in a large smart playlist is reachable without materializing the ones before it");
+    }
+
+    @Test
+    void createSmartPlaylistQueueRejectsAStartItemWithShuffle() {
         PlaylistEntity playlist = buildPlaylist(PlaylistType.SMART, LibraryType.MUSIC);
         playlist.setFilterKind(FilterKind.TRACK);
         playlist.setFilter(FilterJson.writeFilter(emptyFilter()));
         when(playlistService.ownedPlaylist(authentication, playlist.getId())).thenReturn(Optional.of(playlist));
 
         assertThrows(IllegalArgumentException.class, () -> subject.createPlayQueue(
-                PlayQueueSourceType.PLAYLIST, playlist.getId(), UUID.randomUUID(), false, null, authentication));
+                PlayQueueSourceType.PLAYLIST, playlist.getId(), UUID.randomUUID(), true, null, authentication));
     }
 
     @Test

@@ -201,8 +201,8 @@ public class PlayQueueService {
     /**
      * Everything that defines a new play queue.
      *
-     * @param startId    the episode/track to start at (ignored for MOVIE, optional otherwise,
-     *                   unsupported for FILTER)
+     * @param startId    the episode/track to start at (ignored for MOVIE, optional otherwise;
+     *                   for a filter-backed source only without shuffle)
      * @param shuffle    play the source in a stable seeded random order; required for LIBRARY sources
      * @param rankKind   which ranked track list an ARTIST source plays; required for ARTIST, forbidden otherwise
      * @param filter     inline filter definition for an ad-hoc FILTER source (alternative to a
@@ -245,10 +245,9 @@ public class PlayQueueService {
             PlaylistEntity playlist = playlistService.ownedPlaylist(authentication, request.sourceId())
                     .orElseThrow(() -> new IllegalArgumentException("Playlist not found"));
             if (playlist.getType() == PlaylistType.SMART) {
-                if (request.startId() != null) {
-                    // Same reason FILTER queues reject it: locating a start item would need
-                    // the full ordered id list of the filter.
-                    throw new IllegalArgumentException("Smart playlist play queues cannot start at a specific item");
+                if (request.startId() != null && request.shuffle()) {
+                    // Same reason FILTER queues reject it (see validateCreateRequest).
+                    throw new IllegalArgumentException("A shuffled smart playlist cannot start at a specific item");
                 }
                 MediaFilter playlistFilter = FilterJson.readFilter(playlist.getFilter());
                 filterQueryService.validate(playlist.getFilterKind(), playlistFilter);
@@ -297,10 +296,11 @@ public class PlayQueueService {
         if (request.sourceType() != PlayQueueSourceType.FILTER && request.sourceId() == null) {
             throw new IllegalArgumentException("sourceId is required for " + request.sourceType() + " play queues");
         }
-        if (request.sourceType() == PlayQueueSourceType.FILTER && request.startId() != null) {
-            // Locating a start item would need the full ordered id list (see orderedIndexOf),
-            // exactly the full-materialization a filter source is designed to avoid.
-            throw new IllegalArgumentException("Filter play queues cannot start at a specific item");
+        if (request.sourceType() == PlayQueueSourceType.FILTER && request.startId() != null && request.shuffle()) {
+            // An ordered filter source locates the start item with a single ranking query
+            // (see filterIndexOf). A shuffled one cannot: its membership is "the first N of the
+            // seeded permutation", which the pinned sort says nothing about.
+            throw new IllegalArgumentException("A shuffled filter play queue cannot start at a specific item");
         }
     }
 
@@ -809,6 +809,10 @@ public class PlayQueueService {
      */
     private int orderedIndexOf(PlayQueueEntity queue, UUID startId) {
         UUID sourceId = queue.getSourceId();
+        if (pinnedFilterOf(queue) != null) {
+            // FILTER queues and SMART playlists alike: the pinned filter is the source.
+            return filterIndexOf(queue, startId);
+        }
         if (queue.getSourceType() == PlayQueueSourceType.PLAYLIST) {
             return playlistOrderedIndexOf(queue, startId);
         }
@@ -861,6 +865,28 @@ public class PlayQueueService {
                     .orElse(startId);
         }
         int index = mediaIds.indexOf(needle);
+        if (index == -1) {
+            throw new IllegalArgumentException("Start item not part of the source");
+        }
+        return index;
+    }
+
+    /**
+     * Index of the start item in a filter-backed source (a FILTER queue or a SMART playlist).
+     * The database ranks the matching rows and returns only that one position, so a queue over a
+     * ten-thousand-track filter still starts at the tapped item without materializing what
+     * precedes it. Access is enforced by the same allowed-library scope the chunks use, so an
+     * item the user may not see is "not part of the source".
+     */
+    private int filterIndexOf(PlayQueueEntity queue, UUID startId) {
+        PinnedFilter pinned = pinnedFilterOf(queue);
+        Set<UUID> allowed = libraryAccessService.allowedLibraryIdsForUser(queue.getUserEntity()).orElse(null);
+        int index = filterQueryService.indexOf(pinned.kind(), pinned.filter(),
+                pinned.sorting() != null ? pinned.sorting() : SortingEnum.NAME,
+                pinned.sortingOrder() != null ? pinned.sortingOrder() : SortingOrder.ASCENDING,
+                new FilterQueryService.FilterScope(allowed, pinned.libraryId(),
+                        queue.getUserEntity().getExternalId()),
+                queue.getDateCreated(), startId);
         if (index == -1) {
             throw new IllegalArgumentException("Start item not part of the source");
         }

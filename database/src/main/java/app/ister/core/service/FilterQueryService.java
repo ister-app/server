@@ -188,6 +188,38 @@ public class FilterQueryService {
                 .stream().map(UUID.class::cast).toList();
     }
 
+    /**
+     * Position of one media id in the filter's ordered result set, or -1 when the item does not
+     * match the filter (or falls past its top-level limit, which cuts the source short). Lets a
+     * FILTER play queue start at a chosen item without materializing the ids before it: the
+     * ranking happens inside PostgreSQL and only the one row number comes back.
+     *
+     * @param asOf the same freeze point the queue's chunks use, so the position and the chunks
+     *             agree on the play-derived fields
+     */
+    @Transactional(readOnly = true)
+    // S2077: every value is a bind parameter; the SQL identifiers come from closed enums (class javadoc).
+    @SuppressWarnings("java:S2077")
+    public int indexOf(FilterKind kind, MediaFilter filter, SortingEnum sorting, SortingOrder sortingOrder,
+                       FilterScope scope, Instant asOf, UUID id) {
+        if (id == null || (scope.libraryIds() != null && scope.libraryIds().isEmpty())) {
+            return -1;
+        }
+        Params params = new Params();
+        String fromWhere = buildFromWhere(kind, filter, scope, asOf, params);
+        String sql = "SELECT t.rn FROM (SELECT x.id AS mid, row_number() OVER (ORDER BY "
+                + orderExpression(kind, sorting, sortingOrder) + ") AS rn"
+                + fromWhere + ") t WHERE t.mid = :indexId";
+        params.values.put("indexId", id);
+        List<?> rows = withParams(entityManager.createNativeQuery(sql), params).getResultList();
+        if (rows.isEmpty()) {
+            return -1;
+        }
+        // row_number() is 1-based.
+        int index = ((Number) rows.getFirst()).intValue() - 1;
+        return filter.limit() != null && index >= filter.limit() ? -1 : index;
+    }
+
     // ---------------------------------------------------------------------
     // SQL assembly
     // ---------------------------------------------------------------------
