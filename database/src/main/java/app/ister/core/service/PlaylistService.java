@@ -1,9 +1,14 @@
 package app.ister.core.service;
 
+import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.PlaylistEntity;
 import app.ister.core.entity.PlaylistItemEntity;
+import app.ister.core.entity.PodcastEpisodeEntity;
+import app.ister.core.entity.TrackEntity;
 import app.ister.core.entity.UserEntity;
+import app.ister.core.enums.ImageType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlaylistType;
@@ -14,8 +19,10 @@ import app.ister.core.filter.FilterKind;
 import app.ister.core.filter.MediaFilter;
 import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.MovieRepository;
+import app.ister.core.repository.PlaylistItemRepository;
 import app.ister.core.repository.PlaylistRepository;
 import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.TrackRepository;
@@ -26,10 +33,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * The calling user's playlists. Strictly personal, like {@link SavedViewService}: every lookup
@@ -43,6 +57,8 @@ import java.util.UUID;
 public class PlaylistService {
 
     private final PlaylistRepository playlistRepository;
+    private final PlaylistItemRepository playlistItemRepository;
+    private final ImageRepository imageRepository;
     private final LibraryRepository libraryRepository;
     private final LibraryAccessService libraryAccessService;
     private final FilterQueryService filterQueryService;
@@ -72,6 +88,149 @@ public class PlaylistService {
     /** Everything that defines a playlist; shared by create and update. */
     public record PlaylistSpec(String name, UUID libraryId, PlaylistType type, FilterKind filterKind,
                                MediaFilter filter, SortingEnum sorting, SortingOrder sortingOrder) {
+    }
+
+    /** How many entries are looked at while collecting distinct covers. */
+    private static final int COVER_SCAN = 40;
+    /** The mosaic a client draws from them; fewer distinct covers are repeated client-side. */
+    private static final int COVER_COUNT = 4;
+
+    /**
+     * Up to four <em>distinct</em> cover images taken from the playlist's first entries, so a
+     * playlist can be shown as a cover mosaic instead of a bare icon. Manual playlists read their
+     * own order; smart ones resolve their filter live (scoped to the caller, like browsing it).
+     * Only the first {@value #COVER_SCAN} entries are scanned: a playlist whose opening stretch
+     * shares one cover gets one cover, not a table scan.
+     */
+    @Transactional(readOnly = true)
+    public List<ImageEntity> coverImages(Authentication authentication, PlaylistEntity playlist) {
+        List<UUID> mediaIds = firstMediaIds(authentication, playlist);
+        if (mediaIds.isEmpty()) {
+            return List.of();
+        }
+        LibraryType libraryType = playlist.getLibraryEntity().getLibraryType();
+        List<UUID> ownerIds = coverOwnerIds(libraryType, mediaIds);
+        Map<UUID, ImageEntity> covers = coversByOwner(libraryType, ownerIds);
+        List<ImageEntity> result = new ArrayList<>();
+        Set<UUID> seen = new HashSet<>();
+        for (UUID ownerId : ownerIds) {
+            ImageEntity cover = covers.get(ownerId);
+            // Distinct by image: a playlist of one album is one cover, and the client repeats it.
+            if (cover != null && seen.add(cover.getId())) {
+                result.add(cover);
+                if (result.size() == COVER_COUNT) {
+                    break;
+                }
+            }
+        }
+        return result;
+    }
+
+    /** The opening entries of the playlist, in play order. */
+    private List<UUID> firstMediaIds(Authentication authentication, PlaylistEntity playlist) {
+        if (playlist.getType() == PlaylistType.MANUAL) {
+            return playlistItemRepository.findMediaIdsForPlaylistOrdered(playlist.getId(), COVER_SCAN, 0);
+        }
+        if (playlist.getFilter() == null || playlist.getFilterKind() == null) {
+            return List.of();
+        }
+        UserEntity user = userService.getOrCreateUser(authentication);
+        Set<UUID> allowed = libraryAccessService.allowedLibraryIdsForUser(user).orElse(null);
+        return filterQueryService.chunkIds(playlist.getFilterKind(), FilterJson.readFilter(playlist.getFilter()),
+                playlist.getSorting() != null ? playlist.getSorting() : SortingEnum.NAME,
+                playlist.getSortingOrder() != null ? playlist.getSortingOrder() : SortingOrder.ASCENDING,
+                new FilterQueryService.FilterScope(allowed, playlist.getLibraryEntity().getId(),
+                        user.getExternalId()),
+                // Live, like browsing the playlist: no freeze point to respect here.
+                new FilterQueryService.ChunkPage(null, null, null, COVER_SCAN, 0));
+    }
+
+    /**
+     * Whose artwork represents each entry, in entry order and deduplicated: an album for a track,
+     * a podcast for its episode, the item itself for movies, episodes and books.
+     */
+    private List<UUID> coverOwnerIds(LibraryType libraryType, List<UUID> mediaIds) {
+        List<UUID> owners = switch (libraryType) {
+            case MUSIC -> ordered(mediaIds, trackRepository.findAllById(mediaIds).stream()
+                    .collect(Collectors.toMap(TrackEntity::getId, track -> track.getAlbumEntity().getId())));
+            case PODCAST -> ordered(mediaIds, podcastEpisodeRepository.findAllById(mediaIds).stream()
+                    .collect(Collectors.toMap(PodcastEpisodeEntity::getId,
+                            episode -> episode.getPodcastEntity().getId())));
+            case MOVIE, SHOW, BOOK -> mediaIds;
+            case COMIC -> List.of();
+        };
+        return owners.stream().distinct().toList();
+    }
+
+    /** The owner ids in the entries' own order; entries whose owner vanished are dropped. */
+    private static List<UUID> ordered(List<UUID> mediaIds, Map<UUID, UUID> ownerByMediaId) {
+        return mediaIds.stream().map(ownerByMediaId::get).filter(Objects::nonNull).toList();
+    }
+
+    /**
+     * The cover of each owner. Episodes fall back to their show's cover, the same order of
+     * preference the clients use for an episode still.
+     */
+    private Map<UUID, ImageEntity> coversByOwner(LibraryType libraryType, List<UUID> ownerIds) {
+        if (ownerIds.isEmpty()) {
+            return Map.of();
+        }
+        List<ImageEntity> images = switch (libraryType) {
+            case MUSIC -> imageRepository.findByAlbumEntityIdIn(ownerIds);
+            case MOVIE -> imageRepository.findByMovieEntityIdIn(ownerIds);
+            case SHOW -> imageRepository.findByEpisodeEntityIdIn(ownerIds);
+            case BOOK -> imageRepository.findByBookEntityIdIn(ownerIds);
+            case PODCAST -> imageRepository.findByPodcastEntityIdIn(ownerIds);
+            case COMIC -> List.of();
+        };
+        Map<UUID, ImageEntity> byOwner = new HashMap<>();
+        for (ImageEntity image : images) {
+            byOwner.merge(ownerFor(libraryType, image), image, PlaylistService::preferCover);
+        }
+        if (libraryType == LibraryType.SHOW) {
+            addShowFallbacks(ownerIds, byOwner);
+        }
+        return byOwner;
+    }
+
+    /** An episode without artwork of its own shows its series' cover. */
+    private void addShowFallbacks(List<UUID> episodeIds, Map<UUID, ImageEntity> byOwner) {
+        List<EpisodeEntity> missing = episodeRepository.findAllById(episodeIds).stream()
+                .filter(episode -> !byOwner.containsKey(episode.getId()))
+                .toList();
+        if (missing.isEmpty()) {
+            return;
+        }
+        Map<UUID, ImageEntity> byShow = new HashMap<>();
+        for (ImageEntity image : imageRepository.findByShowEntityIdIn(
+                missing.stream().map(episode -> episode.getShowEntity().getId()).distinct().toList())) {
+            byShow.merge(image.getShowEntityId(), image, PlaylistService::preferCover);
+        }
+        for (EpisodeEntity episode : missing) {
+            ImageEntity showCover = byShow.get(episode.getShowEntity().getId());
+            if (showCover != null) {
+                byOwner.put(episode.getId(), showCover);
+            }
+        }
+    }
+
+    private static UUID ownerFor(LibraryType libraryType, ImageEntity image) {
+        return switch (libraryType) {
+            case MUSIC -> image.getAlbumEntityId();
+            case MOVIE -> image.getMovieEntityId();
+            case SHOW -> image.getEpisodeEntityId();
+            case BOOK -> image.getBookEntityId();
+            case PODCAST -> image.getPodcastEntityId();
+            case COMIC -> null;
+        };
+    }
+
+    /** A COVER wins over any other type; between equals the first one found stays. */
+    private static ImageEntity preferCover(ImageEntity current, ImageEntity candidate) {
+        if (current.getType() == ImageType.COVER || candidate.getType() != ImageType.COVER) {
+            return current;
+        }
+        return candidate;
     }
 
     /** The caller's own playlist, or empty for an unknown id and for someone else's playlist. */

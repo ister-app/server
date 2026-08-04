@@ -68,6 +68,10 @@ public interface ImageRepository extends CrudRepository<ImageEntity, UUID> {
     // Batch variants (used by GraphQL @BatchMapping to avoid N+1)
     List<ImageEntity> findByShowEntityIdIn(Collection<UUID> showEntityIds);
 
+    List<ImageEntity> findByMovieEntityIdIn(Collection<UUID> movieEntityIds);
+
+    List<ImageEntity> findByEpisodeEntityIdIn(Collection<UUID> episodeEntityIds);
+
     List<ImageEntity> findByPersonEntityIdIn(Collection<UUID> personEntityIds);
 
     List<ImageEntity> findByAlbumEntityIdIn(Collection<UUID> albumEntityIds);

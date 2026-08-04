@@ -1,22 +1,27 @@
 package app.ister.core.service;
 
 import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PlaylistEntity;
 import app.ister.core.entity.PlaylistItemEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.entity.UserEntity;
+import app.ister.core.enums.ImageType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlaylistType;
+import app.ister.core.filter.FilterJson;
 import app.ister.core.filter.FilterKind;
 import app.ister.core.filter.FilterMatch;
 import app.ister.core.filter.MediaFilter;
 import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.MovieRepository;
+import app.ister.core.repository.PlaylistItemRepository;
 import app.ister.core.repository.PlaylistRepository;
 import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.TrackRepository;
@@ -29,17 +34,22 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,6 +60,12 @@ class PlaylistServiceTest {
 
     @Mock
     private PlaylistRepository playlistRepository;
+
+    @Mock
+    private PlaylistItemRepository playlistItemRepository;
+
+    @Mock
+    private ImageRepository imageRepository;
 
     @Mock
     private LibraryRepository libraryRepository;
@@ -376,5 +392,113 @@ class PlaylistServiceTest {
         item.setId(UUID.randomUUID());
         item.setTrackEntityId(UUID.randomUUID());
         return item;
+    }
+
+    // --- cover mosaic ---
+
+    private static ImageEntity albumImage(ImageType type, UUID albumId) {
+        ImageEntity image = ImageEntity.builder().type(type).build();
+        image.setId(UUID.randomUUID());
+        image.setAlbumEntityId(albumId);
+        return image;
+    }
+
+    /** A manual music playlist whose entries are tracks off the given albums, in that order. */
+    private PlaylistEntity musicPlaylistWithTracks(List<UUID> trackIds, List<UUID> albumIds) {
+        PlaylistEntity playlist = PlaylistEntity.builder()
+                .userEntity(user).libraryEntity(musicLibrary).name("Mine").type(PlaylistType.MANUAL).build();
+        playlist.setId(UUID.randomUUID());
+        when(playlistItemRepository.findMediaIdsForPlaylistOrdered(eq(playlist.getId()), anyInt(), eq(0)))
+                .thenReturn(trackIds);
+        List<TrackEntity> tracks = new ArrayList<>();
+        for (int i = 0; i < trackIds.size(); i++) {
+            AlbumEntity album = AlbumEntity.builder().build();
+            album.setId(albumIds.get(i));
+            TrackEntity track = TrackEntity.builder().albumEntity(album).number(i + 1).discNumber(1).build();
+            track.setId(trackIds.get(i));
+            tracks.add(track);
+        }
+        when(trackRepository.findAllById(trackIds)).thenReturn(tracks);
+        return playlist;
+    }
+
+    @Test
+    void coverImagesTakeTheFirstFourDistinctCovers() {
+        List<UUID> trackIds = IntStream.range(0, 6).mapToObj(i -> UUID.randomUUID()).toList();
+        List<UUID> albumIds = IntStream.range(0, 6).mapToObj(i -> UUID.randomUUID()).toList();
+        PlaylistEntity playlist = musicPlaylistWithTracks(trackIds, albumIds);
+        List<ImageEntity> covers = albumIds.stream()
+                .map(albumId -> albumImage(ImageType.COVER, albumId))
+                .toList();
+        when(imageRepository.findByAlbumEntityIdIn(albumIds)).thenReturn(covers);
+
+        assertEquals(covers.subList(0, 4), subject.coverImages(authentication, playlist),
+                "four covers, in playlist order");
+    }
+
+    @Test
+    void coverImagesReturnOnlyWhatIsDistinctWhenAlbumsRepeat() {
+        // Six tracks off two albums: the client repeats the two covers over the mosaic.
+        UUID albumA = UUID.randomUUID();
+        UUID albumB = UUID.randomUUID();
+        List<UUID> trackIds = IntStream.range(0, 6).mapToObj(i -> UUID.randomUUID()).toList();
+        PlaylistEntity playlist = musicPlaylistWithTracks(trackIds,
+                List.of(albumA, albumA, albumB, albumA, albumB, albumB));
+        ImageEntity coverA = albumImage(ImageType.COVER, albumA);
+        ImageEntity coverB = albumImage(ImageType.COVER, albumB);
+        when(imageRepository.findByAlbumEntityIdIn(List.of(albumA, albumB)))
+                .thenReturn(List.of(coverA, coverB));
+
+        assertEquals(List.of(coverA, coverB), subject.coverImages(authentication, playlist));
+    }
+
+    @Test
+    void coverImagesPreferACoverAndSkipItemsWithoutArtwork() {
+        UUID albumA = UUID.randomUUID();
+        UUID albumB = UUID.randomUUID();
+        List<UUID> trackIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+        PlaylistEntity playlist = musicPlaylistWithTracks(trackIds, List.of(albumA, albumB));
+        ImageEntity background = albumImage(ImageType.BACKGROUND, albumA);
+        ImageEntity cover = albumImage(ImageType.COVER, albumA);
+        // Album B has no artwork at all, so it contributes nothing.
+        when(imageRepository.findByAlbumEntityIdIn(List.of(albumA, albumB)))
+                .thenReturn(List.of(background, cover));
+
+        assertEquals(List.of(cover), subject.coverImages(authentication, playlist));
+    }
+
+    @Test
+    void coverImagesOfASmartPlaylistResolveThroughItsFilter() {
+        PlaylistEntity playlist = PlaylistEntity.builder()
+                .userEntity(user).libraryEntity(musicLibrary).name("Smart").type(PlaylistType.SMART)
+                .filterKind(FilterKind.TRACK).filter(FilterJson.writeFilter(emptyFilter())).build();
+        playlist.setId(UUID.randomUUID());
+        UUID trackId = UUID.randomUUID();
+        UUID albumId = UUID.randomUUID();
+        AlbumEntity album = AlbumEntity.builder().build();
+        album.setId(albumId);
+        TrackEntity track = TrackEntity.builder().albumEntity(album).number(1).discNumber(1).build();
+        track.setId(trackId);
+        when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.empty());
+        when(filterQueryService.chunkIds(eq(FilterKind.TRACK), any(), any(), any(),
+                argThat(scope -> musicLibrary.getId().equals(scope.libraryId())), any()))
+                .thenReturn(List.of(trackId));
+        when(trackRepository.findAllById(List.of(trackId))).thenReturn(List.of(track));
+        ImageEntity cover = albumImage(ImageType.COVER, albumId);
+        when(imageRepository.findByAlbumEntityIdIn(List.of(albumId))).thenReturn(List.of(cover));
+
+        assertEquals(List.of(cover), subject.coverImages(authentication, playlist));
+        verifyNoInteractions(playlistItemRepository);
+    }
+
+    @Test
+    void coverImagesOfAnEmptyPlaylistAreEmpty() {
+        PlaylistEntity playlist = PlaylistEntity.builder()
+                .userEntity(user).libraryEntity(musicLibrary).name("Empty").type(PlaylistType.MANUAL).build();
+        playlist.setId(UUID.randomUUID());
+        when(playlistItemRepository.findMediaIdsForPlaylistOrdered(eq(playlist.getId()), anyInt(), eq(0)))
+                .thenReturn(List.of());
+
+        assertTrue(subject.coverImages(authentication, playlist).isEmpty());
     }
 }

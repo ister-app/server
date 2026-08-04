@@ -3,6 +3,7 @@ package app.ister.api.controller;
 import app.ister.api.dto.PlaylistInput;
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PlaylistEntity;
@@ -138,6 +139,13 @@ public class PlaylistController {
             return null;
         }
         return (int) playlistItemRepository.countByPlaylistEntityId(playlist.getId());
+    }
+
+    /** Up to four distinct covers of the first entries, for the client's mosaic tile. */
+    @PreAuthorize("hasRole('user')")
+    @SchemaMapping(typeName = "Playlist", field = "coverImages")
+    public List<ImageEntity> coverImages(PlaylistEntity playlist, Authentication authentication) {
+        return playlistService.coverImages(authentication, playlist);
     }
 
     /** The stored JSON, back as the typed FilterGroup tree with lists normalized to non-null. */

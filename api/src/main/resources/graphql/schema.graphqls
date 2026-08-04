@@ -521,6 +521,13 @@ type Playlist {
     sortingOrder: SortingOrder
     "MANUAL entries in play order; empty for SMART playlists."
     items: [PlaylistItem!]!
+    """
+    Up to four distinct covers taken from the playlist's first entries (an album cover for a
+    track, a podcast's artwork for its episode, the item's own for movies, episodes and books).
+    Fewer when the opening entries share their artwork, empty when there is none — clients repeat
+    what they get to fill a four-tile mosaic.
+    """
+    coverImages: [Image!]!
 }
 
 "One entry of a MANUAL playlist. Exactly one media field is set, matching type."
