@@ -132,6 +132,8 @@ class PlaylistControllerGraphQlTest {
                 .path("playlists[0].itemCount").entity(Integer.class).isEqualTo(3)
                 .path("playlists[0].filterKind").valueIsNull()
                 .path("playlists[0].filter").valueIsNull();
+
+        verify(playlistItemRepository).countByPlaylistEntityId(playlist.getId());
     }
 
     @Test
@@ -151,6 +153,8 @@ class PlaylistControllerGraphQlTest {
                 .path("playlistById.filterKind").entity(String.class).isEqualTo("TRACK")
                 .path("playlistById.filter.match").entity(String.class).isEqualTo("ALL")
                 .path("playlistById.filter.limit").entity(Integer.class).isEqualTo(25);
+
+        verify(playlistService).ownedPlaylist(any(), eq(playlist.getId()));
     }
 
     @Test
@@ -162,6 +166,8 @@ class PlaylistControllerGraphQlTest {
                 .variable("id", unknown)
                 .execute()
                 .path("playlistById").valueIsNull();
+
+        verify(playlistService).ownedPlaylist(any(), eq(unknown));
     }
 
     @Test
@@ -188,6 +194,8 @@ class PlaylistControllerGraphQlTest {
                 .path("playlistById.items[0].type").entity(String.class).isEqualTo("TRACK")
                 .path("playlistById.items[0].track.id").entity(String.class).isEqualTo(track.getId().toString())
                 .path("playlistById.items[0].movie").valueIsNull();
+
+        verify(trackRepository).findById(track.getId());
     }
 
     @Test
@@ -228,6 +236,11 @@ class PlaylistControllerGraphQlTest {
         graphQlTester.document("mutation($p: ID!) { deletePlaylist(id: $p) }")
                 .variable("p", playlist.getId())
                 .execute().path("deletePlaylist").entity(Boolean.class).isEqualTo(true);
+
+        verify(playlistService).addItem(any(), eq(playlist.getId()), eq(mediaId), isNull());
+        verify(playlistService).moveItem(any(), eq(playlist.getId()), eq(itemId), isNull());
+        verify(playlistService).removeItem(any(), eq(playlist.getId()), eq(itemId));
+        verify(playlistService).delete(any(), eq(playlist.getId()));
     }
 
     @Test
@@ -243,5 +256,7 @@ class PlaylistControllerGraphQlTest {
                 .variable("id", library.getId())
                 .execute()
                 .path("libraryById.playlists[0].name").entity(String.class).isEqualTo("Roadtrip");
+
+        verify(playlistService).playlistsInLibraries(any(), eq(List.of(library.getId())));
     }
 }

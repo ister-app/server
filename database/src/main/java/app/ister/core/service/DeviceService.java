@@ -44,16 +44,20 @@ public class DeviceService {
     public DeviceEntity register(Authentication authentication, UUID deviceId, String name, DevicePlatform platform) {
         UserEntity user = userService.getOrCreateUser(authentication);
         DeviceEntity device = deviceRepository.findByUserEntityIdAndDeviceId(user.getId(), deviceId)
-                .orElseGet(() -> DeviceEntity.builder()
-                        .userEntity(user)
-                        .deviceId(deviceId)
-                        .name(name)
-                        .platform(platform)
-                        .lastSeenAt(Instant.now())
-                        .build());
+                .orElseGet(() -> newDevice(user, deviceId, name, platform));
         device.setPlatform(platform);
         device.setLastSeenAt(Instant.now());
         return deviceRepository.save(device);
+    }
+
+    private static DeviceEntity newDevice(UserEntity user, UUID deviceId, String name, DevicePlatform platform) {
+        DeviceEntity device = new DeviceEntity();
+        device.setUserEntity(user);
+        device.setDeviceId(deviceId);
+        device.setName(name);
+        device.setPlatform(platform);
+        device.setLastSeenAt(Instant.now());
+        return device;
     }
 
     /**

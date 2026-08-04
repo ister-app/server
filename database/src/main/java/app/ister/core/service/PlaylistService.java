@@ -1,8 +1,10 @@
 package app.ister.core.service;
 
+import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.LibraryEntity;
+import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PlaylistEntity;
 import app.ister.core.entity.PlaylistItemEntity;
 import app.ister.core.entity.PodcastEpisodeEntity;
@@ -55,6 +57,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class PlaylistService {
+
+    private static final String PLAYLIST_NOT_FOUND = "Playlist not found";
 
     private final PlaylistRepository playlistRepository;
     private final PlaylistItemRepository playlistItemRepository;
@@ -274,7 +278,7 @@ public class PlaylistService {
     @Transactional
     public PlaylistEntity update(Authentication authentication, UUID id, PlaylistSpec spec) {
         PlaylistEntity playlist = findOwnedPlaylist(authentication, id)
-                .orElseThrow(() -> new IllegalArgumentException("Playlist not found"));
+                .orElseThrow(() -> new IllegalArgumentException(PLAYLIST_NOT_FOUND));
         if (spec.libraryId() != null && !spec.libraryId().equals(playlist.getLibraryEntity().getId())) {
             throw new IllegalArgumentException("A playlist cannot move to another library");
         }
@@ -289,7 +293,7 @@ public class PlaylistService {
     @Transactional
     public boolean delete(Authentication authentication, UUID id) {
         PlaylistEntity playlist = findOwnedPlaylist(authentication, id)
-                .orElseThrow(() -> new IllegalArgumentException("Playlist not found"));
+                .orElseThrow(() -> new IllegalArgumentException(PLAYLIST_NOT_FOUND));
         playlistRepository.delete(playlist);
         return true;
     }
@@ -431,7 +435,7 @@ public class PlaylistService {
 
     private PlaylistEntity editableManualPlaylist(Authentication authentication, UUID playlistId) {
         PlaylistEntity playlist = findOwnedPlaylist(authentication, playlistId)
-                .orElseThrow(() -> new IllegalArgumentException("Playlist not found"));
+                .orElseThrow(() -> new IllegalArgumentException(PLAYLIST_NOT_FOUND));
         if (playlist.getType() != PlaylistType.MANUAL) {
             throw new IllegalArgumentException("A smart playlist's items come from its filter");
         }
@@ -445,10 +449,10 @@ public class PlaylistService {
      */
     private Optional<LibraryEntity> libraryOfMedia(MediaType mediaType, UUID mediaId) {
         return switch (mediaType) {
-            case MOVIE -> movieRepository.findById(mediaId).map(movie -> movie.getLibraryEntity());
+            case MOVIE -> movieRepository.findById(mediaId).map(MovieEntity::getLibraryEntity);
             case EPISODE -> episodeRepository.findById(mediaId).map(episode -> episode.getShowEntity().getLibraryEntity());
             case TRACK -> trackRepository.findById(mediaId).map(track -> track.getAlbumEntity().getLibraryEntity());
-            case BOOK -> bookRepository.findById(mediaId).map(book -> book.getLibraryEntity());
+            case BOOK -> bookRepository.findById(mediaId).map(BookEntity::getLibraryEntity);
             case PODCAST_EPISODE -> podcastEpisodeRepository.findById(mediaId).map(episode -> episode.getPodcastEntity().getLibraryEntity());
             default -> Optional.empty();
         };

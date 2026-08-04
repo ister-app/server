@@ -417,7 +417,7 @@ public class FilterQueryService {
         boolean negated = c.operator() == FilterOperator.NOT_EQUALS
                 || c.operator() == FilterOperator.NOT_CONTAINS
                 || c.operator() == FilterOperator.IS_NOT_SET;
-        String exists = "EXISTS (SELECT 1 FROM metadata_entity m WHERE " + joinCondition + " AND " + inner + ")";
+        String exists = "EXISTS (SELECT 1 FROM metadata_entity m WHERE " + joinCondition + AND + inner + ")";
         return negated ? "NOT " + exists : exists;
     }
 
@@ -429,7 +429,7 @@ public class FilterQueryService {
         };
         boolean negated = c.operator() == FilterOperator.NOT_EQUALS
                 || c.operator() == FilterOperator.NOT_CONTAINS;
-        String exists = "EXISTS (SELECT 1 FROM person_entity p WHERE " + joinCondition + " AND " + inner + ")";
+        String exists = "EXISTS (SELECT 1 FROM person_entity p WHERE " + joinCondition + AND + inner + ")";
         return negated ? "NOT " + exists : exists;
     }
 

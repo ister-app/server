@@ -100,6 +100,8 @@ class DeviceControllerGraphQlTest {
                 .execute()
                 .path("myDevices[0].name").entity(String.class).isEqualTo("Laptop")
                 .path("myDevices[0].online").entity(Boolean.class).isEqualTo(true);
+
+        verify(devicePresenceRegistry).onlineDeviceIds(userId);
     }
 
     @Test
@@ -125,6 +127,8 @@ class DeviceControllerGraphQlTest {
                         """.formatted(deviceId))
                 .execute()
                 .path("renameDevice").valueIsNull();
+
+        verify(deviceService).rename(any(), eq(deviceId), eq("Nieuw"));
     }
 
     @Test

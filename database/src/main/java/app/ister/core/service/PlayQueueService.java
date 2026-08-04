@@ -809,9 +809,10 @@ public class PlayQueueService {
      */
     private int orderedIndexOf(PlayQueueEntity queue, UUID startId) {
         UUID sourceId = queue.getSourceId();
-        if (pinnedFilterOf(queue) != null) {
+        PinnedFilter pinned = pinnedFilterOf(queue);
+        if (pinned != null) {
             // FILTER queues and SMART playlists alike: the pinned filter is the source.
-            return filterIndexOf(queue, startId);
+            return filterIndexOf(queue, pinned, startId);
         }
         if (queue.getSourceType() == PlayQueueSourceType.PLAYLIST) {
             return playlistOrderedIndexOf(queue, startId);
@@ -878,8 +879,7 @@ public class PlayQueueService {
      * precedes it. Access is enforced by the same allowed-library scope the chunks use, so an
      * item the user may not see is "not part of the source".
      */
-    private int filterIndexOf(PlayQueueEntity queue, UUID startId) {
-        PinnedFilter pinned = pinnedFilterOf(queue);
+    private int filterIndexOf(PlayQueueEntity queue, PinnedFilter pinned, UUID startId) {
         Set<UUID> allowed = libraryAccessService.allowedLibraryIdsForUser(queue.getUserEntity()).orElse(null);
         int index = filterQueryService.indexOf(pinned.kind(), pinned.filter(),
                 pinned.sorting() != null ? pinned.sorting() : SortingEnum.NAME,

@@ -69,8 +69,9 @@ public class AlbumController {
         if (filtered.isPresent()) {
             return filtered.get();
         }
-        if (args.artistId().isPresent()) {
-            return personRepository.findById(args.artistId().get())
+        Optional<UUID> artistId = args.artistId();
+        if (artistId.isPresent()) {
+            return personRepository.findById(artistId.get())
                     .map(artist -> libraryAccessService.allowedLibraryIds(authentication)
                             .map(allowed -> albumRepository.findByPersonEntityAndLibraryEntityIdIn(artist, allowed, pageable))
                             .orElseGet(() -> albumRepository.findByPersonEntity(artist, pageable)))

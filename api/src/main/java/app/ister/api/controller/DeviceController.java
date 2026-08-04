@@ -13,6 +13,7 @@ import app.ister.core.status.DevicePresenceRegistry;
 import app.ister.core.status.PlaybackSessionRegistry;
 import app.ister.core.status.ServerStatusBroadcaster;
 import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.Arguments;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SubscriptionMapping;
@@ -104,35 +105,39 @@ public class DeviceController {
         return true;
     }
 
+    /** All arguments of the {@code sendDeviceCommand} mutation, bound as one object off the argument map. */
+    record DeviceCommandArguments(UUID deviceId, DeviceCommandType command, MediaType mediaType,
+                                  UUID mediaId, UUID startId, UUID playQueueId,
+                                  Double positionInMilliseconds) {
+    }
+
     @PreAuthorize("hasRole('user')")
     @MutationMapping
-    public boolean sendDeviceCommand(@Argument UUID deviceId, @Argument DeviceCommandType command,
-                                     @Argument MediaType mediaType, @Argument UUID mediaId,
-                                     @Argument UUID startId, @Argument UUID playQueueId,
-                                     @Argument Double positionInMilliseconds, Authentication authentication) {
+    public boolean sendDeviceCommand(@Arguments DeviceCommandArguments args, Authentication authentication) {
         UUID userId = userService.getOrCreateUser(authentication).getId();
         // Own devices only; an unknown or someone else's device id is indistinguishable (false).
-        if (deviceService.findOwned(userId, deviceId).isEmpty()) {
+        if (deviceService.findOwned(userId, args.deviceId()).isEmpty()) {
             return false;
         }
         // Only an online device is listening; without a subscriber the fan-out would drop the
         // command anyway, so refuse up front and let the UI say the device is offline.
-        if (!devicePresenceRegistry.isOnline(userId, deviceId)) {
+        if (!devicePresenceRegistry.isOnline(userId, args.deviceId())) {
             return false;
         }
-        if ((command == DeviceCommandType.TAKEOVER_QUEUE || command == DeviceCommandType.START_FOLLOW)
-                && (playQueueId == null || playbackSessionRegistry.find(playQueueId).isEmpty())) {
+        if ((args.command() == DeviceCommandType.TAKEOVER_QUEUE || args.command() == DeviceCommandType.START_FOLLOW)
+                && (args.playQueueId() == null || playbackSessionRegistry.find(args.playQueueId()).isEmpty())) {
             return false;
         }
+        Double position = args.positionInMilliseconds();
         deviceCommandService.publish(DeviceCommandData.builder()
                 .ownerUserId(userId)
-                .deviceId(deviceId)
-                .command(command)
-                .mediaType(mediaType)
-                .mediaId(mediaId)
-                .startId(startId)
-                .playQueueId(playQueueId)
-                .positionInMilliseconds(positionInMilliseconds == null ? null : positionInMilliseconds.longValue())
+                .deviceId(args.deviceId())
+                .command(args.command())
+                .mediaType(args.mediaType())
+                .mediaId(args.mediaId())
+                .startId(args.startId())
+                .playQueueId(args.playQueueId())
+                .positionInMilliseconds(position == null ? null : position.longValue())
                 .build());
         return true;
     }

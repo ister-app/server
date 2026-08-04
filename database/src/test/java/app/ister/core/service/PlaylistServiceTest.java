@@ -222,21 +222,25 @@ class PlaylistServiceTest {
         other.setId(UUID.randomUUID());
         when(playlistRepository.findById(other.getId())).thenReturn(Optional.of(other));
 
-        assertTrue(subject.ownedPlaylist(authentication, other.getId()).isEmpty());
-        assertThrows(IllegalArgumentException.class, () -> subject.delete(authentication, other.getId()));
+        UUID otherId = other.getId();
+        UUID mediaId = UUID.randomUUID();
+
+        assertTrue(subject.ownedPlaylist(authentication, otherId).isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> subject.delete(authentication, otherId));
         assertThrows(IllegalArgumentException.class,
-                () -> subject.addItem(authentication, other.getId(), UUID.randomUUID(), null));
+                () -> subject.addItem(authentication, otherId, mediaId, null));
     }
 
     @Test
     void updateRejectsChangingTheLibraryOrType() {
         PlaylistEntity playlist = ownedManualPlaylist(musicLibrary);
+        UUID playlistId = playlist.getId();
         PlaylistService.PlaylistSpec otherLibrary = manualSpec("Mine", UUID.randomUUID());
-        assertThrows(IllegalArgumentException.class, () -> subject.update(authentication, playlist.getId(), otherLibrary));
+        assertThrows(IllegalArgumentException.class, () -> subject.update(authentication, playlistId, otherLibrary));
 
         PlaylistService.PlaylistSpec otherType = new PlaylistService.PlaylistSpec("Mine", musicLibrary.getId(),
                 PlaylistType.SMART, FilterKind.TRACK, emptyFilter(), null, null);
-        assertThrows(IllegalArgumentException.class, () -> subject.update(authentication, playlist.getId(), otherType));
+        assertThrows(IllegalArgumentException.class, () -> subject.update(authentication, playlistId, otherType));
     }
 
     @Test
@@ -278,9 +282,10 @@ class PlaylistServiceTest {
         LibraryEntity otherLibrary = LibraryEntity.builder().id(UUID.randomUUID()).libraryType(LibraryType.MUSIC).build();
         UUID trackId = UUID.randomUUID();
         trackIn(otherLibrary, trackId);
+        UUID playlistId = playlist.getId();
 
         assertThrows(IllegalArgumentException.class,
-                () -> subject.addItem(authentication, playlist.getId(), trackId, null));
+                () -> subject.addItem(authentication, playlistId, trackId, null));
     }
 
     @Test
@@ -288,9 +293,10 @@ class PlaylistServiceTest {
         PlaylistEntity playlist = ownedManualPlaylist(musicLibrary);
         UUID unknown = UUID.randomUUID();
         when(trackRepository.findById(unknown)).thenReturn(Optional.empty());
+        UUID playlistId = playlist.getId();
 
         assertThrows(IllegalArgumentException.class,
-                () -> subject.addItem(authentication, playlist.getId(), unknown, null));
+                () -> subject.addItem(authentication, playlistId, unknown, null));
     }
 
     @Test
@@ -303,9 +309,11 @@ class PlaylistServiceTest {
                 .build();
         playlist.setId(UUID.randomUUID());
         when(playlistRepository.findById(playlist.getId())).thenReturn(Optional.of(playlist));
+        UUID playlistId = playlist.getId();
+        UUID mediaId = UUID.randomUUID();
 
         assertThrows(IllegalArgumentException.class,
-                () -> subject.addItem(authentication, playlist.getId(), UUID.randomUUID(), null));
+                () -> subject.addItem(authentication, playlistId, mediaId, null));
     }
 
     @Test
@@ -359,9 +367,10 @@ class PlaylistServiceTest {
         PlaylistItemEntity first = playlistItem(playlist, "1000");
         playlist.getItems().add(first);
         UUID itemId = first.getId();
+        UUID playlistId = playlist.getId();
 
         assertThrows(IllegalArgumentException.class,
-                () -> subject.moveItem(authentication, playlist.getId(), itemId, itemId));
+                () -> subject.moveItem(authentication, playlistId, itemId, itemId));
     }
 
     @Test
@@ -379,8 +388,9 @@ class PlaylistServiceTest {
     void removeItemRejectsAnUnknownEntry() {
         PlaylistEntity playlist = ownedManualPlaylist(musicLibrary);
         UUID unknown = UUID.randomUUID();
+        UUID playlistId = playlist.getId();
         assertThrows(IllegalArgumentException.class,
-                () -> subject.removeItem(authentication, playlist.getId(), unknown));
+                () -> subject.removeItem(authentication, playlistId, unknown));
     }
 
     private PlaylistItemEntity playlistItem(PlaylistEntity playlist, String position) {

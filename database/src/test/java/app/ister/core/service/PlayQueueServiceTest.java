@@ -1836,8 +1836,11 @@ class PlayQueueServiceTest {
         playlist.setFilter(FilterJson.writeFilter(emptyFilter()));
         when(playlistService.ownedPlaylist(authentication, playlist.getId())).thenReturn(Optional.of(playlist));
 
+        UUID playlistId = playlist.getId();
+        UUID startId = UUID.randomUUID();
+
         assertThrows(IllegalArgumentException.class, () -> subject.createPlayQueue(
-                PlayQueueSourceType.PLAYLIST, playlist.getId(), UUID.randomUUID(), true, null, authentication));
+                PlayQueueSourceType.PLAYLIST, playlistId, startId, true, null, authentication));
     }
 
     @Test
@@ -1877,8 +1880,10 @@ class PlayQueueServiceTest {
         when(playlistService.ownedPlaylist(authentication, playlist.getId())).thenReturn(Optional.of(playlist));
         when(playlistRepository.findById(playlist.getId())).thenReturn(Optional.of(playlist));
 
+        UUID playlistId = playlist.getId();
+
         assertThrows(IllegalArgumentException.class, () -> subject.createPlayQueue(
-                PlayQueueSourceType.PLAYLIST, playlist.getId(), null, true, null, authentication));
+                PlayQueueSourceType.PLAYLIST, playlistId, null, true, null, authentication));
     }
 
     @Test
