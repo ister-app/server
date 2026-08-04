@@ -1,5 +1,7 @@
 package app.ister.core.status;
 
+import app.ister.core.eventdata.DeviceCommandData;
+import app.ister.core.eventdata.DevicePresenceData;
 import app.ister.core.eventdata.EventFailureStatusData;
 import app.ister.core.eventdata.NodeActivityStatusData;
 import app.ister.core.eventdata.PlaybackCommandData;
@@ -34,6 +36,9 @@ class StatusEventListenerTest {
 
     @Mock
     private PlaybackSessionRegistry playbackSessionRegistry;
+
+    @Mock
+    private DevicePresenceRegistry devicePresenceRegistry;
 
     @Mock
     private ServerStatusBroadcaster broadcaster;
@@ -91,5 +96,27 @@ class StatusEventListenerTest {
 
         verify(broadcaster).emitCommand(data);
         verifyNoInteractions(nodeActivityRegistry, queueStatsRegistry, recentFailuresBuffer, playbackSessionRegistry);
+    }
+
+    @Test
+    void onDeviceCommandOnlyBroadcasts() {
+        DeviceCommandData data = DeviceCommandData.builder().build();
+
+        subject.onDeviceCommand(data);
+
+        verify(broadcaster).emitDeviceCommand(data);
+        verifyNoInteractions(nodeActivityRegistry, queueStatsRegistry, recentFailuresBuffer,
+                playbackSessionRegistry, devicePresenceRegistry);
+    }
+
+    @Test
+    void onDevicePresenceOnlyUpdatesTheRegistry() {
+        DevicePresenceData data = DevicePresenceData.builder().build();
+
+        subject.onDevicePresence(data);
+
+        verify(devicePresenceRegistry).update(data);
+        verifyNoInteractions(nodeActivityRegistry, queueStatsRegistry, recentFailuresBuffer,
+                playbackSessionRegistry, broadcaster);
     }
 }

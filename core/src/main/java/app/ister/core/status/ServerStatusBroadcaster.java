@@ -1,5 +1,6 @@
 package app.ister.core.status;
 
+import app.ister.core.eventdata.DeviceCommandData;
 import app.ister.core.eventdata.PlaybackCommandData;
 import app.ister.core.eventdata.PlaybackStatusData;
 import org.springframework.stereotype.Component;
@@ -27,6 +28,9 @@ public class ServerStatusBroadcaster {
     // Commands must NOT replay: a (re)subscriber would re-execute the last command.
     // Best-effort is correct here — with no live subscriber a command has no addressee.
     private final Sinks.Many<PlaybackCommandData> commandSink = Sinks.many().multicast().directBestEffort();
+    // Same non-replay reasoning as commandSink: a reconnecting device must never re-execute
+    // the last device command (e.g. re-start playback it was just told to hand off).
+    private final Sinks.Many<DeviceCommandData> deviceCommandSink = Sinks.many().multicast().directBestEffort();
 
     public ServerStatusBroadcaster() {
         // Seed so a subscriber on a fresh node immediately receives the (empty) list
@@ -50,6 +54,11 @@ public class ServerStatusBroadcaster {
         commandSink.tryEmitNext(command);
     }
 
+    public void emitDeviceCommand(DeviceCommandData command) {
+        // Same single-thread emit + intended drop semantics as emitCommand.
+        deviceCommandSink.tryEmitNext(command);
+    }
+
     /**
      * Sinks reject concurrent emission (FAIL_NON_SERIALIZED) and the callers race:
      * nowPlaying is emitted from both the RabbitMQ status listener and the session
@@ -70,5 +79,9 @@ public class ServerStatusBroadcaster {
 
     public Flux<PlaybackCommandData> commandFlux() {
         return commandSink.asFlux();
+    }
+
+    public Flux<DeviceCommandData> deviceCommandFlux() {
+        return deviceCommandSink.asFlux();
     }
 }

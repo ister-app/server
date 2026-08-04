@@ -20,6 +20,9 @@ class PlaybackSessionSweeperTest {
     private FollowerRegistry followerRegistry;
 
     @Mock
+    private DevicePresenceRegistry devicePresenceRegistry;
+
+    @Mock
     private ServerStatusBroadcaster broadcaster;
 
     @InjectMocks
@@ -54,6 +57,20 @@ class PlaybackSessionSweeperTest {
 
         sweeper.sweep();
 
+        verifyNoInteractions(broadcaster);
+    }
+
+    @Test
+    void sweepsDevicePresenceWithoutBroadcasting() {
+        // Device online state is pulled via the myDevices query — presence expiry alone
+        // must not re-emit the now-playing list.
+        when(registry.removeExpired(PlaybackSessionSweeper.SESSION_TIMEOUT)).thenReturn(false);
+        when(followerRegistry.removeExpired(PlaybackSessionSweeper.SESSION_TIMEOUT)).thenReturn(false);
+        when(devicePresenceRegistry.removeExpired(PlaybackSessionSweeper.SESSION_TIMEOUT)).thenReturn(true);
+
+        sweeper.sweep();
+
+        verify(devicePresenceRegistry).removeExpired(PlaybackSessionSweeper.SESSION_TIMEOUT);
         verifyNoInteractions(broadcaster);
     }
 }

@@ -1,5 +1,7 @@
 package app.ister.core.status;
 
+import app.ister.core.eventdata.DeviceCommandData;
+import app.ister.core.eventdata.DevicePresenceData;
 import app.ister.core.eventdata.EventFailureStatusData;
 import app.ister.core.eventdata.FollowerStatusData;
 import app.ister.core.eventdata.NodeActivityStatusData;
@@ -23,7 +25,7 @@ import org.springframework.stereotype.Component;
 // Jackson binding of the @RabbitHandler payloads in the GraalVM native image.
 @RegisterReflectionForBinding({NodeActivityStatusData.class, QueueStatsStatusData.class,
         EventFailureStatusData.class, PlaybackStatusData.class, PlaybackCommandData.class,
-        FollowerStatusData.class})
+        FollowerStatusData.class, DeviceCommandData.class, DevicePresenceData.class})
 @RabbitListener(queues = "#{statusQueue.name}")
 public class StatusEventListener {
 
@@ -32,16 +34,19 @@ public class StatusEventListener {
     private final RecentFailuresBuffer recentFailuresBuffer;
     private final PlaybackSessionRegistry playbackSessionRegistry;
     private final FollowerRegistry followerRegistry;
+    private final DevicePresenceRegistry devicePresenceRegistry;
     private final ServerStatusBroadcaster broadcaster;
 
     public StatusEventListener(NodeActivityRegistry nodeActivityRegistry, QueueStatsRegistry queueStatsRegistry,
                                RecentFailuresBuffer recentFailuresBuffer, PlaybackSessionRegistry playbackSessionRegistry,
-                               FollowerRegistry followerRegistry, ServerStatusBroadcaster broadcaster) {
+                               FollowerRegistry followerRegistry, DevicePresenceRegistry devicePresenceRegistry,
+                               ServerStatusBroadcaster broadcaster) {
         this.nodeActivityRegistry = nodeActivityRegistry;
         this.queueStatsRegistry = queueStatsRegistry;
         this.recentFailuresBuffer = recentFailuresBuffer;
         this.playbackSessionRegistry = playbackSessionRegistry;
         this.followerRegistry = followerRegistry;
+        this.devicePresenceRegistry = devicePresenceRegistry;
         this.broadcaster = broadcaster;
     }
 
@@ -72,6 +77,17 @@ public class StatusEventListener {
     @RabbitHandler
     public void onPlaybackCommand(PlaybackCommandData data) {
         broadcaster.emitCommand(data);
+    }
+
+    @RabbitHandler
+    public void onDeviceCommand(DeviceCommandData data) {
+        broadcaster.emitDeviceCommand(data);
+    }
+
+    @RabbitHandler
+    public void onDevicePresence(DevicePresenceData data) {
+        // Registry-only: device online state is pulled via the myDevices query, not broadcast.
+        devicePresenceRegistry.update(data);
     }
 
     @RabbitHandler

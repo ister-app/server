@@ -19,12 +19,14 @@ public class PlaybackSessionSweeper {
 
     private final PlaybackSessionRegistry registry;
     private final FollowerRegistry followerRegistry;
+    private final DevicePresenceRegistry devicePresenceRegistry;
     private final ServerStatusBroadcaster broadcaster;
 
     public PlaybackSessionSweeper(PlaybackSessionRegistry registry, FollowerRegistry followerRegistry,
-                                  ServerStatusBroadcaster broadcaster) {
+                                  DevicePresenceRegistry devicePresenceRegistry, ServerStatusBroadcaster broadcaster) {
         this.registry = registry;
         this.followerRegistry = followerRegistry;
+        this.devicePresenceRegistry = devicePresenceRegistry;
         this.broadcaster = broadcaster;
     }
 
@@ -32,6 +34,8 @@ public class PlaybackSessionSweeper {
     public void sweep() {
         boolean sessionsExpired = registry.removeExpired(SESSION_TIMEOUT);
         boolean followersExpired = followerRegistry.removeExpired(SESSION_TIMEOUT);
+        // Device presence expiry is registry-only: online state is pulled via myDevices.
+        devicePresenceRegistry.removeExpired(SESSION_TIMEOUT);
         if (sessionsExpired || followersExpired) {
             broadcaster.emitNowPlaying(registry.snapshot());
         }
