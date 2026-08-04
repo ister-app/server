@@ -71,6 +71,8 @@ type Query {
     playlists(libraryId: ID): [Playlist!]!
     "One of the caller's own playlists; null for an unknown id and for someone else's playlist."
     playlistById(id: ID!): Playlist
+    "The calling user's registered devices, most recently seen first."
+    myDevices: [Device!]!
 }
 
 "The external provider a metadata row or image originated from, for attribution."
@@ -234,6 +236,30 @@ type Mutation {
     "Moves an entry to directly after another entry, or to the front when afterPlaylistItemId is null."
     movePlaylistItem(playlistId: ID!, playlistItemId: ID!, afterPlaylistItemId: ID): Playlist!
     removePlaylistItem(playlistId: ID!, playlistItemId: ID!): Playlist!
+    """
+    Registers (or refreshes) the calling user's device. deviceId is the stable client-generated
+    install id — the same one followPlayQueue uses. The name only seeds the first registration;
+    a later rename by the user wins over whatever the client reports.
+    """
+    registerDevice(deviceId: ID!, name: String!, platform: DevicePlatform!): Device!
+    "Renames one of the caller's own devices; null for an unknown or someone else's device."
+    renameDevice(deviceId: ID!, name: String!): Device
+    "Removes one of the caller's own devices. Returns whether it existed."
+    removeDevice(deviceId: ID!): Boolean!
+    """
+    Presence heartbeat: marks the device online cluster-wide for ~60s. Call every ~20s while the
+    app is open (alongside an open deviceCommands subscription — only a device that is listening
+    should report itself online). Returns false for an unregistered device.
+    """
+    pingDevice(deviceId: ID!): Boolean!
+    """
+    Sends a command to one of the caller's OWN devices (deny-as-not-found for anyone else's).
+    The target must be online (presence registry); TAKEOVER_QUEUE and START_FOLLOW additionally
+    require a live playback session for playQueueId. Delivery is best-effort over the cluster
+    status exchange: true means published to an online device, not executed.
+    """
+    sendDeviceCommand(deviceId: ID!, command: DeviceCommandType!, mediaType: MediaType,
+        mediaId: ID, startId: ID, playQueueId: ID, positionInMilliseconds: Float): Boolean!
 }
 
 type Subscription {
@@ -247,6 +273,61 @@ type Subscription {
     remote controls) to refetch the queue after someone edited it.
     """
     playbackCommands(playQueueId: ID!): PlaybackCommand!
+    """
+    Commands addressed to this device (own devices only: the subscription is rejected when the
+    device is not the caller's). Keep it open while the app runs — a device without a live
+    subscriber silently drops its commands.
+    """
+    deviceCommands(deviceId: ID!): DeviceCommand!
+}
+
+"The platform a registered device runs on, as reported by the client."
+enum DevicePlatform {
+    ANDROID
+    ANDROID_TV
+    IOS
+    LINUX
+    MACOS
+    WINDOWS
+    WEB
+    OTHER
+}
+
+enum DeviceCommandType {
+    "Start playback of a media item on the target device."
+    PLAY_MEDIA
+    "Hand the play queue off: the target resumes it at the given position, the source stops."
+    TAKEOVER_QUEUE
+    "Make the target device start listen-along (follow mode) on the given play queue."
+    START_FOLLOW
+}
+
+"One of the calling user's registered devices."
+type Device {
+    "The client-generated install id (unique per user, not globally)."
+    deviceId: ID!
+    name: String!
+    platform: DevicePlatform!
+    "Whether the device pinged its presence within the session timeout — only online devices accept commands."
+    online: Boolean!
+    "Durable last activity (registration or presence ping), ISO-8601."
+    lastSeenAt: String!
+    createdAt: String!
+}
+
+type DeviceCommand {
+    deviceId: ID!
+    command: DeviceCommandType!
+    "PLAY_MEDIA: what to play."
+    mediaType: MediaType
+    mediaId: ID
+    "PLAY_MEDIA: item to start at (track/episode/chapter) within the media."
+    startId: ID
+    "TAKEOVER_QUEUE / START_FOLLOW: the play queue to resume or follow."
+    playQueueId: ID
+    "TAKEOVER_QUEUE: position to resume at. Float: long media exceeds GraphQL Int."
+    positionInMilliseconds: Float
+    timestamp: String!
 }
 
 """
