@@ -114,7 +114,7 @@ type Mutation {
     device was at anchorPositionMs at server-clock time anchorServerTimeMs" (the client converts its local clock using
     the offset it measured against GET /time). Followers extrapolate the leader position locally from the anchor.
     """
-    updatePlayQueue(id: ID!, progressInMilliseconds: Int!, playQueueItemId: ID!, streamSettings: StreamSettingsInput, playState: PlayState, anchorPositionMs: Int, anchorServerTimeMs: Float): PlayQueue
+    updatePlayQueue(id: ID!, progressInMilliseconds: Int!, playQueueItemId: ID!, streamSettings: StreamSettingsInput, playState: PlayState, deviceId: ID, anchorPositionMs: Int, anchorServerTimeMs: Float): PlayQueue
     movePlayQueueItem(playQueueId: ID!, playQueueItemId: ID!, afterPlayQueueItemId: ID): PlayQueue!
     removePlayQueueItem(playQueueId: ID!, playQueueItemId: ID!): PlayQueue!
     addPlayQueueItem(playQueueId: ID!, mediaType: MediaType!, mediaId: ID!, afterPlayQueueItemId: ID): PlayQueue!
@@ -428,6 +428,10 @@ type PlaybackSession {
     controllable: Boolean!
     "Number of devices currently following (listening along with) this session."
     followerCount: Int!
+    "Install id of the playing device; null for clients that don't report one."
+    deviceId: ID
+    "Registered name of the playing device; null without a device id."
+    deviceName: String
     "Tight-sync timeline anchor: playback position at anchorServerTimeMs. Null when the playing client doesn't report one."
     anchorPositionMs: Int
     "Server-clock instant (epoch ms) the anchor position was sampled at. Null when the playing client doesn't report one."

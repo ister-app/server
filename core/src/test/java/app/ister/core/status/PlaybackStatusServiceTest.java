@@ -31,6 +31,8 @@ class PlaybackStatusServiceTest {
         subject = new PlaybackStatusService(messageSender, "node1");
     }
 
+    private final UUID deviceId = UUID.randomUUID();
+
     private PlaybackStatusData publish(PlayState playState) {
         UUID queueId = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
@@ -41,6 +43,7 @@ class PlaybackStatusServiceTest {
         subject.publishHeartbeat(queueId, itemId, userId, "external-id", "Gerben", MediaType.EPISODE,
                 mediaId, "Title", 1000L, artworkId, 500L, playState,
                 RemoteControlScope.ALLOWLIST, java.util.List.of(UUID.randomUUID()),
+                deviceId, "Woonkamer",
                 480L, 1_760_000_000_000L);
 
         ArgumentCaptor<PlaybackStatusData> captor = ArgumentCaptor.forClass(PlaybackStatusData.class);
@@ -62,6 +65,8 @@ class PlaybackStatusServiceTest {
         assertEquals(PlayState.PAUSED, data.getPlayState());
         assertEquals(RemoteControlScope.ALLOWLIST, data.getControlScopeOverride());
         assertEquals(1, data.getControlAllowedUserIds().size());
+        assertEquals(deviceId, data.getDeviceId());
+        assertEquals("Woonkamer", data.getDeviceName());
         assertEquals(480L, data.getAnchorPositionMs());
         assertEquals(1_760_000_000_000L, data.getAnchorServerTimeMs());
         assertNotNull(data.getTimestamp());

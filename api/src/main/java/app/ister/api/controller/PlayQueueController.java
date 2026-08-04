@@ -24,6 +24,8 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.TrackRepository;
+import app.ister.core.entity.DeviceEntity;
+import app.ister.core.service.DeviceService;
 import app.ister.core.service.LibraryAccessService;
 import app.ister.core.service.MediaLibraryResolver;
 import app.ister.core.service.PlayQueuePrefetchService;
@@ -45,11 +47,15 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Controller
 @Slf4j
@@ -87,6 +93,16 @@ public class PlayQueueController {
 
     private final MediaLibraryResolver mediaLibraryResolver;
 
+    private final DeviceService deviceService;
+
+    /** Short-lived (owner, device) → name cache: the heartbeat arrives every ~10s per session
+     * and the device name may not cost a query each time. A rename shows up within a minute. */
+    private final Map<String, DeviceNameCacheEntry> deviceNameCache = new ConcurrentHashMap<>();
+    private static final Duration DEVICE_NAME_CACHE_TTL = Duration.ofSeconds(60);
+
+    private record DeviceNameCacheEntry(String name, Instant expiresAt) {
+    }
+
     @PreAuthorize("hasRole('user')")
     @QueryMapping
     public Optional<PlayQueueEntity> getPlayQueue(@Argument UUID id, Authentication authentication) {
@@ -103,7 +119,7 @@ public class PlayQueueController {
     /** All arguments of the {@code updatePlayQueue} mutation, bound as one object off the argument map. */
     record UpdatePlayQueueArguments(UUID id, long progressInMilliseconds, UUID playQueueItemId,
                                     StreamSettingsInput streamSettings, PlayState playState,
-                                    Integer anchorPositionMs, Double anchorServerTimeMs) {
+                                    UUID deviceId, Integer anchorPositionMs, Double anchorServerTimeMs) {
     }
 
     @PreAuthorize("hasRole('user')")
@@ -138,7 +154,7 @@ public class PlayQueueController {
         playQueue.ifPresent(queue -> {
             playQueuePrefetchService.maybePrefetchNext(queue, playQueueItemId, progressInMilliseconds);
             publishPlaybackHeartbeat(queue, playQueueItemId, progressInMilliseconds, playState,
-                    anchorPosition, anchorServerTime);
+                    args.deviceId(), anchorPosition, anchorServerTime);
         });
         return playQueue;
     }
@@ -164,6 +180,7 @@ public class PlayQueueController {
                         last.getDurationInMilliseconds(), last.getArtworkImageId(),
                         progressInMilliseconds, playState,
                         last.getControlScopeOverride(), last.getControlAllowedUserIds(),
+                        last.getDeviceId(), last.getDeviceName(),
                         anchorPositionMs, anchorServerTimeMs));
     }
 
@@ -173,7 +190,8 @@ public class PlayQueueController {
      * only plain values go into the heartbeat message.
      */
     private void publishPlaybackHeartbeat(PlayQueueEntity queue, UUID playQueueItemId, long progressInMilliseconds,
-                                          PlayState playState, Long anchorPositionMs, Long anchorServerTimeMs) {
+                                          PlayState playState, UUID deviceId,
+                                          Long anchorPositionMs, Long anchorServerTimeMs) {
         Optional<PlayQueueItemEntity> item = Optional.ofNullable(queue.getItems()).orElse(List.of()).stream()
                 .filter(candidate -> candidate.getId().equals(playQueueItemId))
                 .findFirst();
@@ -198,8 +216,25 @@ public class PlayQueueController {
                 playState,
                 controlScopeOverride,
                 controlAllowedUserIds,
+                deviceId,
+                deviceNameOf(queue.getUserEntity().getId(), deviceId),
                 anchorPositionMs,
                 anchorServerTimeMs);
+    }
+
+    /** Cached lookup of the owner's device name; null for clients that report no device id. */
+    private String deviceNameOf(UUID ownerId, UUID deviceId) {
+        if (deviceId == null) {
+            return null;
+        }
+        String key = ownerId + ":" + deviceId;
+        DeviceNameCacheEntry cached = deviceNameCache.get(key);
+        if (cached != null && cached.expiresAt().isAfter(Instant.now())) {
+            return cached.name();
+        }
+        String name = deviceService.findOwned(ownerId, deviceId).map(DeviceEntity::getName).orElse(null);
+        deviceNameCache.put(key, new DeviceNameCacheEntry(name, Instant.now().plus(DEVICE_NAME_CACHE_TTL)));
+        return name;
     }
 
     /** Duration of the playing item's media file; the longest one wins if there are several. */

@@ -35,8 +35,11 @@ public class PlaybackStatusService {
                                  Long durationInMilliseconds, UUID artworkImageId,
                                  long progressInMilliseconds, PlayState playState,
                                  RemoteControlScope controlScopeOverride, List<UUID> controlAllowedUserIds,
+                                 UUID deviceId, String deviceName,
                                  Long anchorPositionMs, Long anchorServerTimeMs) {
         messageSender.sendStatus(PlaybackStatusData.builder()
+                .deviceId(deviceId)
+                .deviceName(deviceName)
                 .anchorPositionMs(anchorPositionMs)
                 .anchorServerTimeMs(anchorServerTimeMs)
                 .playQueueId(playQueueId)

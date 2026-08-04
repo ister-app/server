@@ -93,6 +93,9 @@ class PlayQueueControllerGraphQlTest {
     @MockitoBean
     private app.ister.core.service.MediaLibraryResolver mediaLibraryResolver;
 
+    @MockitoBean
+    private app.ister.core.service.DeviceService deviceService;
+
     @BeforeEach
     void authenticateAsUser() {
         SecurityContextHolder.getContext().setAuthentication(

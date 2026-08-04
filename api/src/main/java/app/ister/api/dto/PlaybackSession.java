@@ -25,6 +25,10 @@ public record PlaybackSession(
         boolean controllable,
         /** Number of devices currently following (listening along with) this session. */
         int followerCount,
+        /** Install id of the playing device; null for clients that don't report one. */
+        UUID deviceId,
+        /** Name of the playing device as registered at heartbeat time; null without a device id. */
+        String deviceName,
         /** Tight-sync anchor: playback position (ms) at {@link #anchorServerTimeMs}; null without one. */
         Long anchorPositionMs,
         /** Server-clock instant the anchor was sampled at (epoch ms, Float on the wire); null without one. */
@@ -36,6 +40,7 @@ public record PlaybackSession(
                 data.getDurationInMilliseconds(), data.getArtworkImageId(),
                 data.getProgressInMilliseconds(), data.getPlayState(), data.getNodeName(),
                 String.valueOf(data.getTimestamp()), controllable, followerCount,
+                data.getDeviceId(), data.getDeviceName(),
                 data.getAnchorPositionMs(),
                 data.getAnchorServerTimeMs() == null ? null : data.getAnchorServerTimeMs().doubleValue());
     }

@@ -47,6 +47,11 @@ public class PlaybackStatusData {
     /** Grantee user ids of this session's per-session control allowlist; used when
      * {@link #controlScopeOverride} is ALLOWLIST. Empty when there is no override list. */
     private List<UUID> controlAllowedUserIds;
+    /** Install id of the playing device; null for clients that don't report one. */
+    private UUID deviceId;
+    /** User-facing name of the playing device at heartbeat time; resolved on the request
+     * thread (cached) so the now-playing resolver never needs the database for it. */
+    private String deviceName;
     /** Tight-sync anchor: playback position (ms) at {@link #anchorServerTimeMs}. Null when
      * the playing client doesn't report one (older clients, or clock sync unavailable). */
     private Long anchorPositionMs;
