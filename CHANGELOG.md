@@ -1,5 +1,33 @@
 # Changelog
 
+## server v2.8.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.8.0` |
+| `ghcr.io/ister-app/migrations` | `2.8.0` |
+
+### Features
+
+- feat(api): per-user playlists with manual items and smart filters ([`3dd4bac`](https://github.com/ister-app/server/commit/3dd4bac))
+- feat(api): shared-timeline anchor and /time endpoint for listen-along tight sync ([`914f2f6`](https://github.com/ister-app/server/commit/914f2f6))
+
+### Fixes
+
+- fix(database): register filter records for native-image reflection ([`1f40a92`](https://github.com/ister-app/server/commit/1f40a92))
+
+### Other
+
+- refactor: resolve all open SonarCloud issues ([`8f938e0`](https://github.com/ister-app/server/commit/8f938e0))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.8.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.7.0...v2.8.0
+
 ## server v2.7.0
 
 | Image | Tag |
