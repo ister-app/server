@@ -1,5 +1,33 @@
 # Changelog
 
+## server v2.9.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.9.0` |
+| `ghcr.io/ister-app/migrations` | `2.9.0` |
+
+### Features
+
+- feat(api): report the playing device on playback sessions ([`7fcc611`](https://github.com/ister-app/server/commit/7fcc611))
+- feat(api): devices graphql api ([`9241e7e`](https://github.com/ister-app/server/commit/9241e7e))
+- feat(api): device command fan-out and presence registry ([`674f19c`](https://github.com/ister-app/server/commit/674f19c))
+- feat(api): device registration with per-user install ids ([`8e7d388`](https://github.com/ister-app/server/commit/8e7d388))
+- feat(api): cover images for playlists ([`d2b4abc`](https://github.com/ister-app/server/commit/d2b4abc))
+- feat(api): start a filter-backed play queue at a chosen item ([`e14ea74`](https://github.com/ister-app/server/commit/e14ea74))
+
+### Fixes
+
+- fix: resolve SonarCloud findings on main ([`d486ed2`](https://github.com/ister-app/server/commit/d486ed2))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.9.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.8.0...v2.9.0
+
 ## server v2.8.0
 
 | Image | Tag |
