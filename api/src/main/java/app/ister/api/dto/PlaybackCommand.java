@@ -11,11 +11,12 @@ public record PlaybackCommand(
         PlaybackCommandType command,
         Long positionInMilliseconds,
         UUID playQueueItemId,
+        String targetDeviceId,
         String timestamp) {
 
     public static PlaybackCommand from(PlaybackCommandData data) {
         return new PlaybackCommand(data.getPlayQueueId(), data.getCommand(),
                 data.getPositionInMilliseconds(), data.getPlayQueueItemId(),
-                String.valueOf(data.getTimestamp()));
+                data.getTargetDeviceId(), String.valueOf(data.getTimestamp()));
     }
 }

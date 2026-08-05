@@ -26,5 +26,7 @@ public class PlaybackCommandData {
     private Long positionInMilliseconds;
     /** Target queue item for SKIP_TO_ITEM. */
     private UUID playQueueItemId;
+    /** STOP_FOLLOW: install id of the following device that must stop listening along. */
+    private String targetDeviceId;
     private Instant timestamp;
 }

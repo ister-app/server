@@ -53,6 +53,11 @@ public class PlaybackCommandController {
     public boolean sendPlaybackCommand(@Argument UUID playQueueId, @Argument PlaybackCommandType command,
                                        @Argument Long positionInMilliseconds, @Argument UUID playQueueItemId,
                                        Authentication authentication) {
+        // STOP_FOLLOW is not a transport command but the session owner kicking a follower, and is
+        // published by removeFollower — accepting it here would let any controller kick anyone.
+        if (command == PlaybackCommandType.STOP_FOLLOW) {
+            return false;
+        }
         // The registry is cluster-wide (status fan-out), so no live session anywhere means the
         // command has nowhere to go. Both "no session" and "not allowed to control" return false,
         // so a denied caller cannot tell an unshared session from a stopped one (deny = not-found).

@@ -63,6 +63,12 @@ type Query {
     playbackSharingSettings: PlaybackSharingSettings!
     "Users the caller can pick for a sharing allowlist: id + display name only, excluding the caller."
     shareableUsers: [ShareableUser!]!
+    """
+    Devices listening along (follow mode) with one of the caller's OWN live sessions, oldest
+    registration first. Empty for a session the caller does not own (deny-as-not-found) and for a
+    session nobody follows.
+    """
+    sessionFollowers(playQueueId: ID!): [SessionFollower!]!
     "External metadata/image providers actually in use on this server, for attribution display."
     attributions: [Attribution!]!
     "The calling user's custom views (saved filters), by name; optionally narrowed to one library and/or kind."
@@ -188,6 +194,13 @@ type Mutation {
     client-generated install id.
     """
     followPlayQueue(playQueueId: ID!, deviceId: String!, active: Boolean!): FollowResult!
+    """
+    Kicks a listen-along follower off one of the caller's OWN sessions: a null deviceId removes
+    every device of that user, otherwise just that one. The devices are told to stop over the
+    playbackCommands channel (STOP_FOLLOW) and are refused a re-registration until the kick
+    expires with the session timeout. Returns whether anything was following.
+    """
+    removeFollower(playQueueId: ID!, userId: ID!, deviceId: String): Boolean!
     """
     Saves the calling user's playback settings. They apply to every client of that user and steer
     pre-transcoding: only the preferred audio languages (and video variants up to maxVideoHeight)
@@ -349,6 +362,11 @@ enum PlaybackCommandType {
     SEEK
     SKIP_TO_ITEM
     QUEUE_CHANGED
+    """
+    Not a transport command: it tells one listening-along device (targetDeviceId) that the session
+    owner removed it. Sent here because deviceCommands only reaches the caller's own devices.
+    """
+    STOP_FOLLOW
 }
 
 type PlaybackCommand {
@@ -358,7 +376,27 @@ type PlaybackCommand {
     positionInMilliseconds: Int
     "Target queue item for SKIP_TO_ITEM."
     playQueueItemId: ID
+    """
+    STOP_FOLLOW: install id of the follower device that must stop. Every subscriber of the queue
+    sees it — an install id, not a personal identifier — and ignores the ones that are not theirs.
+    """
+    targetDeviceId: String
     timestamp: String!
+}
+
+"One device listening along with a session; only the session owner can see these."
+type SessionFollower {
+    userId: ID!
+    "Display name of the following user."
+    userName: String
+    "The follower's client install id — unique per user, not globally."
+    deviceId: String!
+    "Registered device name; null when the follower never called registerDevice."
+    deviceName: String
+    "Registered device platform; null without a device registration."
+    platform: DevicePlatform
+    "When this device started following, ISO-8601."
+    since: String!
 }
 
 enum PlayState {
