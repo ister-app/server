@@ -3,6 +3,7 @@ package app.ister.api.controller;
 import app.ister.api.dto.PlaybackCommand;
 import app.ister.core.enums.PlayState;
 import app.ister.core.enums.PlaybackCommandType;
+import app.ister.core.enums.RepeatMode;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.eventdata.PlaybackCommandData;
 import app.ister.core.eventdata.PlaybackStatusData;
@@ -112,21 +113,48 @@ class PlaybackCommandControllerTest {
         UUID playQueueId = UUID.randomUUID();
         playbackSessionRegistry.update(session(playQueueId));
 
-        boolean sent = controller.sendPlaybackCommand(playQueueId, PlaybackCommandType.SEEK, 12345L, null, authentication);
+        boolean sent = controller.sendPlaybackCommand(playQueueId, PlaybackCommandType.SEEK, 12345L, null, null, authentication);
 
         assertTrue(sent);
-        verify(playbackCommandService).publish(playQueueId, PlaybackCommandType.SEEK, 12345L, null);
+        verify(playbackCommandService).publish(playQueueId, PlaybackCommandType.SEEK, 12345L, null, null);
+    }
+
+    @Test
+    void sendPlaybackCommandRelaysTheRequestedRepeatMode() {
+        UUID playQueueId = UUID.randomUUID();
+        playbackSessionRegistry.update(session(playQueueId));
+
+        boolean sent = controller.sendPlaybackCommand(playQueueId, PlaybackCommandType.SET_REPEAT,
+                null, null, RepeatMode.ONE, authentication);
+
+        assertTrue(sent);
+        verify(playbackCommandService)
+                .publish(playQueueId, PlaybackCommandType.SET_REPEAT, null, null, RepeatMode.ONE);
+    }
+
+    @Test
+    void sendPlaybackCommandRefusesToKickAFollower() {
+        UUID playQueueId = UUID.randomUUID();
+        playbackSessionRegistry.update(session(playQueueId));
+
+        // Removing a follower is owner-only and goes through removeFollower; a controller
+        // must not be able to publish the kick itself.
+        boolean sent = controller.sendPlaybackCommand(playQueueId, PlaybackCommandType.STOP_FOLLOW,
+                null, null, null, authentication);
+
+        assertFalse(sent);
+        verify(playbackCommandService, never()).publish(any(), any(), any(), any(), any());
     }
 
     @Test
     void sendPlaybackCommandDropsWhenNoLiveSession() {
         UUID playQueueId = UUID.randomUUID();
 
-        boolean sent = controller.sendPlaybackCommand(playQueueId, PlaybackCommandType.PAUSE, null, null, authentication);
+        boolean sent = controller.sendPlaybackCommand(playQueueId, PlaybackCommandType.PAUSE, null, null, null, authentication);
 
         assertFalse(sent);
         // No live session anywhere in the cluster: nothing is published.
-        verify(playbackCommandService, never()).publish(any(), any(), any(), any());
+        verify(playbackCommandService, never()).publish(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -135,11 +163,11 @@ class PlaybackCommandControllerTest {
         playbackSessionRegistry.update(session(playQueueId));
         when(playbackSharingService.canControl(any(), any(), any(), any())).thenReturn(false);
 
-        boolean sent = controller.sendPlaybackCommand(playQueueId, PlaybackCommandType.NEXT, null, null, authentication);
+        boolean sent = controller.sendPlaybackCommand(playQueueId, PlaybackCommandType.NEXT, null, null, null, authentication);
 
         assertFalse(sent);
         // Deny reads as not-found: a disallowed caller cannot tell an unshared session from a stopped one.
-        verify(playbackCommandService, never()).publish(any(), any(), any(), any());
+        verify(playbackCommandService, never()).publish(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -154,7 +182,7 @@ class PlaybackCommandControllerTest {
                     .timestamp(Instant.now())
                     .build());
             return null;
-        }).when(playbackCommandService).publish(any(), any(), any(), any());
+        }).when(playbackCommandService).publish(any(), any(), any(), any(), any());
 
         UUID playQueueId = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
@@ -162,7 +190,7 @@ class PlaybackCommandControllerTest {
         List<PlaybackCommand> received = new CopyOnWriteArrayList<>();
         controller.playbackCommands(playQueueId).subscribe(received::add);
 
-        controller.sendPlaybackCommand(playQueueId, PlaybackCommandType.SKIP_TO_ITEM, null, itemId, authentication);
+        controller.sendPlaybackCommand(playQueueId, PlaybackCommandType.SKIP_TO_ITEM, null, itemId, null, authentication);
 
         assertEquals(1, received.size());
         assertEquals(PlaybackCommandType.SKIP_TO_ITEM, received.getFirst().command());

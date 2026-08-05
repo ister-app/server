@@ -3,6 +3,7 @@ package app.ister.core.status;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayState;
 import app.ister.core.enums.RemoteControlScope;
+import app.ister.core.enums.RepeatMode;
 import app.ister.core.eventdata.PlaybackStatusData;
 import app.ister.core.service.MessageSender;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +45,7 @@ class PlaybackStatusServiceTest {
                 mediaId, "Title", 1000L, artworkId, 500L, playState,
                 RemoteControlScope.ALLOWLIST, java.util.List.of(UUID.randomUUID()),
                 deviceId, "Woonkamer",
-                480L, 1_760_000_000_000L);
+                480L, 1_760_000_000_000L, RepeatMode.ALL);
 
         ArgumentCaptor<PlaybackStatusData> captor = ArgumentCaptor.forClass(PlaybackStatusData.class);
         verify(messageSender).sendStatus(captor.capture());
@@ -58,6 +59,7 @@ class PlaybackStatusServiceTest {
         assertEquals("node1", data.getNodeName());
         assertEquals("external-id", data.getUserExternalId());
         assertEquals("Gerben", data.getUserName());
+        assertEquals(RepeatMode.ALL, data.getRepeatMode());
         assertEquals(MediaType.EPISODE, data.getMediaType());
         assertEquals("Title", data.getTitle());
         assertEquals(1000L, data.getDurationInMilliseconds());

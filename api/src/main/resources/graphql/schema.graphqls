@@ -120,7 +120,7 @@ type Mutation {
     device was at anchorPositionMs at server-clock time anchorServerTimeMs" (the client converts its local clock using
     the offset it measured against GET /time). Followers extrapolate the leader position locally from the anchor.
     """
-    updatePlayQueue(id: ID!, progressInMilliseconds: Int!, playQueueItemId: ID!, streamSettings: StreamSettingsInput, playState: PlayState, deviceId: ID, anchorPositionMs: Int, anchorServerTimeMs: Float): PlayQueue
+    updatePlayQueue(id: ID!, progressInMilliseconds: Int!, playQueueItemId: ID!, streamSettings: StreamSettingsInput, playState: PlayState, deviceId: ID, anchorPositionMs: Int, anchorServerTimeMs: Float, repeatMode: RepeatMode): PlayQueue
     movePlayQueueItem(playQueueId: ID!, playQueueItemId: ID!, afterPlayQueueItemId: ID): PlayQueue!
     removePlayQueueItem(playQueueId: ID!, playQueueItemId: ID!): PlayQueue!
     addPlayQueueItem(playQueueId: ID!, mediaType: MediaType!, mediaId: ID!, afterPlayQueueItemId: ID): PlayQueue!
@@ -184,7 +184,7 @@ type Mutation {
     client regardless of which node it is connected to. Returns whether an active session for the
     queue was known and the command was accepted.
     """
-    sendPlaybackCommand(playQueueId: ID!, command: PlaybackCommandType!, positionInMilliseconds: Int, playQueueItemId: ID): Boolean!
+    sendPlaybackCommand(playQueueId: ID!, command: PlaybackCommandType!, positionInMilliseconds: Int, playQueueItemId: ID, repeatMode: RepeatMode): Boolean!
     """
     Registers (active: true) or deregisters (active: false) this device as a follower of a live
     playback session: the device plays the same queue along and the following user's watch status
@@ -367,6 +367,18 @@ enum PlaybackCommandType {
     owner removed it. Sent here because deviceCommands only reaches the caller's own devices.
     """
     STOP_FOLLOW
+    "Switch the playing client's repeat mode to repeatMode; every controller then shows it."
+    SET_REPEAT
+}
+
+"""
+Repeat mode of a playing client. Enforced client-side; the server only relays it, so a remote
+control shows and toggles the same state as the device that is playing.
+"""
+enum RepeatMode {
+    NONE
+    ALL
+    ONE
 }
 
 type PlaybackCommand {
@@ -381,6 +393,8 @@ type PlaybackCommand {
     sees it — an install id, not a personal identifier — and ignores the ones that are not theirs.
     """
     targetDeviceId: String
+    "SET_REPEAT: the requested repeat mode."
+    repeatMode: RepeatMode
     timestamp: String!
 }
 
@@ -474,6 +488,8 @@ type PlaybackSession {
     anchorPositionMs: Int
     "Server-clock instant (epoch ms) the anchor position was sampled at. Null when the playing client doesn't report one."
     anchorServerTimeMs: Float
+    "Repeat mode of the playing client; null for clients that don't report one."
+    repeatMode: RepeatMode
 }
 
 type ServerActivitySnapshot {

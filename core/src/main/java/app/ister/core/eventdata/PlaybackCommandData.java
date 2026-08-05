@@ -1,6 +1,7 @@
 package app.ister.core.eventdata;
 
 import app.ister.core.enums.PlaybackCommandType;
+import app.ister.core.enums.RepeatMode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -28,5 +29,7 @@ public class PlaybackCommandData {
     private UUID playQueueItemId;
     /** STOP_FOLLOW: install id of the following device that must stop listening along. */
     private String targetDeviceId;
+    /** SET_REPEAT: the repeat mode the playing client should switch to. */
+    private RepeatMode repeatMode;
     private Instant timestamp;
 }

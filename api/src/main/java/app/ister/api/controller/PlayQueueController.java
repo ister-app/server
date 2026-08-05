@@ -15,6 +15,7 @@ import app.ister.core.enums.ImageType;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayState;
 import app.ister.core.enums.RemoteControlScope;
+import app.ister.core.enums.RepeatMode;
 import app.ister.core.entity.PodcastEpisodeEntity;
 import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.EpisodeRepository;
@@ -119,7 +120,8 @@ public class PlayQueueController {
     /** All arguments of the {@code updatePlayQueue} mutation, bound as one object off the argument map. */
     record UpdatePlayQueueArguments(UUID id, long progressInMilliseconds, UUID playQueueItemId,
                                     StreamSettingsInput streamSettings, PlayState playState,
-                                    UUID deviceId, Integer anchorPositionMs, Double anchorServerTimeMs) {
+                                    UUID deviceId, Integer anchorPositionMs, Double anchorServerTimeMs,
+                                    RepeatMode repeatMode) {
     }
 
     @PreAuthorize("hasRole('user')")
@@ -148,13 +150,13 @@ public class PlayQueueController {
             // re-publish the last known session with the fresh progress/state, then
             // surface the error so the client retries the persistent update.
             republishLastKnownSession(id, playQueueItemId, progressInMilliseconds, playState,
-                    anchorPosition, anchorServerTime, authentication);
+                    anchorPosition, anchorServerTime, args.repeatMode(), authentication);
             throw ex;
         }
         playQueue.ifPresent(queue -> {
             playQueuePrefetchService.maybePrefetchNext(queue, playQueueItemId, progressInMilliseconds);
             publishPlaybackHeartbeat(queue, playQueueItemId, progressInMilliseconds, playState,
-                    args.deviceId(), anchorPosition, anchorServerTime);
+                    args.deviceId(), anchorPosition, anchorServerTime, args.repeatMode());
         });
         return playQueue;
     }
@@ -169,7 +171,7 @@ public class PlayQueueController {
      */
     private void republishLastKnownSession(UUID playQueueId, UUID playQueueItemId, long progressInMilliseconds,
                                            PlayState playState, Long anchorPositionMs, Long anchorServerTimeMs,
-                                           Authentication authentication) {
+                                           RepeatMode repeatMode, Authentication authentication) {
         playbackSessionRegistry.find(playQueueId)
                 .filter(last -> authentication.getName() != null
                         && authentication.getName().equals(last.getUserExternalId()))
@@ -181,7 +183,7 @@ public class PlayQueueController {
                         progressInMilliseconds, playState,
                         last.getControlScopeOverride(), last.getControlAllowedUserIds(),
                         last.getDeviceId(), last.getDeviceName(),
-                        anchorPositionMs, anchorServerTimeMs));
+                        anchorPositionMs, anchorServerTimeMs, repeatMode));
     }
 
     /**
@@ -191,7 +193,8 @@ public class PlayQueueController {
      */
     private void publishPlaybackHeartbeat(PlayQueueEntity queue, UUID playQueueItemId, long progressInMilliseconds,
                                           PlayState playState, UUID deviceId,
-                                          Long anchorPositionMs, Long anchorServerTimeMs) {
+                                          Long anchorPositionMs, Long anchorServerTimeMs,
+                                          RepeatMode repeatMode) {
         Optional<PlayQueueItemEntity> item = Optional.ofNullable(queue.getItems()).orElse(List.of()).stream()
                 .filter(candidate -> candidate.getId().equals(playQueueItemId))
                 .findFirst();
@@ -219,7 +222,8 @@ public class PlayQueueController {
                 deviceId,
                 deviceNameOf(queue.getUserEntity().getId(), deviceId),
                 anchorPositionMs,
-                anchorServerTimeMs);
+                anchorServerTimeMs,
+                repeatMode);
     }
 
     /** Cached lookup of the owner's device name; null for clients that report no device id. */

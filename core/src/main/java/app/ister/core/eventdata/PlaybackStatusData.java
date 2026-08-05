@@ -3,6 +3,7 @@ package app.ister.core.eventdata;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayState;
 import app.ister.core.enums.RemoteControlScope;
+import app.ister.core.enums.RepeatMode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -40,6 +41,8 @@ public class PlaybackStatusData {
     private PlayState playState;
     private String nodeName;
     private Instant timestamp;
+    /** Repeat mode of the playing client; null for clients that don't report one. */
+    private RepeatMode repeatMode;
     /** Per-session remote-control override; null = use the owner's account-level control scope.
      * Embedded on the heartbeat path (which has DB access) so the now-playing resolver can compute
      * the per-viewer {@code controllable} flag without touching the database on listener threads. */

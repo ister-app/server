@@ -2,6 +2,7 @@ package app.ister.api.controller;
 
 import app.ister.api.dto.PlaybackCommand;
 import app.ister.core.enums.PlaybackCommandType;
+import app.ister.core.enums.RepeatMode;
 import app.ister.core.eventdata.PlaybackStatusData;
 import app.ister.core.service.PlaybackSharingService;
 import app.ister.core.service.UserService;
@@ -52,7 +53,7 @@ public class PlaybackCommandController {
     @MutationMapping
     public boolean sendPlaybackCommand(@Argument UUID playQueueId, @Argument PlaybackCommandType command,
                                        @Argument Long positionInMilliseconds, @Argument UUID playQueueItemId,
-                                       Authentication authentication) {
+                                       @Argument RepeatMode repeatMode, Authentication authentication) {
         // STOP_FOLLOW is not a transport command but the session owner kicking a follower, and is
         // published by removeFollower — accepting it here would let any controller kick anyone.
         if (command == PlaybackCommandType.STOP_FOLLOW) {
@@ -72,7 +73,7 @@ public class PlaybackCommandController {
         if (!playbackSharingService.canControl(viewerId, data.getUserId(), data.getControlScopeOverride(), sessionAllowed)) {
             return false;
         }
-        playbackCommandService.publish(playQueueId, command, positionInMilliseconds, playQueueItemId);
+        playbackCommandService.publish(playQueueId, command, positionInMilliseconds, playQueueItemId, repeatMode);
         return true;
     }
 

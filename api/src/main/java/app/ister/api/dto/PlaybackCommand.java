@@ -1,6 +1,7 @@
 package app.ister.api.dto;
 
 import app.ister.core.enums.PlaybackCommandType;
+import app.ister.core.enums.RepeatMode;
 import app.ister.core.eventdata.PlaybackCommandData;
 
 import java.util.UUID;
@@ -12,11 +13,13 @@ public record PlaybackCommand(
         Long positionInMilliseconds,
         UUID playQueueItemId,
         String targetDeviceId,
+        RepeatMode repeatMode,
         String timestamp) {
 
     public static PlaybackCommand from(PlaybackCommandData data) {
         return new PlaybackCommand(data.getPlayQueueId(), data.getCommand(),
                 data.getPositionInMilliseconds(), data.getPlayQueueItemId(),
-                data.getTargetDeviceId(), String.valueOf(data.getTimestamp()));
+                data.getTargetDeviceId(), data.getRepeatMode(),
+                String.valueOf(data.getTimestamp()));
     }
 }

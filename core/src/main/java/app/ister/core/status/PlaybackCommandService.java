@@ -1,6 +1,7 @@
 package app.ister.core.status;
 
 import app.ister.core.enums.PlaybackCommandType;
+import app.ister.core.enums.RepeatMode;
 import app.ister.core.eventdata.PlaybackCommandData;
 import app.ister.core.service.MessageSender;
 import org.springframework.stereotype.Service;
@@ -22,18 +23,20 @@ public class PlaybackCommandService {
         this.messageSender = messageSender;
     }
 
-    public void publish(UUID playQueueId, PlaybackCommandType command, Long positionInMilliseconds, UUID playQueueItemId) {
+    public void publish(UUID playQueueId, PlaybackCommandType command, Long positionInMilliseconds,
+                        UUID playQueueItemId, RepeatMode repeatMode) {
         messageSender.sendStatus(PlaybackCommandData.builder()
                 .playQueueId(playQueueId)
                 .command(command)
                 .positionInMilliseconds(positionInMilliseconds)
                 .playQueueItemId(playQueueItemId)
+                .repeatMode(repeatMode)
                 .timestamp(Instant.now())
                 .build());
     }
 
     public void publishQueueChanged(UUID playQueueId) {
-        publish(playQueueId, PlaybackCommandType.QUEUE_CHANGED, null, null);
+        publish(playQueueId, PlaybackCommandType.QUEUE_CHANGED, null, null, null);
     }
 
     /**

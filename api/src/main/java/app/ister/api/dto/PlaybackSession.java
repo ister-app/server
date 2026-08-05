@@ -2,6 +2,7 @@ package app.ister.api.dto;
 
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayState;
+import app.ister.core.enums.RepeatMode;
 import app.ister.core.eventdata.PlaybackStatusData;
 
 import java.util.UUID;
@@ -32,7 +33,9 @@ public record PlaybackSession(
         /** Tight-sync anchor: playback position (ms) at {@link #anchorServerTimeMs}; null without one. */
         Long anchorPositionMs,
         /** Server-clock instant the anchor was sampled at (epoch ms, Float on the wire); null without one. */
-        Double anchorServerTimeMs) {
+        Double anchorServerTimeMs,
+        /** Repeat mode of the playing client; null for clients that don't report one. */
+        RepeatMode repeatMode) {
 
     public static PlaybackSession from(PlaybackStatusData data, boolean controllable, int followerCount) {
         return new PlaybackSession(data.getPlayQueueId(), data.getPlayQueueItemId(), data.getUserId(),
@@ -42,6 +45,7 @@ public record PlaybackSession(
                 String.valueOf(data.getTimestamp()), controllable, followerCount,
                 data.getDeviceId(), data.getDeviceName(),
                 data.getAnchorPositionMs(),
-                data.getAnchorServerTimeMs() == null ? null : data.getAnchorServerTimeMs().doubleValue());
+                data.getAnchorServerTimeMs() == null ? null : data.getAnchorServerTimeMs().doubleValue(),
+                data.getRepeatMode());
     }
 }

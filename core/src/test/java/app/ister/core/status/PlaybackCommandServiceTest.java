@@ -37,7 +37,7 @@ class PlaybackCommandServiceTest {
         UUID queueId = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
 
-        subject.publish(queueId, PlaybackCommandType.SEEK, 42000L, itemId);
+        subject.publish(queueId, PlaybackCommandType.SEEK, 42000L, itemId, null);
 
         PlaybackCommandData data = captureSentCommand();
         assertEquals(queueId, data.getPlayQueueId());

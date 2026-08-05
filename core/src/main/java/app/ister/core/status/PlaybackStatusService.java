@@ -3,6 +3,7 @@ package app.ister.core.status;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayState;
 import app.ister.core.enums.RemoteControlScope;
+import app.ister.core.enums.RepeatMode;
 import app.ister.core.eventdata.PlaybackStatusData;
 import app.ister.core.service.MessageSender;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,7 +37,7 @@ public class PlaybackStatusService {
                                  long progressInMilliseconds, PlayState playState,
                                  RemoteControlScope controlScopeOverride, List<UUID> controlAllowedUserIds,
                                  UUID deviceId, String deviceName,
-                                 Long anchorPositionMs, Long anchorServerTimeMs) {
+                                 Long anchorPositionMs, Long anchorServerTimeMs, RepeatMode repeatMode) {
         messageSender.sendStatus(PlaybackStatusData.builder()
                 .deviceId(deviceId)
                 .deviceName(deviceName)
@@ -58,6 +59,7 @@ public class PlaybackStatusService {
                 .timestamp(Instant.now())
                 .controlScopeOverride(controlScopeOverride)
                 .controlAllowedUserIds(controlAllowedUserIds)
+                .repeatMode(repeatMode)
                 .build());
     }
 }
