@@ -1202,8 +1202,34 @@ type Book {
     metadata: [Metadata!]
     "Reading progress (book-level rows) for the calling user."
     watchStatus: [WatchStatus!]
+    """
+    How far the calling user is in the book as a whole — listening counts finished chapters in
+    full instead of only showing the position inside the current chapter. Null when the book was
+    never started. When the user both reads and listens, the mode they touched last wins.
+    """
+    progress: BookProgress
     "The calling user's rating (1-10), or null if unrated."
     rating: Int
+}
+
+type BookProgress {
+    "Whether this position comes from the epub or from the audiobook."
+    mode: BookProgressMode!
+    "Position in the whole book, 0.0-1.0."
+    progress: Float!
+    "Read/listened to the end; clients hide the progress bar for these."
+    finished: Boolean!
+    "Total duration of all analysed chapters; null while reading."
+    durationInMilliseconds: Int
+    "Position within that total; null while reading."
+    positionInMilliseconds: Int
+    "When this position was last updated (ISO-8601)."
+    updatedAt: String!
+}
+
+enum BookProgressMode {
+    READING
+    LISTENING
 }
 
 type Chapter {

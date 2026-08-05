@@ -15,6 +15,7 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.BookProgressService;
 import app.ister.core.service.BookResumeService;
 import app.ister.core.service.ContinueWatchingService;
 import app.ister.core.service.LibraryAccessService;
@@ -36,6 +37,7 @@ import org.springframework.stereotype.Controller;
 
 import java.time.LocalDate;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -56,6 +58,7 @@ public class BookController {
     private final WatchStatusService watchStatusService;
     private final ContinueWatchingService continueWatchingService;
     private final BookResumeService bookResumeService;
+    private final BookProgressService bookProgressService;
     private final UserService userService;
     private final LibraryAccessService libraryAccessService;
 
@@ -198,6 +201,25 @@ public class BookController {
         Map<UUID, List<ImageEntity>> byBookId = imageRepository.findByBookEntityIdIn(ids).stream()
                 .collect(Collectors.groupingBy(ImageEntity::getBookEntityId));
         return books.stream().collect(Collectors.toMap(b -> b, b -> byBookId.getOrDefault(b.getId(), List.of())));
+    }
+
+    /**
+     * Batch-mapped because a continue-watching carousel resolves this for every book at once, and
+     * the aggregate touches every chapter of every one of them.
+     */
+    @BatchMapping(typeName = "Book", field = "progress")
+    public Map<BookEntity, BookProgressService.BookProgress> progress(List<BookEntity> books,
+                                                                     Authentication authentication) {
+        Map<UUID, BookProgressService.BookProgress> byBookId = bookProgressService
+                .forBooks(userService.getOrCreateUser(authentication), books);
+        Map<BookEntity, BookProgressService.BookProgress> result = new HashMap<>();
+        books.forEach(book -> result.put(book, byBookId.get(book.getId())));
+        return result;
+    }
+
+    @SchemaMapping(typeName = "BookProgress", field = "updatedAt")
+    public String progressUpdatedAt(BookProgressService.BookProgress progress) {
+        return progress.updatedAt().toString();
     }
 
     @BatchMapping(typeName = "Book", field = "watchStatus")

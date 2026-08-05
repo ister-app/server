@@ -1,6 +1,8 @@
 package app.ister.core.repository;
 
 import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.BookEntity;
+import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.ContinueWatchingEntity;
 import app.ister.core.entity.CreditEntity;
 import app.ister.core.entity.DirectoryEntity;
@@ -53,6 +55,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -537,6 +540,50 @@ class PostgresRepositoryIntegrationTest {
         assertEquals(2, byId.get(trackA.getId()).getPlays());
         assertEquals(1, byId.get(trackB.getId()).getPlays());
         assertNotNull(byId.get(trackA.getId()).getLastPlayedAt());
+    }
+
+    /** Feeds whole-book listening progress: every chapter, its duration, and this user's position. */
+    @Test
+    void chapterProgressReturnsEveryChapterWithItsDurationAndThisUsersPosition() {
+        UserEntity user = em.persist(UserEntity.builder().externalId("listener-book").build());
+        UserEntity other = em.persist(UserEntity.builder().externalId("listener-book-2").build());
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.BOOK).name("Books-progress").build());
+        PersonEntity author = em.persist(PersonEntity.builder().name("Author-progress").build());
+        BookEntity book = em.persist(BookEntity.builder()
+                .libraryEntity(library).personEntity(author).name("Book-progress").releaseYear(2021).build());
+        ChapterEntity chapter1 = em.persist(ChapterEntity.builder().bookEntity(book).personEntity(author).number(1).build());
+        ChapterEntity chapter2 = em.persist(ChapterEntity.builder().bookEntity(book).personEntity(author).number(2).build());
+        // Chapter 3 has no media file at all: it must still come back, without a duration.
+        em.persist(ChapterEntity.builder().bookEntity(book).personEntity(author).number(3).build());
+        MediaFileEntity file1 = persistMediaFile("chapter-1.m4b");
+        file1.setChapterEntity(chapter1);
+        file1.setDurationInMilliseconds(3_600_000L);
+        MediaFileEntity file2 = persistMediaFile("chapter-2.m4b");
+        file2.setChapterEntity(chapter2);
+        file2.setDurationInMilliseconds(1_800_000L);
+        em.persist(WatchStatusEntity.builder().userEntity(user).playQueueItemId(chapter1.getId())
+                .chapterEntity(chapter1).watched(true).progressInMilliseconds(3_600_000L).build());
+        em.persist(WatchStatusEntity.builder().userEntity(user).playQueueItemId(chapter2.getId())
+                .chapterEntity(chapter2).watched(false).progressInMilliseconds(600_000L).build());
+        // Someone else's position must not leak into this user's rows.
+        em.persist(WatchStatusEntity.builder().userEntity(other).playQueueItemId(chapter2.getId())
+                .chapterEntity(chapter2).watched(true).progressInMilliseconds(1_800_000L).build());
+        em.flush();
+
+        var rows = watchStatusRepository.findChapterProgress(user.getId(), List.of(book.getId()));
+
+        assertEquals(3, rows.size());
+        var byChapterId = rows.stream().collect(java.util.stream.Collectors.toMap(
+                WatchStatusRepository.ChapterProgressRow::getChapterId, r -> r));
+        assertEquals(book.getId(), byChapterId.get(chapter1.getId()).getBookId());
+        assertEquals(3_600_000L, byChapterId.get(chapter1.getId()).getDurationInMilliseconds());
+        assertTrue(byChapterId.get(chapter1.getId()).getWatched());
+        assertEquals(600_000L, byChapterId.get(chapter2.getId()).getProgressInMilliseconds());
+        assertFalse(byChapterId.get(chapter2.getId()).getWatched());
+        assertNotNull(byChapterId.get(chapter2.getId()).getUpdatedAt());
+        var unanalysed = rows.stream().filter(r -> r.getDurationInMilliseconds() == null).toList();
+        assertEquals(1, unanalysed.size());
+        assertNull(unanalysed.get(0).getWatched());
     }
 
     @Test

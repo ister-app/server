@@ -52,6 +52,49 @@ public interface WatchStatusRepository extends JpaRepository<WatchStatusEntity, 
     /** True when someone is mid-episode: started (progress > 0) but not finished. */
     boolean existsByPodcastEpisodeEntityIdAndWatchedFalseAndProgressInMillisecondsGreaterThan(UUID podcastEpisodeId, long progressInMilliseconds);
 
+    /** One chapter of a book, with its duration and how far the user got in it. */
+    interface ChapterProgressRow {
+
+        UUID getBookId();
+
+        UUID getChapterId();
+
+        /** Null when the chapter has no media file, or it was never analysed. */
+        Long getDurationInMilliseconds();
+
+        /** Null when the user never played this chapter. */
+        Boolean getWatched();
+
+        Long getProgressInMilliseconds();
+
+        Instant getUpdatedAt();
+    }
+
+    /**
+     * Every chapter of the given books with the calling user's position in it — the raw material for
+     * whole-book listening progress. One query for a whole carousel of books; chapters the user
+     * never touched come back with null watch columns.
+     */
+    @Query(value = """
+            SELECT c.book_entity_id AS "bookId",
+              c.id AS "chapterId",
+              mf.duration_in_milliseconds AS "durationInMilliseconds",
+              w.watched AS "watched",
+              w.progress_in_milliseconds AS "progressInMilliseconds",
+              w.date_updated AS "updatedAt"
+            FROM chapter_entity c
+            LEFT JOIN LATERAL (SELECT m.duration_in_milliseconds
+                               FROM media_file_entity m
+                               WHERE m.chapter_entity_id = c.id
+                               ORDER BY m.id
+                               LIMIT 1) mf ON TRUE
+            LEFT JOIN watch_status_entity w
+              ON w.chapter_entity_id = c.id AND w.user_entity_id = :userId
+            WHERE c.book_entity_id IN (:bookIds)
+            """, nativeQuery = true)
+    List<ChapterProgressRow> findChapterProgress(@Param("userId") UUID userId,
+                                                 @Param("bookIds") java.util.Collection<UUID> bookIds);
+
     /** Per-track play statistics of one user: number of plays and when it was last played. */
     interface TrackPlayStats {
 

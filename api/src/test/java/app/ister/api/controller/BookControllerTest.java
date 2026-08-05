@@ -7,6 +7,7 @@ import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.PersonEntity;
+import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
@@ -15,8 +16,10 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.WatchStatusRepository;
+import app.ister.core.service.BookProgressService;
 import app.ister.core.service.ContinueWatchingService;
 import app.ister.core.service.LibraryAccessService;
+import app.ister.core.service.UserService;
 import app.ister.core.service.WatchStatusService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +31,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Month;
 import java.util.List;
@@ -38,6 +42,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -75,6 +80,12 @@ class BookControllerTest {
 
     @Mock
     private LibraryAccessService libraryAccessService;
+
+    @Mock
+    private BookProgressService bookProgressService;
+
+    @Mock
+    private UserService userService;
 
     @Mock
     private Authentication authentication;
@@ -193,6 +204,28 @@ class BookControllerTest {
                 () -> subject.updateReadingProgress(bookId, "epubcfi(/6/4)", 0.1, authentication));
 
         verifyNoInteractions(watchStatusService, watchStatusRepository);
+    }
+
+    /** The books a user never started come back as a null value, not as a missing key. */
+    @Test
+    void progressIsBatchedPerBookAndNullForUnstartedBooks() {
+        BookEntity started = book("De wolven van Arazan");
+        BookEntity unstarted = book("Dit zijn de namen");
+        UserEntity user = UserEntity.builder().name("test-user").externalId("sub-123").build();
+        BookProgressService.BookProgress progress = new BookProgressService.BookProgress(
+                BookProgressService.BookProgressMode.LISTENING, 0.4, false, 10_000L, 4_000L,
+                Instant.parse("2026-08-05T12:00:00Z"));
+        when(userService.getOrCreateUser(authentication)).thenReturn(user);
+        when(bookProgressService.forBooks(user, List.of(started, unstarted)))
+                .thenReturn(Map.of(started.getId(), progress));
+
+        Map<BookEntity, BookProgressService.BookProgress> result =
+                subject.progress(List.of(started, unstarted), authentication);
+
+        assertEquals(progress, result.get(started));
+        assertTrue(result.containsKey(unstarted));
+        assertNull(result.get(unstarted));
+        assertEquals("2026-08-05T12:00:00Z", subject.progressUpdatedAt(progress));
     }
 
     @Test
