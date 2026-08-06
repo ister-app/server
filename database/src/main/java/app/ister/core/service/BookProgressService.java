@@ -51,7 +51,7 @@ public class BookProgressService {
     /** Empty when the user never started this book in either form. */
     @Transactional(readOnly = true)
     public Optional<BookProgress> forBook(UserEntity userEntity, BookEntity bookEntity) {
-        return Optional.ofNullable(forBooks(userEntity, List.of(bookEntity)).get(bookEntity.getId()));
+        return Optional.ofNullable(progressByBookId(userEntity, List.of(bookEntity)).get(bookEntity.getId()));
     }
 
     /**
@@ -60,6 +60,10 @@ public class BookProgressService {
      */
     @Transactional(readOnly = true)
     public Map<UUID, BookProgress> forBooks(UserEntity userEntity, List<BookEntity> books) {
+        return progressByBookId(userEntity, books);
+    }
+
+    private Map<UUID, BookProgress> progressByBookId(UserEntity userEntity, List<BookEntity> books) {
         if (books.isEmpty()) {
             return Map.of();
         }

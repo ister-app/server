@@ -124,6 +124,14 @@ public class PlayQueueController {
                                     RepeatMode repeatMode) {
     }
 
+    /**
+     * The volatile part of a heartbeat: where the client is and how it is playing. Kept
+     * together so both publish paths take one value instead of five loose arguments.
+     */
+    private record HeartbeatState(long progressInMilliseconds, PlayState playState,
+                                  Long anchorPositionMs, Long anchorServerTimeMs, RepeatMode repeatMode) {
+    }
+
     @PreAuthorize("hasRole('user')")
     @MutationMapping
     public Optional<PlayQueueEntity> updatePlayQueue(@Arguments UpdatePlayQueueArguments args, Authentication authentication) {
@@ -137,6 +145,8 @@ public class PlayQueueController {
         // Epoch ms exceeds GraphQL Int, so the wire type is Float; internally it is a Long.
         Long anchorPosition = args.anchorPositionMs() == null ? null : args.anchorPositionMs().longValue();
         Long anchorServerTime = args.anchorServerTimeMs() == null ? null : (long) (double) args.anchorServerTimeMs();
+        HeartbeatState state = new HeartbeatState(progressInMilliseconds, playState,
+                anchorPosition, anchorServerTime, args.repeatMode());
         // Watch status is written for the owner plus every currently-following user; the follower
         // registry lives in core (fed by the status fan-out), so resolve the set here and pass it
         // down — the database module cannot see the registry.
@@ -149,14 +159,12 @@ public class PlayQueueController {
             // burst) must not silence the now-playing feed: the registry is in-memory, so
             // re-publish the last known session with the fresh progress/state, then
             // surface the error so the client retries the persistent update.
-            republishLastKnownSession(id, playQueueItemId, progressInMilliseconds, playState,
-                    anchorPosition, anchorServerTime, args.repeatMode(), authentication);
+            republishLastKnownSession(id, playQueueItemId, state, authentication);
             throw ex;
         }
         playQueue.ifPresent(queue -> {
             playQueuePrefetchService.maybePrefetchNext(queue, playQueueItemId, progressInMilliseconds);
-            publishPlaybackHeartbeat(queue, playQueueItemId, progressInMilliseconds, playState,
-                    args.deviceId(), anchorPosition, anchorServerTime, args.repeatMode());
+            publishPlaybackHeartbeat(queue, playQueueItemId, state, args.deviceId());
         });
         return playQueue;
     }
@@ -169,9 +177,8 @@ public class PlayQueueController {
      * is unavailable here). Skipped when the client moved on to another queue item —
      * the stale media fields would then describe the wrong track.
      */
-    private void republishLastKnownSession(UUID playQueueId, UUID playQueueItemId, long progressInMilliseconds,
-                                           PlayState playState, Long anchorPositionMs, Long anchorServerTimeMs,
-                                           RepeatMode repeatMode, Authentication authentication) {
+    private void republishLastKnownSession(UUID playQueueId, UUID playQueueItemId,
+                                           HeartbeatState state, Authentication authentication) {
         playbackSessionRegistry.find(playQueueId)
                 .filter(last -> authentication.getName() != null
                         && authentication.getName().equals(last.getUserExternalId()))
@@ -180,10 +187,10 @@ public class PlayQueueController {
                         playQueueId, last.getPlayQueueItemId(), last.getUserId(), last.getUserExternalId(),
                         last.getUserName(), last.getMediaType(), last.getMediaId(), last.getTitle(),
                         last.getDurationInMilliseconds(), last.getArtworkImageId(),
-                        progressInMilliseconds, playState,
+                        state.progressInMilliseconds(), state.playState(),
                         last.getControlScopeOverride(), last.getControlAllowedUserIds(),
                         last.getDeviceId(), last.getDeviceName(),
-                        anchorPositionMs, anchorServerTimeMs, repeatMode));
+                        state.anchorPositionMs(), state.anchorServerTimeMs(), state.repeatMode()));
     }
 
     /**
@@ -191,10 +198,8 @@ public class PlayQueueController {
      * Hibernate session), so the lazy user/media associations may be navigated here;
      * only plain values go into the heartbeat message.
      */
-    private void publishPlaybackHeartbeat(PlayQueueEntity queue, UUID playQueueItemId, long progressInMilliseconds,
-                                          PlayState playState, UUID deviceId,
-                                          Long anchorPositionMs, Long anchorServerTimeMs,
-                                          RepeatMode repeatMode) {
+    private void publishPlaybackHeartbeat(PlayQueueEntity queue, UUID playQueueItemId,
+                                          HeartbeatState state, UUID deviceId) {
         Optional<PlayQueueItemEntity> item = Optional.ofNullable(queue.getItems()).orElse(List.of()).stream()
                 .filter(candidate -> candidate.getId().equals(playQueueItemId))
                 .findFirst();
@@ -215,15 +220,15 @@ public class PlayQueueController {
                 item.map(this::titleOf).orElse(null),
                 item.map(this::durationOf).orElse(null),
                 item.map(this::artworkOf).orElse(null),
-                progressInMilliseconds,
-                playState,
+                state.progressInMilliseconds(),
+                state.playState(),
                 controlScopeOverride,
                 controlAllowedUserIds,
                 deviceId,
                 deviceNameOf(queue.getUserEntity().getId(), deviceId),
-                anchorPositionMs,
-                anchorServerTimeMs,
-                repeatMode);
+                state.anchorPositionMs(),
+                state.anchorServerTimeMs(),
+                state.repeatMode());
     }
 
     /** Cached lookup of the owner's device name; null for clients that report no device id. */

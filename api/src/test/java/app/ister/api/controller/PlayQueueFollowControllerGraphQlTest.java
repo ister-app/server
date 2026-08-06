@@ -115,13 +115,14 @@ class PlayQueueFollowControllerGraphQlTest {
         when(followerRegistry.followers(queueId)).thenReturn(List.of(new FollowerRegistry.FollowerInfo(
                 followerId, "Anna", "device-a", "Kitchen", DevicePlatform.ANDROID, Instant.EPOCH)));
 
-        graphQlTester.document("""
+        GraphQlTester.Response response = graphQlTester.document("""
                         query { sessionFollowers(playQueueId: "%s") {
                             userId userName deviceId deviceName platform since } }
                         """.formatted(queueId))
-                .execute()
-                .path("sessionFollowers[0].deviceName").entity(String.class).isEqualTo("Kitchen")
-                .path("sessionFollowers[0].platform").entity(String.class).isEqualTo("ANDROID");
+                .execute();
+
+        assertEquals("Kitchen", response.path("sessionFollowers[0].deviceName").entity(String.class).get());
+        assertEquals("ANDROID", response.path("sessionFollowers[0].platform").entity(String.class).get());
     }
 
     @Test
@@ -133,10 +134,12 @@ class PlayQueueFollowControllerGraphQlTest {
         when(followerRegistry.followers(queueId)).thenReturn(List.of(new FollowerRegistry.FollowerInfo(
                 followerId, "Anna", "device-a", "Kitchen", DevicePlatform.ANDROID, Instant.EPOCH)));
 
-        graphQlTester.document("""
+        Boolean removed = graphQlTester.document("""
                         mutation { removeFollower(playQueueId: "%s", userId: "%s") }
                         """.formatted(queueId, followerId))
                 .execute()
-                .path("removeFollower").entity(Boolean.class).isEqualTo(true);
+                .path("removeFollower").entity(Boolean.class).get();
+
+        assertEquals(Boolean.TRUE, removed);
     }
 }

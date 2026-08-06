@@ -18,6 +18,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.boot.graphql.test.autoconfigure.GraphQlTest;
 import org.springframework.graphql.test.tester.GraphQlTester;
 import org.springframework.security.authentication.TestingAuthenticationToken;
@@ -30,6 +31,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.when;
@@ -103,20 +107,21 @@ class BookControllerGraphQlTest {
 
     @Test
     void bookProgressIsServedAsAWholeBookPosition() {
-        graphQlTester.document("""
+        GraphQlTester.Response response = graphQlTester.document("""
                         query($id: ID!) {
                           bookById(id: $id) {
                             progress { mode progress finished durationInMilliseconds positionInMilliseconds updatedAt }
                           }
                         }""")
                 .variable("id", bookId)
-                .execute()
-                .path("bookById.progress.mode").entity(String.class).isEqualTo("LISTENING")
-                .path("bookById.progress.progress").entity(Double.class).isEqualTo(0.4)
-                .path("bookById.progress.finished").entity(Boolean.class).isEqualTo(false)
-                .path("bookById.progress.durationInMilliseconds").entity(Integer.class).isEqualTo(43_200_000)
-                .path("bookById.progress.positionInMilliseconds").entity(Integer.class).isEqualTo(17_280_000)
-                .path("bookById.progress.updatedAt").entity(String.class).isEqualTo("2026-08-05T12:00:00Z");
+                .execute();
+
+        assertEquals("LISTENING", response.path("bookById.progress.mode").entity(String.class).get());
+        assertEquals(0.4, response.path("bookById.progress.progress").entity(Double.class).get());
+        assertEquals(false, response.path("bookById.progress.finished").entity(Boolean.class).get());
+        assertEquals(43_200_000, response.path("bookById.progress.durationInMilliseconds").entity(Integer.class).get());
+        assertEquals(17_280_000, response.path("bookById.progress.positionInMilliseconds").entity(Integer.class).get());
+        assertEquals("2026-08-05T12:00:00Z", response.path("bookById.progress.updatedAt").entity(String.class).get());
     }
 
     /** A book the user never started resolves to null, not to an error. */
@@ -124,13 +129,16 @@ class BookControllerGraphQlTest {
     void bookProgressIsNullForAnUnstartedBook() {
         when(bookProgressService.forBooks(any(), anyList())).thenReturn(Map.of());
 
-        graphQlTester.document("""
+        Map<String, Object> book = graphQlTester.document("""
                         query($id: ID!) {
                           bookById(id: $id) { id progress { progress } }
                         }""")
                 .variable("id", bookId)
                 .execute()
-                .path("bookById.progress").valueIsNull();
+                .path("bookById").entity(new ParameterizedTypeReference<Map<String, Object>>() {
+                }).get();
+
+        assertNull(book.get("progress"));
     }
 
     @Test
@@ -139,12 +147,14 @@ class BookControllerGraphQlTest {
         when(watchStatusRepository.findByUserEntityExternalIdAndBookEntityIn(any(), anyList(), any()))
                 .thenReturn(List.of());
 
-        graphQlTester.document("""
+        List<Object> watchStatus = graphQlTester.document("""
                         query($id: ID!) {
                           bookById(id: $id) { watchStatus { id } }
                         }""")
                 .variable("id", bookId)
                 .execute()
-                .path("bookById.watchStatus").entityList(Object.class).hasSize(0);
+                .path("bookById.watchStatus").entityList(Object.class).get();
+
+        assertTrue(watchStatus.isEmpty());
     }
 }

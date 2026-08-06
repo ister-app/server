@@ -53,26 +53,34 @@ public class FollowerRegistry {
             return;
         }
         if (data.isActive()) {
-            Instant now = clock.instant();
-            followers.computeIfAbsent(data.getPlayQueueId(), id -> new ConcurrentHashMap<>())
-                    .compute(data.getDeviceId(), (deviceId, existing) -> new Entry(
-                            data.getUserId(), data.getUserName(), data.getDeviceName(), data.getPlatform(),
-                            // A heartbeat keeps the moment this device started following.
-                            existing == null ? now : existing.since(), now));
+            register(data);
         } else {
-            // Deregistration by the follower only removes the caller's own entry: the user id must
-            // match, so one user cannot deregister another user's device by reusing its device id.
-            // A forced deregistration is the session owner kicking someone, and skips that check.
-            followers.computeIfPresent(data.getPlayQueueId(), (queueId, devices) -> {
-                devices.computeIfPresent(data.getDeviceId(), (deviceId, entry) ->
-                        data.isForced() || entry.userId().equals(data.getUserId()) ? null : entry);
-                return devices.isEmpty() ? null : devices;
-            });
-            if (data.isForced()) {
-                // Without this the kicked client's next 20s heartbeat would simply re-register it.
-                kicked.computeIfAbsent(data.getPlayQueueId(), id -> new ConcurrentHashMap<>())
-                        .put(data.getDeviceId(), clock.instant());
-            }
+            deregister(data);
+        }
+    }
+
+    private void register(FollowerStatusData data) {
+        Instant now = clock.instant();
+        followers.computeIfAbsent(data.getPlayQueueId(), id -> new ConcurrentHashMap<>())
+                .compute(data.getDeviceId(), (deviceId, existing) -> new Entry(
+                        data.getUserId(), data.getUserName(), data.getDeviceName(), data.getPlatform(),
+                        // A heartbeat keeps the moment this device started following.
+                        existing == null ? now : existing.since(), now));
+    }
+
+    private void deregister(FollowerStatusData data) {
+        // Deregistration by the follower only removes the caller's own entry: the user id must
+        // match, so one user cannot deregister another user's device by reusing its device id.
+        // A forced deregistration is the session owner kicking someone, and skips that check.
+        followers.computeIfPresent(data.getPlayQueueId(), (queueId, devices) -> {
+            devices.computeIfPresent(data.getDeviceId(), (deviceId, entry) ->
+                    data.isForced() || entry.userId().equals(data.getUserId()) ? null : entry);
+            return devices.isEmpty() ? null : devices;
+        });
+        if (data.isForced()) {
+            // Without this the kicked client's next 20s heartbeat would simply re-register it.
+            kicked.computeIfAbsent(data.getPlayQueueId(), id -> new ConcurrentHashMap<>())
+                    .put(data.getDeviceId(), clock.instant());
         }
     }
 

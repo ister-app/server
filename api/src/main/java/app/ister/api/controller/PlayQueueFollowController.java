@@ -168,7 +168,7 @@ public class PlayQueueFollowController {
     private static Optional<UUID> parseDeviceId(String deviceId) {
         try {
             return Optional.of(UUID.fromString(deviceId));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return Optional.empty();
         }
     }

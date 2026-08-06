@@ -24,7 +24,7 @@ import java.util.UUID;
 @ToString
 @SuperBuilder
 @EntityListeners(AuditingEntityListener.class)
-public class BaseEntity {
+public abstract class BaseEntity {
     @Column(nullable = false)
     @CreatedDate
     Instant dateCreated;
