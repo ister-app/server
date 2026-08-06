@@ -1,5 +1,26 @@
 # Changelog
 
+## server v2.10.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.10.0` |
+| `ghcr.io/ister-app/migrations` | `2.10.0` |
+
+### Features
+
+- feat(api): expose how far a user is in a whole book ([`5550f99`](https://github.com/ister-app/server/commit/5550f99))
+- feat(api): relay the repeat mode of a playing session ([`197768b`](https://github.com/ister-app/server/commit/197768b))
+- feat(api): list and kick listen-along followers ([`c56b8dc`](https://github.com/ister-app/server/commit/c56b8dc))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.10.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.9.0...v2.10.0
+
 ## server v2.9.0
 
 | Image | Tag |
