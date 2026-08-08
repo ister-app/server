@@ -13,6 +13,7 @@ import app.ister.core.entity.PlayQueueItemEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.MediaType;
+import app.ister.core.enums.MetadataSource;
 import app.ister.core.enums.PlayState;
 import app.ister.core.enums.RemoteControlScope;
 import app.ister.core.enums.RepeatMode;
@@ -271,6 +272,10 @@ public class PlayQueueController {
      * Cover art for the now-playing card: the movie poster, the episode still (show
      * poster when the episode has none), or the album cover for a track. Falls back to
      * any image when there is no COVER. Clients fetch the bytes via GET /images/{id}/download.
+     * Within a type, local artwork (shipped next to the media files) wins over scraped
+     * provider images — the same preference the clients apply when they resolve artwork
+     * themselves (ImageUtil.getImageByType), so a session card and the local mini player
+     * show the same cover.
      */
     private UUID artworkOf(PlayQueueItemEntity item) {
         List<ImageEntity> images = switch (item.getType()) {
@@ -291,8 +296,13 @@ public class PlayQueueController {
                             .orElse(List.of());
             case BOOK, COMIC -> List.of();
         };
-        return images.stream().filter(image -> image.getType() == ImageType.COVER).findFirst()
-                .or(() -> images.stream().findFirst())
+        List<ImageEntity> covers =
+                images.stream().filter(image -> image.getType() == ImageType.COVER).toList();
+        List<ImageEntity> pool = covers.isEmpty() ? images : covers;
+        return pool.stream()
+                .filter(image -> image.getSource() == null || image.getSource() == MetadataSource.LOCAL_FILE)
+                .findFirst()
+                .or(() -> pool.stream().findFirst())
                 .map(ImageEntity::getId)
                 .orElse(null);
     }

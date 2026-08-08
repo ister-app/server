@@ -19,6 +19,7 @@ import app.ister.core.entity.TrackEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.MediaType;
+import app.ister.core.enums.MetadataSource;
 import app.ister.core.enums.PlayQueueSourceType;
 import app.ister.api.dto.StreamSettingsInput;
 import app.ister.core.enums.PlayState;
@@ -657,6 +658,41 @@ class PlayQueueControllerTest {
         verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
                 eq("test-user"), eq(MediaType.TRACK), eq(track.getId()), eq("Idioteque"), eq(240_000L),
                 eq(cover.getId()), eq(1000L), eq(PlayState.PLAYING), isNull(), eq(java.util.List.of()), isNull(), isNull(), isNull(), isNull(), isNull());
+    }
+
+    /**
+     * Two album covers, the scraped one first in repository order: the local-file
+     * cover must win regardless, because the clients prefer local artwork when they
+     * resolve it themselves — the now-playing card and the mini player have to show
+     * the same image.
+     */
+    @Test
+    void heartbeatForATrackPrefersTheLocalFileCover() {
+        AlbumEntity album = AlbumEntity.builder().name("Sour").build();
+        album.setId(UUID.randomUUID());
+        TrackEntity track = TrackEntity.builder().number(1).albumEntity(album)
+                .metadataEntities(List.of(MetadataEntity.builder().title("brutal").build())).build();
+        track.setId(UUID.randomUUID());
+        PlayQueueItemEntity item = identified(PlayQueueItemEntity.builder()
+                .type(MediaType.TRACK).position(BigDecimal.ZERO).build());
+        item.setTrackEntityId(track.getId());
+
+        ImageEntity scraped = ImageEntity.builder()
+                .type(ImageType.COVER).source(MetadataSource.COVER_ART_ARCHIVE).build();
+        scraped.setId(UUID.randomUUID());
+        ImageEntity local = ImageEntity.builder()
+                .type(ImageType.COVER).source(MetadataSource.LOCAL_FILE).build();
+        local.setId(UUID.randomUUID());
+        when(trackRepository.findById(track.getId())).thenReturn(Optional.of(track));
+        when(mediaFileRepository.findByTrackEntityId(track.getId()))
+                .thenReturn(List.of(MediaFileEntity.builder().durationInMilliseconds(150_000L).build()));
+        when(imageRepository.findByAlbumEntityId(album.getId())).thenReturn(List.of(scraped, local));
+
+        updateWith(item);
+
+        verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
+                eq("test-user"), eq(MediaType.TRACK), eq(track.getId()), eq("brutal"), eq(150_000L),
+                eq(local.getId()), eq(1000L), eq(PlayState.PLAYING), isNull(), eq(java.util.List.of()), isNull(), isNull(), isNull(), isNull(), isNull());
     }
 
     /** A chapter without metadata is named after its book. */
