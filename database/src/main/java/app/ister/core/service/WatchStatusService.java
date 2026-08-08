@@ -31,7 +31,12 @@ public class WatchStatusService {
     // Sonar FP: Lombok @SuperBuilder declares builder() on the subclass itself
     @SuppressWarnings("java:S3252")
     public WatchStatusEntity getOrCreate(UserEntity userEntity, UUID playQueueItemId, EpisodeEntity episodeEntity, MovieEntity movieEntity) {
-        Optional<WatchStatusEntity> user = watchStatusRepository.findByUserEntityAndPlayQueueItemIdAndEpisodeEntity(userEntity, playQueueItemId, episodeEntity);
+        // Look up by whichever entity is set: a derived query binds a null parameter as
+        // `= null`, which matches nothing — the movie lookup used the episode query with a
+        // null episode and therefore created a fresh row on every heartbeat.
+        Optional<WatchStatusEntity> user = episodeEntity != null
+                ? watchStatusRepository.findByUserEntityAndPlayQueueItemIdAndEpisodeEntity(userEntity, playQueueItemId, episodeEntity)
+                : watchStatusRepository.findByUserEntityAndPlayQueueItemIdAndMovieEntity(userEntity, playQueueItemId, movieEntity);
         if (user.isPresent()) {
             return user.get();
         } else {

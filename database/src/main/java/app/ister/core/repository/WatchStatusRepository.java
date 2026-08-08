@@ -19,6 +19,8 @@ import java.util.UUID;
 public interface WatchStatusRepository extends JpaRepository<WatchStatusEntity, UUID> {
     Optional<WatchStatusEntity> findByUserEntityAndPlayQueueItemIdAndEpisodeEntity(UserEntity userEntity, UUID playQueueItemId, EpisodeEntity episodeEntity);
 
+    Optional<WatchStatusEntity> findByUserEntityAndPlayQueueItemIdAndMovieEntity(UserEntity userEntity, UUID playQueueItemId, MovieEntity movieEntity);
+
     List<WatchStatusEntity> findByUserEntityExternalIdAndEpisodeEntity(String userEntityExternalId, EpisodeEntity episodeEntity, Sort sort);
 
     List<WatchStatusEntity> findByUserEntityExternalIdAndMovieEntity(String userEntityExternalId, MovieEntity movieEntity, Sort sort);

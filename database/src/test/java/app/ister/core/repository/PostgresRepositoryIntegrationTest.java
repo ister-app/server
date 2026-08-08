@@ -935,6 +935,25 @@ class PostgresRepositoryIntegrationTest {
         assertEquals(8, batch.get(0).getValue());
     }
 
+    /**
+     * The movie heartbeat lookup must find the row written by the previous heartbeat, and it
+     * must be unambiguous: the movie-scoped query matches on the movie itself, instead of
+     * relying on the episode-scoped query treating its null episode as IS NULL.
+     */
+    @Test
+    void movieWatchStatusLookupFindsTheExistingRow() {
+        UserEntity user = em.persist(UserEntity.builder().externalId("movie-watcher-1").build());
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.MOVIE).name("Movies-ws").build());
+        MovieEntity movie = em.persist(MovieEntity.builder().libraryEntity(library).name("Movie-ws").releaseYear(2020).build());
+        WatchStatusEntity existing = em.persistAndFlush(watchStatus(user, null, movie));
+        em.clear();
+
+        var found = watchStatusRepository.findByUserEntityAndPlayQueueItemIdAndMovieEntity(
+                user, existing.getPlayQueueItemId(), movie);
+
+        assertEquals(existing.getId(), found.orElseThrow().getId());
+    }
+
     private MediaFileEntity persistMediaFile(String path) {
         NodeEntity node = em.persist(NodeEntity.builder().name("node-" + path).url("http://localhost").build());
         DirectoryEntity directory = em.persist(DirectoryEntity.builder()

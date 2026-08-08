@@ -73,6 +73,28 @@ class WatchStatusServiceTest {
     }
 
     /**
+     * A movie lookup must use the movie-scoped query: routing it through the episode query with
+     * a null episode matches nothing (derived queries bind null as {@code = null}), which made
+     * every heartbeat create a fresh row.
+     */
+    @Test
+    void getOrCreateForMovieFindsTheExistingRow() {
+        UserEntity user = UserEntity.builder().build();
+        MovieEntity movie = MovieEntity.builder().build();
+        UUID playQueueItemId = UUID.randomUUID();
+        WatchStatusEntity existing = WatchStatusEntity.builder().userEntity(user).build();
+
+        when(userService.getOrCreateUser(authentication)).thenReturn(user);
+        when(watchStatusRepository.findByUserEntityAndPlayQueueItemIdAndMovieEntity(user, playQueueItemId, movie))
+                .thenReturn(Optional.of(existing));
+
+        WatchStatusEntity result = subject.getOrCreate(authentication, playQueueItemId, null, movie);
+
+        assertEquals(existing, result);
+        verify(watchStatusRepository, never()).save(any(WatchStatusEntity.class));
+    }
+
+    /**
      * Listening progress must not be scoped to a play queue: a second queue over the same book has
      * to find the row the first one wrote, and the reader (which has no queue at all) writes it too.
      */
@@ -180,7 +202,7 @@ class WatchStatusServiceTest {
         UUID playQueueItemId = UUID.randomUUID();
 
         when(userService.getOrCreateUser(authentication)).thenReturn(user);
-        when(watchStatusRepository.findByUserEntityAndPlayQueueItemIdAndEpisodeEntity(user, playQueueItemId, null))
+        when(watchStatusRepository.findByUserEntityAndPlayQueueItemIdAndMovieEntity(user, playQueueItemId, movie))
                 .thenReturn(Optional.empty());
 
         WatchStatusEntity result = subject.getOrCreate(authentication, playQueueItemId, null, movie);
