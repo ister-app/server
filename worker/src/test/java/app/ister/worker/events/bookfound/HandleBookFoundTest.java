@@ -331,7 +331,7 @@ class HandleBookFoundTest {
         when(bookRepository.findById(bookId)).thenReturn(Optional.of(bookInSeries));
         when(metadataRepository.findByBookEntityId(bookId)).thenReturn(completeMetadata());
         when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
-        when(wikidataBookSeriesService.findBookInSeries("Losgeld voor Erak", "De Grijze Jager", List.of("en", "nl")))
+        when(wikidataBookSeriesService.findBookInSeries("Losgeld voor Erak", "John Flanagan", "De Grijze Jager", List.of("en", "nl")))
                 .thenReturn(Optional.of(new WikidataBookSeriesService.BookSeriesInfo("Q3497559", 7.0, 2007)));
 
         subject.handle(data);
@@ -354,7 +354,7 @@ class HandleBookFoundTest {
         when(bookRepository.findById(bookId)).thenReturn(Optional.of(bookInSeries));
         when(metadataRepository.findByBookEntityId(bookId)).thenReturn(completeMetadata());
         when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
-        when(wikidataBookSeriesService.findBookInSeries("Losgeld voor Erak", "De Grijze Jager", List.of("en", "nl")))
+        when(wikidataBookSeriesService.findBookInSeries("Losgeld voor Erak", "John Flanagan", "De Grijze Jager", List.of("en", "nl")))
                 .thenReturn(Optional.of(new WikidataBookSeriesService.BookSeriesInfo("Q3497559", 8.0, 2007)));
 
         subject.handle(data);
@@ -392,7 +392,7 @@ class HandleBookFoundTest {
         when(bookRepository.findById(bookId)).thenReturn(Optional.of(bookInSeries));
         when(metadataRepository.findByBookEntityId(bookId)).thenReturn(completeMetadata());
         when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of(ImageEntity.builder().build()));
-        when(wikidataBookSeriesService.findBookInSeries("Losgeld voor Erak", "De Grijze Jager", List.of("en", "nl")))
+        when(wikidataBookSeriesService.findBookInSeries("Losgeld voor Erak", "John Flanagan", "De Grijze Jager", List.of("en", "nl")))
                 .thenReturn(Optional.empty());
 
         subject.handle(data);

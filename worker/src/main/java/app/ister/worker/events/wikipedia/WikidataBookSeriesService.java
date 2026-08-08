@@ -22,9 +22,13 @@ import static app.ister.worker.events.musicbrainz.MusicBrainzService.normalizeTi
  * <p>{@link #discoverSeries} works the other way around: for a book whose series is unknown it
  * reads which of the author's <em>existing</em> series the Wikidata item belongs to. That covers
  * titles the path-prefix heuristic can never split ("Harry Potter en de steen der wijzen" has no
- * separator) and audiobook-only books without epub series metadata. Discovery additionally
- * requires an author (P50) label match, so the film or the game — same title, different creator
- * statement — can never link a book into a series.
+ * separator) and audiobook-only books without epub series metadata.
+ *
+ * <p>Both directions require an author (P50) label match, so the film or the game — same title,
+ * different creator statement — can never match. The series label alone cannot tell them apart:
+ * a film series ("Harry Potter", Q216930) may carry exactly the same label as the book series
+ * (Q8337), so without the author check the film adaptation wins and its premiere year replaces
+ * the book's first publication year.
  */
 @Slf4j
 @Service
@@ -48,26 +52,14 @@ public class WikidataBookSeriesService {
     public record DiscoveredSeries(String wikidataId, String seriesName, Double seriesIndex,
                                    Integer firstPublicationYear) {}
 
-    public Optional<BookSeriesInfo> findBookInSeries(String bookTitle, String seriesName, List<String> languageTags) {
-        if (bookTitle == null || bookTitle.isBlank() || seriesName == null || seriesName.isBlank()
-                || languageTags == null || languageTags.isEmpty()) {
+    public Optional<BookSeriesInfo> findBookInSeries(String bookTitle, String authorName,
+                                                     String seriesName, List<String> languageTags) {
+        if (seriesName == null || seriesName.isBlank()) {
             return Optional.empty();
         }
-        String wantedTitle = normalizeTitle(bookTitle);
-        for (String tag : languageTags) {
-            for (String candidateId : wikipediaService.searchEntityIds(bookTitle, tag)) {
-                Map<String, Object> entity = wikipediaService.fetchWikidataEntity(candidateId);
-                if (!wikipediaService.labelMatches(entity, candidateId, wantedTitle, languageTags)) {
-                    continue;
-                }
-                Optional<BookSeriesInfo> info = fromEntity(entity, candidateId, seriesName, languageTags);
-                if (info.isPresent()) {
-                    return info;
-                }
-            }
-        }
-        log.debug("No Wikidata series match for book={} series={}", bookTitle, seriesName);
-        return Optional.empty();
+        return discoverSeries(bookTitle, authorName, List.of(seriesName), languageTags)
+                .map(found -> new BookSeriesInfo(
+                        found.wikidataId(), found.seriesIndex(), found.firstPublicationYear()));
     }
 
     /**
@@ -104,17 +96,6 @@ public class WikidataBookSeriesService {
         }
         log.debug("No Wikidata series discovered for book={} author={}", bookTitle, authorName);
         return Optional.empty();
-    }
-
-    /** The candidate is accepted only when one of its P179 statements points at our series. */
-    private Optional<BookSeriesInfo> fromEntity(Map<String, Object> entity, String entityId,
-                                                String seriesName, List<String> languageTags) {
-        if (!(wikipediaService.entityField(entity, entityId, "claims") instanceof Map<?, ?> claims)) {
-            return Optional.empty();
-        }
-        return seriesFromClaims(claims, entityId, List.of(seriesName), languageTags)
-                .map(found -> new BookSeriesInfo(
-                        found.wikidataId(), found.seriesIndex(), found.firstPublicationYear()));
     }
 
     /** The first P179 statement whose series label matches one of the candidate names wins. */

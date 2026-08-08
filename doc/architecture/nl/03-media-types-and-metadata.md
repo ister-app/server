@@ -74,7 +74,9 @@ audiobook-mp3's via `ChapterEntity` (gestreamd over hetzelfde audio-only HLS-pad
   (`WikidataBookSeriesService.discoverSeries`, gedraaid vanuit `BOOK_FOUND`) koppelt een reeksloos
   boek aan een van de *bestaande* reeksen van de auteur via zijn P179-statement (part of series) —
   ze maakt nooit een reeks aan, en vereist een P50-labelmatch (auteur) zodat de gelijknamige film of
-  game nooit kan koppelen. Labelmatching accepteert naast de geconfigureerde talen ook Wikidata's
+  game nooit kan koppelen. De positie/oorspronkelijk-jaar-verrijking voor boeken die al een reeks
+  hebben (`findBookInSeries`) past dezelfde P50-check toe: het reekslabel alleen kan de film niet
+  afwijzen, want een filmreeks kan exact hetzelfde label dragen als de boekenreeks ("Harry Potter"). Labelmatching accepteert naast de geconfigureerde talen ook Wikidata's
   `mul`-label (standaard voor alle talen): bots consolideren labels die in alle talen gelijk zijn
   daarin en verwijderen de per-taal-labels. Ontdekking dekt wat de andere twee niet zien: titels zonder scheider
   ("Harry Potter en de steen der wijzen") en audiobook-only boeken zonder epub-metadata. Wanneer

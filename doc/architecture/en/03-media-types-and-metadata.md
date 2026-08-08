@@ -72,6 +72,9 @@ type to create chapters instead of tracks.
   (`WikidataBookSeriesService.discoverSeries`, run from `BOOK_FOUND`) links a series-less book into
   one of the author's *existing* series via its P179 (part of series) statement — it never creates
   a series, and requires a P50 (author) label match so the same-titled film or game can never link.
+  The position/original-year enrichment for books that already have a series
+  (`findBookInSeries`) applies the same P50 check: the series label alone cannot reject the film,
+  because a film series may carry exactly the same label as the book series ("Harry Potter").
   Label matching accepts Wikidata's `mul` (default-for-all-languages) label next to the configured
   languages: bots consolidate labels that are identical across languages into it, deleting the
   per-language ones.

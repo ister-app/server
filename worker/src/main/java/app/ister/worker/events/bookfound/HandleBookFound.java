@@ -182,7 +182,8 @@ public class HandleBookFound implements Handle<BookFoundData> {
     private void enrichFromWikidata(BookEntity book, List<MetadataEntity> existingMetadata) {
         String title = book.getTitle() != null ? book.getTitle() : book.getName();
         wikidataBookSeriesService
-                .findBookInSeries(title, book.getSeriesEntity().getName(), languageProperties.tags())
+                .findBookInSeries(title, book.getPersonEntity().getName(),
+                        book.getSeriesEntity().getName(), languageProperties.tags())
                 .ifPresent(info -> {
                     if (book.getSeriesIndex() == null && info.seriesIndex() != null) {
                         book.setSeriesIndex(info.seriesIndex());

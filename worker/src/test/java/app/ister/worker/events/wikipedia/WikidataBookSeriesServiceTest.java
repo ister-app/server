@@ -73,6 +73,7 @@ class WikidataBookSeriesServiceTest {
     void findsOrdinalAndEarliestPublicationYear() {
         givenEntityFieldsPassThrough();
         Map<String, Object> claims = new java.util.HashMap<>(partOfSeriesClaim("Q2195491", "7"));
+        claims.putAll(authorClaim("Q816577"));
         claims.putAll(publicationDates("+2011-05-01T00:00:00Z", "+2007-11-01T00:00:00Z"));
         Map<String, Object> bookEntity = entity("Q3497559", label("en", "Erak's Ransom"), claims);
         Map<String, Object> seriesEntity = entity("Q2195491", label("nl", "De Grijze Jager"), Map.of());
@@ -80,14 +81,35 @@ class WikidataBookSeriesServiceTest {
         when(wikipediaService.searchEntityIds("Losgeld voor Erak", "en")).thenReturn(List.of("Q3497559"));
         when(wikipediaService.fetchWikidataEntity("Q3497559")).thenReturn(bookEntity);
         when(wikipediaService.fetchWikidataEntity("Q2195491")).thenReturn(seriesEntity);
+        when(wikipediaService.fetchWikidataEntity("Q816577")).thenReturn(Map.of());
         when(wikipediaService.labelMatches(any(), anyString(), anyString(), any())).thenReturn(true);
 
         Optional<WikidataBookSeriesService.BookSeriesInfo> info =
-                subject.findBookInSeries("Losgeld voor Erak", "De Grijze Jager", TAGS);
+                subject.findBookInSeries("Losgeld voor Erak", "John Flanagan", "De Grijze Jager", TAGS);
 
         assertEquals("Q3497559", info.orElseThrow().wikidataId());
         assertEquals(7.0, info.orElseThrow().seriesIndex());
         assertEquals(2007, info.orElseThrow().firstPublicationYear());
+    }
+
+    /**
+     * The film adaptation's series may carry exactly the same label as the book series ("Harry
+     * Potter"), so the series match alone cannot reject the film — only the missing P50 does.
+     */
+    @Test
+    void rejectsTheFilmWhoseFilmSeriesCarriesTheSameLabel() {
+        givenEntityFieldsPassThrough();
+        Map<String, Object> filmEntity = entity("Q102438",
+                label("nl", "Harry Potter en de steen der wijzen"), partOfSeriesClaim("Q216930", "1"));
+        Map<String, Object> filmSeries = entity("Q216930", label("nl", "Harry Potter"), Map.of());
+
+        when(wikipediaService.searchEntityIds(anyString(), anyString())).thenReturn(List.of("Q102438"));
+        when(wikipediaService.fetchWikidataEntity("Q102438")).thenReturn(filmEntity);
+        when(wikipediaService.fetchWikidataEntity("Q216930")).thenReturn(filmSeries);
+        when(wikipediaService.labelMatches(any(), anyString(), anyString(), any())).thenReturn(true);
+
+        assertTrue(subject.findBookInSeries("Harry Potter en de steen der wijzen", "J.K. Rowling",
+                "Harry Potter", TAGS).isEmpty());
     }
 
     /** A same-titled item in another series (the film, the game) must not slip through. */
@@ -105,7 +127,8 @@ class WikidataBookSeriesServiceTest {
         when(wikipediaService.labelMatches(bookEntity, "Q999", "losgeldvoorerak", TAGS)).thenReturn(true);
         when(wikipediaService.labelMatches(otherSeries, "Q555", "degrijzejager", TAGS)).thenReturn(false);
 
-        assertTrue(subject.findBookInSeries("Losgeld voor Erak", "De Grijze Jager", TAGS).isEmpty());
+        assertTrue(subject.findBookInSeries("Losgeld voor Erak", "John Flanagan",
+                "De Grijze Jager", TAGS).isEmpty());
     }
 
     /** Membership without an ordinal still yields the year — series position stays unknown. */
@@ -113,16 +136,19 @@ class WikidataBookSeriesServiceTest {
     void confirmsMembershipWithoutAnOrdinal() {
         givenEntityFieldsPassThrough();
         Map<String, Object> claims = new java.util.HashMap<>(partOfSeriesClaim("Q2195491", null));
+        claims.putAll(authorClaim("Q816577"));
         claims.putAll(publicationDates("+2017-01-01T00:00:00Z"));
         Map<String, Object> bookEntity = entity("Q1", label("nl", "De jacht op het schaduwdier"), claims);
 
         when(wikipediaService.searchEntityIds(anyString(), anyString())).thenReturn(List.of("Q1"));
         when(wikipediaService.fetchWikidataEntity("Q1")).thenReturn(bookEntity);
         when(wikipediaService.fetchWikidataEntity("Q2195491")).thenReturn(Map.of());
+        when(wikipediaService.fetchWikidataEntity("Q816577")).thenReturn(Map.of());
         when(wikipediaService.labelMatches(any(), anyString(), anyString(), any())).thenReturn(true);
 
         Optional<WikidataBookSeriesService.BookSeriesInfo> info =
-                subject.findBookInSeries("De jacht op het schaduwdier", "De Grijze Jager", TAGS);
+                subject.findBookInSeries("De jacht op het schaduwdier", "John Flanagan",
+                        "De Grijze Jager", TAGS);
 
         assertEquals(null, info.orElseThrow().seriesIndex());
         assertEquals(2017, info.orElseThrow().firstPublicationYear());
@@ -134,15 +160,16 @@ class WikidataBookSeriesServiceTest {
         when(wikipediaService.fetchWikidataEntity("Q1")).thenReturn(Map.of());
         when(wikipediaService.labelMatches(any(), anyString(), anyString(), any())).thenReturn(false);
 
-        assertTrue(subject.findBookInSeries("Some Book", "Some Series", TAGS).isEmpty());
+        assertTrue(subject.findBookInSeries("Some Book", "The Author", "Some Series", TAGS).isEmpty());
         verify(wikipediaService, never()).entityField(any(), anyString(), anyString());
     }
 
     @Test
     void returnsEmptyOnBlankInput() {
-        assertTrue(subject.findBookInSeries(null, "Series", TAGS).isEmpty());
-        assertTrue(subject.findBookInSeries("Book", " ", TAGS).isEmpty());
-        assertTrue(subject.findBookInSeries("Book", "Series", List.of()).isEmpty());
+        assertTrue(subject.findBookInSeries(null, "Author", "Series", TAGS).isEmpty());
+        assertTrue(subject.findBookInSeries("Book", " ", "Series", TAGS).isEmpty());
+        assertTrue(subject.findBookInSeries("Book", "Author", " ", TAGS).isEmpty());
+        assertTrue(subject.findBookInSeries("Book", "Author", "Series", List.of()).isEmpty());
     }
 
     // ===== discoverSeries =====
