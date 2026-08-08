@@ -133,6 +133,18 @@ class PlaybackCommandControllerTest {
     }
 
     @Test
+    void sendPlaybackCommandPublishesStopLikeAnyTransportCommand() {
+        UUID playQueueId = UUID.randomUUID();
+        playbackSessionRegistry.update(session(playQueueId));
+
+        boolean sent = controller.sendPlaybackCommand(playQueueId, PlaybackCommandType.STOP,
+                null, null, null, authentication);
+
+        assertTrue(sent);
+        verify(playbackCommandService).publish(playQueueId, PlaybackCommandType.STOP, null, null, null);
+    }
+
+    @Test
     void sendPlaybackCommandRefusesToKickAFollower() {
         UUID playQueueId = UUID.randomUUID();
         playbackSessionRegistry.update(session(playQueueId));

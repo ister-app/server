@@ -369,6 +369,11 @@ enum PlaybackCommandType {
     STOP_FOLLOW
     "Switch the playing client's repeat mode to repeatMode; every controller then shows it."
     SET_REPEAT
+    """
+    End the whole session: the playing client tears down its queue and re-publishes STOP so
+    listening-along devices stop too. Sent by a remote control or by the playing client itself.
+    """
+    STOP
 }
 
 """
