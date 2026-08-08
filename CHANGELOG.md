@@ -1,5 +1,28 @@
 # Changelog
 
+## server v2.10.1
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.10.1` |
+| `ghcr.io/ister-app/migrations` | `2.10.1` |
+
+### Dependency updates
+
+- chore(deps): update plugin org.graalvm.buildtools.native to v1.1.8 ([`3574280`](https://github.com/ister-app/server/commit/3574280))
+
+### Other
+
+- refactor: resolve the open SonarCloud issues on new code ([`ac14655`](https://github.com/ister-app/server/commit/ac14655))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.10.1
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.10.0...v2.10.1
+
 ## server v2.10.0
 
 | Image | Tag |
