@@ -1,5 +1,36 @@
 # Changelog
 
+## server v2.11.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.11.0` |
+| `ghcr.io/ister-app/migrations` | `2.11.0` |
+
+### Features
+
+- feat: bake last_update frontmatter into the docs zip ([`3795452`](https://github.com/ister-app/server/commit/3795452))
+- feat: add a STOP playback command that ends the whole session ([`4abd242`](https://github.com/ister-app/server/commit/4abd242))
+
+### Fixes
+
+- fix: authenticate the async dispatch of streamed responses ([`05be733`](https://github.com/ister-app/server/commit/05be733))
+- fix: update the existing movie watch status instead of inserting a row per heartbeat ([`0abec0d`](https://github.com/ister-app/server/commit/0abec0d))
+- fix(worker): require an author match when enriching a series book from Wikidata ([`26d60a6`](https://github.com/ister-app/server/commit/26d60a6))
+- fix: prefer local-file artwork for the now-playing session card ([`b7d1084`](https://github.com/ister-app/server/commit/b7d1084))
+
+### Dependency updates
+
+- chore(deps): update gradle, sonarqube, setup-graalvm and flyway ([`f92046a`](https://github.com/ister-app/server/commit/f92046a))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.11.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.10.1...v2.11.0
+
 ## server v2.10.1
 
 | Image | Tag |
