@@ -98,4 +98,16 @@ public class StreamTokenAuthenticationFilter extends OncePerRequestFilter {
                 && !matches(path, DOWNLOAD_PATH)
                 && !matches(path, UPLOAD_PATH);
     }
+
+    /**
+     * Streaming endpoints (epub resources, HLS) complete through an async dispatch, which
+     * runs the security filter chain a second time. The authorization filter checks that
+     * dispatch too, so authentication must run again as well — without this the dispatch
+     * is anonymous and every streamed response logs an AuthorizationDeniedException
+     * (harmless for the client, the body is already committed, but it floods the log).
+     */
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return false;
+    }
 }

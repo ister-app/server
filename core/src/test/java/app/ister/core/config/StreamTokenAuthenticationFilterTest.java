@@ -65,6 +65,15 @@ class StreamTokenAuthenticationFilterTest {
         assertFalse(filter.shouldNotFilter(request), "Path should be filtered: " + uri);
     }
 
+    /**
+     * Streaming endpoints complete through an async dispatch that re-runs the filter chain;
+     * the authorization filter checks that dispatch, so this filter must authenticate it too.
+     */
+    @Test
+    void filterRunsOnAsyncDispatches() {
+        assertFalse(filter.shouldNotFilterAsyncDispatch());
+    }
+
     @Test
     void shouldNotFilterReturnsTrueForOtherPaths() {
         when(request.getRequestURI()).thenReturn("/api/graphql");
