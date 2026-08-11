@@ -388,12 +388,12 @@ class PlayQueueServiceTest {
                 .map(id -> (EpisodeRepository.IdOnly) () -> id)
                 .toList();
         when(episodeRepository.findIdsOnlyByShowEntityId(eq(showId), any(Sort.class))).thenReturn(idOnlies);
-        when(episodeRepository.findEpisodeIdsForShowOrdered(showId, 50, 30)).thenReturn(allIds.subList(30, 80));
+        when(episodeRepository.findEpisodeIdsForShowOrdered(showId, 50, 10)).thenReturn(allIds.subList(10, 60));
 
         PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.SHOW, showId, startId, false, null, authentication);
 
         assertEquals(50, result.getItems().size());
-        assertEquals(80, result.getSourceOffset());
+        assertEquals(60, result.getSourceOffset());
         PlayQueueItemEntity current = result.getItems().stream()
                 .filter(item -> item.getId().equals(result.getCurrentItem()))
                 .findFirst().orElseThrow();
@@ -553,14 +553,15 @@ class PlayQueueServiceTest {
         when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.empty());
         when(trackRepository.findRecentlyPlayedTrackIdsForPerson(eq(personId), eq("listener"), any(Instant.class), eq(Integer.MAX_VALUE), eq(0)))
                 .thenReturn(ranked);
-        when(trackRepository.findRecentlyPlayedTrackIdsForPerson(eq(personId), eq("listener"), any(Instant.class), eq(50), eq(10)))
-                .thenReturn(ranked.subList(10, 30));
+        when(trackRepository.findRecentlyPlayedTrackIdsForPerson(eq(personId), eq("listener"), any(Instant.class), eq(50), eq(0)))
+                .thenReturn(ranked);
 
         PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.ARTIST, personId, startId, false, RankKind.RECENTLY_PLAYED, authentication);
 
-        // The materialized window starts BACK_WINDOW items before the start item.
-        assertEquals(20, result.getItems().size());
-        assertEquals(ranked.get(10), result.getItems().getFirst().getTrackEntityId());
+        // The materialized window starts BACK_WINDOW items before the start item,
+        // clamped to the source start when the start item sits closer to it.
+        assertEquals(30, result.getItems().size());
+        assertEquals(ranked.getFirst(), result.getItems().getFirst().getTrackEntityId());
         assertTrue(result.isSourceExhausted());
         PlayQueueItemEntity current = result.getItems().stream()
                 .filter(item -> item.getId().equals(result.getCurrentItem()))
@@ -1632,20 +1633,20 @@ class PlayQueueServiceTest {
     void createFilterPlayQueueWithStartIdStartsWindowBeforeStartItem() {
         mockSaveAssignsItemIds();
         List<UUID> trackIds = IntStream.range(0, 50).mapToObj(i -> UUID.randomUUID()).toList();
-        UUID startId = trackIds.get(10);
+        UUID startId = trackIds.get(30);
         when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.empty());
         // Position 40 in the filter's result: the window opens BACK_WINDOW items earlier.
         when(filterQueryService.indexOf(eq(FilterKind.TRACK), any(), any(), any(), any(), any(), eq(startId)))
                 .thenReturn(40);
         when(filterQueryService.chunkIds(eq(FilterKind.TRACK), any(), any(), any(), any(),
-                argThat(c -> c.limit() == 50 && c.offset() == 30))).thenReturn(trackIds);
+                argThat(c -> c.limit() == 50 && c.offset() == 10))).thenReturn(trackIds);
 
         PlayQueueEntity result = subject.createPlayQueue(new PlayQueueService.CreatePlayQueueRequest(
                 PlayQueueSourceType.FILTER, null, startId, false,
                 null, emptyFilter(), FilterKind.TRACK, null, null, null), authentication);
 
         assertEquals(50, result.getItems().size());
-        assertEquals(80, result.getSourceOffset(), "the cursor sits past the materialized window");
+        assertEquals(60, result.getSourceOffset(), "the cursor sits past the materialized window");
         PlayQueueItemEntity current = result.getItems().stream()
                 .filter(item -> item.getId().equals(result.getCurrentItem()))
                 .findFirst().orElseThrow();
@@ -1811,13 +1812,13 @@ class PlayQueueServiceTest {
         playlist.setFilterKind(FilterKind.TRACK);
         playlist.setFilter(FilterJson.writeFilter(emptyFilter()));
         List<UUID> trackIds = IntStream.range(0, 50).mapToObj(i -> UUID.randomUUID()).toList();
-        UUID startId = trackIds.get(25);
+        UUID startId = trackIds.get(30);
         when(playlistService.ownedPlaylist(authentication, playlist.getId())).thenReturn(Optional.of(playlist));
         when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.empty());
         when(filterQueryService.indexOf(eq(FilterKind.TRACK), any(), any(), any(), any(), any(), eq(startId)))
                 .thenReturn(500);
         when(filterQueryService.chunkIds(eq(FilterKind.TRACK), any(), any(), any(), any(),
-                argThat(c -> c.offset() == 490))).thenReturn(trackIds);
+                argThat(c -> c.offset() == 470))).thenReturn(trackIds);
 
         PlayQueueEntity result = subject.createPlayQueue(
                 PlayQueueSourceType.PLAYLIST, playlist.getId(), startId, false, null, authentication);

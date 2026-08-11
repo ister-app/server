@@ -97,10 +97,12 @@ public class PlayQueueService {
     private static final BigDecimal GAP = GapPositions.GAP;
     // Number of source items materialized per append.
     private static final int CHUNK_SIZE = 50;
-    // Append a new chunk when fewer than this many items remain after the current item.
-    private static final int EXTEND_THRESHOLD = 15;
+    // Append a new chunk when fewer than this many items remain after the current item. Sized so
+    // the player's fit-to-viewport "up next" tab (~20-25 rows on a tall desktop window) stays full.
+    private static final int EXTEND_THRESHOLD = 25;
     // How many already-played items to keep before the start item when creating a queue mid-source.
-    private static final int BACK_WINDOW = 10;
+    // Sized like EXTEND_THRESHOLD: enough to fill the player's "previous" tab on any realistic screen.
+    private static final int BACK_WINDOW = 30;
     // Bound for the shuffle exclusion parameter when there is no start item; matches no row.
     private static final UUID NIL_UUID = new UUID(0, 0);
 
