@@ -18,21 +18,31 @@ import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.NodeService;
 import app.ister.core.service.ServerEventService;
+import app.ister.core.eventdata.FileScanRequestedData;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -192,6 +202,184 @@ class HandleAlbumFoundTest {
                 .build());
 
         verify(messageSender, never()).sendNfoFileFound(any(), any());
+    }
+
+    @Test
+    void handleSendsFileScanRequestedForLocalCoverImages(@TempDir Path tempDir) throws IOException {
+        UUID albumId = UUID.randomUUID();
+        UUID dirId = UUID.randomUUID();
+
+        LibraryEntity library = LibraryEntity.builder()
+                .libraryType(LibraryType.MUSIC)
+                .name("Music")
+                .build();
+        ReflectionTestUtils.setField(library, "id", UUID.randomUUID());
+
+        PersonEntity artist = PersonEntity.builder()
+                .libraryEntity(library)
+                .name("ArtistName")
+                .build();
+
+        AlbumEntity album = AlbumEntity.builder()
+                .libraryEntity(library)
+                .personEntity(artist)
+                .name("AlbumName")
+                .releaseYear(2024)
+                .metadataEntities(List.of())
+                .build();
+        ReflectionTestUtils.setField(album, "id", albumId);
+
+        NodeEntity node = NodeEntity.builder().name("node1").url("http://localhost").build();
+        DirectoryEntity dir = DirectoryEntity.builder()
+                .name("music-dir")
+                .path(tempDir.toString())
+                .directoryType(DirectoryType.LIBRARY)
+                .libraryEntity(library)
+                .nodeEntity(node)
+                .build();
+        ReflectionTestUtils.setField(dir, "id", dirId);
+
+        Path albumPath = tempDir.resolve("ArtistName").resolve("AlbumName (2024)");
+        Files.createDirectories(albumPath);
+        Path cover = albumPath.resolve("cover.jpg");
+        Files.write(cover, new byte[]{1, 2, 3});
+        Files.writeString(albumPath.resolve("01 - Track.mp3"), "not an image");
+        Files.writeString(albumPath.resolve("album.nfo"), "<album/>");
+
+        when(albumRepository.findById(albumId)).thenReturn(Optional.of(album));
+        when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
+        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node))
+                .thenReturn(List.of(dir));
+        when(otherPathFileRepository.findByDirectoryEntityAndPath(any(), any())).thenReturn(Optional.empty());
+
+        subject.handle(AlbumFoundData.builder()
+                .eventType(EventType.ALBUM_FOUND)
+                .albumId(albumId)
+                .build());
+
+        ArgumentCaptor<FileScanRequestedData> captor = ArgumentCaptor.forClass(FileScanRequestedData.class);
+        verify(messageSender).sendFileScanRequested(captor.capture(), eq("music-dir"));
+        assertEquals(cover, captor.getValue().getPath());
+        assertTrue(captor.getValue().getRegularFile());
+        assertEquals(3, captor.getValue().getSize());
+        assertEquals(dirId, captor.getValue().getDirectoryEntityUUID());
+    }
+
+    @Test
+    void handleSendsNoFileScanRequestedWithoutLocalImages(@TempDir Path tempDir) throws IOException {
+        UUID albumId = UUID.randomUUID();
+
+        LibraryEntity library = LibraryEntity.builder()
+                .libraryType(LibraryType.MUSIC)
+                .name("Music")
+                .build();
+        ReflectionTestUtils.setField(library, "id", UUID.randomUUID());
+
+        PersonEntity artist = PersonEntity.builder()
+                .libraryEntity(library)
+                .name("ArtistName")
+                .build();
+
+        AlbumEntity album = AlbumEntity.builder()
+                .libraryEntity(library)
+                .personEntity(artist)
+                .name("AlbumName")
+                .releaseYear(2024)
+                .metadataEntities(List.of())
+                .build();
+        ReflectionTestUtils.setField(album, "id", albumId);
+
+        NodeEntity node = NodeEntity.builder().name("node1").url("http://localhost").build();
+        DirectoryEntity dir = DirectoryEntity.builder()
+                .name("music-dir")
+                .path(tempDir.toString())
+                .directoryType(DirectoryType.LIBRARY)
+                .libraryEntity(library)
+                .nodeEntity(node)
+                .build();
+
+        Path albumPath = tempDir.resolve("ArtistName").resolve("AlbumName (2024)");
+        Files.createDirectories(albumPath);
+        Files.writeString(albumPath.resolve("01 - Track.mp3"), "not an image");
+
+        when(albumRepository.findById(albumId)).thenReturn(Optional.of(album));
+        when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
+        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node))
+                .thenReturn(List.of(dir));
+        when(otherPathFileRepository.findByDirectoryEntityAndPath(any(), any())).thenReturn(Optional.empty());
+
+        subject.handle(AlbumFoundData.builder()
+                .eventType(EventType.ALBUM_FOUND)
+                .albumId(albumId)
+                .build());
+
+        verify(messageSender, never()).sendFileScanRequested(any(), any());
+    }
+
+    @Test
+    void handleDefersSendsUntilAfterCommit(@TempDir Path tempDir) throws IOException {
+        UUID albumId = UUID.randomUUID();
+
+        LibraryEntity library = LibraryEntity.builder()
+                .libraryType(LibraryType.MUSIC)
+                .name("Music")
+                .build();
+        ReflectionTestUtils.setField(library, "id", UUID.randomUUID());
+
+        PersonEntity artist = PersonEntity.builder()
+                .libraryEntity(library)
+                .name("ArtistName")
+                .build();
+
+        AlbumEntity album = AlbumEntity.builder()
+                .libraryEntity(library)
+                .personEntity(artist)
+                .name("AlbumName")
+                .releaseYear(2024)
+                .metadataEntities(List.of())
+                .build();
+        ReflectionTestUtils.setField(album, "id", albumId);
+
+        NodeEntity node = NodeEntity.builder().name("node1").url("http://localhost").build();
+        DirectoryEntity dir = DirectoryEntity.builder()
+                .name("music-dir")
+                .path(tempDir.toString())
+                .directoryType(DirectoryType.LIBRARY)
+                .libraryEntity(library)
+                .nodeEntity(node)
+                .build();
+
+        Path albumPath = tempDir.resolve("ArtistName").resolve("AlbumName (2024)");
+        Files.createDirectories(albumPath);
+        Files.write(albumPath.resolve("cover.jpg"), new byte[]{1});
+        String nfoPath = albumPath.resolve("album.nfo").toString();
+
+        when(albumRepository.findById(albumId)).thenReturn(Optional.of(album));
+        when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
+        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node))
+                .thenReturn(List.of(dir));
+        when(otherPathFileRepository.findByDirectoryEntityAndPath(dir, nfoPath))
+                .thenReturn(Optional.of(new OtherPathFileEntity()));
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            subject.handle(AlbumFoundData.builder()
+                    .eventType(EventType.ALBUM_FOUND)
+                    .albumId(albumId)
+                    .build());
+
+            // This handler deletes the album metadata in its own transaction: the NFO re-parse and
+            // cover re-ingest must not run against the pre-delete state.
+            verify(messageSender, never()).sendNfoFileFound(any(), any());
+            verify(messageSender, never()).sendFileScanRequested(any(), any());
+
+            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        verify(messageSender).sendNfoFileFound(any(), eq("music-dir"));
+        verify(messageSender).sendFileScanRequested(any(), eq("music-dir"));
     }
 
     @Test
