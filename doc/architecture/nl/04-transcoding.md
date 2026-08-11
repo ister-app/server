@@ -25,6 +25,16 @@ met `-f segment -segment_times` zodat de encoder de PTS nooit reset — dát voo
 keerzijde: passes encoderen sequentieel vanaf t=0, dus een sprong vooruit wacht tot de encoder het
 gevraagde segment heeft ingehaald.
 
+Dat geldt ook voor de `copy`-kwaliteiten (direct spelen): video wordt stream-gekopieerd en geknipt
+op hetzelfde keyframe-grid dat de playlists adverteren, en copy-audio laat elke MPEG-TS-native
+codec (AAC, MP3, AC-3, E-AC-3, DTS) ongemoeid en valt alleen terug op AAC voor codecs die MPEG-TS
+niet kan dragen. Copy-audio werd voorheen geadverteerd als één segment dat het hele bestand
+besloeg en on-demand werd gegenereerd; bij lange bestanden blokkeerde dat het eerste verzoek
+minutenlang en verhongerde de audiostream van de client terwijl videosegmenten vooruit renden.
+Videopasses zetten bovendien `omit_video_pes_length=0`: zonder expliciete PES-lengtes is het
+laatste PES-pakket van elk segment onbegrensd, en een client die segmenten achter elkaar leest
+markeert dat op elke grens als corrupt — een decodeerhapering om de paar seconden.
+
 ## Concurrency
 
 `transcodeExecutor` is een vaste pool van 4 threads, extra begrensd door de

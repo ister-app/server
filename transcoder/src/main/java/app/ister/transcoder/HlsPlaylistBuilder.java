@@ -199,10 +199,10 @@ public class HlsPlaylistBuilder {
             int sep = part.lastIndexOf('_');
             int audioIdx = Integer.parseInt(part.substring(0, sep));
             String bitrate = part.substring(sep + 1);
-            if ("copy".equals(bitrate)) {
-                return buildSingleSegmentPlaylist(totalDuration,
-                        String.format(Locale.ROOT, "seg_audio_0.000000_%.6f_%d_copy.ts", totalDuration, audioIdx));
-            }
+            // Copy audio is segmented like every other quality. It used to be advertised as a
+            // single whole-file segment, but generating that one giant .ts blocked the first
+            // request for minutes on long files and starved the client's audio stream while
+            // video segments raced ahead (buffer bloat, underruns, reconnect-from-0 loops).
             return buildVodPlaylist(keyframes, totalDuration,
                     (start, dur, idx) -> String.format(Locale.ROOT, "seg_audio_%d_%s_%05d.ts", audioIdx, bitrate, idx));
         }

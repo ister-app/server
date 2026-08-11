@@ -218,14 +218,16 @@ class HlsPlaylistBuilderTest {
     }
 
     @Test
-    void buildStreamPlaylistAudioCopyReturnsSingleSegment() {
-        List<Double> keyframes = List.of(0.0);
-        String result = builder.buildStreamPlaylist("stream_audio_1_copy.m3u8", keyframes, 60.0);
+    void buildStreamPlaylistAudioCopyUsesKeyframedSegments() {
+        // Copy audio is segmented like every other quality: a single whole-file segment
+        // blocked the first request for minutes and starved the client's audio stream.
+        List<Double> keyframes = List.of(0.0, 4.0, 8.0);
+        String result = builder.buildStreamPlaylist("stream_audio_1_copy.m3u8", keyframes, 12.0);
 
-        assertTrue(result.contains("seg_audio_0.000000_60.000000_1_copy.ts"));
+        assertTrue(result.contains("seg_audio_1_copy_00000.ts"));
+        assertTrue(result.contains("seg_audio_1_copy_00001.ts"));
         assertTrue(result.contains("#EXT-X-ENDLIST"));
-        // Single segment, no multiple entries
-        assertEquals(1, countOccurrences(result, "#EXTINF:"));
+        assertEquals(3, countOccurrences(result, "#EXTINF:"));
     }
 
     @Test

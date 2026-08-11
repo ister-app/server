@@ -24,6 +24,15 @@ segment, using `-f segment -segment_times` so the encoder never resets PTS — t
 A/V drift. The trade-off: passes encode sequentially from t=0, so a forward seek waits for the
 encoder to catch up to the requested segment.
 
+This includes the `copy` (direct-play) qualities: video is stream-copied and cut at the same
+keyframe grid the playlists advertise, and copy audio keeps any MPEG-TS-native codec (AAC, MP3,
+AC-3, E-AC-3, DTS) untouched, falling back to AAC only for codecs MPEG-TS cannot carry. Copy audio
+used to be advertised as a single whole-file segment generated on demand; on long files that
+blocked the first request for minutes and starved the client's audio stream while video segments
+raced ahead. Video passes also set `omit_video_pes_length=0`: without explicit PES lengths the
+final PES packet of every segment is unbounded, and a client reading segments back to back flags
+it corrupt on each boundary — a decode hiccup every few seconds.
+
 ## Concurrency
 
 `transcodeExecutor` is a fixed 4-thread pool, additionally bounded by the `concurrentFileSlots`

@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -117,6 +118,9 @@ public class HlsService {
 
     /** Per-subtitle locks to prevent duplicate segment generation for the same subtitle stream. */
     private final ConcurrentHashMap<String, Object> subtitleLocks = new ConcurrentHashMap<>();
+
+    /** Per-file locks for on-demand binary generation — see {@link #getCachedOrGenerateBinary}. */
+    private final ConcurrentHashMap<Path, Object> binaryGenerationLocks = new ConcurrentHashMap<>();
 
     /** What a pre-transcode of one media file asked for, so its remaining passes can be resumed. */
     private record PreTranscodeRequest(boolean direct, boolean transcode, PassFilter filter) {
@@ -398,10 +402,11 @@ public class HlsService {
     /**
      * No master playlist ever points at the 64k group — the builder folds it into 192k — so producing
      * it in the background is wasted work. Interactive requests still get it on demand.
+     * COPY audio is a real segmented pass (it used to be a single on-demand whole-file segment),
+     * so it warms up in the background alongside the copy video pass whenever direct is requested.
      */
     private static boolean producesAudioPass(AudioQuality quality, PassFilter filter) {
-        return quality != AudioQuality.COPY
-                && !(filter.preTranscode() && quality == AudioQuality.Q64K);
+        return !(filter.preTranscode() && quality == AudioQuality.Q64K);
     }
 
     private static boolean exceedsQualityCap(VideoQuality quality, PassFilter filter) {
@@ -522,9 +527,12 @@ public class HlsService {
     /**
      * Returns path to (cached) audio-only .ts segment.
      * <p>
-     * COPY format:       {@code seg_audio_{start}_{duration}_{streamIdx}_copy.ts} — generated on demand per segment.
-     * Transcoded format: {@code seg_audio_{streamIdx}_{bitrate}_%05d.ts}           — produced by a background FFmpeg pass.
-     * On first request for a transcoded quality, sends a {@code TRANSCODE_PASS_REQUESTED} event.
+     * All qualities (including {@code copy}) use {@code seg_audio_{streamIdx}_{bitrate}_%05d.ts},
+     * produced by a background FFmpeg pass; the first request for a quality sends a
+     * {@code TRANSCODE_PASS_REQUESTED} event.
+     * Legacy format {@code seg_audio_{start}_{duration}_{streamIdx}_copy.ts} (one segment spanning
+     * the whole file) is still generated on demand for playlists cached before copy audio became
+     * segmented; the cache retention window retires those.
      */
     public Path getAudioSegment(UUID mediaFileId, String segmentFilename) throws IOException {
         String[] parts = segmentFilename.replace(".ts", "").split("_");
@@ -745,17 +753,12 @@ public class HlsService {
             if (!includeVideo[qi]) continue;
             AudioQuality aq = audioQualities[qi];
             for (MediaFileStreamEntity as : audioStreams) {
+                // Copy audio is segmented like every other quality — see HlsPlaylistBuilder.
                 String filename = String.format(Locale.ROOT, "stream_audio_%d_%s" + EXT_M3U8, as.getStreamIndex(), aq.getLabel());
-                if (aq == AudioQuality.COPY) {
-                    writePlaylistIfAbsent(mediaFileId, filename,
-                            playlistBuilder.buildSingleSegmentPlaylist(totalDuration,
-                                    String.format(Locale.ROOT, "seg_audio_0.000000_%.6f_%d_copy.ts", totalDuration, as.getStreamIndex())));
-                } else {
-                    int streamIndex = as.getStreamIndex();
-                    String bitrateLabel = aq.getLabel();
-                    writeStreamPlaylistIfAbsent(mediaFileId, filename, keyframes, totalDuration,
-                            (start, dur, idx) -> String.format(Locale.ROOT, "seg_audio_%d_%s_%05d.ts", streamIndex, bitrateLabel, idx));
-                }
+                int streamIndex = as.getStreamIndex();
+                String bitrateLabel = aq.getLabel();
+                writeStreamPlaylistIfAbsent(mediaFileId, filename, keyframes, totalDuration,
+                        (start, dur, idx) -> String.format(Locale.ROOT, "seg_audio_%d_%s_%05d.ts", streamIndex, bitrateLabel, idx));
             }
         }
     }
@@ -985,13 +988,33 @@ public class HlsService {
                 direct ? 1 : 0, transcode ? 1 : 0, subtitleFormat.name());
     }
 
+    /**
+     * Returns the cached file, generating it first when absent. The generator writes to a
+     * {@code .part} sibling that is atomically moved into place on success: the cache file
+     * either does not exist or is complete, so a request arriving mid-generation can never
+     * be served a half-written file (the client would see it as a corrupt segment and, for
+     * ffmpeg-based players, retry from byte 0 in a loop). Concurrent requests for the same
+     * file share one generation via a per-file lock instead of racing a second FFmpeg run.
+     */
     private Path getCachedOrGenerateBinary(Path cacheFile, Consumer<Path> generator) throws IOException {
         if (Files.exists(cacheFile)) {
             Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(System.currentTimeMillis()));
             return cacheFile;
         }
         Files.createDirectories(cacheFile.getParent());
-        generator.accept(cacheFile);
+        Object lock = binaryGenerationLocks.computeIfAbsent(cacheFile, k -> new Object());
+        try {
+            synchronized (lock) {
+                if (!Files.exists(cacheFile)) {
+                    Path partFile = cacheFile.resolveSibling(cacheFile.getFileName() + ".part");
+                    generator.accept(partFile);
+                    Files.move(partFile, cacheFile,
+                            StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        } finally {
+            binaryGenerationLocks.remove(cacheFile);
+        }
         return cacheFile;
     }
 

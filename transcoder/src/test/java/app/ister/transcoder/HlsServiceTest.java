@@ -288,15 +288,16 @@ class HlsServiceTest {
     }
 
     @Test
-    void getStreamPlaylistForAudioCopyReturnsSingleSegment() throws IOException {
+    void getStreamPlaylistForAudioCopyUsesKeyframedSegments() throws IOException {
         UUID id = UUID.randomUUID();
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(60.0);
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 30.0));
 
         String playlist = hlsService.getStreamPlaylist(id, "stream_audio_1_copy.m3u8");
 
-        assertTrue(playlist.contains("seg_audio_0.000000_60.000000_1_copy.ts"));
+        assertTrue(playlist.contains("seg_audio_1_copy_00000.ts"));
+        assertTrue(playlist.contains("seg_audio_1_copy_00001.ts"));
         assertTrue(playlist.contains("#EXT-X-ENDLIST"));
     }
 
@@ -590,7 +591,9 @@ class HlsServiceTest {
 
         String segFilename = "seg_audio_0.000000_60.000000_1_copy.ts";
         doAnswer(inv -> {
-            Files.writeString(cacheDir.resolve(segFilename), "audio-copy-data");
+            // On-demand generation writes to a .part sibling that HlsService atomically
+            // moves into place — the fake ffmpeg must do the same.
+            Files.writeString(cacheDir.resolve(segFilename + ".part"), "audio-copy-data");
             return completedFFmpegFuture();
         }).when(ffmpegMock).executeAsync();
 
@@ -613,7 +616,9 @@ class HlsServiceTest {
 
         String segFilename = "seg_audio_0.000000_60.000000_1_copy.ts";
         doAnswer(inv -> {
-            Files.writeString(cacheDir.resolve(segFilename), "audio-copy-data");
+            // On-demand generation writes to a .part sibling that HlsService atomically
+            // moves into place — the fake ffmpeg must do the same.
+            Files.writeString(cacheDir.resolve(segFilename + ".part"), "audio-copy-data");
             return completedFFmpegFuture();
         }).when(ffmpegMock).executeAsync();
 
@@ -1018,7 +1023,7 @@ class HlsServiceTest {
     }
 
     @Test
-    void startAllPassesDirectOnlyStartsOneCopyVideoPass() throws Exception {
+    void startAllPassesDirectStartsCopyVideoAndCopyAudioPasses() throws Exception {
         UUID id = UUID.randomUUID();
         Path cacheDir = tempDir.resolve(id.toString());
         Files.createDirectories(cacheDir);
@@ -1032,18 +1037,19 @@ class HlsServiceTest {
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
 
-        CountDownLatch copyDone = new CountDownLatch(1);
+        // Copy audio is a segmented background pass just like copy video, so a
+        // direct-only warm-up starts exactly two passes: video copy + audio copy.
+        CountDownLatch bothDone = new CountDownLatch(2);
         doAnswer(inv -> {
             Files.writeString(cacheDir.resolve("seg_video_copy_00000.ts"), "data");
-            copyDone.countDown();
+            bothDone.countDown();
             return completedFFmpegFuture();
         }).when(ffmpegMock).executeAsync();
 
         hlsService.startAllPasses(id, true, false);
-        assertTrue(copyDone.await(5, TimeUnit.SECONDS));
+        assertTrue(bothDone.await(5, TimeUnit.SECONDS));
 
-        // Only COPY video pass — COPY audio is generated on-demand, not via a background pass
-        verify(ffmpegMock, times(1)).executeAsync();
+        verify(ffmpegMock, times(2)).executeAsync();
     }
 
     @Test

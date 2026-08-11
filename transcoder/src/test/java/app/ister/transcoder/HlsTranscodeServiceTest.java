@@ -715,6 +715,57 @@ class HlsTranscodeServiceTest {
     }
 
     @Test
+    void startAudioPassCopyQualityStreamCopiesMpegTsNativeCodec() {
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of());
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
+
+        // DTS is MPEG-TS native: the copy quality must never re-encode it.
+        service.startAudioPass("/test/video.mkv", tempDir, 1, AudioQuality.COPY, "dts");
+
+        verify(ffmpegMock).executeAsync();
+        List<String> args = outputArgsOf(ffmpegMock);
+        assertContainsSequence(args, "-c:a", "copy");
+        assertDoesNotContain(args, "-force_key_frames");
+    }
+
+    @Test
+    void startAudioPassCopyQualityTranscodesNonNativeCodecToAac() {
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of());
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
+
+        // FLAC cannot be carried in MPEG-TS: the copy quality falls back to AAC at 192k.
+        service.startAudioPass("/test/video.mkv", tempDir, 1, AudioQuality.COPY, "flac");
+
+        verify(ffmpegMock).executeAsync();
+        List<String> args = outputArgsOf(ffmpegMock);
+        assertContainsSequence(args, "-c:a", "aac");
+        assertContainsSequence(args, "-b:a", "192k");
+    }
+
+    @Test
+    void startVideoPassWritesExplicitPesLengthsForCleanSegmentBoundaries() {
+        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 2.0, 4.0));
+        FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
+        when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
+        when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
+
+        service.startVideoPass("/test/video.mkv", tempDir, VideoQuality.COPY);
+
+        verify(ffmpegMock).executeAsync();
+        List<String> args = outputArgsOf(ffmpegMock);
+        assertContainsSequence(args, "-c:v", "copy");
+        // Without explicit PES lengths the final PES packet of every segment is unbounded
+        // and clients reading segments back to back flag it corrupt on each boundary.
+        assertContainsSequence(args, "-segment_format_options", "omit_video_pes_length=0");
+        // The cut grid must stay exactly the keyframe grid the playlists advertise.
+        assertContainsSequence(args, "-segment_times", "2.000000,4.000000");
+    }
+
+    @Test
     void startAudioPassForceStopsStalledPassThatProducesNoOutput() {
         ReflectionTestUtils.setField(service, "passStallTimeoutSeconds", 0L);
         when(ffprobeService.getKeyframes("/test/audio.mkv")).thenReturn(List.of());

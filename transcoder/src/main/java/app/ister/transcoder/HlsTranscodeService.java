@@ -51,6 +51,7 @@ public class HlsTranscodeService {
     private static final String FORMAT_MPEGTS = "mpegts";
     private static final String ARG_SEGMENT_TIMES = "-segment_times";
     private static final String ARG_SEGMENT_TIME_DELTA = "-segment_time_delta";
+    private static final String ARG_SEGMENT_FORMAT_OPTIONS = "-segment_format_options";
     private static final String AUDIO_SAMPLE_RATE = "48000";
     /** The codec the AAC transcode qualities re-encode to; a source already in this codec is copied instead. */
     private static final String AAC_CODEC = "aac";
@@ -626,6 +627,13 @@ public class HlsTranscodeService {
         var output = UrlOutput.toUrl(outputPattern.toString())
                 .setFormat("segment")
                 .addArguments("-segment_format", FORMAT_MPEGTS)
+                // By default the mpegts muxer writes video PES packets with length 0
+                // (unbounded); the final PES of every segment then has no terminator, and a
+                // client reading segments back to back flags it as a corrupt packet on each
+                // boundary — a decode hiccup every few seconds. Explicit PES lengths let the
+                // demuxer see the packet end cleanly. (Packets over 64k fall back to
+                // unbounded, but boundary-final packets are small delta frames in practice.)
+                .addArguments(ARG_SEGMENT_FORMAT_OPTIONS, "omit_video_pes_length=0")
                 .addArguments("-map", "0:v:0")
                 .addArgument("-an");
 
@@ -688,7 +696,12 @@ public class HlsTranscodeService {
         Path outputPattern = cacheDir.resolve(
                 String.format("seg_audio_%d_%s_%%05d.ts", streamIdx, audioQuality.getLabel()));
 
-        boolean copySource = AAC_CODEC.equalsIgnoreCase(sourceCodecName);
+        // COPY keeps any MPEG-TS-native codec (DTS, AC-3, MP3, AAC, …) untouched and only
+        // falls back to AAC for codecs MPEG-TS cannot carry (FLAC, ALAC). The transcode
+        // qualities target AAC, so there a copy is only possible when the source already is AAC.
+        boolean copySource = audioQuality == AudioQuality.COPY
+                ? MPEGTS_NATIVE_AUDIO_CODECS.contains(sourceCodecName.toLowerCase(Locale.ROOT))
+                : AAC_CODEC.equalsIgnoreCase(sourceCodecName);
         log.debug("Starting audio pass: streamIdx={} quality={} sourceCodec={} copy={}",
                 streamIdx, audioQuality.getLabel(), sourceCodecName, copySource);
 
@@ -703,9 +716,11 @@ public class HlsTranscodeService {
         if (copySource) {
             output.addArguments("-c:a", "copy");
         } else {
+            // COPY has no bitrate of its own; its AAC fallback mirrors the 192k quality.
+            String bitrate = audioQuality.getBitrate() != null ? audioQuality.getBitrate() : "192k";
             output.addArguments("-c:a", AAC_CODEC)
                     .addArguments("-ar", AUDIO_SAMPLE_RATE)
-                    .addArguments("-b:a", audioQuality.getBitrate())
+                    .addArguments("-b:a", bitrate)
                     .addArguments("-ac", "2");
         }
 
