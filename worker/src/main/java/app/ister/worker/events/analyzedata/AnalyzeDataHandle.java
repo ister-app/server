@@ -25,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+import static app.ister.core.utils.AfterCommitPublisher.publishAfterCommit;
+
 @Service
 @Slf4j
 @Transactional
@@ -74,8 +76,10 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
                 imageRepository.deleteAll(imageRepository.findByEpisodeEntityId(data.getEpisodeId()));
                 List<MediaFileEntity> mediaFiles = mediaFileRepository.findByEpisodeEntityId(data.getEpisodeId());
                 mediaFiles.forEach(mediaFileEntity -> mediaFileStreamRepository.deleteAllByMediaFileEntityId(mediaFileEntity.getId()));
-                messageSender.sendEpisodeFound(
-                        EpisodeFoundData.builder().eventType(EventType.EPISODE_FOUND).episodeId(data.getEpisodeId()).build());
+                // The *_FOUND consumer checks for existing metadata/image rows; publish only after
+                // the deletes above have committed or it sees the doomed rows and skips the refetch.
+                publishAfterCommit(() -> messageSender.sendEpisodeFound(
+                        EpisodeFoundData.builder().eventType(EventType.EPISODE_FOUND).episodeId(data.getEpisodeId()).build()));
                 startAnalyzeMediaFiles(mediaFiles, data);
             });
         } else if (data.getMovieId() != null) {
@@ -84,8 +88,8 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
                 imageRepository.deleteAll(imageRepository.findByMovieEntityId(data.getMovieId()));
                 List<MediaFileEntity> mediaFiles = mediaFileRepository.findByMovieEntityId(data.getMovieId());
                 mediaFiles.forEach(mediaFileEntity -> mediaFileStreamRepository.deleteAllByMediaFileEntityId(mediaFileEntity.getId()));
-                messageSender.sendMovieFound(
-                        MovieFoundData.builder().eventType(EventType.MOVIE_FOUND).movieId(data.getMovieId()).build());
+                publishAfterCommit(() -> messageSender.sendMovieFound(
+                        MovieFoundData.builder().eventType(EventType.MOVIE_FOUND).movieId(data.getMovieId()).build()));
                 startAnalyzeMediaFiles(mediaFiles, data);
             });
         }
@@ -99,11 +103,11 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
                     .stream()
                     .map(dir -> dir.getNodeEntity().getName())
                     .distinct()
-                    .forEach(nodeName -> messageSender.sendPersonFound(
+                    .forEach(nodeName -> publishAfterCommit(() -> messageSender.sendPersonFound(
                             PersonFoundData.builder().eventType(EventType.PERSON_FOUND).personId(data.getPersonId()).build(),
-                            nodeName));
-            albumRepository.findByPersonEntityId(artist.getId()).forEach(album -> messageSender.sendAnalyzeData(
-                    AnalyzeData.builder().eventType(EventType.ANALYZE_DATA).albumId(album.getId()).build()));
+                            nodeName)));
+            albumRepository.findByPersonEntityId(artist.getId()).forEach(album -> publishAfterCommit(() -> messageSender.sendAnalyzeData(
+                    AnalyzeData.builder().eventType(EventType.ANALYZE_DATA).albumId(album.getId()).build())));
         });
     }
 
@@ -115,13 +119,13 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
                     .stream()
                     .map(dir -> dir.getNodeEntity().getName())
                     .distinct()
-                    .forEach(nodeName -> messageSender.sendAlbumFound(
+                    .forEach(nodeName -> publishAfterCommit(() -> messageSender.sendAlbumFound(
                             AlbumFoundData.builder().eventType(EventType.ALBUM_FOUND).albumId(data.getAlbumId()).build(),
-                            nodeName));
-            messageSender.sendAlbumFound(
-                    AlbumFoundData.builder().eventType(EventType.ALBUM_FOUND).albumId(data.getAlbumId()).build());
-            trackRepository.findByAlbumEntity_Id(album.getId(), Sort.unsorted()).forEach(track -> messageSender.sendAnalyzeData(
-                    AnalyzeData.builder().eventType(EventType.ANALYZE_DATA).trackId(track.getId()).build()));
+                            nodeName)));
+            publishAfterCommit(() -> messageSender.sendAlbumFound(
+                    AlbumFoundData.builder().eventType(EventType.ALBUM_FOUND).albumId(data.getAlbumId()).build()));
+            trackRepository.findByAlbumEntity_Id(album.getId(), Sort.unsorted()).forEach(track -> publishAfterCommit(() -> messageSender.sendAnalyzeData(
+                    AnalyzeData.builder().eventType(EventType.ANALYZE_DATA).trackId(track.getId()).build())));
         });
     }
 
@@ -131,8 +135,10 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
             mediaFileRepository.findByTrackEntityId(track.getId()).stream()
                     .filter(m -> m.getDirectoryEntityId() != null)
                     .forEach(m -> directoryRepository.findById(m.getDirectoryEntityId())
-                            .ifPresent(dir -> messageSender.sendAudioFileFound(
-                                    AudioFileFoundData.fromMediaFileEntity(m), dir.getName())));
+                            .ifPresent(dir -> {
+                                var audioFileFoundData = AudioFileFoundData.fromMediaFileEntity(m);
+                                publishAfterCommit(() -> messageSender.sendAudioFileFound(audioFileFoundData, dir.getName()));
+                            }));
         });
     }
 
@@ -140,25 +146,25 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
         LibraryEntity library = libraryRepository.findById(data.getLibraryId()).orElseThrow();
         if (library.getLibraryType() == LibraryType.SHOW) {
             showRepository.findIdsByLibraryId(data.getLibraryId())
-                    .forEach(showId -> messageSender.sendAnalyzeData(
+                    .forEach(showId -> publishAfterCommit(() -> messageSender.sendAnalyzeData(
                             AnalyzeData.builder()
                                     .eventType(EventType.ANALYZE_DATA)
                                     .showId(showId)
-                                    .build()));
+                                    .build())));
         } else if (library.getLibraryType() == LibraryType.MUSIC) {
             personRepository.findByLibraryEntityId(data.getLibraryId())
-                    .forEach(artist -> messageSender.sendAnalyzeData(
+                    .forEach(artist -> publishAfterCommit(() -> messageSender.sendAnalyzeData(
                             AnalyzeData.builder()
                                     .eventType(EventType.ANALYZE_DATA)
                                     .personId(artist.getId())
-                                    .build()));
+                                    .build())));
         } else {
             movieRepository.findIdsByLibraryId(data.getLibraryId())
-                    .forEach(movieId -> messageSender.sendAnalyzeData(
+                    .forEach(movieId -> publishAfterCommit(() -> messageSender.sendAnalyzeData(
                             AnalyzeData.builder()
                                     .eventType(EventType.ANALYZE_DATA)
                                     .movieId(movieId)
-                                    .build()));
+                                    .build())));
         }
     }
 
@@ -166,17 +172,17 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
         showRepository.findById(data.getShowId()).ifPresent(showEntity -> {
             metadataRepository.deleteAll(metadataRepository.findByShowEntityId(data.getShowId()));
             imageRepository.deleteAll(imageRepository.findByShowEntityId(data.getShowId()));
-            messageSender.sendShowFound(
+            publishAfterCommit(() -> messageSender.sendShowFound(
                     ShowFoundData.builder()
                             .eventType(EventType.SHOW_FOUND)
                             .showId(data.getShowId())
-                            .build());
+                            .build()));
             episodeRepository.findByShowEntityId(data.getShowId(), Sort.by("number"))
-                    .forEach(episode -> messageSender.sendAnalyzeData(
+                    .forEach(episode -> publishAfterCommit(() -> messageSender.sendAnalyzeData(
                             AnalyzeData.builder()
                                     .eventType(EventType.ANALYZE_DATA)
                                     .episodeId(episode.getId())
-                                    .build()));
+                                    .build())));
         });
     }
 
@@ -185,14 +191,14 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
         mediaFileEntityList.stream()
                 .map(MediaFileEntity::getDirectoryEntityId)
                 .distinct()
-                .forEach(dirId -> directoryRepository.findById(dirId).ifPresent(dir -> messageSender.sendAnalyzeData(
+                .forEach(dirId -> directoryRepository.findById(dirId).ifPresent(dir -> publishAfterCommit(() -> messageSender.sendAnalyzeData(
                         AnalyzeData.builder()
                                 .eventType(EventType.ANALYZE_DATA)
                                 .episodeId(data.getEpisodeId())
                                 .movieId(data.getMovieId())
                                 .directoryId(dir.getId())
                                 .build(),
-                        dir.getName())));
+                        dir.getName()))));
 
     }
 }

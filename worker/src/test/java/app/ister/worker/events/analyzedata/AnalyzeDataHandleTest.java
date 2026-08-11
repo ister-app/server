@@ -34,6 +34,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Sort;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Optional;
@@ -45,6 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -332,6 +335,47 @@ class AnalyzeDataHandleTest {
         ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
         verify(messageSender).sendAnalyzeData(captor.capture());
         assertEquals(trackId1, captor.getValue().getTrackId());
+    }
+
+    @Test
+    void handleAlbumIdDefersSendsUntilAfterCommit() {
+        UUID albumId = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder().build();
+        NodeEntity node = NodeEntity.builder().name("disk1").build();
+        DirectoryEntity dir = DirectoryEntity.builder().nodeEntity(node).build();
+        AlbumEntity album = AlbumEntity.builder()
+                .id(albumId)
+                .libraryEntity(library)
+                .metadataEntities(List.of())
+                .imageEntities(List.of())
+                .trackEntities(List.of())
+                .build();
+        AnalyzeData data = AnalyzeData.builder()
+                .eventType(EventType.ANALYZE_DATA)
+                .albumId(albumId)
+                .build();
+
+        when(albumRepository.findById(albumId)).thenReturn(Optional.of(album));
+        when(trackRepository.findByAlbumEntity_Id(eq(albumId), any(Sort.class))).thenReturn(List.of());
+        when(directoryRepository.findByLibraryEntityAndDirectoryType(library, DirectoryType.LIBRARY))
+                .thenReturn(List.of(dir));
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            subject.handle(data);
+
+            // The album-found consumers check for existing metadata/image rows: publishing before
+            // the delete commits makes them skip the refetch and the album ends up cover-less.
+            verify(messageSender, never()).sendAlbumFound(any());
+            verify(messageSender, never()).sendAlbumFound(any(), any());
+
+            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        verify(messageSender).sendAlbumFound(any());
+        verify(messageSender).sendAlbumFound(any(), eq("disk1"));
     }
 
     @Test
