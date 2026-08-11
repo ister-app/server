@@ -15,12 +15,14 @@ public record DeviceCommand(
         UUID startId,
         UUID playQueueId,
         Double positionInMilliseconds,
+        UUID targetDeviceId,
         String timestamp) {
 
     public static DeviceCommand from(DeviceCommandData data) {
         return new DeviceCommand(data.getDeviceId(), data.getCommand(), data.getMediaType(),
                 data.getMediaId(), data.getStartId(), data.getPlayQueueId(),
                 data.getPositionInMilliseconds() == null ? null : data.getPositionInMilliseconds().doubleValue(),
+                data.getTargetDeviceId(),
                 String.valueOf(data.getTimestamp()));
     }
 }

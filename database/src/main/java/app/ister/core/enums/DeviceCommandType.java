@@ -7,5 +7,7 @@ public enum DeviceCommandType {
     /** Hand the play queue off: the target resumes it at the given position, the source stops. */
     TAKEOVER_QUEUE,
     /** Make the target device start listen-along (follow mode) on the given play queue. */
-    START_FOLLOW
+    START_FOLLOW,
+    /** Ask the target device to hand its live queue off to targetDeviceId (pull handoff). */
+    HANDOFF_QUEUE
 }

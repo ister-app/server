@@ -267,12 +267,15 @@ type Mutation {
     pingDevice(deviceId: ID!): Boolean!
     """
     Sends a command to one of the caller's OWN devices (deny-as-not-found for anyone else's).
-    The target must be online (presence registry); TAKEOVER_QUEUE and START_FOLLOW additionally
-    require a live playback session for playQueueId. Delivery is best-effort over the cluster
+    The target must be online (presence registry); TAKEOVER_QUEUE, START_FOLLOW and HANDOFF_QUEUE
+    additionally require a live playback session for playQueueId. HANDOFF_QUEUE also requires an
+    own, online targetDeviceId different from deviceId, and refuses when the session reports a
+    different playing device than deviceId. Delivery is best-effort over the cluster
     status exchange: true means published to an online device, not executed.
     """
     sendDeviceCommand(deviceId: ID!, command: DeviceCommandType!, mediaType: MediaType,
-        mediaId: ID, startId: ID, playQueueId: ID, positionInMilliseconds: Float): Boolean!
+        mediaId: ID, startId: ID, playQueueId: ID, positionInMilliseconds: Float,
+        targetDeviceId: ID): Boolean!
 }
 
 type Subscription {
@@ -313,6 +316,8 @@ enum DeviceCommandType {
     TAKEOVER_QUEUE
     "Make the target device start listen-along (follow mode) on the given play queue."
     START_FOLLOW
+    "Ask the target device to hand its live queue off to targetDeviceId (pull handoff)."
+    HANDOFF_QUEUE
 }
 
 "One of the calling user's registered devices."
@@ -340,6 +345,8 @@ type DeviceCommand {
     playQueueId: ID
     "TAKEOVER_QUEUE: position to resume at. Float: long media exceeds GraphQL Int."
     positionInMilliseconds: Float
+    "HANDOFF_QUEUE: the device to push the queue to."
+    targetDeviceId: ID
     timestamp: String!
 }
 

@@ -108,7 +108,7 @@ public class DeviceController {
     /** All arguments of the {@code sendDeviceCommand} mutation, bound as one object off the argument map. */
     record DeviceCommandArguments(UUID deviceId, DeviceCommandType command, MediaType mediaType,
                                   UUID mediaId, UUID startId, UUID playQueueId,
-                                  Double positionInMilliseconds) {
+                                  Double positionInMilliseconds, UUID targetDeviceId) {
     }
 
     @PreAuthorize("hasRole('user')")
@@ -124,9 +124,26 @@ public class DeviceController {
         if (!devicePresenceRegistry.isOnline(userId, args.deviceId())) {
             return false;
         }
-        if ((args.command() == DeviceCommandType.TAKEOVER_QUEUE || args.command() == DeviceCommandType.START_FOLLOW)
+        if ((args.command() == DeviceCommandType.TAKEOVER_QUEUE || args.command() == DeviceCommandType.START_FOLLOW
+                || args.command() == DeviceCommandType.HANDOFF_QUEUE)
                 && (args.playQueueId() == null || playbackSessionRegistry.find(args.playQueueId()).isEmpty())) {
             return false;
+        }
+        if (args.command() == DeviceCommandType.HANDOFF_QUEUE) {
+            // The queue moves on to targetDeviceId, so that device must be an own, online one too;
+            // a handoff to the device itself would be a no-op loop.
+            if (args.targetDeviceId() == null || args.targetDeviceId().equals(args.deviceId())
+                    || deviceService.findOwned(userId, args.targetDeviceId()).isEmpty()
+                    || !devicePresenceRegistry.isOnline(userId, args.targetDeviceId())) {
+                return false;
+            }
+            // The recipient must actually be the device playing the queue; a session without a
+            // device id is allowed through and left to the recipient's own-live-queue guard.
+            UUID sessionDeviceId = playbackSessionRegistry.find(args.playQueueId())
+                    .map(session -> session.getDeviceId()).orElse(null);
+            if (sessionDeviceId != null && !sessionDeviceId.equals(args.deviceId())) {
+                return false;
+            }
         }
         Double position = args.positionInMilliseconds();
         deviceCommandService.publish(DeviceCommandData.builder()
@@ -138,6 +155,7 @@ public class DeviceController {
                 .startId(args.startId())
                 .playQueueId(args.playQueueId())
                 .positionInMilliseconds(position == null ? null : position.longValue())
+                .targetDeviceId(args.targetDeviceId())
                 .build());
         return true;
     }

@@ -199,6 +199,114 @@ class DeviceControllerGraphQlTest {
     }
 
     @Test
+    void handoffWithoutLiveSessionIsFalse() {
+        when(deviceService.findOwned(userId, deviceId)).thenReturn(Optional.of(entity("Laptop")));
+        when(devicePresenceRegistry.isOnline(userId, deviceId)).thenReturn(true);
+        UUID queueId = UUID.randomUUID();
+        when(playbackSessionRegistry.find(queueId)).thenReturn(Optional.empty());
+
+        Boolean result = graphQlTester.document("""
+                        mutation { sendDeviceCommand(deviceId: "%s", command: HANDOFF_QUEUE, playQueueId: "%s", targetDeviceId: "%s") }
+                        """.formatted(deviceId, queueId, UUID.randomUUID()))
+                .execute()
+                .path("sendDeviceCommand").entity(Boolean.class).get();
+
+        assertEquals(false, result);
+        verify(deviceCommandService, never()).publish(any());
+    }
+
+    @Test
+    void handoffWithUnownedOrOfflineTargetIsFalse() {
+        when(deviceService.findOwned(userId, deviceId)).thenReturn(Optional.of(entity("Laptop")));
+        when(devicePresenceRegistry.isOnline(userId, deviceId)).thenReturn(true);
+        UUID queueId = UUID.randomUUID();
+        when(playbackSessionRegistry.find(queueId))
+                .thenReturn(Optional.of(PlaybackStatusData.builder().deviceId(deviceId).build()));
+        UUID targetId = UUID.randomUUID();
+        when(deviceService.findOwned(userId, targetId)).thenReturn(Optional.empty());
+
+        String document = """
+                mutation { sendDeviceCommand(deviceId: "%s", command: HANDOFF_QUEUE, playQueueId: "%s", targetDeviceId: "%s") }
+                """.formatted(deviceId, queueId, targetId);
+        Boolean unowned = graphQlTester.document(document).execute()
+                .path("sendDeviceCommand").entity(Boolean.class).get();
+        assertEquals(false, unowned);
+
+        when(deviceService.findOwned(userId, targetId))
+                .thenReturn(Optional.of(entity("Telefoon")));
+        when(devicePresenceRegistry.isOnline(userId, targetId)).thenReturn(false);
+        Boolean offline = graphQlTester.document(document).execute()
+                .path("sendDeviceCommand").entity(Boolean.class).get();
+        assertEquals(false, offline);
+
+        verify(deviceCommandService, never()).publish(any());
+    }
+
+    @Test
+    void handoffToSelfIsFalse() {
+        when(deviceService.findOwned(userId, deviceId)).thenReturn(Optional.of(entity("Laptop")));
+        when(devicePresenceRegistry.isOnline(userId, deviceId)).thenReturn(true);
+        UUID queueId = UUID.randomUUID();
+        when(playbackSessionRegistry.find(queueId))
+                .thenReturn(Optional.of(PlaybackStatusData.builder().deviceId(deviceId).build()));
+
+        Boolean result = graphQlTester.document("""
+                        mutation { sendDeviceCommand(deviceId: "%s", command: HANDOFF_QUEUE, playQueueId: "%s", targetDeviceId: "%s") }
+                        """.formatted(deviceId, queueId, deviceId))
+                .execute()
+                .path("sendDeviceCommand").entity(Boolean.class).get();
+
+        assertEquals(false, result);
+        verify(deviceCommandService, never()).publish(any());
+    }
+
+    @Test
+    void handoffWhenSessionIsOnADifferentDeviceIsFalse() {
+        when(deviceService.findOwned(userId, deviceId)).thenReturn(Optional.of(entity("Laptop")));
+        when(devicePresenceRegistry.isOnline(userId, deviceId)).thenReturn(true);
+        UUID queueId = UUID.randomUUID();
+        when(playbackSessionRegistry.find(queueId))
+                .thenReturn(Optional.of(PlaybackStatusData.builder().deviceId(UUID.randomUUID()).build()));
+        UUID targetId = UUID.randomUUID();
+        when(deviceService.findOwned(userId, targetId)).thenReturn(Optional.of(entity("Telefoon")));
+        when(devicePresenceRegistry.isOnline(userId, targetId)).thenReturn(true);
+
+        Boolean result = graphQlTester.document("""
+                        mutation { sendDeviceCommand(deviceId: "%s", command: HANDOFF_QUEUE, playQueueId: "%s", targetDeviceId: "%s") }
+                        """.formatted(deviceId, queueId, targetId))
+                .execute()
+                .path("sendDeviceCommand").entity(Boolean.class).get();
+
+        assertEquals(false, result);
+        verify(deviceCommandService, never()).publish(any());
+    }
+
+    @Test
+    void handoffPublishesCommandWithTargetDeviceId() {
+        when(deviceService.findOwned(userId, deviceId)).thenReturn(Optional.of(entity("Laptop")));
+        when(devicePresenceRegistry.isOnline(userId, deviceId)).thenReturn(true);
+        UUID queueId = UUID.randomUUID();
+        when(playbackSessionRegistry.find(queueId))
+                .thenReturn(Optional.of(PlaybackStatusData.builder().deviceId(deviceId).build()));
+        UUID targetId = UUID.randomUUID();
+        when(deviceService.findOwned(userId, targetId)).thenReturn(Optional.of(entity("Telefoon")));
+        when(devicePresenceRegistry.isOnline(userId, targetId)).thenReturn(true);
+
+        graphQlTester.document("""
+                        mutation { sendDeviceCommand(deviceId: "%s", command: HANDOFF_QUEUE, playQueueId: "%s", targetDeviceId: "%s") }
+                        """.formatted(deviceId, queueId, targetId))
+                .execute()
+                .path("sendDeviceCommand").entity(Boolean.class).isEqualTo(true);
+
+        ArgumentCaptor<DeviceCommandData> captor = ArgumentCaptor.forClass(DeviceCommandData.class);
+        verify(deviceCommandService).publish(captor.capture());
+        assertEquals(userId, captor.getValue().getOwnerUserId());
+        assertEquals(deviceId, captor.getValue().getDeviceId());
+        assertEquals(queueId, captor.getValue().getPlayQueueId());
+        assertEquals(targetId, captor.getValue().getTargetDeviceId());
+    }
+
+    @Test
     void pingUnknownDeviceIsFalseAndPublishesNothing() {
         when(deviceService.ping(any(), eq(deviceId))).thenReturn(false);
 

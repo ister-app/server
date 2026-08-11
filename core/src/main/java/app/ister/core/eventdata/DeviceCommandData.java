@@ -35,5 +35,7 @@ public class DeviceCommandData {
     private UUID playQueueId;
     /** TAKEOVER_QUEUE: position to resume at. */
     private Long positionInMilliseconds;
+    /** HANDOFF_QUEUE: the device the receiving (source) device should push its queue to. */
+    private UUID targetDeviceId;
     private Instant timestamp;
 }
