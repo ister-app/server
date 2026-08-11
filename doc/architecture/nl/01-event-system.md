@@ -73,7 +73,7 @@ base-URL zitten.
 | `HandleAnalyzeDataDisk` | disk | `ANALYZE_DATA` | `MEDIA_FILE_FOUND` / `AUDIO_FILE_FOUND` / `NFO_FILE_FOUND` / `SUBTITLE_FILE_FOUND` |
 | `HandlePreTranscodeRecentlyWatched` | disk | `PRE_TRANSCODE_RECENTLY_WATCHED` | `TRANSCODE_REQUESTED`, `MEDIA_FILE_FOUND` (voor bestanden zonder geanalyseerde streams) |
 | `HandlePersonFound` | disk | `PERSON_FOUND` | `NFO_FILE_FOUND` |
-| `HandleAlbumFound` | disk | `ALBUM_FOUND` | `NFO_FILE_FOUND` |
+| `HandleAlbumFound` | disk | `ALBUM_FOUND` | `NFO_FILE_FOUND`, `FILE_SCAN_REQUESTED` (heringest van lokale albumartwork zoals `cover.jpg`) |
 | `HandlePodcastEpisodeDownloadRequested` | disk | `PODCAST_EPISODE_DOWNLOAD_REQUESTED` | `AUDIO_FILE_FOUND` (op de cache-dir-queue → ffprobe + HLS-pregeneratie) |
 | `AnalyzeLibraryRequestedHandle` | worker | `ANALYZE_LIBRARY_REQUEST` | `UPDATE_IMAGES_REQUESTED`, `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND`, `ALBUM_FOUND`, `AUDIO_FILE_FOUND` |
 | `AnalyzeDataHandle` | worker | `ANALYZE_DATA` | cascade per entiteitstype |
@@ -90,6 +90,16 @@ base-URL zitten.
 | `HandleTranscodePassRequested` | transcoder | `TRANSCODE_PASS_REQUESTED` | — |
 | `HandleSearchIndexRequested` | search | `SEARCH_INDEX_REQUESTED` | — (upsert/delete in Typesense) |
 | `HandleSearchReindexRequested` | search | `SEARCH_REINDEX_REQUESTED` | — (volledige rebuild + alias-swap) |
+
+**Publiceren na commit.** Handlers die rijen verwijderen of schrijven en daarna een event sturen
+dat naar die rijen wijst, moeten publiceren via `AfterCommitPublisher.publishAfterCommit` (core;
+`ServerEventService` gebruikt hem voor elk `create*FoundEvent`): de consumer draait vaak binnen
+milliseconden en zou anders de pre-commit-toestand lezen — bijvoorbeeld een album-found-consumer
+die image-rijen ziet staan die de analyse-transactie op het punt staat te verwijderen, en daarom
+de cover-refetch overslaat. De wrap zit bewust op de call sites en niet in `MessageSender`:
+meerdere handlers registreren zelf al after-commit-callbacks, en een synchronization die vanuit
+een `afterCommit`-callback geregistreerd wordt, wordt nooit meer aangeroepen — berichten zouden
+dan stil verloren gaan.
 
 `SEARCH_INDEX_REQUESTED` wordt op veel plekken verstuurd: `ServerEventService.createXFoundEvent`
 (bij creatie), `MetadataSave` (TMDB), de MusicBrainz- en NFO-handlers, audio-tag-saves (inclusief

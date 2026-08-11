@@ -51,6 +51,14 @@ library fans out to all its shows/movies/artists, a show to its episodes, an alb
 re-firing the `*_FOUND` events; `HandleAnalyzeDataDisk` (disk) clears the HLS cache and re-emits the
 file-level events (`MEDIA_FILE_FOUND`/`AUDIO_FILE_FOUND`, `NFO_FILE_FOUND`, `SUBTITLE_FILE_FOUND`).
 
+The `*_FOUND` events are published **after the wipe has committed**
+(`AfterCommitPublisher.publishAfterCommit`): their consumers check for existing metadata/image rows
+and would otherwise still see the doomed rows and skip the refetch, leaving the item permanently
+without covers. For albums, disk-side `HandleAlbumFound` additionally re-emits `FILE_SCAN_REQUESTED`
+for local artwork (`cover.jpg` and friends) in the album directory — album analysis wipes those image
+rows too, and unlike movies/episodes no directory rescan follows, so the files are re-ingested
+explicitly (deduped by `ImageScanner` on the existing `(directory, path)` row).
+
 ## The BlurHash sweep
 
 `HandleImageFound` deliberately saves images **without** a BlurHash: encoding one is CPU-expensive

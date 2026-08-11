@@ -53,6 +53,15 @@ zijn afleveringen, een album naar zijn tracks — en vuurt de `*_FOUND`-events o
 `HandleAnalyzeDataDisk` (disk) wist de HLS-cache en stuurt de bestandsniveau-events opnieuw
 (`MEDIA_FILE_FOUND`/`AUDIO_FILE_FOUND`, `NFO_FILE_FOUND`, `SUBTITLE_FILE_FOUND`).
 
+De `*_FOUND`-events worden pas gepubliceerd **nadat de wipe gecommit is**
+(`AfterCommitPublisher.publishAfterCommit`): hun consumers controleren op bestaande metadata- en
+image-rijen en zouden anders de ten dode opgeschreven rijen nog zien staan en de refetch overslaan,
+waardoor het item blijvend zonder covers achterblijft. Voor albums stuurt disk-`HandleAlbumFound`
+daarnaast `FILE_SCAN_REQUESTED` voor lokale artwork (`cover.jpg` en verwanten) in de albummap — de
+album-analyse wist ook die image-rijen, en anders dan bij films/afleveringen volgt er geen
+directory-rescan, dus worden de bestanden expliciet opnieuw ingelezen (door `ImageScanner` gededupt
+op de bestaande `(directory, path)`-rij).
+
 ## De BlurHash-sweep
 
 `HandleImageFound` slaat afbeeldingen bewust **zonder** BlurHash op: die coderen is CPU-duur en

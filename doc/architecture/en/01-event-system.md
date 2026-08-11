@@ -72,7 +72,7 @@ which is why every external call must sit behind a configurable base URL.
 | `HandleAnalyzeDataDisk` | disk | `ANALYZE_DATA` | `MEDIA_FILE_FOUND` / `AUDIO_FILE_FOUND` / `NFO_FILE_FOUND` / `SUBTITLE_FILE_FOUND` |
 | `HandlePreTranscodeRecentlyWatched` | disk | `PRE_TRANSCODE_RECENTLY_WATCHED` | `TRANSCODE_REQUESTED`, `MEDIA_FILE_FOUND` (for files without analyzed streams) |
 | `HandlePersonFound` | disk | `PERSON_FOUND` | `NFO_FILE_FOUND` |
-| `HandleAlbumFound` | disk | `ALBUM_FOUND` | `NFO_FILE_FOUND` |
+| `HandleAlbumFound` | disk | `ALBUM_FOUND` | `NFO_FILE_FOUND`, `FILE_SCAN_REQUESTED` (re-ingest of local album artwork such as `cover.jpg`) |
 | `HandlePodcastEpisodeDownloadRequested` | disk | `PODCAST_EPISODE_DOWNLOAD_REQUESTED` | `AUDIO_FILE_FOUND` (on the cache-dir queue → ffprobe + HLS pre-generation) |
 | `AnalyzeLibraryRequestedHandle` | worker | `ANALYZE_LIBRARY_REQUEST` | `UPDATE_IMAGES_REQUESTED`, `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND`, `ALBUM_FOUND`, `AUDIO_FILE_FOUND` |
 | `AnalyzeDataHandle` | worker | `ANALYZE_DATA` | cascade per entity type |
@@ -89,6 +89,15 @@ which is why every external call must sit behind a configurable base URL.
 | `HandleTranscodePassRequested` | transcoder | `TRANSCODE_PASS_REQUESTED` | — |
 | `HandleSearchIndexRequested` | search | `SEARCH_INDEX_REQUESTED` | — (upsert/delete in Typesense) |
 | `HandleSearchReindexRequested` | search | `SEARCH_REINDEX_REQUESTED` | — (full rebuild + alias swap) |
+
+**Publish after commit.** Handlers that delete or write rows and then emit an event pointing at
+those rows must publish via `AfterCommitPublisher.publishAfterCommit` (core; `ServerEventService`
+uses it for every `create*FoundEvent`): the consumer often runs within milliseconds and would
+otherwise read pre-commit state — e.g. an album-found consumer seeing image rows that the analysis
+transaction is about to delete, and skipping the cover refetch. The wrap deliberately lives at the
+call sites, not inside `MessageSender`: several handlers register their own after-commit callbacks,
+and a synchronization registered from within an `afterCommit` callback is never invoked, which would
+silently drop messages.
 
 `SEARCH_INDEX_REQUESTED` is emitted from many places: `ServerEventService.createXFoundEvent` (on
 creation), `MetadataSave` (TMDB), the MusicBrainz and NFO handlers, audio-tag saves (including
