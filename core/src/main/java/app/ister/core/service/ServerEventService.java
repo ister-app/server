@@ -7,10 +7,10 @@ import app.ister.core.eventdata.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.UUID;
+
+import static app.ister.core.utils.AfterCommitPublisher.publishAfterCommit;
 
 @Service
 @Slf4j
@@ -124,24 +124,5 @@ public class ServerEventService {
         publishAfterCommit(() -> messageSender.sendSearchReindexRequested(SearchReindexRequestedData.builder()
                         .eventType(EventType.SEARCH_REINDEX_REQUESTED)
                         .build()));
-    }
-
-    /**
-     * Publishes after the surrounding transaction commits (immediately when there is none).
-     * Every event here carries an entity id the consumer looks up, so publishing
-     * mid-transaction — the scan runs in one long transaction — races the commit: the
-     * consumer reads before the row is visible and skips silently or dead-letters, flakily.
-     */
-    private void publishAfterCommit(Runnable publish) {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    publish.run();
-                }
-            });
-        } else {
-            publish.run();
-        }
     }
 }
