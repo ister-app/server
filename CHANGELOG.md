@@ -1,5 +1,36 @@
 # Changelog
 
+## server v2.12.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.12.0` |
+| `ghcr.io/ister-app/migrations` | `2.12.0` |
+
+### Features
+
+- feat(playqueue): widen the materialized windows for the fit-to-screen player ([`981c5d6`](https://github.com/ister-app/server/commit/981c5d6))
+- feat(devices): HANDOFF_QUEUE pull-handoff command with targetDeviceId ([`75782b3`](https://github.com/ister-app/server/commit/75782b3))
+
+### Fixes
+
+- fix(transcoder): unbreak direct play — segmented copy audio, atomic on-demand segments, clean segment boundaries ([`75797ac`](https://github.com/ister-app/server/commit/75797ac))
+- fix(disk): re-ingest local album artwork after an album analysis ([`805ba2b`](https://github.com/ister-app/server/commit/805ba2b))
+- fix(worker): publish analyze-data events only after the wipe commits ([`0ee996a`](https://github.com/ister-app/server/commit/0ee996a))
+
+### Other
+
+- docs(architecture): document after-commit publishing and cover re-ingest ([`65f11a1`](https://github.com/ister-app/server/commit/65f11a1))
+- refactor(core): extract publishAfterCommit into AfterCommitPublisher ([`9bd9ff1`](https://github.com/ister-app/server/commit/9bd9ff1))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.12.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.11.0...v2.12.0
+
 ## server v2.11.0
 
 | Image | Tag |
