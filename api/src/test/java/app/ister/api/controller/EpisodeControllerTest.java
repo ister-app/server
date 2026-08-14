@@ -3,6 +3,7 @@ package app.ister.api.controller;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.MediaFileEpisodeEntity;
 import app.ister.core.entity.MediaFileStreamEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.SeasonEntity;
@@ -12,8 +13,10 @@ import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.LibraryRepository;
+import app.ister.core.repository.MediaFileEpisodeRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import app.ister.core.service.LibraryAccessService;
+import app.ister.core.service.MediaFileEpisodeService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -56,6 +59,12 @@ class EpisodeControllerTest {
 
     @Mock
     private LibraryRepository libraryRepository;
+
+    @Mock
+    private MediaFileEpisodeRepository mediaFileEpisodeRepository;
+
+    @Mock
+    private MediaFileEpisodeService mediaFileEpisodeService;
 
     @Mock
     private Authentication authentication;
@@ -203,6 +212,7 @@ class EpisodeControllerTest {
     void mediaFileReturnsEpisodeMediaFiles() {
         MediaFileEntity mediaFile = MediaFileEntity.builder().build();
         EpisodeEntity episode = EpisodeEntity.builder().number(1).mediaFileEntities(List.of(mediaFile)).build();
+        when(mediaFileEpisodeService.filesForEpisode(episode.getId())).thenReturn(List.of(mediaFile));
 
         List<MediaFileEntity> result = subject.mediaFile(episode);
 
@@ -224,6 +234,7 @@ class EpisodeControllerTest {
         EpisodeEntity episode = EpisodeEntity.builder().number(1).build();
         MediaFileEntity mediaFile = MediaFileEntity.builder().build();
         mediaFile.setEpisodeEntity(episode);
+        when(mediaFileEpisodeRepository.findByMediaFileEntityIdOrderByPartNumber(mediaFile.getId())).thenReturn(List.of());
 
         List<EpisodeEntity> result = subject.episodes(mediaFile);
 
@@ -234,9 +245,63 @@ class EpisodeControllerTest {
     @Test
     void episodesForMediaFileReturnsEmptyWhenNoEpisode() {
         MediaFileEntity mediaFile = MediaFileEntity.builder().build();
+        when(mediaFileEpisodeRepository.findByMediaFileEntityIdOrderByPartNumber(mediaFile.getId())).thenReturn(List.of());
 
         List<EpisodeEntity> result = subject.episodes(mediaFile);
 
         assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void episodesForMultiEpisodeMediaFileReturnsAllLinkedEpisodes() {
+        UUID fileId = UUID.randomUUID();
+        UUID firstEpisodeId = UUID.randomUUID();
+        UUID secondEpisodeId = UUID.randomUUID();
+        MediaFileEntity mediaFile = MediaFileEntity.builder().build();
+        when(mediaFileEpisodeRepository.findByMediaFileEntityIdOrderByPartNumber(mediaFile.getId())).thenReturn(List.of(
+                MediaFileEpisodeEntity.builder().mediaFileEntityId(fileId).episodeEntityId(firstEpisodeId).partNumber(0).build(),
+                MediaFileEpisodeEntity.builder().mediaFileEntityId(fileId).episodeEntityId(secondEpisodeId).partNumber(1).build()));
+        EpisodeEntity first = EpisodeEntity.builder().number(6).build();
+        EpisodeEntity second = EpisodeEntity.builder().number(7).build();
+        when(episodeRepository.findById(firstEpisodeId)).thenReturn(Optional.of(first));
+        when(episodeRepository.findById(secondEpisodeId)).thenReturn(Optional.of(second));
+
+        List<EpisodeEntity> result = subject.episodes(mediaFile);
+
+        assertEquals(List.of(first, second), result);
+    }
+
+    @Test
+    void mediaFilePartsExposeTheEpisodeSlice() {
+        UUID episodeId = UUID.randomUUID();
+        UUID fileId = UUID.randomUUID();
+        EpisodeEntity episode = EpisodeEntity.builder().number(6).build();
+        MediaFileEntity mediaFile = mock(MediaFileEntity.class);
+        when(mediaFile.getId()).thenReturn(fileId);
+        when(mediaFileEpisodeService.filesForEpisode(episode.getId())).thenReturn(List.of(mediaFile));
+        when(mediaFileEpisodeService.segmentFor(fileId, episode.getId())).thenReturn(Optional.of(
+                MediaFileEpisodeEntity.builder().mediaFileEntityId(fileId).episodeEntityId(episodeId)
+                        .partNumber(1).startInMilliseconds(2_650_000).durationInMilliseconds(2_750_000).build()));
+
+        var result = subject.mediaFileParts(episode);
+
+        assertEquals(1, result.size());
+        assertEquals(2_650_000, result.get(0).startInMilliseconds());
+        assertEquals(2_750_000, result.get(0).durationInMilliseconds());
+    }
+
+    @Test
+    void mediaFilePartsFallBackToTheWholeFileWithoutASegment() {
+        EpisodeEntity episode = EpisodeEntity.builder().number(1).build();
+        MediaFileEntity mediaFile = mock(MediaFileEntity.class);
+        when(mediaFile.getDurationInMilliseconds()).thenReturn(2_650_000L);
+        when(mediaFileEpisodeService.filesForEpisode(episode.getId())).thenReturn(List.of(mediaFile));
+        when(mediaFileEpisodeService.segmentFor(any(), any())).thenReturn(Optional.empty());
+
+        var result = subject.mediaFileParts(episode);
+
+        assertEquals(1, result.size());
+        assertEquals(0, result.get(0).startInMilliseconds());
+        assertEquals(2_650_000, result.get(0).durationInMilliseconds());
     }
 }

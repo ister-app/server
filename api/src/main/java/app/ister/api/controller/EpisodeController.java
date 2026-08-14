@@ -5,10 +5,13 @@ import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.filter.FilterKind;
 import app.ister.core.filter.MediaFilter;
+import app.ister.api.dto.MediaFilePart;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.LibraryRepository;
+import app.ister.core.repository.MediaFileEpisodeRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import app.ister.core.service.LibraryAccessService;
+import app.ister.core.service.MediaFileEpisodeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,6 +38,8 @@ public class EpisodeController {
     private final WatchStatusRepository watchStatusRepository;
     private final LibraryAccessService libraryAccessService;
     private final LibraryRepository libraryRepository;
+    private final MediaFileEpisodeRepository mediaFileEpisodeRepository;
+    private final MediaFileEpisodeService mediaFileEpisodeService;
     private final FilteredBrowse filteredBrowse;
 
     @PreAuthorize("hasRole('user')")
@@ -102,9 +107,20 @@ public class EpisodeController {
         return episodes.stream().collect(Collectors.toMap(e -> e, e -> byEpisodeId.getOrDefault(e.getId(), List.of())));
     }
 
+    // Via MediaFileEpisodeService: an episode inside a multi-episode file (s04e06-e07.mkv) only
+    // reaches its file through the link table, not through the direct FK.
     @SchemaMapping(typeName = "Episode", field = "mediaFile")
     public List<MediaFileEntity> mediaFile(EpisodeEntity episodeEntity) {
-        return episodeEntity.getMediaFileEntities();
+        return mediaFileEpisodeService.filesForEpisode(episodeEntity.getId());
+    }
+
+    @SchemaMapping(typeName = "Episode", field = "mediaFileParts")
+    public List<MediaFilePart> mediaFileParts(EpisodeEntity episodeEntity) {
+        return mediaFileEpisodeService.filesForEpisode(episodeEntity.getId()).stream()
+                .map(file -> mediaFileEpisodeService.segmentFor(file.getId(), episodeEntity.getId())
+                        .map(segment -> new MediaFilePart(file, segment.getStartInMilliseconds(), segment.getDurationInMilliseconds()))
+                        .orElseGet(() -> new MediaFilePart(file, 0, file.getDurationInMilliseconds())))
+                .toList();
     }
 
     @SchemaMapping(typeName = "MediaFile", field = "mediaFileStreams")
@@ -114,6 +130,14 @@ public class EpisodeController {
 
     @SchemaMapping(typeName = "MediaFile", field = "episodes")
     public List<EpisodeEntity> episodes(MediaFileEntity mediaFileEntity) {
+        List<MediaFileEpisodeEntity> links = mediaFileEpisodeRepository.findByMediaFileEntityIdOrderByPartNumber(mediaFileEntity.getId());
+        if (!links.isEmpty()) {
+            // At most three links per file; resolve one by one to keep the part order.
+            return links.stream()
+                    .map(link -> episodeRepository.findById(link.getEpisodeEntityId()))
+                    .flatMap(Optional::stream)
+                    .toList();
+        }
         if (mediaFileEntity.getEpisodeEntity() == null) {
             return List.of();
         }

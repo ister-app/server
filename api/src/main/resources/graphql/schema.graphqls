@@ -874,9 +874,19 @@ type Episode {
     metadata: [Metadata!]
     watchStatus: [WatchStatus!]
     mediaFile: [MediaFile!]
+    "The file slices containing this episode: one entry per file. For an episode inside a multi-episode file (s04e06-e07.mkv) start/duration cover only this episode's slice; for normal files start is 0 and duration the whole file."
+    mediaFileParts: [MediaFilePart!]
     cast: [Credit!]
     "The calling user's rating (1-10), or null if unrated."
     rating: Int
+}
+
+"One episode's time slice within a media file. Playback opens the file's HLS stream, seeks to startInMilliseconds and treats start + duration as end-of-episode."
+type MediaFilePart {
+    mediaFile: MediaFile!
+    startInMilliseconds: Float!
+    "0 while analysis has not yet computed the episode boundaries of a multi-episode file."
+    durationInMilliseconds: Float!
 }
 
 type Image {
