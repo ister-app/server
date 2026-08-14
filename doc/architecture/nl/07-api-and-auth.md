@@ -39,6 +39,16 @@ in dev ingeschakeld. Naast queries en mutations zijn er drie websocket-subscript
 - `playbackCommands(playQueueId)` — party-mode-afstandsbediening (best-effort, non-replaying);
   begrensd door de afstandsbedienings-scope van de eigenaar
 
+Voor afleveringen kent het schema naast `Episode.mediaFile` een lijst `Episode.mediaFileParts` van
+`MediaFilePart { mediaFile, startInMilliseconds, durationInMilliseconds }`: de tijd-slice van de
+aflevering binnen elk bestand. Voor een gewoon bestand is dat `(0, bestandsduur)`; voor een
+aflevering in een multi-episode-bestand (`s04e06-e07.mkv`,
+[hoofdstuk 2](02-scanning-and-analysis.md)) de eigen slice — de client opent dezelfde
+file-addressed HLS-stream, seekt naar `startInMilliseconds` en behandelt `start + duration` als
+einde-aflevering. `MediaFile.episodes` somt elke aflevering op die een bestand bevat, dus
+`episodes.length > 1` is het "gecombineerd bestand"-signaal. Progress-heartbeats blijven de
+absolute bestandspositie rapporteren.
+
 ## Voorkeuren per gebruiker en attributie
 
 Drie kleine API-oppervlakken die de hoofdstukken hierboven slechts terloops raken:

@@ -25,6 +25,12 @@ Zie het [continue-watching-flow-diagram](../diagrams/continue-watching-flow.md).
   over aan de volgende ongekeken episode/chapter, gevonden met één geïndexeerde query
   (`EpisodeRepository.findNextUnwatchedEpisodeId`, `ChapterRepository.findNextUnfinishedChapterId`)
   — nooit door een hele show te laden.
+- **Watched is grens-bewust.** Progress is altijd absoluut binnen het mediabestand. Een item telt
+  als gekeken zodra de heartbeat binnen een minuut van — of voorbij — de *eindpositie* van het item
+  komt: normaal het einde van het bestand, voor een aflevering in een multi-episode-bestand
+  (`s04e06-e07.mkv`, zie [hoofdstuk 2](02-scanning-and-analysis.md)) de eigen slicegrens van die
+  aflevering. Zonder dat onderscheid zou alleen de laatste aflevering van zo'n bestand ooit kunnen
+  uitspelen.
 - **Een boek is als geheel voltooid.** De enkele `BOOK`-rij van een boek heeft twee onafhankelijke
   slots — audio (`chapter_entity_id`) en epub (`book_entity_id`) — maar het laatste hoofdstuk
   uitluisteren maakt *beide* leeg: het einde van het audioboek bereiken betekent dat het boek af

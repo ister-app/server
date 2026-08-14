@@ -38,6 +38,15 @@ enabled in dev. Besides queries and mutations there are three websocket subscrip
 - `playbackCommands(playQueueId)` — party-mode remote control (best-effort, non-replaying); gated by
   the owner's remote-control sharing scope
 
+For episodes the schema carries, next to `Episode.mediaFile`, an `Episode.mediaFileParts` list of
+`MediaFilePart { mediaFile, startInMilliseconds, durationInMilliseconds }`: the episode's time
+slice within each file. For a normal file that is `(0, file duration)`; for an episode inside a
+multi-episode file (`s04e06-e07.mkv`, [chapter 2](02-scanning-and-analysis.md)) it is the episode's
+own slice — the client opens the same file-addressed HLS stream, seeks to `startInMilliseconds` and
+treats `start + duration` as end-of-episode. `MediaFile.episodes` lists every episode a file
+contains, so `episodes.length > 1` is the "combined file" signal. Progress heartbeats keep
+reporting the absolute file position.
+
 ## Per-user preferences and attribution
 
 Three small API surfaces that the chapters above only touch in passing:

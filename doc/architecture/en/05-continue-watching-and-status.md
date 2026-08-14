@@ -23,6 +23,11 @@ See the [continue-watching-flow diagram](../diagrams/continue-watching-flow.md).
   unwatched episode/chapter, found with a single indexed query
   (`EpisodeRepository.findNextUnwatchedEpisodeId`, `ChapterRepository.findNextUnfinishedChapterId`)
   — never by loading a whole show.
+- **Watched is boundary-aware.** Progress is always absolute within the media file. An item counts
+  as watched when the heartbeat comes within a minute of — or passes — the item's *end position*:
+  the file's end normally, the episode's own slice boundary for an episode inside a multi-episode
+  file (`s04e06-e07.mkv`, see [chapter 2](02-scanning-and-analysis.md)). Without that distinction
+  only the last episode of such a file could ever finish.
 - **A book completes as a whole.** A book's single `BOOK` row has two independent slots — audio
   (`chapter_entity_id`) and epub (`book_entity_id`) — but finishing the last chapter clears *both*:
   reaching the end of the audiobook means the book is done, and an epub position left behind from

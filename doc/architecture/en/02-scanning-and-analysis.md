@@ -34,6 +34,30 @@ See the [scan-flow diagram](../diagrams/scan-flow.md). `scanLibrary()` sends
 Entity creation goes through `ScannerHelperService.getOrCreate*`, which also fires the `*_FOUND`
 enrichment events and the search-index creation events.
 
+### Multi-episode files
+
+A filename may carry an episode **range** — `s04e06-e07.mkv`, `s04e06-08.mkv`, `s04e06e07.mkv` —
+for a file holding up to three consecutive episodes. `PathObject` parses the range (an implausible
+range, backwards or longer than three, falls back to the first episode) and `MediaFileScanner`
+creates one `EpisodeEntity` per episode, so each gets its own TMDB metadata and watch status. The
+file's `episode_entity_id` FK always points at the **first** episode; every contained episode
+(including the first) additionally gets a `media_file_episode_entity` link row carrying its
+`start`/`duration` slice within the file. No link rows means "normal single-episode file" — all
+existing FK-based queries stay correct, and playback paths resolve files via
+`MediaFileEpisodeService.filesForEpisode`.
+
+The slice boundaries are computed in `HandleMediaFileFound` (`MediaFileFoundEpisodeBoundaries`)
+once ffprobe knows the file duration: one MKV chapter per episode is used directly; with more
+chapters (scene markers) the chapter nearest to each equal-split point wins, unless that would make
+an episode implausibly short; otherwise the duration is split equally. Each episode also gets its
+own backdrop still, taken at the midpoint of its slice. Files scanned **before** multi-episode
+support are backfilled by a normal library rescan: the scanner notices an existing file whose path
+parses as a range but has no link rows, creates the missing episodes and links, and re-sends
+`MEDIA_FILE_FOUND` so the boundaries and stills get computed.
+
+Sidecar files (NFO, local images, external subtitles) attach to the first episode of the range,
+as before.
+
 ## Library analyze
 
 See the [analyze-flow diagram](../diagrams/analyze-flow.md). `analyzeLibrary()` sends

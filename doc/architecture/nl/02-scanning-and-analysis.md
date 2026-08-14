@@ -35,6 +35,31 @@ Zie het [scan-flow-diagram](../diagrams/scan-flow.md). `scanLibrary()` stuurt pe
 Entity-creatie loopt via `ScannerHelperService.getOrCreate*`, dat ook de `*_FOUND`-verrijkingsevents
 en de creatie-events voor de zoekindex afvuurt.
 
+### Multi-episode-bestanden
+
+Een bestandsnaam mag een aflevering-**range** dragen — `s04e06-e07.mkv`, `s04e06-08.mkv`,
+`s04e06e07.mkv` — voor een bestand met maximaal drie opeenvolgende afleveringen. `PathObject` parst
+de range (een onwaarschijnlijke range, achterstevoren of langer dan drie, valt terug op de eerste
+aflevering) en `MediaFileScanner` maakt per aflevering een eigen `EpisodeEntity`, zodat elke z'n
+eigen TMDB-metadata en watch status krijgt. De FK `episode_entity_id` van het bestand wijst altijd
+naar de **eerste** aflevering; elke bevatte aflevering (ook de eerste) krijgt daarnaast een
+`media_file_episode_entity`-linkrij met z'n `start`/`duration`-slice binnen het bestand. Geen
+linkrijen betekent "gewoon single-episode-bestand" — alle bestaande FK-queries blijven correct, en
+afspeelpaden zoeken bestanden op via `MediaFileEpisodeService.filesForEpisode`.
+
+De slicegrenzen worden berekend in `HandleMediaFileFound` (`MediaFileFoundEpisodeBoundaries`) zodra
+ffprobe de bestandsduur kent: één MKV-chapter per aflevering wordt direct gebruikt; bij meer
+chapters (scene-markers) wint de chapter het dichtst bij elk gelijk-verdeel-punt, tenzij dat een
+aflevering onwaarschijnlijk kort zou maken; anders wordt de duur gelijk verdeeld. Elke aflevering
+krijgt ook een eigen backdrop-still, genomen op het midden van z'n eigen slice. Bestanden die
+**vóór** multi-episode-ondersteuning zijn gescand worden gebackfilld door een gewone
+library-rescan: de scanner ziet een bestaand bestand waarvan het pad als range parst maar zonder
+linkrijen, maakt de ontbrekende afleveringen en links aan en stuurt `MEDIA_FILE_FOUND` opnieuw,
+zodat de grenzen en stills worden berekend.
+
+Sidecar-bestanden (NFO, lokale afbeeldingen, externe ondertitels) hangen zoals voorheen aan de
+eerste aflevering van de range.
+
 ## Library analyseren
 
 Zie het [analyze-flow-diagram](../diagrams/analyze-flow.md). `analyzeLibrary()` stuurt per node een
