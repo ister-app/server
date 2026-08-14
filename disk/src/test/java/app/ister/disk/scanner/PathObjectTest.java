@@ -6,6 +6,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import java.util.List;
+import java.util.stream.IntStream;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -133,8 +136,44 @@ class PathObjectTest {
         assertEquals("Show", subject.getName());
         assertEquals(season, subject.getSeason());
         assertEquals(episode, subject.getEpisode());
+        assertEquals(episode, subject.getEpisodeEnd());
+        assertEquals(List.of(episode), subject.getEpisodes());
         assertEquals(DirType.EPISODE, subject.getDirType());
         assertEquals(FileType.MEDIA, subject.getFileType());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "/disk/shows/Show (2024)/Season 04/s04e06-e07.mkv, 4, 6, 7",
+        "/disk/shows/Show (2024)/Season 04/s04e06-07.mkv, 4, 6, 7",
+        "/disk/shows/Show (2024)/Season 04/s04e06e07.mkv, 4, 6, 7",
+        "/disk/shows/Show (2024)/Season 04/S04E11-E13.mkv, 4, 11, 13"
+    })
+    void multiEpisodeTest(String path, int season, int episode, int episodeEnd) {
+        var subject = new PathObject(path);
+        assertEquals(season, subject.getSeason());
+        assertEquals(episode, subject.getEpisode());
+        assertEquals(episodeEnd, subject.getEpisodeEnd());
+        assertEquals(IntStream.rangeClosed(episode, episodeEnd).boxed().toList(), subject.getEpisodes());
+        assertEquals(DirType.EPISODE, subject.getDirType());
+        assertEquals(FileType.MEDIA, subject.getFileType());
+    }
+
+    // Backwards ranges, ranges spanning more than three episodes, and resolution suffixes that
+    // happen to parse as a range must all fall back to a single episode.
+    @ParameterizedTest
+    @CsvSource({
+        "/disk/shows/Show (2024)/Season 04/s04e07-e06.mkv, 7",
+        "/disk/shows/Show (2024)/Season 04/s04e01-e09.mkv, 1",
+        "/disk/shows/Show (2024)/Season 04/s04e06-1080.mkv, 6",
+        "/disk/shows/Show (2024)/Season 04/s04e06-e06.mkv, 6"
+    })
+    void implausibleRangeFallsBackToSingleEpisodeTest(String path, int episode) {
+        var subject = new PathObject(path);
+        assertEquals(episode, subject.getEpisode());
+        assertEquals(episode, subject.getEpisodeEnd());
+        assertEquals(List.of(episode), subject.getEpisodes());
+        assertEquals(DirType.EPISODE, subject.getDirType());
     }
 
     @Test

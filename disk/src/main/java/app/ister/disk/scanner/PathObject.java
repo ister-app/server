@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 
 @Getter
 @Slf4j
@@ -18,7 +19,10 @@ public class PathObject {
     private static final String REGEX_MOVIE = ".*\\/(.*)\\((\\d{4})\\)[a-zA-Z-]*\\.[a-zA-Z]+";
     private static final String REGEX_SHOW = ".*\\/(.*)\\((\\d{4})\\)*";
     private static final String REGEX_SEASON = "season\\s+(\\d{1,4})";
-    private static final String REGEX_EPISODE = "s(\\d{1,4})e(\\d{1,4}).*";
+    private static final String REGEX_EPISODE = "s(\\d{1,4})e(\\d{1,4})(?:(?:-e?|e)(\\d{1,4}))?.*";
+    // A file may hold at most this many consecutive episodes; longer "ranges" are almost
+    // certainly a mis-parse (e.g. "e06-1080p") and fall back to a single episode.
+    private static final int MAX_EPISODES_PER_FILE = 3;
     private static final String REGEX_FILE_TYPE = ".*\\.(.*)";
     private static final List<String> IMAGE_FILE_TYPES = List.of("jpg", "png");
     private static final List<String> NFO_FILE_TYPES = List.of("nfo");
@@ -28,6 +32,8 @@ public class PathObject {
     private int year;
     private int season;
     private int episode;
+    /** Last episode of the range for a multi-episode file (s04e06-e07.mkv); equals episode otherwise. */
+    private int episodeEnd;
     private DirType dirType;
     private FileType fileType;
 
@@ -85,11 +91,29 @@ public class PathObject {
         if (matches.isPresent()) {
             season = Integer.parseInt(matches.get().group(1));
             episode = Integer.parseInt(matches.get().group(2));
+            episodeEnd = parseEpisodeEnd(matches.get().group(3));
             dirType = DirType.EPISODE;
             return true;
         } else {
             return false;
         }
+    }
+
+    private int parseEpisodeEnd(String rangeEnd) {
+        if (rangeEnd == null) {
+            return episode;
+        }
+        int end = Integer.parseInt(rangeEnd);
+        if (end <= episode || end - episode >= MAX_EPISODES_PER_FILE) {
+            log.warn("Ignoring implausible episode range e{}-e{}, treating as single episode", episode, end);
+            return episode;
+        }
+        return end;
+    }
+
+    /** All episode numbers of the file, in order; a single element for normal files. */
+    public List<Integer> getEpisodes() {
+        return IntStream.rangeClosed(episode, episodeEnd).boxed().toList();
     }
 
     private void setFileType(String path) {
