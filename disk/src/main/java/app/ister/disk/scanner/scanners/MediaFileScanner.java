@@ -3,6 +3,7 @@ package app.ister.disk.scanner.scanners;
 import app.ister.core.entity.*;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.MediaFileFoundData;
+import app.ister.core.repository.MediaFileEpisodeRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,6 +29,7 @@ import java.util.UUID;
 public class MediaFileScanner implements Scanner {
     private final ScannerHelperService scannerHelperService;
     private final MediaFileRepository mediaFileRepository;
+    private final MediaFileEpisodeRepository mediaFileEpisodeRepository;
     private final MessageSender messageSender;
 
     @Override
@@ -40,21 +43,24 @@ public class MediaFileScanner implements Scanner {
     @Override
     public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, boolean isRegularFile, long size) {
         PathObject pathObject = new PathObject(path.toString());
-        Optional<EpisodeEntity> episodeEntity = Optional.empty();
+        List<EpisodeEntity> episodeEntities = List.of();
         Optional<MovieEntity> movieEntity = Optional.empty();
-        UUID episodeId = null;
         UUID movieId = null;
         switch (pathObject.getDirType()) {
-            case EPISODE -> {
-                episodeEntity = Optional.of(scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear(), pathObject.getSeason(), pathObject.getEpisode()));
-                episodeId = episodeEntity.get().getId();
-            }
+            case EPISODE -> episodeEntities = pathObject.getEpisodes().stream()
+                    .map(episodeNumber -> scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear(), pathObject.getSeason(), episodeNumber))
+                    .toList();
             case MOVIE -> {
                 movieEntity = Optional.of(scannerHelperService.getOrCreateMovie(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear()));
                 movieId = movieEntity.get().getId();
             }
             default -> throw new IllegalStateException("Only EPISODE or MOVIE is supported");
         }
+        // The FK on the media file always points at the first episode of the file; the other
+        // episodes of a multi-episode file are linked through MediaFileEpisodeEntity rows.
+        Optional<EpisodeEntity> episodeEntity = episodeEntities.stream().findFirst();
+        UUID episodeId = episodeEntity.map(BaseEntity::getId).orElse(null);
+        List<UUID> episodeIds = episodeEntities.stream().map(BaseEntity::getId).toList();
 
         Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString());
         if (mediaFile.isEmpty()) {
@@ -65,13 +71,46 @@ public class MediaFileScanner implements Scanner {
                     .path(path.toString())
                     .size(size).build();
             mediaFileRepository.save(entity);
+            createEpisodeLinks(entity, episodeIds);
             messageSender.sendMediaFileFound(MediaFileFoundData.builder()
                     .eventType(EventType.MEDIA_FILE_FOUND)
                     .directoryEntityUUID(directoryEntity.getId())
                     .episodeEntityUUID(episodeId)
+                    .episodeEntityUUIDs(episodeIds.isEmpty() ? null : episodeIds)
                     .movieEntityUUID(movieId)
+                    .path(path.toString()).build(), directoryEntity.getName());
+        } else if (episodeIds.size() > 1
+                && mediaFileEpisodeRepository.findByMediaFileEntityIdOrderByPartNumber(mediaFile.get().getId()).isEmpty()) {
+            // Backfill for files scanned before multi-episode support: the file row exists but the
+            // range episodes and their link rows do not. Create them and re-analyze so the episode
+            // boundaries get computed. Idempotent: the next rescan finds the link rows and skips this.
+            log.info("Backfilling multi-episode links for {}", path);
+            createEpisodeLinks(mediaFile.get(), episodeIds);
+            messageSender.sendMediaFileFound(MediaFileFoundData.builder()
+                    .eventType(EventType.MEDIA_FILE_FOUND)
+                    .directoryEntityUUID(directoryEntity.getId())
+                    .episodeEntityUUID(episodeId)
+                    .episodeEntityUUIDs(episodeIds)
+                    .movieEntityUUID(null)
                     .path(path.toString()).build(), directoryEntity.getName());
         }
         return Optional.ofNullable(episodeEntity.orElse(null));
+    }
+
+    private void createEpisodeLinks(MediaFileEntity mediaFile, List<UUID> episodeIds) {
+        if (episodeIds.size() < 2) {
+            return;
+        }
+        List<MediaFileEpisodeEntity> links = new ArrayList<>();
+        for (int part = 0; part < episodeIds.size(); part++) {
+            links.add(MediaFileEpisodeEntity.builder()
+                    .mediaFileEntityId(mediaFile.getId())
+                    .episodeEntityId(episodeIds.get(part))
+                    .partNumber(part)
+                    .startInMilliseconds(0)
+                    .durationInMilliseconds(0)
+                    .build());
+        }
+        mediaFileEpisodeRepository.saveAll(links);
     }
 }

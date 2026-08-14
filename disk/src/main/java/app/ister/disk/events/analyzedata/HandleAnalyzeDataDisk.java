@@ -9,6 +9,7 @@ import app.ister.core.eventdata.MediaFileFoundData;
 import app.ister.core.eventdata.NfoFileFoundData;
 import app.ister.core.eventdata.SubtitleFileFoundData;
 import app.ister.core.repository.*;
+import app.ister.core.service.MediaFileEpisodeService;
 import app.ister.core.service.MessageSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,8 @@ public class HandleAnalyzeDataDisk implements Handle<AnalyzeData> {
     private final MetadataRepository metadataRepository;
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final OtherPathFileRepository otherPathFileRepository;
+    private final MediaFileEpisodeRepository mediaFileEpisodeRepository;
+    private final MediaFileEpisodeService mediaFileEpisodeService;
     private final MessageSender messageSender;
 
     @Value("${app.ister.server.tmp-dir}")
@@ -62,7 +65,9 @@ public class HandleAnalyzeDataDisk implements Handle<AnalyzeData> {
         List<MediaFileEntity> localFiles;
         if (data.getEpisodeId() != null) {
             episodeRepository.findById(data.getEpisodeId()).orElseThrow();
-            localFiles = mediaFileRepository.findByEpisodeEntityId(data.getEpisodeId()).stream()
+            // filesForEpisode instead of findByEpisodeEntityId: an episode that is not the first of
+            // a multi-episode file only reaches its file through the link table.
+            localFiles = mediaFileEpisodeService.filesForEpisode(data.getEpisodeId()).stream()
                     .filter(mf -> mf.getDirectoryEntityId().equals(dir.getId())).toList();
             metadataEntities = metadataRepository.findByEpisodeEntityId(data.getEpisodeId());
         } else {
@@ -75,12 +80,16 @@ public class HandleAnalyzeDataDisk implements Handle<AnalyzeData> {
         for (MediaFileEntity mf : localFiles) {
             deleteHlsCache(mf.getId());
             mediaFileStreamRepository.deleteAllByMediaFileEntityId(mf.getId());
+            List<MediaFileEpisodeEntity> links = mediaFileEpisodeRepository.findByMediaFileEntityIdOrderByPartNumber(mf.getId());
             messageSender.sendMediaFileFound(
                     MediaFileFoundData.builder()
                             .eventType(EventType.MEDIA_FILE_FOUND)
                             .directoryEntityUUID(dir.getId())
                             .path(mf.getPath())
-                            .episodeEntityUUID(data.getEpisodeId())
+                            // The event carries the file's first episode, which for a multi-episode
+                            // file is not necessarily the episode being re-analyzed.
+                            .episodeEntityUUID(links.isEmpty() ? data.getEpisodeId() : links.getFirst().getEpisodeEntityId())
+                            .episodeEntityUUIDs(links.isEmpty() ? null : links.stream().map(MediaFileEpisodeEntity::getEpisodeEntityId).toList())
                             .movieEntityUUID(data.getMovieId())
                             .build(),
                     dir.getName());

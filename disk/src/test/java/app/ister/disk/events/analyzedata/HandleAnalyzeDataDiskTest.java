@@ -13,11 +13,13 @@ import app.ister.core.enums.StreamCodecType;
 import app.ister.core.eventdata.AnalyzeData;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.MediaFileEpisodeRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.OtherPathFileRepository;
+import app.ister.core.service.MediaFileEpisodeService;
 import app.ister.core.service.MessageSender;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -64,6 +66,10 @@ class HandleAnalyzeDataDiskTest {
     @Mock
     private OtherPathFileRepository otherPathFileRepository;
     @Mock
+    private MediaFileEpisodeRepository mediaFileEpisodeRepository;
+    @Mock
+    private MediaFileEpisodeService mediaFileEpisodeService;
+    @Mock
     private MessageSender messageSender;
 
     @Test
@@ -99,7 +105,7 @@ class HandleAnalyzeDataDiskTest {
 
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
-        when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(mf));
+        when(mediaFileEpisodeService.filesForEpisode(episodeId)).thenReturn(List.of(mf));
         when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
                 .thenReturn(List.of());
 
@@ -220,7 +226,7 @@ class HandleAnalyzeDataDiskTest {
 
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
-        when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(mf));
+        when(mediaFileEpisodeService.filesForEpisode(episodeId)).thenReturn(List.of(mf));
         when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
                 .thenReturn(List.of(stream));
         when(otherPathFileRepository.findByMediaFileStreamEntity(stream)).thenReturn(Optional.of(subtitleFile));
@@ -251,7 +257,7 @@ class HandleAnalyzeDataDiskTest {
 
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
-        when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(mf));
+        when(mediaFileEpisodeService.filesForEpisode(episodeId)).thenReturn(List.of(mf));
         when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
                 .thenReturn(List.of(stream));
         when(otherPathFileRepository.findByMediaFileStreamEntity(stream)).thenReturn(Optional.empty());
@@ -287,7 +293,7 @@ class HandleAnalyzeDataDiskTest {
 
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
-        when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(mf));
+        when(mediaFileEpisodeService.filesForEpisode(episodeId)).thenReturn(List.of(mf));
         when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
                 .thenReturn(List.of());
 
@@ -317,7 +323,7 @@ class HandleAnalyzeDataDiskTest {
 
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
-        when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(mfOtherDir));
+        when(mediaFileEpisodeService.filesForEpisode(episodeId)).thenReturn(List.of(mfOtherDir));
 
         subject.handle(data);
 

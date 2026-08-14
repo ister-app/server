@@ -1,6 +1,8 @@
 package app.ister.disk.scanner.scanners;
 
 import app.ister.core.entity.*;
+import app.ister.core.eventdata.MediaFileFoundData;
+import app.ister.core.repository.MediaFileEpisodeRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
@@ -26,6 +28,8 @@ class MediaFileScannerTest {
     private ScannerHelperService scannerHelperService;
     @Mock
     private MediaFileRepository mediaFileRepository;
+    @Mock
+    private MediaFileEpisodeRepository mediaFileEpisodeRepository;
     @Mock
     private MessageSender messageSender;
 
@@ -99,6 +103,88 @@ class MediaFileScannerTest {
         subject.analyze(directory, path, true, 1024L);
 
         verify(mediaFileRepository, never()).save(any());
+        verifyNoInteractions(messageSender);
+    }
+
+    @Test
+    void analyzeMultiEpisodeFileCreatesAllEpisodesAndLinkRows() {
+        LibraryEntity library = LibraryEntity.builder().build();
+        DirectoryEntity directory = DirectoryEntity.builder()
+                .id(UUID.randomUUID()).name("disk1").libraryEntity(library)
+                .nodeEntity(NodeEntity.builder().name("node1").build())
+                .build();
+        EpisodeEntity episode6 = EpisodeEntity.builder().id(UUID.randomUUID()).build();
+        EpisodeEntity episode7 = EpisodeEntity.builder().id(UUID.randomUUID()).build();
+        Path path = Path.of("/disk/shows/Show (2024)/Season 04/s04e06-e07.mkv");
+
+        when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 4, 6)).thenReturn(episode6);
+        when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 4, 7)).thenReturn(episode7);
+        when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path.toString())).thenReturn(Optional.empty());
+
+        Optional<BaseEntity> result = subject.analyze(directory, path, true, 1024L);
+
+        assertTrue(result.isPresent());
+        assertEquals(episode6, result.get());
+        verify(mediaFileRepository).save(any(MediaFileEntity.class));
+        verify(mediaFileEpisodeRepository).saveAll(argThat((Iterable<MediaFileEpisodeEntity> links) -> {
+            var it = links.iterator();
+            MediaFileEpisodeEntity first = it.next();
+            MediaFileEpisodeEntity second = it.next();
+            return !it.hasNext()
+                    && first.getEpisodeEntityId().equals(episode6.getId()) && first.getPartNumber() == 0
+                    && second.getEpisodeEntityId().equals(episode7.getId()) && second.getPartNumber() == 1;
+        }));
+        verify(messageSender).sendMediaFileFound(argThat((MediaFileFoundData data) ->
+                data.getEpisodeEntityUUID().equals(episode6.getId())
+                        && data.getEpisodeEntityUUIDs().equals(java.util.List.of(episode6.getId(), episode7.getId()))), eq("disk1"));
+    }
+
+    @Test
+    void analyzeExistingMultiEpisodeFileWithoutLinksBackfillsAndReanalyzes() {
+        LibraryEntity library = LibraryEntity.builder().build();
+        DirectoryEntity directory = DirectoryEntity.builder()
+                .id(UUID.randomUUID()).name("disk1").libraryEntity(library)
+                .nodeEntity(NodeEntity.builder().name("node1").build())
+                .build();
+        EpisodeEntity episode6 = EpisodeEntity.builder().id(UUID.randomUUID()).build();
+        EpisodeEntity episode7 = EpisodeEntity.builder().id(UUID.randomUUID()).build();
+        Path path = Path.of("/disk/shows/Show (2024)/Season 04/s04e06-e07.mkv");
+        MediaFileEntity existing = MediaFileEntity.builder().id(UUID.randomUUID()).path(path.toString()).build();
+
+        when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 4, 6)).thenReturn(episode6);
+        when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 4, 7)).thenReturn(episode7);
+        when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path.toString())).thenReturn(Optional.of(existing));
+        when(mediaFileEpisodeRepository.findByMediaFileEntityIdOrderByPartNumber(existing.getId())).thenReturn(java.util.List.of());
+
+        subject.analyze(directory, path, true, 1024L);
+
+        verify(mediaFileRepository, never()).save(any());
+        verify(mediaFileEpisodeRepository).saveAll(any());
+        verify(messageSender).sendMediaFileFound(any(), eq("disk1"));
+    }
+
+    @Test
+    void analyzeExistingMultiEpisodeFileWithLinksIsIdempotent() {
+        LibraryEntity library = LibraryEntity.builder().build();
+        DirectoryEntity directory = DirectoryEntity.builder()
+                .id(UUID.randomUUID()).name("disk1").libraryEntity(library)
+                .nodeEntity(NodeEntity.builder().name("node1").build())
+                .build();
+        EpisodeEntity episode6 = EpisodeEntity.builder().id(UUID.randomUUID()).build();
+        EpisodeEntity episode7 = EpisodeEntity.builder().id(UUID.randomUUID()).build();
+        Path path = Path.of("/disk/shows/Show (2024)/Season 04/s04e06-e07.mkv");
+        MediaFileEntity existing = MediaFileEntity.builder().id(UUID.randomUUID()).path(path.toString()).build();
+
+        when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 4, 6)).thenReturn(episode6);
+        when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 4, 7)).thenReturn(episode7);
+        when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path.toString())).thenReturn(Optional.of(existing));
+        when(mediaFileEpisodeRepository.findByMediaFileEntityIdOrderByPartNumber(existing.getId()))
+                .thenReturn(java.util.List.of(MediaFileEpisodeEntity.builder().build()));
+
+        subject.analyze(directory, path, true, 1024L);
+
+        verify(mediaFileRepository, never()).save(any());
+        verify(mediaFileEpisodeRepository, never()).saveAll(any());
         verifyNoInteractions(messageSender);
     }
 }
