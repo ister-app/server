@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -31,11 +32,13 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     private final MovieRepository movieRepository;
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final ImageRepository imageRepository;
+    private final MediaFileEpisodeRepository mediaFileEpisodeRepository;
 
     private final MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams;
     private final MediaFileFoundCreateBackground mediaFileFoundCreateBackground;
     private final MediaFileFoundGetDuration mediaFileFoundGetDuration;
     private final MediaFileFoundExtractSubtitles mediaFileFoundExtractSubtitles;
+    private final MediaFileFoundEpisodeBoundaries mediaFileFoundEpisodeBoundaries;
     private final MessageSender messageSender;
 
     @Value("${app.ister.server.ffmpeg-dir}")
@@ -48,10 +51,12 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
                                 MovieRepository movieRepository,
                                 MediaFileStreamRepository mediaFileStreamRepository,
                                 ImageRepository imageRepository,
+                                MediaFileEpisodeRepository mediaFileEpisodeRepository,
                                 MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams,
                                 MediaFileFoundCreateBackground mediaFileFoundCreateBackground,
                                 MediaFileFoundGetDuration mediaFileFoundGetDuration,
                                 MediaFileFoundExtractSubtitles mediaFileFoundExtractSubtitles,
+                                MediaFileFoundEpisodeBoundaries mediaFileFoundEpisodeBoundaries,
                                 MessageSender messageSender) {
         this.nodeService = nodeService;
         this.directoryRepository = directoryRepository;
@@ -60,10 +65,12 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
         this.movieRepository = movieRepository;
         this.mediaFileStreamRepository = mediaFileStreamRepository;
         this.imageRepository = imageRepository;
+        this.mediaFileEpisodeRepository = mediaFileEpisodeRepository;
         this.mediaFileFoundCheckForStreams = mediaFileFoundCheckForStreams;
         this.mediaFileFoundCreateBackground = mediaFileFoundCreateBackground;
         this.mediaFileFoundGetDuration = mediaFileFoundGetDuration;
         this.mediaFileFoundExtractSubtitles = mediaFileFoundExtractSubtitles;
+        this.mediaFileFoundEpisodeBoundaries = mediaFileFoundEpisodeBoundaries;
         this.messageSender = messageSender;
     }
 
@@ -103,7 +110,40 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
         Optional<EpisodeEntity> episodeEntity = mediaFileFoundData.getEpisodeEntityUUID() != null ? episodeRepository.findById(mediaFileFoundData.getEpisodeEntityUUID()) : Optional.empty();
         Optional<MovieEntity> movieEntity = mediaFileFoundData.getMovieEntityUUID() != null ? movieRepository.findById(mediaFileFoundData.getMovieEntityUUID()) : Optional.empty();
         var mediaFile = checkMediaFile(directoryEntity, mediaFileFoundData.getPath());
-        mediaFile.ifPresent(mediaFileEntity -> createBackgroundImage(episodeEntity, movieEntity, mediaFileFoundData.getPath(), mediaFileEntity.getDurationInMilliseconds()));
+        mediaFile.ifPresent(mediaFileEntity -> {
+            var parts = updateEpisodeBoundaries(mediaFileEntity);
+            if (parts.size() >= 2) {
+                // Multi-episode file: every contained episode gets its own background still,
+                // taken at the midpoint of its own slice of the file.
+                for (MediaFileEpisodeEntity part : parts) {
+                    episodeRepository.findById(part.getEpisodeEntityId()).ifPresent(partEpisode ->
+                            createBackgroundImage(Optional.of(partEpisode), Optional.empty(), mediaFileFoundData.getPath(),
+                                    part.getStartInMilliseconds() + part.getDurationInMilliseconds() / 2));
+                }
+            } else {
+                createBackgroundImage(episodeEntity, movieEntity, mediaFileFoundData.getPath(), mediaFileEntity.getDurationInMilliseconds() / 2);
+            }
+        });
+    }
+
+    /**
+     * For a multi-episode file (s04e06-e07.mkv): compute where each episode starts, preferring the
+     * MKV chapter markers, and store the slices on the link rows. Idempotent on re-analysis.
+     */
+    private List<MediaFileEpisodeEntity> updateEpisodeBoundaries(MediaFileEntity mediaFileEntity) {
+        List<MediaFileEpisodeEntity> parts = mediaFileEpisodeRepository.findByMediaFileEntityIdOrderByPartNumber(mediaFileEntity.getId());
+        long duration = mediaFileEntity.getDurationInMilliseconds();
+        if (parts.size() < 2 || duration <= 0) {
+            return parts;
+        }
+        List<Long> starts = mediaFileFoundEpisodeBoundaries.boundaryStarts(mediaFileEntity.getPath(), dirOfFFmpeg, duration, parts.size());
+        for (int i = 0; i < parts.size(); i++) {
+            long end = i + 1 < parts.size() ? starts.get(i + 1) : duration;
+            parts.get(i).setStartInMilliseconds(starts.get(i));
+            parts.get(i).setDurationInMilliseconds(end - starts.get(i));
+        }
+        mediaFileEpisodeRepository.saveAll(parts);
+        return parts;
     }
 
     private Optional<MediaFileEntity> checkMediaFile(DirectoryEntity directoryEntity, String file) {
@@ -136,7 +176,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
      * Check if the given {@link EpisodeEntity} or {@link MovieEntity} has image entities if not:
      * Create background image for media file and save a reference to it in the database.
      */
-    private void createBackgroundImage(Optional<EpisodeEntity> episodeEntity, Optional<MovieEntity> movieEntity, String mediaFilePath, long durationInMilliseconds) {
+    private void createBackgroundImage(Optional<EpisodeEntity> episodeEntity, Optional<MovieEntity> movieEntity, String mediaFilePath, long stillAtMilliseconds) {
         // Query the image repository directly instead of navigating the entities' LAZY
         // imagesEntities collection: this handler runs on a RabbitMQ listener thread with no
         // open-session-in-view, so lazy navigation would throw LazyInitializationException.
@@ -147,7 +187,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             DirectoryEntity cacheDisk = directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity).stream().findFirst().orElseThrow();
             String toPath = getPathString(cacheDisk, episodeEntity, movieEntity);
             try {
-                mediaFileFoundCreateBackground.createBackground(Path.of(toPath), Path.of(mediaFilePath), dirOfFFmpeg, durationInMilliseconds / 2);
+                mediaFileFoundCreateBackground.createBackground(Path.of(toPath), Path.of(mediaFilePath), dirOfFFmpeg, stillAtMilliseconds);
             } catch (JaffreeAbnormalExitException e) {
                 log.error("Failed to create background image for {}: {}", mediaFilePath, e.getMessage());
                 return;
