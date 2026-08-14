@@ -6,6 +6,7 @@ import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.MediaFileEpisodeEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PlayQueueEntity;
@@ -29,6 +30,7 @@ import app.ister.core.repository.TrackRepository;
 import app.ister.core.entity.DeviceEntity;
 import app.ister.core.service.DeviceService;
 import app.ister.core.service.LibraryAccessService;
+import app.ister.core.service.MediaFileEpisodeService;
 import app.ister.core.service.MediaLibraryResolver;
 import app.ister.core.service.PlayQueuePrefetchService;
 import app.ister.core.service.PlayQueueService;
@@ -76,6 +78,7 @@ public class PlayQueueController {
     private final PodcastEpisodeRepository podcastEpisodeRepository;
 
     private final MediaFileRepository mediaFileRepository;
+    private final MediaFileEpisodeService mediaFileEpisodeService;
 
     private final ImageRepository imageRepository;
 
@@ -255,17 +258,32 @@ public class PlayQueueController {
         }
         List<MediaFileEntity> files = switch (item.getType()) {
             case MOVIE -> mediaFileRepository.findByMovieEntityId(mediaId);
-            case EPISODE -> mediaFileRepository.findByEpisodeEntityId(mediaId);
+            case EPISODE -> mediaFileEpisodeService.filesForEpisode(mediaId);
             case TRACK -> mediaFileRepository.findByTrackEntityId(mediaId);
             case CHAPTER -> mediaFileRepository.findByChapterEntityId(mediaId);
             case PODCAST_EPISODE -> mediaFileRepository.findByPodcastEpisodeEntityId(mediaId);
             case BOOK, COMIC -> List.of();
         };
         return files.stream()
-                .map(MediaFileEntity::getDurationInMilliseconds)
+                .map(file -> effectiveDuration(item, mediaId, file))
                 .filter(duration -> duration > 0)
                 .max(Long::compare)
                 .orElse(null);
+    }
+
+    /**
+     * The episode's own slice length for an episode inside a multi-episode file
+     * (s04e06-e07.mkv), so the now-playing card shows the episode length instead of the
+     * double-length file; the file duration otherwise.
+     */
+    private long effectiveDuration(PlayQueueItemEntity item, UUID mediaId, MediaFileEntity file) {
+        if (item.getType() == MediaType.EPISODE) {
+            return mediaFileEpisodeService.segmentFor(file.getId(), mediaId)
+                    .filter(segment -> segment.getDurationInMilliseconds() > 0)
+                    .map(MediaFileEpisodeEntity::getDurationInMilliseconds)
+                    .orElse(file.getDurationInMilliseconds());
+        }
+        return file.getDurationInMilliseconds();
     }
 
     /**

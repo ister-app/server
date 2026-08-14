@@ -33,6 +33,7 @@ import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.TrackRepository;
+import app.ister.core.service.MediaFileEpisodeService;
 import app.ister.core.service.PlayQueuePrefetchService;
 import app.ister.core.service.PlayQueueService;
 import app.ister.core.status.PlaybackStatusService;
@@ -80,6 +81,9 @@ class PlayQueueControllerTest {
 
     @Mock
     private MediaFileRepository mediaFileRepository;
+
+    @Mock
+    private MediaFileEpisodeService mediaFileEpisodeService;
 
     @Mock
     private ImageRepository imageRepository;
@@ -623,7 +627,7 @@ class PlayQueueControllerTest {
 
         ImageEntity showImage = ImageEntity.builder().type(ImageType.BACKGROUND).build();
         showImage.setId(UUID.randomUUID());
-        when(mediaFileRepository.findByEpisodeEntityId(episode.getId())).thenReturn(List.of());
+        when(mediaFileEpisodeService.filesForEpisode(episode.getId())).thenReturn(List.of());
         when(imageRepository.findByEpisodeEntityId(episode.getId())).thenReturn(List.of());
         when(imageRepository.findByShowEntityId(show.getId())).thenReturn(List.of(showImage));
 

@@ -67,6 +67,9 @@ class PlayQueueControllerGraphQlTest {
     private MediaFileRepository mediaFileRepository;
 
     @MockitoBean
+    private app.ister.core.service.MediaFileEpisodeService mediaFileEpisodeService;
+
+    @MockitoBean
     private ImageRepository imageRepository;
 
     @MockitoBean

@@ -88,6 +88,9 @@ class PlayQueueServiceTest {
     @Mock
     private ContinueWatchingService continueWatchingService;
 
+    @Mock
+    private MediaFileEpisodeService mediaFileEpisodeService;
+
     /**
      * Unstubbed: ofSource defaults to Optional.empty(), which counts as accessible (the
      * source-deleted fallback), so the pre-permissions behaviour of every test is preserved.
@@ -839,11 +842,71 @@ class PlayQueueServiceTest {
         when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
         when(episodeRepository.findById(epId)).thenReturn(Optional.of(episode));
         when(watchStatusService.getOrCreate(user, item.getId(), episode, null)).thenReturn(watchStatus);
+        when(mediaFileEpisodeService.filesForEpisode(epId)).thenReturn(List.of(mediaFile));
+        when(mediaFileEpisodeService.segmentFor(mediaFile.getId(), epId)).thenReturn(Optional.empty());
 
         subject.updatePlayQueue(queue.getId(), 90000L, item.getId(), null, Set.of(), authentication);
 
         verify(watchStatusRepository).save(watchStatus);
         assertEquals(90000L, watchStatus.getProgressInMilliseconds());
+    }
+
+    /**
+     * An episode inside a multi-episode file (s04e06-e07.mkv) becomes watched at its own slice
+     * boundary, not at the end of the double-length file — and playing past the boundary into the
+     * next episode also counts as watched.
+     */
+    @Test
+    void updatePlayQueueMarksAMultiEpisodeSliceWatchedAtItsOwnBoundary() {
+        mockUser();
+        UUID epId = UUID.randomUUID();
+        PlayQueueItemEntity item = buildItem(MediaType.EPISODE, epId, "1000");
+        PlayQueueEntity queue = ownedQueue(List.of(item));
+
+        MediaFileEntity mediaFile = MediaFileEntity.builder().id(UUID.randomUUID()).durationInMilliseconds(5400000L).build();
+        EpisodeEntity episode = EpisodeEntity.builder().id(epId).mediaFileEntities(List.of()).build();
+        WatchStatusEntity watchStatus = WatchStatusEntity.builder().watched(false).build();
+        MediaFileEpisodeEntity segment = MediaFileEpisodeEntity.builder()
+                .mediaFileEntityId(mediaFile.getId()).episodeEntityId(epId)
+                .partNumber(0).startInMilliseconds(0).durationInMilliseconds(2700000L).build();
+
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        when(episodeRepository.findById(epId)).thenReturn(Optional.of(episode));
+        when(watchStatusService.getOrCreate(user, item.getId(), episode, null)).thenReturn(watchStatus);
+        when(mediaFileEpisodeService.filesForEpisode(epId)).thenReturn(List.of(mediaFile));
+        when(mediaFileEpisodeService.segmentFor(mediaFile.getId(), epId)).thenReturn(Optional.of(segment));
+
+        // 30s before the slice boundary at 45:00 — far from the file's end at 1:30:00.
+        subject.updatePlayQueue(queue.getId(), 2670000L, item.getId(), null, Set.of(), authentication);
+
+        assertTrue(watchStatus.isWatched());
+    }
+
+    @Test
+    void updatePlayQueueDoesNotMarkAMultiEpisodeSliceWatchedMidSlice() {
+        mockUser();
+        UUID epId = UUID.randomUUID();
+        PlayQueueItemEntity item = buildItem(MediaType.EPISODE, epId, "1000");
+        PlayQueueEntity queue = ownedQueue(List.of(item));
+
+        MediaFileEntity mediaFile = MediaFileEntity.builder().id(UUID.randomUUID()).durationInMilliseconds(5400000L).build();
+        EpisodeEntity episode = EpisodeEntity.builder().id(epId).mediaFileEntities(List.of()).build();
+        WatchStatusEntity watchStatus = WatchStatusEntity.builder().watched(false).build();
+        MediaFileEpisodeEntity segment = MediaFileEpisodeEntity.builder()
+                .mediaFileEntityId(mediaFile.getId()).episodeEntityId(epId)
+                .partNumber(1).startInMilliseconds(2700000L).durationInMilliseconds(2700000L).build();
+
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        when(episodeRepository.findById(epId)).thenReturn(Optional.of(episode));
+        when(watchStatusService.getOrCreate(user, item.getId(), episode, null)).thenReturn(watchStatus);
+        when(mediaFileEpisodeService.filesForEpisode(epId)).thenReturn(List.of(mediaFile));
+        when(mediaFileEpisodeService.segmentFor(mediaFile.getId(), epId)).thenReturn(Optional.of(segment));
+
+        // Two minutes into the second slice: nowhere near its end at 1:30:00.
+        subject.updatePlayQueue(queue.getId(), 2820000L, item.getId(), null, Set.of(), authentication);
+
+        assertFalse(watchStatus.isWatched());
+        assertEquals(2820000L, watchStatus.getProgressInMilliseconds());
     }
 
     @Test
@@ -1564,6 +1627,7 @@ class PlayQueueServiceTest {
         when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
         when(episodeRepository.findById(epId)).thenReturn(Optional.of(episode));
         when(watchStatusService.getOrCreate(user, item.getId(), episode, null)).thenReturn(watchStatus);
+        when(mediaFileEpisodeService.filesForEpisode(epId)).thenReturn(List.of());
 
         subject.updatePlayQueue(queue.getId(), 90000L, item.getId(), null, Set.of(), authentication);
 

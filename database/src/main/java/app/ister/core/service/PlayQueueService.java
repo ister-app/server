@@ -88,6 +88,8 @@ public class PlayQueueService {
 
     private final ContinueWatchingService continueWatchingService;
 
+    private final MediaFileEpisodeService mediaFileEpisodeService;
+
     private final PodcastPreferenceService podcastPreferenceService;
 
     /** Stream settings a client reports via updatePlayQueue; used to prefetch the next item in the same format. */
@@ -124,7 +126,7 @@ public class PlayQueueService {
 
     private final PlaylistItemRepository playlistItemRepository;
 
-    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, ChapterRepository chapterRepository, PodcastEpisodeRepository podcastEpisodeRepository, LibraryRepository libraryRepository, UserService userService, UserRepository userRepository, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService, ContinueWatchingService continueWatchingService, PodcastPreferenceService podcastPreferenceService, LibraryAccessService libraryAccessService, MediaLibraryResolver mediaLibraryResolver, PlaybackSharingService playbackSharingService, PlayQueueControlGrantRepository playQueueControlGrantRepository, FilterQueryService filterQueryService, SavedViewService savedViewService, PlaylistService playlistService, PlaylistRepository playlistRepository, PlaylistItemRepository playlistItemRepository) {
+    public PlayQueueService(PlayQueueRepository playQueueRepository, EpisodeRepository episodeRepository, MovieRepository movieRepository, TrackRepository trackRepository, ChapterRepository chapterRepository, PodcastEpisodeRepository podcastEpisodeRepository, LibraryRepository libraryRepository, UserService userService, UserRepository userRepository, WatchStatusRepository watchStatusRepository, WatchStatusService watchStatusService, ContinueWatchingService continueWatchingService, PodcastPreferenceService podcastPreferenceService, LibraryAccessService libraryAccessService, MediaLibraryResolver mediaLibraryResolver, PlaybackSharingService playbackSharingService, PlayQueueControlGrantRepository playQueueControlGrantRepository, FilterQueryService filterQueryService, SavedViewService savedViewService, PlaylistService playlistService, PlaylistRepository playlistRepository, PlaylistItemRepository playlistItemRepository, MediaFileEpisodeService mediaFileEpisodeService) {
         this.playQueueRepository = playQueueRepository;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;
@@ -147,6 +149,7 @@ public class PlayQueueService {
         this.playlistService = playlistService;
         this.playlistRepository = playlistRepository;
         this.playlistItemRepository = playlistItemRepository;
+        this.mediaFileEpisodeService = mediaFileEpisodeService;
     }
 
     /**
@@ -1080,7 +1083,17 @@ public class PlayQueueService {
     private void updateEpisodeWatchStatus(long progressInMilliseconds, UUID playQueueItemId, UserEntity listener, PlayQueueItemEntity playQueueItemEntity) {
         episodeRepository.findById(playQueueItemEntity.getEpisodeEntityId()).ifPresent(episodeEntity -> {
             WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreate(listener, playQueueItemId, episodeEntity, null);
-            updateWatchStatus(progressInMilliseconds, watchStatusEntity, episodeEntity.getMediaFileEntities());
+            // Progress is absolute within the file. For an episode inside a multi-episode file
+            // (s04e06-e07.mkv) the episode ends at its slice boundary, not at the file's end —
+            // otherwise only the last episode of the file could ever become watched.
+            List<MediaFileEntity> files = mediaFileEpisodeService.filesForEpisode(episodeEntity.getId());
+            long endOfEpisode = files.stream().findFirst()
+                    .map(file -> mediaFileEpisodeService.segmentFor(file.getId(), episodeEntity.getId())
+                            .filter(segment -> segment.getDurationInMilliseconds() > 0)
+                            .map(segment -> segment.getStartInMilliseconds() + segment.getDurationInMilliseconds())
+                            .orElse(file.getDurationInMilliseconds()))
+                    .orElse(0L);
+            updateWatchStatus(progressInMilliseconds, watchStatusEntity, endOfEpisode);
         });
     }
 
@@ -1106,11 +1119,17 @@ public class PlayQueueService {
     }
 
     private void updateWatchStatus(long progressInMilliseconds, WatchStatusEntity watchStatusEntity, List<MediaFileEntity> mediaFileEntities) {
+        long endOfItem = mediaFileEntities.isEmpty() ? 0 : mediaFileEntities.get(0).getDurationInMilliseconds();
+        updateWatchStatus(progressInMilliseconds, watchStatusEntity, endOfItem);
+    }
+
+    /** endOfItemInMilliseconds 0 means unknown: progress is recorded but watched is left untouched. */
+    private void updateWatchStatus(long progressInMilliseconds, WatchStatusEntity watchStatusEntity, long endOfItemInMilliseconds) {
         watchStatusEntity.setProgressInMilliseconds(progressInMilliseconds);
-        if (!mediaFileEntities.isEmpty()) {
-            long durationOfMediaFile = mediaFileEntities.get(0).getDurationInMilliseconds();
-            boolean durationIsLessThenOneMinute = durationOfMediaFile - progressInMilliseconds < 60000;
-            watchStatusEntity.setWatched(durationIsLessThenOneMinute);
+        if (endOfItemInMilliseconds > 0) {
+            // Within a minute of — or past — the end of the item counts as watched. "Past" happens
+            // when playback of a multi-episode file runs across an episode boundary.
+            watchStatusEntity.setWatched(endOfItemInMilliseconds - progressInMilliseconds < 60000);
         }
         watchStatusRepository.save(watchStatusEntity);
         // Keep the user's continue-watching entry in step with the heartbeat: finishing an episode
