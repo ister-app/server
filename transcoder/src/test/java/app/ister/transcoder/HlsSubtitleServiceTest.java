@@ -316,4 +316,58 @@ class HlsSubtitleServiceTest {
         // 1500 + 1480 = 2980 ms; 2250 + 1480 = 3730 ms
         assertTrue(content.contains("00:00:02,980 --> 00:00:03,730"));
     }
+
+    @Test
+    void sanitizeClampsSentinelDurationsToNextCueStart() {
+        // FFmpeg's "unknown duration" extraction: end = start + 655,350 ms.
+        var cues = List.of(
+                new HlsSubtitleService.SrtCue(3_565, 3_565 + 655_350, "one"),
+                new HlsSubtitleService.SrtCue(5_901, 5_901 + 655_350, "two"),
+                new HlsSubtitleService.SrtCue(9_363, 9_363 + 655_350, "three"));
+
+        var result = HlsSubtitleService.sanitizeCueDurations(cues);
+
+        assertEquals(5_901, result.get(0).endMs());
+        assertEquals(9_363, result.get(1).endMs());
+        // Last cue has no follow-up: short default duration.
+        assertEquals(9_363 + HlsSubtitleService.DEFAULT_CUE_DURATION_MS, result.get(2).endMs());
+    }
+
+    @Test
+    void sanitizeCapsClampAtMaxDurationWhenNextCueIsFarAway() {
+        var cues = List.of(
+                new HlsSubtitleService.SrtCue(1_000, 1_000 + 655_350, "one"),
+                new HlsSubtitleService.SrtCue(120_000, 123_000, "two"));
+
+        var result = HlsSubtitleService.sanitizeCueDurations(cues);
+
+        assertEquals(1_000 + HlsSubtitleService.MAX_CUE_DURATION_MS, result.get(0).endMs());
+        // Sane cues stay untouched.
+        assertEquals(123_000, result.get(1).endMs());
+    }
+
+    @Test
+    void sanitizeLeavesNormalCuesAlone() {
+        var cues = List.of(
+                new HlsSubtitleService.SrtCue(1_000, 3_500, "one"),
+                new HlsSubtitleService.SrtCue(4_000, 29_000, "long but plausible"));
+
+        var result = HlsSubtitleService.sanitizeCueDurations(cues);
+
+        assertEquals(3_500, result.get(0).endMs());
+        assertEquals(29_000, result.get(1).endMs());
+    }
+
+    @Test
+    void generationMarkerRoundTrip() throws IOException {
+        UUID subtitleId = UUID.randomUUID();
+        assertFalse(subject.isGenerationCurrent(tempDir, subtitleId));
+
+        Files.writeString(tempDir.resolve("seg_sub_" + subtitleId + ".gen"), "1");
+        assertFalse(subject.isGenerationCurrent(tempDir, subtitleId));
+
+        Files.writeString(tempDir.resolve("seg_sub_" + subtitleId + ".gen"),
+                String.valueOf(HlsSubtitleService.SUBTITLE_GENERATION));
+        assertTrue(subject.isGenerationCurrent(tempDir, subtitleId));
+    }
 }

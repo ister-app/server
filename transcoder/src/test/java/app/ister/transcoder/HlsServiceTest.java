@@ -654,7 +654,7 @@ class HlsServiceTest {
         Path result = hlsService.getSrtSubtitle(mediaFileId, "sub_" + subtitleId + ".srt");
 
         assertNotNull(result);
-        assertTrue(result.toString().endsWith("_offset.srt"));
+        assertTrue(result.toString().endsWith("_offset_g" + HlsSubtitleService.SUBTITLE_GENERATION + ".srt"));
         String content = Files.readString(result);
         // Timestamps shifted by 1480ms
         assertTrue(content.contains("00:00:02,480 --> 00:00:04,480"));
@@ -1720,7 +1720,7 @@ class HlsServiceTest {
         Path result = hlsService.getSrtSubtitle(mediaFileId, "sub_" + subtitleId + ".srt");
 
         assertNotNull(result);
-        assertTrue(result.toString().endsWith("_offset.srt"));
+        assertTrue(result.toString().endsWith("_offset_g" + HlsSubtitleService.SUBTITLE_GENERATION + ".srt"));
     }
 
     // ========== generateAllPlaylists SRT subtitle format ==========

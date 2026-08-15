@@ -34,7 +34,30 @@ public class HlsSubtitleService {
     private final Jaffree jaffree;
     private final FfprobeService ffprobeService;
 
-    private record SrtCue(long startMs, long endMs, String text) {}
+    record SrtCue(long startMs, long endMs, String text) {}
+
+    /**
+     * Generation number of the subtitle artifacts this service writes. Bump it
+     * whenever the cue processing changes (e.g. the duration sanitizing):
+     * cached segment sets from an older generation are regenerated on the next
+     * request instead of being served forever.
+     */
+    static final int SUBTITLE_GENERATION = 2;
+
+    /** Marker recording the generation the cached segment set was written by. */
+    private Path generationMarker(Path cacheDir, UUID subtitleId) {
+        return cacheDir.resolve("seg_sub_" + subtitleId + ".gen");
+    }
+
+    boolean isGenerationCurrent(Path cacheDir, UUID subtitleId) {
+        try {
+            Path marker = generationMarker(cacheDir, subtitleId);
+            return Files.exists(marker)
+                    && String.valueOf(SUBTITLE_GENERATION).equals(Files.readString(marker).trim());
+        } catch (IOException e) {
+            return false;
+        }
+    }
 
     /**
      * Generates all WebVTT subtitle segment files for the given stream.
@@ -55,6 +78,8 @@ public class HlsSubtitleService {
         double totalDuration = ffprobeService.getTotalDuration(mediaFilePath);
         List<SrtCue> cues = parseSrt(srtPath);
         writeVttSegments(cues, keyframes, totalDuration, cacheDir, stream.getId());
+        Files.writeString(generationMarker(cacheDir, stream.getId()),
+                String.valueOf(SUBTITLE_GENERATION), StandardCharsets.UTF_8);
     }
 
     /**
@@ -101,6 +126,19 @@ public class HlsSubtitleService {
         Files.writeString(outputPath, sb.toString(), StandardCharsets.UTF_8);
     }
 
+    /**
+     * A cue longer than this has a bogus end time. FFmpeg extracts subtitle
+     * streams without per-event durations (EIA-608 closed captions are the
+     * common case) as SRT cues ending exactly 655,350 ms (0xFFFF x 10 ms)
+     * after their start — such a cue stays on screen for eleven minutes and,
+     * because it overlaps hundreds of segment windows, gets repeated into
+     * every WebVTT segment: the player then piles all of them up on screen.
+     */
+    static final long MAX_CUE_DURATION_MS = 30_000;
+
+    /** Display duration for a sanitized cue with no follow-up cue to clamp to. */
+    static final long DEFAULT_CUE_DURATION_MS = 6_000;
+
     /** Parses an SRT file into a list of cues. Tolerates Windows line endings and missing cue numbers. */
     private List<SrtCue> parseSrt(String srtPath) throws IOException {
         List<SrtCue> cues = new ArrayList<>();
@@ -120,7 +158,28 @@ public class HlsSubtitleService {
                 i++;
             }
         }
-        return cues;
+        return sanitizeCueDurations(cues);
+    }
+
+    /**
+     * Clamps absurdly long cues (see {@link #MAX_CUE_DURATION_MS}) to the start
+     * of the next cue — the natural display window for caption streams whose
+     * source carried no durations — or to a short default for the last cue.
+     */
+    static List<SrtCue> sanitizeCueDurations(List<SrtCue> cues) {
+        List<SrtCue> result = new ArrayList<>(cues.size());
+        for (int i = 0; i < cues.size(); i++) {
+            SrtCue cue = cues.get(i);
+            if (cue.endMs() - cue.startMs() > MAX_CUE_DURATION_MS) {
+                SrtCue next = i + 1 < cues.size() ? cues.get(i + 1) : null;
+                long clamped = next != null && next.startMs() > cue.startMs()
+                        ? Math.min(next.startMs(), cue.startMs() + MAX_CUE_DURATION_MS)
+                        : cue.startMs() + DEFAULT_CUE_DURATION_MS;
+                cue = new SrtCue(cue.startMs(), Math.min(cue.endMs(), clamped), cue.text());
+            }
+            result.add(cue);
+        }
+        return result;
     }
 
     /** Parses a single SRT cue (timestamp line already read); returns the new line index. */

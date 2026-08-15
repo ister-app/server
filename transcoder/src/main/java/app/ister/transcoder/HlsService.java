@@ -640,7 +640,10 @@ public class HlsService {
         UUID subtitleId = UUID.fromString(withoutExt.substring("seg_sub_".length(), lastUnderscore));
 
         Path cacheFile = cacheDir(mediaFileId).resolve(segmentFilename);
-        if (Files.exists(cacheFile)) {
+        // Serve the cache only when it was written by the current generation:
+        // older generations lacked the cue-duration sanitizing and their
+        // segments make players pile up eleven-minute cues.
+        if (Files.exists(cacheFile) && subtitleService.isGenerationCurrent(cacheDir(mediaFileId), subtitleId)) {
             Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(System.currentTimeMillis()));
             return Files.readString(cacheFile, StandardCharsets.UTF_8);
         }
@@ -658,7 +661,8 @@ public class HlsService {
         String generationKey = mediaFileId + "_sub_" + subtitleId;
         Object lock = subtitleLocks.computeIfAbsent(generationKey, k -> new Object());
         synchronized (lock) {
-            if (!Files.exists(cacheFile)) {
+            if (!Files.exists(cacheFile)
+                    || !subtitleService.isGenerationCurrent(cacheDir(mediaFileId), subtitleId)) {
                 subtitleService.generateSubtitleSegments(subtitleStream, mediaFilePath, mediaFileId, cacheDir(mediaFileId));
             }
         }
@@ -690,7 +694,10 @@ public class HlsService {
             sourceSrtPath = subtitleService.extractEmbeddedSubtitleToSrt(stream, ctx.mediaFilePath(), cacheDir(mediaFileId));
         }
 
-        Path offsetPath = cacheDir(mediaFileId).resolve("sub_" + subtitleId + "_offset.srt");
+        // Generation-stamped name: pre-sanitizing offset files must not be
+        // served from cache forever (see HlsSubtitleService.SUBTITLE_GENERATION).
+        Path offsetPath = cacheDir(mediaFileId).resolve(
+                "sub_" + subtitleId + "_offset_g" + HlsSubtitleService.SUBTITLE_GENERATION + ".srt");
         subtitleService.writeSrtWithOffset(sourceSrtPath, offsetPath);
         return offsetPath;
     }
