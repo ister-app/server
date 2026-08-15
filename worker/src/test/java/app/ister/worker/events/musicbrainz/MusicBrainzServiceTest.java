@@ -44,7 +44,7 @@ class MusicBrainzServiceTest {
     @BeforeEach
     void setUp() {
         WikipediaService wikipediaService = new WikipediaService(WIKIDATA_ENDPOINT, WIKIDATA_API, "https://{lang}.wikipedia.org/api/rest_v1/page/summary/{title}");
-        subject = new MusicBrainzService("https://commons.wikimedia.org/wiki/Special:FilePath/", "https://musicbrainz.org/ws/2", "https://coverartarchive.org/release", "https://coverartarchive.org/release-group", wikipediaService);
+        subject = new MusicBrainzService("https://commons.wikimedia.org/wiki/Special:FilePath/", "https://musicbrainz.org/ws/2", "https://coverartarchive.org/release", "https://coverartarchive.org/release-group", 0, wikipediaService);
         // Both services build their own RestClient in the constructor; rebind them to one mock
         // server so no real network calls are made.
         RestClient.Builder builder = RestClient.builder();

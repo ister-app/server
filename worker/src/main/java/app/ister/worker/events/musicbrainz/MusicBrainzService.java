@@ -3,6 +3,7 @@ package app.ister.worker.events.musicbrainz;
 import app.ister.core.enums.MetadataSource;
 import app.ister.worker.events.wikipedia.WikipediaService;
 import app.ister.worker.http.MetadataRestClients;
+import app.ister.worker.http.RequestPacer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,9 @@ public class MusicBrainzService {
     private final String coverArtReleaseGroupBase;
     private final WikipediaService wikipediaService;
     private final RestClient restClient;
+    /** MusicBrainz allows 1 request/second per IP; the pacer makes that hold process-wide,
+     * across every concurrently handled event, instead of per listener thread. */
+    private final RequestPacer pacer;
 
     public MusicBrainzService(
             @Value("${app.ister.worker.musicbrainz.commons-filepath-base:https://commons.wikimedia.org/wiki/Special:FilePath/}")
@@ -44,11 +48,14 @@ public class MusicBrainzService {
             String coverArtBase,
             @Value("${app.ister.worker.musicbrainz.coverart-release-group-base:https://coverartarchive.org/release-group}")
             String coverArtReleaseGroupBase,
+            @Value("${app.ister.worker.musicbrainz.min-request-interval-millis:1100}")
+            long minRequestIntervalMillis,
             WikipediaService wikipediaService) {
         this.commonsFilepathBase = commonsFilepathBase;
         this.musicBrainzBase = musicBrainzBase;
         this.coverArtBase = coverArtBase;
         this.coverArtReleaseGroupBase = coverArtReleaseGroupBase;
+        this.pacer = new RequestPacer(minRequestIntervalMillis);
         this.wikipediaService = wikipediaService;
         this.restClient = MetadataRestClients.json();
     }
@@ -105,7 +112,7 @@ public class MusicBrainzService {
                                             String artistName, String expectedTitle) {
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
-                Thread.sleep(1000);
+                pacer.acquire();
                 @SuppressWarnings("unchecked")
                 Map<String, Object> response = restClient.get()
                         .uri(musicBrainzBase + uriTemplate, query)
@@ -115,11 +122,8 @@ public class MusicBrainzService {
                     return Optional.empty();
                 }
                 return matchOnTitle(response, resultsKey, artistName, expectedTitle);
-            } catch (InterruptedException _) {
-                Thread.currentThread().interrupt();
-                return Optional.empty();
             } catch (HttpServerErrorException.ServiceUnavailable _) {
-                // MusicBrainz throttles with HTTP 503; the 1s sleep at the top of the loop backs off.
+                // MusicBrainz throttles with HTTP 503; the retry re-enters the pacer for a new slot.
                 log.warn("MusicBrainz {} rate-limited (attempt {}/{}) for artist={} album={}",
                         resultsKey, attempt, MAX_ATTEMPTS, artistName, expectedTitle);
                 if (attempt == MAX_ATTEMPTS) {
@@ -284,16 +288,13 @@ public class MusicBrainzService {
     private Map<String, Object> musicBrainzGet(String uriTemplate, String pathArg, String what, String context) {
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
-                Thread.sleep(1000);
+                pacer.acquire();
                 @SuppressWarnings("unchecked")
                 Map<String, Object> response = restClient.get()
                         .uri(musicBrainzBase + uriTemplate, pathArg)
                         .retrieve()
                         .body(Map.class);
                 return response == null ? Map.of() : response;
-            } catch (InterruptedException _) {
-                Thread.currentThread().interrupt();
-                return Map.of();
             } catch (HttpServerErrorException.ServiceUnavailable _) {
                 log.warn("MusicBrainz {} rate-limited (attempt {}/{}) for {}", what, attempt, MAX_ATTEMPTS, context);
                 if (attempt == MAX_ATTEMPTS) {
@@ -309,7 +310,7 @@ public class MusicBrainzService {
 
     public Optional<AlbumInfo> getAlbumInfo(String artistName, String albumName) {
         try {
-            Thread.sleep(1000);
+            pacer.acquire();
             String query = ARTIST_QUERY_PREFIX + encode(artistName) + " AND releasegroup:" + encode(albumName);
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restClient.get()
@@ -329,9 +330,6 @@ public class MusicBrainzService {
             String description = extractAnnotation(groups.getFirst());
             if (description == null) return Optional.empty();
             return Optional.of(new AlbumInfo(description));
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            return Optional.empty();
         } catch (RestClientException e) {
             log.warn("MusicBrainz API error for artist={} album={}: {}", artistName, albumName, e.getMessage());
             return Optional.empty();
