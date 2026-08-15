@@ -90,4 +90,32 @@ class MediaFileScannerSubtitleReextractTest {
         givenSubtitleStreams();
         assertFalse(subject.needsSubtitleReextract(mediaFileId));
     }
+
+    private void givenVideoStreams(MediaFileStreamEntity... video) {
+        when(mediaFileStreamRepositoryMock.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.VIDEO))
+                .thenReturn(List.of(video));
+    }
+
+    @Test
+    void videoStreamWithoutCropColumnsNeedsCropDetect() {
+        givenVideoStreams(MediaFileStreamEntity.builder()
+                .codecType(StreamCodecType.VIDEO).codecName("h264").streamIndex(0)
+                .width(720).height(576).build());
+        assertTrue(subject.needsCropDetect(mediaFileId));
+    }
+
+    @Test
+    void fullFrameSentinelNeedsNoCropDetect() {
+        givenVideoStreams(MediaFileStreamEntity.builder()
+                .codecType(StreamCodecType.VIDEO).codecName("h264").streamIndex(0)
+                .width(720).height(576)
+                .cropX(0).cropY(0).cropWidth(720).cropHeight(576).build());
+        assertFalse(subject.needsCropDetect(mediaFileId));
+    }
+
+    @Test
+    void audioOnlyFileNeedsNoCropDetect() {
+        givenVideoStreams();
+        assertFalse(subject.needsCropDetect(mediaFileId));
+    }
 }

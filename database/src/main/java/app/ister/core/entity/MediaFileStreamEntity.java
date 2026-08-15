@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 @Entity
@@ -41,4 +42,25 @@ public class MediaFileStreamEntity extends BaseEntity {
     private String language;
 
     private String title;
+
+    /**
+     * Baked-in black-bar crop rect (source pixels), detected with ffmpeg
+     * cropdetect after the stream rows are built — hence the setters. Null =
+     * never detected; equal to the full frame = detected, no bars.
+     */
+    // Explicit column names: Hibernate's camel-to-underscores strategy only
+    // splits before an uppercase that is followed by a lowercase, so cropX
+    // would map to "cropx" instead of "crop_x".
+    @Setter
+    @Column(name = "crop_x")
+    private Integer cropX;
+    @Setter
+    @Column(name = "crop_y")
+    private Integer cropY;
+    @Setter
+    @Column(name = "crop_width")
+    private Integer cropWidth;
+    @Setter
+    @Column(name = "crop_height")
+    private Integer cropHeight;
 }

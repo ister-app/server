@@ -998,6 +998,11 @@ type MediaFileStream {
     path: String!
     language: String
     title: String
+    "Detected baked-in black-bar crop (source pixels). Null = not yet detected; equal to the full frame = no bars."
+    cropX: Int
+    cropY: Int
+    cropWidth: Int
+    cropHeight: Int
 }
 
 type Metadata {

@@ -15,6 +15,7 @@ import app.ister.disk.scanner.enums.DirType;
 import app.ister.disk.scanner.enums.FileType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +46,16 @@ public class MediaFileScanner implements Scanner {
      * re-analysis on every rescan; once per application run is enough.
      */
     private final Set<UUID> subtitleReextractRequested = ConcurrentHashMap.newKeySet();
+
+    /** Same once-per-run guard for the crop-detection backfill. */
+    private final Set<UUID> cropDetectRequested = ConcurrentHashMap.newKeySet();
+
+    /**
+     * Escape hatch for very large libraries: the crop backfill re-analyzes
+     * every pre-existing file once (heavy pass); disable to defer it.
+     */
+    @Value("${app.ister.server.crop-detect-backfill:true}")
+    private boolean cropDetectBackfill;
 
     @Override
     public boolean analyzable(Path path, boolean isRegularFile, long size) {
@@ -107,6 +118,22 @@ public class MediaFileScanner implements Scanner {
                     .episodeEntityUUIDs(episodeIds)
                     .movieEntityUUID(null)
                     .path(path.toString()).build(), directoryEntity.getName());
+        } else if (cropDetectBackfill
+                && !cropDetectRequested.contains(mediaFile.get().getId())
+                && needsCropDetect(mediaFile.get().getId())) {
+            // Backfill for files analyzed before crop detection existed: null
+            // crop columns on a video stream mean detection never ran (a
+            // detected "no bars" is stored as the full frame). Re-analysis
+            // writes the columns, so this fires at most once per file.
+            cropDetectRequested.add(mediaFile.get().getId());
+            log.info("Detecting baked-in black bars for {}", path);
+            messageSender.sendMediaFileFound(MediaFileFoundData.builder()
+                    .eventType(EventType.MEDIA_FILE_FOUND)
+                    .directoryEntityUUID(directoryEntity.getId())
+                    .episodeEntityUUID(episodeId)
+                    .episodeEntityUUIDs(episodeIds.isEmpty() ? null : episodeIds)
+                    .movieEntityUUID(movieId)
+                    .path(path.toString()).build(), directoryEntity.getName());
         } else if (!subtitleReextractRequested.contains(mediaFile.get().getId())
                 && needsSubtitleReextract(mediaFile.get().getId())) {
             // Backfill for files whose image subtitles (DVD/PGS bitmaps) never produced an
@@ -124,6 +151,16 @@ public class MediaFileScanner implements Scanner {
                     .path(path.toString()).build(), directoryEntity.getName());
         }
         return Optional.ofNullable(episodeEntity.orElse(null));
+    }
+
+    /**
+     * True when the file has a video stream whose crop columns were never
+     * written (detection predates the file's last analysis).
+     */
+    boolean needsCropDetect(UUID mediaFileId) {
+        return mediaFileStreamRepository
+                .findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.VIDEO).stream()
+                .anyMatch(s -> s.getWidth() > 0 && s.getCropWidth() == null);
     }
 
     /**

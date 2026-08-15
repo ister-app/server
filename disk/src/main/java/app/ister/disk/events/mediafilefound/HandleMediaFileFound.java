@@ -2,6 +2,7 @@ package app.ister.disk.events.mediafilefound;
 
 import app.ister.core.entity.*;
 import app.ister.core.enums.DirectoryType;
+import app.ister.core.enums.StreamCodecType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.eventdata.ImageFoundData;
@@ -39,6 +40,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     private final MediaFileFoundGetDuration mediaFileFoundGetDuration;
     private final MediaFileFoundExtractSubtitles mediaFileFoundExtractSubtitles;
     private final MediaFileFoundEpisodeBoundaries mediaFileFoundEpisodeBoundaries;
+    private final MediaFileFoundDetectCrop mediaFileFoundDetectCrop;
     private final MessageSender messageSender;
 
     @Value("${app.ister.server.ffmpeg-dir}")
@@ -57,6 +59,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
                                 MediaFileFoundGetDuration mediaFileFoundGetDuration,
                                 MediaFileFoundExtractSubtitles mediaFileFoundExtractSubtitles,
                                 MediaFileFoundEpisodeBoundaries mediaFileFoundEpisodeBoundaries,
+                                MediaFileFoundDetectCrop mediaFileFoundDetectCrop,
                                 MessageSender messageSender) {
         this.nodeService = nodeService;
         this.directoryRepository = directoryRepository;
@@ -71,6 +74,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
         this.mediaFileFoundGetDuration = mediaFileFoundGetDuration;
         this.mediaFileFoundExtractSubtitles = mediaFileFoundExtractSubtitles;
         this.mediaFileFoundEpisodeBoundaries = mediaFileFoundEpisodeBoundaries;
+        this.mediaFileFoundDetectCrop = mediaFileFoundDetectCrop;
         this.messageSender = messageSender;
     }
 
@@ -162,6 +166,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             mediaFileRepository.save(mediaFileEntity);
 
             var streams = checkResult.streams();
+            detectAndSetCrop(mediaFileEntity, streams, duration);
             mediaFileStreamRepository.saveAll(streams);
 
             // Extract embedded subtitles to SRT files in the cache directory.
@@ -170,6 +175,26 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             mediaFileStreamRepository.saveAll(mediaFileFoundExtractSubtitles.extractSubtitles(mediaFileEntity, streams, cacheDisk, dirOfFFmpeg));
         });
         return mediaFile;
+    }
+
+    /**
+     * Detects baked-in black bars on the primary video stream and stores the
+     * crop rect on the stream row (full frame = detected, no bars). Failure
+     * leaves the columns null so the scanner's backfill retries later.
+     */
+    private void detectAndSetCrop(MediaFileEntity mediaFileEntity, List<MediaFileStreamEntity> streams, long duration) {
+        streams.stream()
+                .filter(s -> s.getCodecType() == StreamCodecType.VIDEO && s.getWidth() > 0 && s.getHeight() > 0)
+                .findFirst()
+                .ifPresent(video -> mediaFileFoundDetectCrop
+                        .detectCrop(Path.of(mediaFileEntity.getPath()), dirOfFFmpeg, duration,
+                                video.getWidth(), video.getHeight())
+                        .ifPresent(crop -> {
+                            video.setCropX(crop.x());
+                            video.setCropY(crop.y());
+                            video.setCropWidth(crop.w());
+                            video.setCropHeight(crop.h());
+                        }));
     }
 
     /**
