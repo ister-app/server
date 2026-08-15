@@ -136,9 +136,12 @@ class HlsSubtitleServiceTest {
     }
 
     @Test
-    void generateSubtitleSegmentsIncludesCueInAllOverlappingSegments() throws IOException {
+    void generateSubtitleSegmentsWritesCueOnlyIntoItsStartSegment() throws IOException {
         UUID subtitleId = UUID.randomUUID();
-        // Cue from 8s to 12s spans the segment boundary at 10s
+        // Cue from 8s to 12s spans the segment boundary at 10s. It must appear
+        // only in the segment it starts in: repeating it into every overlapping
+        // segment makes mpv's HLS demuxer feed the copy to the renderer again,
+        // stacking the same line multiple times on screen.
         Path srtFile = createSrtFile("1\n00:00:08,000 --> 00:00:12,000\nSpanning\n\n");
         Path cacheDir = createCacheDir();
 
@@ -149,7 +152,7 @@ class HlsSubtitleServiceTest {
                 MEDIA_FILE_PATH, UUID.randomUUID(), cacheDir);
 
         assertTrue(Files.readString(cacheDir.resolve("seg_sub_" + subtitleId + "_00000.vtt")).contains("Spanning"));
-        assertTrue(Files.readString(cacheDir.resolve("seg_sub_" + subtitleId + "_00001.vtt")).contains("Spanning"));
+        assertFalse(Files.readString(cacheDir.resolve("seg_sub_" + subtitleId + "_00001.vtt")).contains("Spanning"));
     }
 
     @Test

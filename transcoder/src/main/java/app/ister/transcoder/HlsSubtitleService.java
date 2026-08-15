@@ -42,7 +42,7 @@ public class HlsSubtitleService {
      * cached segment sets from an older generation are regenerated on the next
      * request instead of being served forever.
      */
-    static final int SUBTITLE_GENERATION = 2;
+    static final int SUBTITLE_GENERATION = 3;
 
     /** Marker recording the generation the cached segment set was written by. */
     private Path generationMarker(Path cacheDir, UUID subtitleId) {
@@ -248,7 +248,12 @@ public class HlsSubtitleService {
             vtt.append("WEBVTT\n");
 
             for (SrtCue cue : cues) {
-                if (cue.endMs() > segStartMs && cue.startMs() < segEndMs) {
+                // A cue goes into the segment where it STARTS — never repeated
+                // into every window it overlaps. hls.js keeps a cue on screen
+                // past its segment anyway (cue times rule), while mpv's HLS
+                // demuxer feeds every copy to the renderer again, showing the
+                // same line stacked two or three times.
+                if (cue.startMs() < segEndMs && (i == 0 || cue.startMs() >= segStartMs)) {
                     vtt.append("\n");
                     vtt.append(formatVttTime(cue.startMs() + SUBTITLE_OFFSET_MS))
                             .append(" --> ")
