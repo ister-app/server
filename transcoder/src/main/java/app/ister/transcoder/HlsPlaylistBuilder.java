@@ -20,16 +20,20 @@ public class HlsPlaylistBuilder {
     private static final String PREFIX_STREAM_SUB = "stream_sub_";
     private static final String PREFIX_STREAM_VIDEO = "stream_video_";
 
+    // Keep in sync with MediaFileFoundExtractSubtitles.IMAGE_SUBTITLE_CODECS
+    // (disk module): what OCR rescues at scan time is exactly what this
+    // builder may drop from the master playlist.
     private static final Set<String> IMAGE_SUBTITLE_CODECS =
-            Set.of("dvd_subtitle", "hdmv_pgs_subtitle", "dvb_subtitle");
+            Set.of("dvd_subtitle", "dvdsub", "hdmv_pgs_subtitle", "pgssub", "dvb_subtitle");
 
     @FunctionalInterface
     interface SegmentNamer {
         String name(double start, double duration, int index);
     }
 
-    private boolean isImageSubtitle(MediaFileStreamEntity s) {
-        return IMAGE_SUBTITLE_CODECS.contains(s.getCodecName());
+    static boolean isImageSubtitle(MediaFileStreamEntity s) {
+        return s.getCodecName() != null
+                && IMAGE_SUBTITLE_CODECS.contains(s.getCodecName().toLowerCase());
     }
 
     /** Codecs ffprobe reports for embedded cover art (attached pictures). */

@@ -711,9 +711,13 @@ public class HlsService {
         List<MediaFileStreamEntity> audioStreams = streams.stream()
                 .filter(s -> s.getCodecType() == StreamCodecType.AUDIO)
                 .toList();
+        // Same filter as HlsPlaylistBuilder: image subtitles never get a
+        // rendition in the master, so pre-writing their playlists only
+        // produces orphans.
         List<MediaFileStreamEntity> subtitleStreams = streams.stream()
-                .filter(s -> s.getCodecType() == StreamCodecType.EXTERNAL_SUBTITLE
+                .filter(s -> (s.getCodecType() == StreamCodecType.EXTERNAL_SUBTITLE
                         || s.getCodecType() == StreamCodecType.SUBTITLE)
+                        && !HlsPlaylistBuilder.isImageSubtitle(s))
                 .toList();
 
         // Audio-only files get every stream playlist regardless of the requested stream

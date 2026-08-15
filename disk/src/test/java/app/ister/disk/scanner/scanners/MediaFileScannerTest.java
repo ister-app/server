@@ -4,6 +4,7 @@ import app.ister.core.entity.*;
 import app.ister.core.eventdata.MediaFileFoundData;
 import app.ister.core.repository.MediaFileEpisodeRepository;
 import app.ister.core.repository.MediaFileRepository;
+import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,8 @@ class MediaFileScannerTest {
     private MediaFileRepository mediaFileRepository;
     @Mock
     private MediaFileEpisodeRepository mediaFileEpisodeRepository;
+    @Mock
+    private MediaFileStreamRepository mediaFileStreamRepository;
     @Mock
     private MessageSender messageSender;
 
@@ -94,7 +97,9 @@ class MediaFileScannerTest {
                 .nodeEntity(NodeEntity.builder().name("node1").build())
                 .build();
         EpisodeEntity episode = EpisodeEntity.builder().id(UUID.randomUUID()).build();
-        MediaFileEntity existing = MediaFileEntity.builder().path("/disk/shows/Show (2024)/Season 01/s01e01.mkv").build();
+        MediaFileEntity existing = MediaFileEntity.builder()
+                .id(UUID.randomUUID())
+                .path("/disk/shows/Show (2024)/Season 01/s01e01.mkv").build();
         Path path = Path.of("/disk/shows/Show (2024)/Season 01/s01e01.mkv");
 
         when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 1, 1)).thenReturn(episode);

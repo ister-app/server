@@ -3,10 +3,13 @@ package app.ister.disk.scanner.scanners;
 import app.ister.core.entity.*;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.MediaFileFoundData;
+import app.ister.core.enums.StreamCodecType;
 import app.ister.core.repository.MediaFileEpisodeRepository;
 import app.ister.core.repository.MediaFileRepository;
+import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
+import app.ister.disk.events.mediafilefound.MediaFileFoundExtractSubtitles;
 import app.ister.disk.scanner.PathObject;
 import app.ister.disk.scanner.enums.DirType;
 import app.ister.disk.scanner.enums.FileType;
@@ -20,7 +23,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Component
 @Slf4j
@@ -30,7 +36,15 @@ public class MediaFileScanner implements Scanner {
     private final ScannerHelperService scannerHelperService;
     private final MediaFileRepository mediaFileRepository;
     private final MediaFileEpisodeRepository mediaFileEpisodeRepository;
+    private final MediaFileStreamRepository mediaFileStreamRepository;
     private final MessageSender messageSender;
+
+    /**
+     * Media files for which this run already requested a subtitle re-extract.
+     * A permanently failing OCR would otherwise re-trigger the (heavy) full
+     * re-analysis on every rescan; once per application run is enough.
+     */
+    private final Set<UUID> subtitleReextractRequested = ConcurrentHashMap.newKeySet();
 
     @Override
     public boolean analyzable(Path path, boolean isRegularFile, long size) {
@@ -93,8 +107,43 @@ public class MediaFileScanner implements Scanner {
                     .episodeEntityUUIDs(episodeIds)
                     .movieEntityUUID(null)
                     .path(path.toString()).build(), directoryEntity.getName());
+        } else if (!subtitleReextractRequested.contains(mediaFile.get().getId())
+                && needsSubtitleReextract(mediaFile.get().getId())) {
+            // Backfill for files whose image subtitles (DVD/PGS bitmaps) never produced an
+            // OCR'd SRT — scanned before OCR existed, or the OCR failed (e.g. an untagged
+            // language before the fallback). Re-analysis re-runs extraction; idempotent
+            // because stream rows are rewritten and existing SRTs on disk are skipped.
+            subtitleReextractRequested.add(mediaFile.get().getId());
+            log.info("Re-extracting image subtitles for {}", path);
+            messageSender.sendMediaFileFound(MediaFileFoundData.builder()
+                    .eventType(EventType.MEDIA_FILE_FOUND)
+                    .directoryEntityUUID(directoryEntity.getId())
+                    .episodeEntityUUID(episodeId)
+                    .episodeEntityUUIDs(episodeIds.isEmpty() ? null : episodeIds)
+                    .movieEntityUUID(movieId)
+                    .path(path.toString()).build(), directoryEntity.getName());
         }
         return Optional.ofNullable(episodeEntity.orElse(null));
+    }
+
+    /**
+     * True when the file has an image-codec subtitle stream without an OCR'd
+     * counterpart at the same stream index.
+     */
+    boolean needsSubtitleReextract(UUID mediaFileId) {
+        var imageSubs = mediaFileStreamRepository
+                .findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.SUBTITLE).stream()
+                .filter(s -> s.getCodecName() != null
+                        && MediaFileFoundExtractSubtitles.IMAGE_SUBTITLE_CODECS.contains(s.getCodecName().toLowerCase()))
+                .toList();
+        if (imageSubs.isEmpty()) {
+            return false;
+        }
+        var extractedIndexes = mediaFileStreamRepository
+                .findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE).stream()
+                .map(MediaFileStreamEntity::getStreamIndex)
+                .collect(Collectors.toSet());
+        return imageSubs.stream().anyMatch(s -> !extractedIndexes.contains(s.getStreamIndex()));
     }
 
     private void createEpisodeLinks(MediaFileEntity mediaFile, List<UUID> episodeIds) {

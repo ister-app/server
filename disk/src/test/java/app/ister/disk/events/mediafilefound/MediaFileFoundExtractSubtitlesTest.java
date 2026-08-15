@@ -172,6 +172,39 @@ class MediaFileFoundExtractSubtitlesTest {
     }
 
     @Test
+    void resolveOcrLanguagePrefersStreamTag() {
+        assertEquals("nld", subject.resolveOcrLanguage("nld", List.of()));
+    }
+
+    @Test
+    void resolveOcrLanguageFallsBackToFirstTaggedAudioLanguage() {
+        MediaFileStreamEntity untaggedAudio = MediaFileStreamEntity.builder()
+                .codecType(StreamCodecType.AUDIO)
+                .streamIndex(0)
+                .build();
+        MediaFileStreamEntity taggedAudio = MediaFileStreamEntity.builder()
+                .codecType(StreamCodecType.AUDIO)
+                .streamIndex(1)
+                .language("ger")
+                .build();
+
+        // "ger" (639-2/B) normalizes to "deu"; untagged audio is skipped.
+        assertEquals("deu", subject.resolveOcrLanguage("und", List.of(untaggedAudio, taggedAudio)));
+    }
+
+    @Test
+    void resolveOcrLanguageFallsBackToConfiguredDefault() {
+        org.springframework.test.util.ReflectionTestUtils.setField(subject, "ocrDefaultLanguage", "nld");
+        assertEquals("nld", subject.resolveOcrLanguage("und", List.of()));
+    }
+
+    @Test
+    void resolveOcrLanguageReturnsNullWhenDefaultBlank() {
+        org.springframework.test.util.ReflectionTestUtils.setField(subject, "ocrDefaultLanguage", "");
+        assertNull(subject.resolveOcrLanguage("und", List.of()));
+    }
+
+    @Test
     void extractSubtitlesHandlesMultipleStreamsCorrectly() throws IOException {
         MediaFileStreamEntity audioStream = MediaFileStreamEntity.builder()
                 .codecType(StreamCodecType.AUDIO)

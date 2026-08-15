@@ -34,8 +34,10 @@ public class MediaFileFoundExtractSubtitles {
     private static final Set<String> TEXT_SUBTITLE_CODECS = Set.of(
             "subrip", "ass", "ssa", "mov_text", "webvtt", "text"
     );
-    private static final Set<String> IMAGE_SUBTITLE_CODECS = Set.of(
-            "dvd_subtitle", "dvdsub", "hdmv_pgs_subtitle", "pgssub"
+    // Keep in sync with HlsPlaylistBuilder.IMAGE_SUBTITLE_CODECS (transcoder):
+    // what the playlist drops is exactly what OCR must rescue.
+    public static final Set<String> IMAGE_SUBTITLE_CODECS = Set.of(
+            "dvd_subtitle", "dvdsub", "hdmv_pgs_subtitle", "pgssub", "dvb_subtitle"
     );
 
     @Value("${app.ister.server.subtile-ocr:/usr/bin/subtile-ocr}")
@@ -43,6 +45,14 @@ public class MediaFileFoundExtractSubtitles {
 
     @Value("${app.ister.server.mkvextract:/usr/bin/mkvextract}")
     private String mkvextractPath;
+
+    /**
+     * OCR fallback language (ISO 639-3) for image subtitles whose stream has
+     * no usable language tag — common on DVD rips. Blank disables the
+     * fallback: such streams are then skipped with a warning.
+     */
+    @Value("${app.ister.server.subtitle-ocr-default-language:eng}")
+    private String ocrDefaultLanguage;
 
     private final Map<String, String> langMap = new HashMap<>();
 
@@ -88,7 +98,19 @@ public class MediaFileFoundExtractSubtitles {
             } else if (TEXT_SUBTITLE_CODECS.contains(codecName)) {
                 extracted = extractTextSubtitle(mediaFile.getPath(), subIdx, srtPath, ffmpegDir);
             } else if (IMAGE_SUBTITLE_CODECS.contains(codecName)) {
-                extracted = extractImageSubtitle(mediaFile.getPath(), subIdx, srtPath, lang, ffmpegDir);
+                String ocrLang = resolveOcrLanguage(lang, streams);
+                if (ocrLang == null) {
+                    log.warn("No usable OCR language for {} stream {} — set app.ister.server.subtitle-ocr-default-language to enable OCR for untagged subtitles",
+                            mediaFile.getPath(), stream.getStreamIndex());
+                } else {
+                    extracted = extractImageSubtitle(mediaFile.getPath(), subIdx, srtPath, ocrLang, ffmpegDir);
+                    // An untagged stream keeps "und" in its filename, but the
+                    // row gets the OCR language so the player's
+                    // language-preference matching can find it.
+                    if (extracted && "und".equals(lang)) {
+                        lang = ocrLang;
+                    }
+                }
             } else {
                 log.debug("Skipping subtitle stream {} with unsupported codec: {}", stream.getStreamIndex(), codecName);
             }
@@ -112,6 +134,27 @@ public class MediaFileFoundExtractSubtitles {
     private String normalizeLanguage(String lang) {
         if (lang == null || lang.isBlank()) return "und";
         return langMap.getOrDefault(lang, lang);
+    }
+
+    /**
+     * The language to feed subtile-ocr (it needs real tesseract traineddata, so
+     * "und" always fails): the stream's own tag, else the language of the
+     * file's first tagged audio stream (a DVD's subs are usually in the disc's
+     * language), else the configured default, else null (skip).
+     */
+    String resolveOcrLanguage(String normalizedStreamLang, List<MediaFileStreamEntity> streams) {
+        if (!"und".equals(normalizedStreamLang)) {
+            return normalizedStreamLang;
+        }
+        var audioLang = streams.stream()
+                .filter(s -> s.getCodecType() == StreamCodecType.AUDIO)
+                .map(s -> normalizeLanguage(s.getLanguage()))
+                .filter(l -> !"und".equals(l))
+                .findFirst();
+        if (audioLang.isPresent()) {
+            return audioLang.get();
+        }
+        return (ocrDefaultLanguage != null && !ocrDefaultLanguage.isBlank()) ? ocrDefaultLanguage : null;
     }
 
     private boolean extractTextSubtitle(String inputPath, int subIdx, Path srtPath, String ffmpegDir) {
@@ -153,34 +196,30 @@ public class MediaFileFoundExtractSubtitles {
                     .execute();
 
             // Step 2: mkvextract → .sub + .idx
-            Process mkvProcess = new ProcessBuilder(mkvextractPath, mksPath.toString(), "tracks", "0:" + subBase)
-                    .redirectErrorStream(true)
-                    .start();
-            if (!mkvProcess.waitFor(10, TimeUnit.MINUTES)) {
-                mkvProcess.destroyForcibly();
+            ProcessResult mkv = run(new ProcessBuilder(mkvextractPath, mksPath.toString(), "tracks", "0:" + subBase));
+            if (!mkv.finished()) {
                 log.warn("mkvextract timed out, skipping image subtitle 0:s:{}", subIdx);
                 return false;
             }
-            if (mkvProcess.exitValue() != 0) {
-                log.warn("mkvextract failed (exit {}), skipping image subtitle 0:s:{}", mkvProcess.exitValue(), subIdx);
+            if (mkv.exitCode() != 0) {
+                log.warn("mkvextract failed (exit {}), skipping image subtitle 0:s:{}. Output tail:\n{}",
+                        mkv.exitCode(), subIdx, mkv.outputTail());
                 return false;
             }
 
             // Step 3: subtile-ocr → SRT
-            Process ocrProcess = new ProcessBuilder(subtileOcrPath, "-l", lang, "-o", srtPath.toString(), idxPath.toString())
-                    .redirectErrorStream(true)
-                    .start();
-            if (!ocrProcess.waitFor(10, TimeUnit.MINUTES)) {
-                ocrProcess.destroyForcibly();
+            ProcessResult ocr = run(new ProcessBuilder(subtileOcrPath, "-l", lang, "-o", srtPath.toString(), idxPath.toString()));
+            if (!ocr.finished()) {
                 log.warn("subtile-ocr timed out, skipping image subtitle 0:s:{}", subIdx);
                 return false;
             }
-            if (ocrProcess.exitValue() != 0) {
-                log.warn("subtile-ocr failed (exit {}), skipping image subtitle 0:s:{}", ocrProcess.exitValue(), subIdx);
+            if (ocr.exitCode() != 0) {
+                log.warn("subtile-ocr failed (exit {}, lang {}), skipping image subtitle 0:s:{}. Output tail:\n{}",
+                        ocr.exitCode(), lang, subIdx, ocr.outputTail());
                 return false;
             }
 
-            log.debug("Extracted image subtitle via OCR to {}", srtPath);
+            log.info("OCR-extracted image subtitle 0:s:{} (lang {}) to {}", subIdx, lang, srtPath);
             return true;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -193,6 +232,37 @@ public class MediaFileFoundExtractSubtitles {
             deleteTmpDir(tmpDir);
         }
     }
+
+    /**
+     * Runs the process with merged stdout/stderr, draining the output on a
+     * background thread so a chatty tool can't dead-lock on a full pipe, and
+     * keeping only the tail for the failure logs.
+     */
+    private ProcessResult run(ProcessBuilder builder) throws IOException, InterruptedException {
+        Process process = builder.redirectErrorStream(true).start();
+        StringBuilder tail = new StringBuilder();
+        Thread drain = Thread.ofVirtual().start(() -> {
+            try (var reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (tail.length() > 4096) {
+                        tail.delete(0, tail.length() - 2048);
+                    }
+                    tail.append(line).append('\n');
+                }
+            } catch (IOException _) {
+                // The stream dies with the process; the tail so far is enough.
+            }
+        });
+        boolean finished = process.waitFor(10, TimeUnit.MINUTES);
+        if (!finished) {
+            process.destroyForcibly();
+        }
+        drain.join(TimeUnit.SECONDS.toMillis(5));
+        return new ProcessResult(finished, finished ? process.exitValue() : -1, tail.toString().trim());
+    }
+
+    private record ProcessResult(boolean finished, int exitCode, String outputTail) {}
 
     private void deleteTmpDir(Path tmpDir) {
         try {
