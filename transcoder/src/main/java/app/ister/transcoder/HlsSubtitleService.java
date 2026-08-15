@@ -42,7 +42,7 @@ public class HlsSubtitleService {
      * cached segment sets from an older generation are regenerated on the next
      * request instead of being served forever.
      */
-    static final int SUBTITLE_GENERATION = 3;
+    static final int SUBTITLE_GENERATION = 4;
 
     /** Marker recording the generation the cached segment set was written by. */
     private Path generationMarker(Path cacheDir, UUID subtitleId) {
@@ -136,7 +136,11 @@ public class HlsSubtitleService {
      */
     static final long MAX_CUE_DURATION_MS = 30_000;
 
-    /** Display duration for a sanitized cue with no follow-up cue to clamp to. */
+    /**
+     * Display duration for a sanitized cue. Also the cap when the next cue is
+     * far away: without it a broken cue before a long dialogue pause lingers
+     * on screen for the whole gap.
+     */
     static final long DEFAULT_CUE_DURATION_MS = 6_000;
 
     /** Parses an SRT file into a list of cues. Tolerates Windows line endings and missing cue numbers. */
@@ -173,7 +177,7 @@ public class HlsSubtitleService {
             if (cue.endMs() - cue.startMs() > MAX_CUE_DURATION_MS) {
                 SrtCue next = i + 1 < cues.size() ? cues.get(i + 1) : null;
                 long clamped = next != null && next.startMs() > cue.startMs()
-                        ? Math.min(next.startMs(), cue.startMs() + MAX_CUE_DURATION_MS)
+                        ? Math.min(next.startMs(), cue.startMs() + DEFAULT_CUE_DURATION_MS)
                         : cue.startMs() + DEFAULT_CUE_DURATION_MS;
                 cue = new SrtCue(cue.startMs(), Math.min(cue.endMs(), clamped), cue.text());
             }

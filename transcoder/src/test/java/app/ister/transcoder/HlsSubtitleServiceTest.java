@@ -337,14 +337,15 @@ class HlsSubtitleServiceTest {
     }
 
     @Test
-    void sanitizeCapsClampAtMaxDurationWhenNextCueIsFarAway() {
+    void sanitizeCapsClampAtDefaultDurationWhenNextCueIsFarAway() {
         var cues = List.of(
                 new HlsSubtitleService.SrtCue(1_000, 1_000 + 655_350, "one"),
                 new HlsSubtitleService.SrtCue(120_000, 123_000, "two"));
 
         var result = HlsSubtitleService.sanitizeCueDurations(cues);
 
-        assertEquals(1_000 + HlsSubtitleService.MAX_CUE_DURATION_MS, result.get(0).endMs());
+        // A long dialogue pause must not keep the broken cue on screen.
+        assertEquals(1_000 + HlsSubtitleService.DEFAULT_CUE_DURATION_MS, result.get(0).endMs());
         // Sane cues stay untouched.
         assertEquals(123_000, result.get(1).endMs());
     }
