@@ -1,5 +1,33 @@
 # Changelog
 
+## server v2.13.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.13.0` |
+| `ghcr.io/ister-app/migrations` | `2.13.0` |
+
+### Features
+
+- feat(playqueue): segment-aware watched status and episode duration ([`0058e0c`](https://github.com/ister-app/server/commit/0058e0c))
+- feat(api): expose mediaFileParts and real MediaFile.episodes ([`3dc7722`](https://github.com/ister-app/server/commit/3dc7722))
+- feat(disk): episode boundaries from mkv chapters and per-episode stills ([`a0ad667`](https://github.com/ister-app/server/commit/a0ad667))
+- feat(disk): create and reconcile multi-episode links in the scanner ([`da17c84`](https://github.com/ister-app/server/commit/da17c84))
+- feat(disk): parse episode ranges in filenames ([`748b7ef`](https://github.com/ister-app/server/commit/748b7ef))
+- feat(database): media_file_episode link table for multi-episode files ([`49731a6`](https://github.com/ister-app/server/commit/49731a6))
+
+### Other
+
+- docs(architecture): multi-episode files ([`32d7886`](https://github.com/ister-app/server/commit/32d7886))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.13.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.12.0...v2.13.0
+
 ## server v2.12.0
 
 | Image | Tag |
