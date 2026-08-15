@@ -62,7 +62,9 @@ public class MediaFileFoundDetectCrop {
                 FFmpeg.atPath(Path.of(dirOfFFmpeg))
                         .addInput(UrlInput.fromPath(mediaFilePath)
                                 .addArguments("-ss", atMs + "ms"))
-                        .addOutput(new NullOutput()
+                        // NullOutput(false): the default adds -c copy, and
+                        // ffmpeg refuses to combine streamcopy with a filter.
+                        .addOutput(new NullOutput(false)
                                 .addArguments("-map", "0:v:0")
                                 .addArguments("-vf", "cropdetect=limit=24:round=2:reset=0")
                                 .addArguments("-frames:v", String.valueOf(FRAMES_PER_SAMPLE)))
