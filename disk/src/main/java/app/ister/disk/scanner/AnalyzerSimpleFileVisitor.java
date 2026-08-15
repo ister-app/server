@@ -9,6 +9,7 @@ import app.ister.disk.scanner.enums.DirType;
 import app.ister.disk.scanner.scanners.AudioScanner;
 import app.ister.disk.scanner.scanners.ComicScanner;
 import app.ister.disk.scanner.scanners.EpubScanner;
+import app.ister.disk.scanner.scanners.MediaFileScanner;
 import app.ister.disk.scanner.scanners.ImageScanner;
 import app.ister.disk.scanner.scanners.NfoScanner;
 import app.ister.disk.scanner.scanners.Scanner;
@@ -101,9 +102,16 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
             boolean canAnalyze = directoryScoped
                     ? directoryScopedAnalyzable(scanner, path, basicFileAttributes)
                     : scanner.analyzable(path, basicFileAttributes.isRegularFile(), basicFileAttributes.size());
-            boolean alreadyScanned = directoryScoped && scanner instanceof AudioScanner
-                    ? scannedCache.foundMusicAudioPath(path.toString())
-                    : scannedCache.foundPath(path.toString());
+            boolean alreadyScanned;
+            if (directoryScoped && scanner instanceof AudioScanner) {
+                alreadyScanned = scannedCache.foundMusicAudioPath(path.toString());
+            } else if (scanner instanceof MediaFileScanner) {
+                // Media files re-run analyze on every rescan (cheap when
+                // up-to-date) so its backfills can fire; see foundMediaFilePath.
+                alreadyScanned = scannedCache.foundMediaFilePath(path.toString());
+            } else {
+                alreadyScanned = scannedCache.foundPath(path.toString());
+            }
             if (canAnalyze && !alreadyScanned) {
                 log.debug("Found file: {}, for scanner: {}", path, scanner);
                 messageSender.sendFileScanRequested(FileScanRequestedData.builder()

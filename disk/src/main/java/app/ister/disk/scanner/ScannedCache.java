@@ -39,6 +39,19 @@ public class ScannedCache {
     }
 
     /**
+     * Like foundPath, but for the media-file scanner: marks the path as seen
+     * (so the file won't be swept as a zombie) yet always returns false, so a
+     * rescan still reaches MediaFileScanner.analyze. That pass is cheap for an
+     * up-to-date file and is what runs the backfills (multi-episode links,
+     * subtitle re-extract, crop detection) — skipping known files here made
+     * those backfills unreachable on a plain rescan.
+     */
+    public boolean foundMediaFilePath(String path) {
+        mediaFileEntities.removeIf(mediaFileEntity -> mediaFileEntity.getPath().equals(path));
+        return false;
+    }
+
+    /**
      * Like foundPath, but for music audio files: marks the path as seen (so it won't be deleted)
      * yet returns false when the existing entry has no track entity, allowing the scanner to
      * re-process and assign the correct track.

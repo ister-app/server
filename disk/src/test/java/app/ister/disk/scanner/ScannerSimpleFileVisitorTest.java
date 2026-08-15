@@ -111,8 +111,8 @@ class ScannerSimpleFileVisitorTest {
     void visitFileSkipsAlreadyScannedPath() {
         Path path = Path.of("/path");
 
-        when(mediaFileScanner.analyzable(path, false, 0)).thenReturn(true);
-        when(imageScanner.analyzable(path, false, 0)).thenReturn(false);
+        when(mediaFileScanner.analyzable(path, false, 0)).thenReturn(false);
+        when(imageScanner.analyzable(path, false, 0)).thenReturn(true);
         when(nfoScanner.analyzable(path, false, 0)).thenReturn(false);
         when(subtitleScanner.analyzable(path, false, 0)).thenReturn(false);
         when(scannedCache.foundPath(path.toString())).thenReturn(true);
@@ -122,6 +122,27 @@ class ScannerSimpleFileVisitorTest {
         assertEquals(FileVisitResult.CONTINUE, subject.visitFile(path, basicFileAttributes));
 
         verify(messageSender, never()).sendFileScanRequested(any(FileScanRequestedData.class), any(String.class));
+    }
+
+    @Test
+    void visitFileRescansAlreadyScannedMediaFile() {
+        // Media files always reach MediaFileScanner.analyze on rescan — that
+        // pass runs the backfills (multi-episode, subtitles, crop detection).
+        Path path = Path.of("/path");
+
+        when(mediaFileScanner.analyzable(path, false, 0)).thenReturn(true);
+        when(imageScanner.analyzable(path, false, 0)).thenReturn(false);
+        when(nfoScanner.analyzable(path, false, 0)).thenReturn(false);
+        when(subtitleScanner.analyzable(path, false, 0)).thenReturn(false);
+        when(scannedCache.foundMediaFilePath(path.toString())).thenReturn(false);
+
+        var subject = visitor(directoryEntity);
+
+        assertEquals(FileVisitResult.CONTINUE, subject.visitFile(path, basicFileAttributes));
+
+        verify(messageSender).sendFileScanRequested(any(FileScanRequestedData.class), any(String.class));
+        // Marked as seen through the media-file variant, not the generic one.
+        verify(scannedCache).foundMediaFilePath(path.toString());
     }
 
     @Test
