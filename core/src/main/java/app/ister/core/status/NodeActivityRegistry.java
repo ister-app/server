@@ -20,8 +20,32 @@ import java.util.concurrent.atomic.LongAdder;
 @Component
 public class NodeActivityRegistry {
 
+    /**
+     * Mutable in-flight entry; handlers update subject/step mid-delivery via
+     * ActivityContext. Snapshots copy it into a fresh ProcessingItem, so published
+     * payloads never alias this and equals-based change detection in
+     * NodeActivityPublisher sees step changes.
+     */
+    private static final class InFlightWork {
+        final String queue;
+        final String eventType;
+        final Instant startedAt;
+        volatile String subject;
+        volatile String step;
+
+        InFlightWork(String queue, String eventType, Instant startedAt) {
+            this.queue = queue;
+            this.eventType = eventType;
+            this.startedAt = startedAt;
+        }
+
+        ProcessingItem toItem() {
+            return new ProcessingItem(queue, eventType, startedAt, subject, step);
+        }
+    }
+
     private final AtomicLong tokenSequence = new AtomicLong();
-    private final Map<Long, ProcessingItem> inFlight = new ConcurrentHashMap<>();
+    private final Map<Long, InFlightWork> inFlight = new ConcurrentHashMap<>();
     private final LongAdder processedCount = new LongAdder();
     private final LongAdder failedCount = new LongAdder();
 
@@ -30,8 +54,22 @@ public class NodeActivityRegistry {
     /** Registers work starting on this node; returns a token for {@link #finished}. */
     public long started(String queue, String eventType, Instant startedAt) {
         long token = tokenSequence.incrementAndGet();
-        inFlight.put(token, new ProcessingItem(queue, eventType, startedAt));
+        inFlight.put(token, new InFlightWork(queue, eventType, startedAt));
         return token;
+    }
+
+    public void updateSubject(long token, String subject) {
+        InFlightWork work = inFlight.get(token);
+        if (work != null) {
+            work.subject = subject;
+        }
+    }
+
+    public void updateStep(long token, String step) {
+        InFlightWork work = inFlight.get(token);
+        if (work != null) {
+            work.step = step;
+        }
     }
 
     public void finished(long token, boolean failed) {
@@ -43,6 +81,7 @@ public class NodeActivityRegistry {
     /** Snapshot of this node's own activity, for publication on the status exchange. */
     public NodeActivityStatusData localSnapshot(String nodeName, Instant now) {
         List<ProcessingItem> processing = inFlight.values().stream()
+                .map(InFlightWork::toItem)
                 .sorted(Comparator.comparing(ProcessingItem::getStartedAt))
                 .toList();
         return new NodeActivityStatusData(nodeName, now, processing, processedCount.sum(), failedCount.sum());

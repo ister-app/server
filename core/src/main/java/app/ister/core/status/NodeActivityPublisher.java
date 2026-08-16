@@ -13,10 +13,14 @@ import java.util.Objects;
 /**
  * Publishes this node's activity snapshot on the status exchange, throttled to one
  * message per 2s and only when something changed — per-delivery publishing would double
- * broker traffic during scan bursts.
+ * broker traffic during scan bursts. An unchanged snapshot is still re-published every
+ * {@link #KEEPALIVE_MS} as a heartbeat, so clients can grey out a node whose timestamp
+ * stops advancing (crashed mid-work) without idle nodes chattering every 2s.
  */
 @Component
 public class NodeActivityPublisher {
+
+    static final long KEEPALIVE_MS = 60_000;
 
     private final NodeActivityRegistry registry;
     private final MessageSender messageSender;
@@ -25,6 +29,7 @@ public class NodeActivityPublisher {
     private List<NodeActivityStatusData.ProcessingItem> lastProcessing;
     private long lastProcessedCount = -1;
     private long lastFailedCount = -1;
+    private long lastPublishedAtMillis;
 
     public NodeActivityPublisher(NodeActivityRegistry registry, MessageSender messageSender,
                                  @Value("${app.ister.server.name}") String nodeName) {
@@ -36,14 +41,17 @@ public class NodeActivityPublisher {
     @Scheduled(fixedDelay = 2000)
     public void publishIfChanged() {
         NodeActivityStatusData snapshot = registry.localSnapshot(nodeName, Instant.now());
+        long nowMillis = snapshot.getTimestamp().toEpochMilli();
         if (Objects.equals(snapshot.getProcessing(), lastProcessing)
                 && snapshot.getProcessedCount() == lastProcessedCount
-                && snapshot.getFailedCount() == lastFailedCount) {
+                && snapshot.getFailedCount() == lastFailedCount
+                && nowMillis - lastPublishedAtMillis < KEEPALIVE_MS) {
             return;
         }
         messageSender.sendStatus(snapshot);
         lastProcessing = snapshot.getProcessing();
         lastProcessedCount = snapshot.getProcessedCount();
         lastFailedCount = snapshot.getFailedCount();
+        lastPublishedAtMillis = nowMillis;
     }
 }

@@ -11,6 +11,7 @@ import app.ister.core.eventdata.MediaFileFoundData;
 import app.ister.core.repository.*;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.NodeService;
+import app.ister.core.status.ActivityContext;
 import app.ister.core.utils.AfterCommitPublisher;
 import app.ister.core.Handle;
 import com.github.kokorin.jaffree.process.JaffreeAbnormalExitException;
@@ -111,6 +112,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
      */
     @Override
     public void handle(app.ister.core.eventdata.MediaFileFoundData mediaFileFoundData) {
+        ActivityContext.subject(Path.of(mediaFileFoundData.getPath()).getFileName().toString());
         DirectoryEntity directoryEntity = directoryRepository.findById(mediaFileFoundData.getDirectoryEntityUUID())
                 .orElseThrow(() -> new IllegalStateException("Directory not found: " + mediaFileFoundData.getDirectoryEntityUUID()));
         Optional<EpisodeEntity> episodeEntity = mediaFileFoundData.getEpisodeEntityUUID() != null ? episodeRepository.findById(mediaFileFoundData.getEpisodeEntityUUID()) : Optional.empty();
@@ -118,6 +120,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
         var mediaFile = checkMediaFile(directoryEntity, mediaFileFoundData.getPath());
         mediaFile.ifPresent(mediaFileEntity -> {
             var parts = updateEpisodeBoundaries(mediaFileEntity);
+            ActivityContext.step("still");
             if (parts.size() >= 2) {
                 // Multi-episode file: every contained episode gets its own background still,
                 // taken at the midpoint of its own slice of the file.
@@ -155,6 +158,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
         if (parts.size() < 2 || duration <= 0) {
             return parts;
         }
+        ActivityContext.step("boundaries");
         List<Long> starts = mediaFileFoundEpisodeBoundaries.boundaryStarts(mediaFileEntity.getPath(), dirOfFFmpeg, duration, parts.size());
         for (int i = 0; i < parts.size(); i++) {
             long end = i + 1 < parts.size() ? starts.get(i + 1) : duration;
@@ -173,6 +177,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             mediaFileStreamRepository.flush();
 
             // Analyze media file streams; duration is derived from the same ffprobe call.
+            ActivityContext.step("probe");
             var checkResult = mediaFileFoundCheckForStreams.checkForStreams(mediaFileEntity, dirOfFFmpeg);
             long duration = checkResult.durationInMilliseconds() > 0
                     ? checkResult.durationInMilliseconds()
@@ -181,10 +186,12 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             mediaFileRepository.save(mediaFileEntity);
 
             var streams = checkResult.streams();
+            ActivityContext.step("crop");
             detectAndSetCrop(mediaFileEntity, streams, duration);
             mediaFileStreamRepository.saveAll(streams);
 
             // Extract embedded subtitles to SRT files in the cache directory.
+            ActivityContext.step("subtitles");
             NodeEntity cacheNode = nodeService.getOrCreateNodeEntityForThisNode();
             DirectoryEntity cacheDisk = directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, cacheNode).stream().findFirst().orElseThrow();
             mediaFileStreamRepository.saveAll(mediaFileFoundExtractSubtitles.extractSubtitles(mediaFileEntity, streams, cacheDisk, dirOfFFmpeg));

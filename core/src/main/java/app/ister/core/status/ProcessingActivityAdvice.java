@@ -41,12 +41,26 @@ public class ProcessingActivityAdvice implements MethodInterceptor {
             return invocation.proceed();
         }
         long token = registry.started(queue, eventTypeOf(message), Instant.now());
+        // The handler runs synchronously on this thread; give it a scope so it can
+        // annotate the registered item with subject/step via ActivityContext.
+        ActivityContext.open(new ActivityContext.Scope() {
+            @Override
+            public void subject(String subject) {
+                registry.updateSubject(token, subject);
+            }
+
+            @Override
+            public void step(String step) {
+                registry.updateStep(token, step);
+            }
+        });
         boolean failed = true;
         try {
             Object result = invocation.proceed();
             failed = false;
             return result;
         } finally {
+            ActivityContext.close();
             registry.finished(token, failed);
         }
     }

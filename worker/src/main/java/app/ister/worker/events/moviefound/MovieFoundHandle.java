@@ -1,5 +1,6 @@
 package app.ister.worker.events.moviefound;
 
+import app.ister.core.status.ActivityContext;
 import app.ister.core.config.LanguageProperties;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
@@ -55,6 +56,7 @@ public class MovieFoundHandle implements Handle<MovieFoundData> {
         }
         try {
             var movieEntity = movieRepository.findById(movieFoundData.getMovieId()).orElseThrow();
+            ActivityContext.subject(movieEntity.getName());
             Integer tmdbMovieId = null;
             for (String language : languageProperties.tags()) {
                 Optional<TMDBResult> tmdbResult = movieMetadata.getMetadata(movieEntity.getName(), movieEntity.getReleaseYear(), language);

@@ -64,6 +64,38 @@ class ProcessingActivityAdviceTest {
     }
 
     @Test
+    void opensAnActivityContextScopeForTheHandler() throws Throwable {
+        when(invocation.getArguments()).thenReturn(new Object[]{
+                message("app.ister.server.MediaFileFound", "app.ister.core.eventdata.MediaFileFoundData")});
+        when(invocation.proceed()).thenAnswer(call -> {
+            ActivityContext.subject("movie.mkv");
+            ActivityContext.step("probe");
+            var item = registry.localSnapshot("node", Instant.now()).getProcessing().getFirst();
+            assertEquals("movie.mkv", item.getSubject());
+            assertEquals("probe", item.getStep());
+            return null;
+        });
+
+        advice.invoke(invocation);
+
+        // Scope is closed afterwards: annotations outside a delivery are dropped.
+        ActivityContext.subject("late");
+        assertTrue(registry.localSnapshot("node", Instant.now()).getProcessing().isEmpty());
+    }
+
+    @Test
+    void closesTheActivityContextScopeOnFailure() throws Throwable {
+        when(invocation.getArguments()).thenReturn(new Object[]{
+                message("app.ister.server.MovieFound", "app.ister.core.eventdata.MovieFoundData")});
+        when(invocation.proceed()).thenThrow(new IllegalStateException("boom"));
+
+        assertThrows(IllegalStateException.class, () -> advice.invoke(invocation));
+
+        // A later out-of-scope call must be a no-op, not an update of a stale token.
+        assertDoesNotThrow(() -> ActivityContext.step("late"));
+    }
+
+    @Test
     void countsFailedDeliveryAndRethrows() throws Throwable {
         when(invocation.getArguments()).thenReturn(new Object[]{
                 message("app.ister.server.MovieFound", "app.ister.core.eventdata.MovieFoundData")});

@@ -11,6 +11,7 @@ import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileSegmentRepository;
 import app.ister.core.service.MediaFileEpisodeService;
+import app.ister.core.status.ActivityContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -96,6 +97,12 @@ public class HandleDetectSegments implements Handle<DetectSegmentsData> {
 
     @Override
     public void handle(DetectSegmentsData data) {
+        episodeRepository.findBySeasonEntityIdOrderByNumberAsc(data.getSeasonEntityUUID()).stream()
+                .findFirst()
+                .map(EpisodeEntity::getSeasonEntity)
+                .filter(season -> season.getShowEntity() != null)
+                .ifPresent(season -> ActivityContext.subject(
+                        season.getShowEntity().getName() + " S" + season.getNumber()));
         List<EpisodeSlice> slices = localAnalyzedSlices(data);
         List<EpisodeSlice> pending = slices.stream()
                 .filter(s -> needsDetection(s.mediaFile()))
@@ -118,6 +125,7 @@ public class HandleDetectSegments implements Handle<DetectSegmentsData> {
         Map<UUID, List<MediaFileSegmentEntity>> segmentsByFile = new LinkedHashMap<>();
         int minSupport = slices.size() == 2 ? 1 : 2;
 
+        ActivityContext.step("fingerprint");
         for (EpisodeSlice slice : pending) {
             List<EpisodeSlice> neighbours = neighboursOf(slices, slice);
             List<Segment> introCandidates = new ArrayList<>();
@@ -144,6 +152,7 @@ public class HandleDetectSegments implements Handle<DetectSegmentsData> {
             });
         }
 
+        ActivityContext.step("match");
         for (EpisodeSlice slice : pending) {
             MediaFileEntity mediaFile = slice.mediaFile();
             if (mediaFile.getSegmentDetectorVersion() != null

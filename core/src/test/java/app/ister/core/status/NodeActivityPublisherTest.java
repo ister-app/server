@@ -57,6 +57,19 @@ class NodeActivityPublisherTest {
     }
 
     @Test
+    void publishesAgainWhenAStepChangesOnInFlightWork() {
+        long token = registry.started("app.ister.server.MediaFileFound", "MediaFileFoundData", Instant.now());
+        subject.publishIfChanged();
+
+        registry.updateStep(token, "crop");
+        subject.publishIfChanged();
+
+        ArgumentCaptor<NodeActivityStatusData> captor = ArgumentCaptor.forClass(NodeActivityStatusData.class);
+        verify(messageSender, times(2)).sendStatus(captor.capture());
+        assertEquals("crop", captor.getValue().getProcessing().getFirst().getStep());
+    }
+
+    @Test
     void publishesAgainWhenTheProcessedCountChanges() {
         long token = registry.started("app.ister.server.MovieFound", "MOVIE_FOUND", Instant.now());
         subject.publishIfChanged();

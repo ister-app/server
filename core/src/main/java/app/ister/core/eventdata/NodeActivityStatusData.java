@@ -32,5 +32,13 @@ public class NodeActivityStatusData {
         private String queue;
         private String eventType;
         private Instant startedAt;
+        /** What is being worked on (file name / entity title); null until the handler reports it. */
+        private String subject;
+        /** Machine token for the current sub-step (e.g. "probe", "crop"); clients map it to a label. */
+        private String step;
+
+        public ProcessingItem(String queue, String eventType, Instant startedAt) {
+            this(queue, eventType, startedAt, null, null);
+        }
     }
 }
