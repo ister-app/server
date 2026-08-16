@@ -1,16 +1,19 @@
 package app.ister.disk.events.detectsegments;
 
+import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MediaFileSegmentEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.SegmentType;
 import app.ister.core.eventdata.DetectSegmentsData;
+import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileSegmentRepository;
 import app.ister.core.service.MediaFileEpisodeService;
-import app.ister.disk.events.detectsegments.HandleDetectSegments.EpisodeSlice;
+import app.ister.core.service.MessageSender;
+import app.ister.disk.events.detectsegments.SegmentDetectionChunkProcessor.EpisodeSlice;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +31,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -49,6 +54,8 @@ class HandleDetectSegmentsTest {
     @Mock private MediaFileRepository mediaFileRepository;
     @Mock private MediaFileSegmentRepository mediaFileSegmentRepository;
     @Mock private MediaFileEpisodeService mediaFileEpisodeService;
+    @Mock private DirectoryRepository directoryRepository;
+    @Mock private MessageSender messageSender;
 
     private HandleDetectSegments subject;
     private final List<EpisodeEntity> episodes = new java.util.ArrayList<>();
@@ -69,9 +76,12 @@ class HandleDetectSegmentsTest {
                 return window(episodeAudio(episode), offsetMs, durationMs);
             }
         };
-        subject = new HandleDetectSegments(episodeRepository, mediaFileRepository,
-                mediaFileSegmentRepository, mediaFileEpisodeService, fakeReader);
-        ReflectionTestUtils.setField(subject, "dirOfFFmpeg", "/usr/bin");
+        SegmentDetectionChunkProcessor processor = new SegmentDetectionChunkProcessor(episodeRepository,
+                mediaFileRepository, mediaFileSegmentRepository, mediaFileEpisodeService,
+                directoryRepository, fakeReader);
+        ReflectionTestUtils.setField(processor, "dirOfFFmpeg", "/usr/bin");
+        subject = new HandleDetectSegments(processor, messageSender);
+        ReflectionTestUtils.setField(subject, "chunkSize", 10);
 
         for (int i = 0; i < 3; i++) {
             MediaFileEntity file = MediaFileEntity.builder()
@@ -112,18 +122,63 @@ class HandleDetectSegmentsTest {
             // Single-episode files carry no episode disambiguation.
             rows.forEach(r -> assertEquals(null, r.getEpisodeEntityId()));
         }
-        files.forEach(f -> assertEquals(HandleDetectSegments.DETECTOR_VERSION, f.getSegmentDetectorVersion()));
+        files.forEach(f -> assertEquals(SegmentDetectionChunkProcessor.DETECTOR_VERSION, f.getSegmentDetectorVersion()));
         verify(mediaFileRepository, times(3)).save(any());
+        // Everything fit in one chunk, so no successor message.
+        verify(messageSender, never()).sendDetectSegments(any(), anyString());
+    }
+
+    @Test
+    void aChunkSmallerThanTheSeasonPublishesASuccessorForTheRest() {
+        ReflectionTestUtils.setField(subject, "chunkSize", 2);
+        when(directoryRepository.findById(DIRECTORY_ID))
+                .thenReturn(Optional.of(DirectoryEntity.builder().name("disk1").build()));
+
+        subject.handle(event());
+
+        // Only the chunk's two episodes are detected and stamped; the third stays pending.
+        verify(mediaFileSegmentRepository, times(2)).saveAll(any());
+        assertEquals(SegmentDetectionChunkProcessor.DETECTOR_VERSION, files.get(0).getSegmentDetectorVersion());
+        assertEquals(SegmentDetectionChunkProcessor.DETECTOR_VERSION, files.get(1).getSegmentDetectorVersion());
+        assertEquals(null, files.get(2).getSegmentDetectorVersion());
+
+        ArgumentCaptor<DetectSegmentsData> successor = ArgumentCaptor.captor();
+        verify(messageSender).sendDetectSegments(successor.capture(), eq("disk1"));
+        assertEquals(SEASON_ID, successor.getValue().getSeasonEntityUUID());
+        assertEquals(DIRECTORY_ID, successor.getValue().getDirectoryEntityUUID());
+        assertEquals(EventType.DETECT_SEGMENTS, successor.getValue().getEventType());
+    }
+
+    @Test
+    void aFailedDecodeStillStampsTheVersionSoTheChainTerminates() {
+        AudioPcmReader silentReader = new AudioPcmReader() {
+            @Override
+            public short[] readMonoPcm(Path mediaFilePath, String dirOfFFmpeg, long offsetMs, long durationMs) {
+                return new short[0]; // What the reader returns when ffmpeg fails.
+            }
+        };
+        SegmentDetectionChunkProcessor processor = new SegmentDetectionChunkProcessor(episodeRepository,
+                mediaFileRepository, mediaFileSegmentRepository, mediaFileEpisodeService,
+                directoryRepository, silentReader);
+        ReflectionTestUtils.setField(processor, "dirOfFFmpeg", "/usr/bin");
+        subject = new HandleDetectSegments(processor, messageSender);
+        ReflectionTestUtils.setField(subject, "chunkSize", 10);
+
+        subject.handle(event());
+
+        files.forEach(f -> assertEquals(SegmentDetectionChunkProcessor.DETECTOR_VERSION, f.getSegmentDetectorVersion()));
+        verify(messageSender, never()).sendDetectSegments(any(), anyString());
     }
 
     @Test
     void aSeasonAlreadyAtTheCurrentVersionDoesNoAudioWork() {
-        files.forEach(f -> f.setSegmentDetectorVersion(HandleDetectSegments.DETECTOR_VERSION));
+        files.forEach(f -> f.setSegmentDetectorVersion(SegmentDetectionChunkProcessor.DETECTOR_VERSION));
 
         subject.handle(event());
 
         assertFalse(pcmRead, "no PCM should be decoded for an already-detected season");
         verify(mediaFileSegmentRepository, never()).saveAll(any());
+        verify(messageSender, never()).sendDetectSegments(any(), anyString());
     }
 
     @Test
@@ -137,21 +192,41 @@ class HandleDetectSegmentsTest {
         // Version must NOT be stamped: a later sibling's trigger should retry this episode.
         assertEquals(null, files.getFirst().getSegmentDetectorVersion());
         verify(mediaFileSegmentRepository, never()).saveAll(any());
+        verify(messageSender, never()).sendDetectSegments(any(), anyString());
+    }
+
+    @Test
+    void aChunkNeverSplitsAMultiEpisodeFile() {
+        MediaFileEntity fileA = fileWithId();
+        MediaFileEntity fileB = fileWithId();
+        MediaFileEntity fileC = fileWithId();
+        List<EpisodeSlice> pending = List.of(
+                new EpisodeSlice(fileA, UUID.randomUUID(), false, 0, 1),
+                new EpisodeSlice(fileB, UUID.randomUUID(), true, 0, 1),
+                new EpisodeSlice(fileB, UUID.randomUUID(), true, 1, 2),
+                new EpisodeSlice(fileC, UUID.randomUUID(), false, 0, 1));
+
+        // A boundary inside fileB is stretched past its last slice…
+        assertEquals(3, SegmentDetectionChunkProcessor.chunkOf(pending, 2).size());
+        // …while boundaries on file edges are left alone.
+        assertEquals(1, SegmentDetectionChunkProcessor.chunkOf(pending, 1).size());
+        assertEquals(3, SegmentDetectionChunkProcessor.chunkOf(pending, 3).size());
+        assertEquals(4, SegmentDetectionChunkProcessor.chunkOf(pending, 9).size());
     }
 
     @Test
     void acceptanceWindows() {
-        assertTrue(HandleDetectSegments.acceptIntro(seg(0, 30_000), 40 * 60_000L));
-        assertFalse(HandleDetectSegments.acceptIntro(seg(0, 10_000), 40 * 60_000L), "too short");
-        assertFalse(HandleDetectSegments.acceptIntro(seg(0, 160_000), 40 * 60_000L), "too long");
-        assertFalse(HandleDetectSegments.acceptIntro(seg(0, 100_000), 300_000), "over 25% of the episode");
-        assertFalse(HandleDetectSegments.acceptIntro(seg(360_000, 390_000), 40 * 60_000L), "starts too late");
-        assertFalse(HandleDetectSegments.acceptIntro(seg(267_000, 297_000), 300_000),
+        assertTrue(SegmentDetectionChunkProcessor.acceptIntro(seg(0, 30_000), 40 * 60_000L));
+        assertFalse(SegmentDetectionChunkProcessor.acceptIntro(seg(0, 10_000), 40 * 60_000L), "too short");
+        assertFalse(SegmentDetectionChunkProcessor.acceptIntro(seg(0, 160_000), 40 * 60_000L), "too long");
+        assertFalse(SegmentDetectionChunkProcessor.acceptIntro(seg(0, 100_000), 300_000), "over 25% of the episode");
+        assertFalse(SegmentDetectionChunkProcessor.acceptIntro(seg(360_000, 390_000), 40 * 60_000L), "starts too late");
+        assertFalse(SegmentDetectionChunkProcessor.acceptIntro(seg(267_000, 297_000), 300_000),
             "a run in the back half of a short episode is the outro, not the intro");
 
-        assertTrue(HandleDetectSegments.acceptOutro(seg(200_000, 240_000), 240_000));
-        assertFalse(HandleDetectSegments.acceptOutro(seg(200_000, 215_000), 240_000), "too short");
-        assertFalse(HandleDetectSegments.acceptOutro(seg(0, 30_000), 240_000), "ends too early");
+        assertTrue(SegmentDetectionChunkProcessor.acceptOutro(seg(200_000, 240_000), 240_000));
+        assertFalse(SegmentDetectionChunkProcessor.acceptOutro(seg(200_000, 215_000), 240_000), "too short");
+        assertFalse(SegmentDetectionChunkProcessor.acceptOutro(seg(0, 30_000), 240_000), "ends too early");
     }
 
     @Test
@@ -160,9 +235,15 @@ class HandleDetectSegmentsTest {
         for (int i = 0; i < 7; i++) {
             slices.add(new EpisodeSlice(mock(MediaFileEntity.class), UUID.randomUUID(), false, 0, 1));
         }
-        List<EpisodeSlice> neighbours = HandleDetectSegments.neighboursOf(slices, slices.get(3));
+        List<EpisodeSlice> neighbours = SegmentDetectionChunkProcessor.neighboursOf(slices, slices.get(3));
         assertEquals(List.of(slices.get(2), slices.get(4), slices.get(1), slices.get(5)), neighbours);
-        assertEquals(2, HandleDetectSegments.neighboursOf(slices.subList(0, 3), slices.get(0)).size());
+        assertEquals(2, SegmentDetectionChunkProcessor.neighboursOf(slices.subList(0, 3), slices.get(0)).size());
+    }
+
+    private static MediaFileEntity fileWithId() {
+        MediaFileEntity file = MediaFileEntity.builder().path("/x").size(1).build();
+        ReflectionTestUtils.setField(file, "id", UUID.randomUUID());
+        return file;
     }
 
     private static SegmentMatcher.Segment seg(long start, long end) {

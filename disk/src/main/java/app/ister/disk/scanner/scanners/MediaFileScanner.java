@@ -10,7 +10,7 @@ import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
-import app.ister.disk.events.detectsegments.HandleDetectSegments;
+import app.ister.disk.events.detectsegments.SegmentDetectionChunkProcessor;
 import app.ister.disk.events.mediafilefound.MediaFileFoundExtractSubtitles;
 import app.ister.disk.scanner.PathObject;
 import app.ister.disk.scanner.enums.DirType;
@@ -198,7 +198,7 @@ public class MediaFileScanner implements Scanner {
     boolean needsSegmentDetect(MediaFileEntity mediaFile) {
         return mediaFile.getDurationInMilliseconds() > 0
                 && (mediaFile.getSegmentDetectorVersion() == null
-                || mediaFile.getSegmentDetectorVersion() < HandleDetectSegments.DETECTOR_VERSION);
+                || mediaFile.getSegmentDetectorVersion() < SegmentDetectionChunkProcessor.DETECTOR_VERSION);
     }
 
     /**

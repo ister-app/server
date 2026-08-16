@@ -79,10 +79,18 @@ per analyzed episode is fine: the last episode's event does the real work. The v
 also the "ran but found nothing" sentinel; `null` means detection never ran, and the scanner's
 backfill (`app.ister.server.segment-detect-backfill`, default on, once per season per run) sends
 `DETECT_SEGMENTS` for such files on a rescan. Per-item reanalysis wipes the segment rows and
-resets the version, and bumping `HandleDetectSegments.DETECTOR_VERSION` re-runs detection
-everywhere via the same backfill. Known limitation: a season spread over multiple nodes only
-pairs the episodes local to each node — a node holding a single stray episode detects nothing
+resets the version, and bumping `SegmentDetectionChunkProcessor.DETECTOR_VERSION` re-runs
+detection everywhere via the same backfill. Known limitation: a season spread over multiple nodes
+only pairs the episodes local to each node — a node holding a single stray episode detects nothing
 for it.
+
+One message detects at most `app.ister.server.segment-detect.chunk-size` episodes (default 4):
+fingerprinting a whole season in one go can outlast RabbitMQ's `consumer_timeout` (default
+30 minutes), which closes the channel and requeues the message forever. Like the blur-hash sweep,
+`SegmentDetectionChunkProcessor` runs one chunk in its own transaction (stretched so slices of one
+multi-episode file never straddle a chunk boundary), and `HandleDetectSegments` publishes a
+successor message for the same season only after that commit. The version column is the cursor,
+and it is stamped even when decoding fails, so the chain always terminates.
 
 ## Library analyze
 

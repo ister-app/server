@@ -84,10 +84,19 @@ versiekolom is tegelijk de sentinel voor "gedraaid maar niets gevonden"; `null` 
 detectie nooit liep, en de backfill van de scanner (`app.ister.server.segment-detect-backfill`,
 standaard aan, één keer per seizoen per run) stuurt bij een rescan `DETECT_SEGMENTS` voor zulke
 bestanden. Heranalyse per item wist de segmentrijen en reset de versie, en het ophogen van
-`HandleDetectSegments.DETECTOR_VERSION` laat de detectie overal opnieuw draaien via dezelfde
-backfill. Bekende beperking: een seizoen verspreid over meerdere nodes paart alleen de
+`SegmentDetectionChunkProcessor.DETECTOR_VERSION` laat de detectie overal opnieuw draaien via
+dezelfde backfill. Bekende beperking: een seizoen verspreid over meerdere nodes paart alleen de
 afleveringen die lokaal op elke node staan — een node met één losse aflevering detecteert er niets
 voor.
+
+Eén bericht detecteert maximaal `app.ister.server.segment-detect.chunk-size` afleveringen
+(standaard 4): een heel seizoen in één keer fingerprinten kan langer duren dan RabbitMQ's
+`consumer_timeout` (standaard 30 minuten), waarna het kanaal wordt gesloten en het bericht
+eindeloos wordt gerequeued. Net als bij de blurhash-sweep draait
+`SegmentDetectionChunkProcessor` één chunk in een eigen transactie (opgerekt zodat slices van één
+multi-episode-bestand nooit over een chunkgrens vallen), en publiceert `HandleDetectSegments` pas
+ná die commit een opvolgerbericht voor hetzelfde seizoen. De versiekolom is de cursor en wordt ook
+bij een mislukte decode gestempeld, dus de keten termineert altijd.
 
 ## Library analyseren
 
