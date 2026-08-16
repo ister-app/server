@@ -50,4 +50,8 @@ public class UserSettingsEntity extends BaseEntity {
 
     /** Highest video variant to pre-transcode (720 / 480); null means every variant. */
     private Integer maxVideoHeight;
+
+    /** Auto-seek past detected intros during playback. */
+    @Column(nullable = false)
+    private boolean autoSkipIntro;
 }

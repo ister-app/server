@@ -74,4 +74,10 @@ public class MediaFileEntity extends FileFromPathEntity {
      * non-comic files.
      */
     private Integer pageCount;
+
+    /**
+     * Version of the intro/outro segment detector that last ran on this file, found or not — the
+     * scanner's backfill re-requests detection while this is null or below the current version.
+     */
+    private Integer segmentDetectorVersion;
 }
