@@ -2,6 +2,7 @@ package app.ister.disk.scanner.scanners;
 
 import app.ister.core.entity.*;
 import app.ister.core.enums.EventType;
+import app.ister.core.eventdata.DetectSegmentsData;
 import app.ister.core.eventdata.MediaFileFoundData;
 import app.ister.core.enums.StreamCodecType;
 import app.ister.core.repository.MediaFileEpisodeRepository;
@@ -9,6 +10,7 @@ import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
+import app.ister.disk.events.detectsegments.HandleDetectSegments;
 import app.ister.disk.events.mediafilefound.MediaFileFoundExtractSubtitles;
 import app.ister.disk.scanner.PathObject;
 import app.ister.disk.scanner.enums.DirType;
@@ -50,12 +52,22 @@ public class MediaFileScanner implements Scanner {
     /** Same once-per-run guard for the crop-detection backfill. */
     private final Set<UUID> cropDetectRequested = ConcurrentHashMap.newKeySet();
 
+    /** Same once-per-run guard for the intro/outro segment-detection backfill, per season. */
+    private final Set<UUID> segmentDetectRequested = ConcurrentHashMap.newKeySet();
+
     /**
      * Escape hatch for very large libraries: the crop backfill re-analyzes
      * every pre-existing file once (heavy pass); disable to defer it.
      */
     @Value("${app.ister.server.crop-detect-backfill:true}")
     private boolean cropDetectBackfill;
+
+    /**
+     * Escape hatch like the crop one: the segment backfill fingerprints every
+     * pre-existing episode file once (two short ffmpeg decodes per file).
+     */
+    @Value("${app.ister.server.segment-detect-backfill:true}")
+    private boolean segmentDetectBackfill;
 
     @Override
     public boolean analyzable(Path path, boolean isRegularFile, long size) {
@@ -134,6 +146,20 @@ public class MediaFileScanner implements Scanner {
                     .episodeEntityUUIDs(episodeIds.isEmpty() ? null : episodeIds)
                     .movieEntityUUID(movieId)
                     .path(path.toString()).build(), directoryEntity.getName());
+        } else if (segmentDetectBackfill
+                && episodeEntity.isPresent()
+                && needsSegmentDetect(mediaFile.get())
+                && segmentDetectRequested.add(episodeEntity.get().getSeasonEntity().getId())) {
+            // Backfill for episode files analyzed before intro/outro detection existed: a null
+            // (or outdated) detector version means detection never ran — "ran, found nothing"
+            // stores the version too. No full re-analysis needed, just the detection event;
+            // once per season per run, the handler covers its siblings.
+            log.info("Detecting intro/outro segments for the season of {}", path);
+            messageSender.sendDetectSegments(DetectSegmentsData.builder()
+                    .eventType(EventType.DETECT_SEGMENTS)
+                    .seasonEntityUUID(episodeEntity.get().getSeasonEntity().getId())
+                    .directoryEntityUUID(directoryEntity.getId())
+                    .build(), directoryEntity.getName());
         } else if (!subtitleReextractRequested.contains(mediaFile.get().getId())
                 && needsSubtitleReextract(mediaFile.get().getId())) {
             // Backfill for files whose image subtitles (DVD/PGS bitmaps) never produced an
@@ -161,6 +187,17 @@ public class MediaFileScanner implements Scanner {
         return mediaFileStreamRepository
                 .findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.VIDEO).stream()
                 .anyMatch(s -> s.getWidth() > 0 && s.getCropWidth() == null);
+    }
+
+    /**
+     * True when intro/outro detection (at the current version) never ran for
+     * this analyzed episode file. Unanalyzed files are left to the normal
+     * MEDIA_FILE_FOUND flow, which triggers detection itself.
+     */
+    boolean needsSegmentDetect(MediaFileEntity mediaFile) {
+        return mediaFile.getDurationInMilliseconds() > 0
+                && (mediaFile.getSegmentDetectorVersion() == null
+                || mediaFile.getSegmentDetectorVersion() < HandleDetectSegments.DETECTOR_VERSION);
     }
 
     /**

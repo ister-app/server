@@ -38,6 +38,7 @@ public class HandleAnalyzeDataDisk implements Handle<AnalyzeData> {
     private final MediaFileRepository mediaFileRepository;
     private final MetadataRepository metadataRepository;
     private final MediaFileStreamRepository mediaFileStreamRepository;
+    private final MediaFileSegmentRepository mediaFileSegmentRepository;
     private final OtherPathFileRepository otherPathFileRepository;
     private final MediaFileEpisodeRepository mediaFileEpisodeRepository;
     private final MediaFileEpisodeService mediaFileEpisodeService;
@@ -80,6 +81,11 @@ public class HandleAnalyzeDataDisk implements Handle<AnalyzeData> {
         for (MediaFileEntity mf : localFiles) {
             deleteHlsCache(mf.getId());
             mediaFileStreamRepository.deleteAllByMediaFileEntityId(mf.getId());
+            // Reset intro/outro detection: the re-fired MEDIA_FILE_FOUND triggers it again, and
+            // a null version is what makes the detector treat the file as pending.
+            mediaFileSegmentRepository.deleteAllByMediaFileEntityId(mf.getId());
+            mf.setSegmentDetectorVersion(null);
+            mediaFileRepository.save(mf);
             List<MediaFileEpisodeEntity> links = mediaFileEpisodeRepository.findByMediaFileEntityIdOrderByPartNumber(mf.getId());
             messageSender.sendMediaFileFound(
                     MediaFileFoundData.builder()

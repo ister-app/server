@@ -77,6 +77,14 @@ public class DiskQueueNamingConfig {
         ).toArray(String[]::new);
     }
 
+    public String[] getDetectSegmentsQueues() {
+        return Stream.concat(
+                config.getDirectories().stream()
+                        .map(dir -> APP_ISTER_SERVER_DETECT_SEGMENTS + "." + dir.getName()),
+                Stream.of(APP_ISTER_SERVER_DETECT_SEGMENTS + "." + cacheDirName())
+        ).toArray(String[]::new);
+    }
+
     public String[] getAnalyzeDataQueues() {
         return Stream.concat(
                 config.getDirectories().stream()

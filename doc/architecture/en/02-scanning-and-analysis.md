@@ -58,6 +58,32 @@ parses as a range but has no link rows, creates the missing episodes and links, 
 Sidecar files (NFO, local images, external subtitles) attach to the first episode of the range,
 as before.
 
+### Intro/outro detection
+
+Recurring intros and closing credits are found by **comparing audio across a season**: the disk
+module decodes short windows (first 10 / last 4 minutes of each episode's slice) to mono PCM,
+fingerprints them (`ChromaFingerprinter`, a chromaprint-style 32-bit gradient hash per 128 ms —
+loudness-invariant, no external library), and `SegmentMatcher` finds the longest shared run
+between an episode and up to four season neighbours. The median bounds over agreeing pairs (at
+least two, one for two-episode seasons) become `media_file_segment_entity` rows (`INTRO`/`OUTRO`)
+in **absolute file time**; in a multi-episode file each slice gets its own rows, disambiguated by
+`episode_entity_id`. The player reads them as `MediaFile.segments` for its skip-intro /
+next-episode buttons.
+
+Because detection is cross-episode it cannot run inside the per-file `MEDIA_FILE_FOUND` handler:
+that handler instead fires a season-scoped `DETECT_SEGMENTS` event **after its transaction
+commits**, on the same directory-scoped queue family, so detection runs on the node owning the
+files. `HandleDetectSegments` is idempotent — files whose `media_file_entity.segment_detector_version`
+already equals the current detector version are only used as comparison material — so one event
+per analyzed episode is fine: the last episode's event does the real work. The version column is
+also the "ran but found nothing" sentinel; `null` means detection never ran, and the scanner's
+backfill (`app.ister.server.segment-detect-backfill`, default on, once per season per run) sends
+`DETECT_SEGMENTS` for such files on a rescan. Per-item reanalysis wipes the segment rows and
+resets the version, and bumping `HandleDetectSegments.DETECTOR_VERSION` re-runs detection
+everywhere via the same backfill. Known limitation: a season spread over multiple nodes only
+pairs the episodes local to each node — a node holding a single stray episode detects nothing
+for it.
+
 ## Library analyze
 
 See the [analyze-flow diagram](../diagrams/analyze-flow.md). `analyzeLibrary()` sends

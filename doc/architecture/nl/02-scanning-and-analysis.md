@@ -60,6 +60,35 @@ zodat de grenzen en stills worden berekend.
 Sidecar-bestanden (NFO, lokale afbeeldingen, externe ondertitels) hangen zoals voorheen aan de
 eerste aflevering van de range.
 
+### Intro/outro-detectie
+
+Terugkerende intro's en aftitelingen worden gevonden door **audio over een seizoen te
+vergelijken**: de disk-module decodeert korte vensters (eerste 10 / laatste 4 minuten van de slice
+van elke aflevering) naar mono-PCM, fingerprint ze (`ChromaFingerprinter`, een chromaprint-achtige
+32-bits gradiënthash per 128 ms — ongevoelig voor volumeverschillen, zonder externe library), en
+`SegmentMatcher` zoekt de langste gedeelde run tussen een aflevering en maximaal vier
+seizoensburen. De mediaan van de grenzen over instemmende paren (minimaal twee, één bij seizoenen
+van twee afleveringen) wordt opgeslagen als `media_file_segment_entity`-rijen (`INTRO`/`OUTRO`) in
+**absolute bestandstijd**; in een multi-episode-bestand krijgt elke slice eigen rijen,
+gedisambigueerd via `episode_entity_id`. De player leest ze als `MediaFile.segments` voor zijn
+intro-overslaan- en volgende-aflevering-knoppen.
+
+Omdat de detectie afleveringen onderling vergelijkt kan ze niet in de per-bestand
+`MEDIA_FILE_FOUND`-handler draaien: die vuurt in plaats daarvan een seizoens-gescopeerd
+`DETECT_SEGMENTS`-event **nadat zijn transactie is gecommit**, op dezelfde directory-gescopeerde
+queue-familie, zodat de detectie draait op de node die de bestanden bezit. `HandleDetectSegments`
+is idempotent — bestanden waarvan `media_file_entity.segment_detector_version` al gelijk is aan de
+huidige detectorversie dienen alleen nog als vergelijkingsmateriaal — dus één event per
+geanalyseerde aflevering is prima: het event van de laatste aflevering doet het echte werk. De
+versiekolom is tegelijk de sentinel voor "gedraaid maar niets gevonden"; `null` betekent dat
+detectie nooit liep, en de backfill van de scanner (`app.ister.server.segment-detect-backfill`,
+standaard aan, één keer per seizoen per run) stuurt bij een rescan `DETECT_SEGMENTS` voor zulke
+bestanden. Heranalyse per item wist de segmentrijen en reset de versie, en het ophogen van
+`HandleDetectSegments.DETECTOR_VERSION` laat de detectie overal opnieuw draaien via dezelfde
+backfill. Bekende beperking: een seizoen verspreid over meerdere nodes paart alleen de
+afleveringen die lokaal op elke node staan — een node met één losse aflevering detecteert er niets
+voor.
+
 ## Library analyseren
 
 Zie het [analyze-flow-diagram](../diagrams/analyze-flow.md). `analyzeLibrary()` stuurt per node een

@@ -5,11 +5,13 @@ import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.StreamCodecType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
+import app.ister.core.eventdata.DetectSegmentsData;
 import app.ister.core.eventdata.ImageFoundData;
 import app.ister.core.eventdata.MediaFileFoundData;
 import app.ister.core.repository.*;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.NodeService;
+import app.ister.core.utils.AfterCommitPublisher;
 import app.ister.core.Handle;
 import com.github.kokorin.jaffree.process.JaffreeAbnormalExitException;
 import lombok.extern.slf4j.Slf4j;
@@ -127,6 +129,19 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             } else {
                 createBackgroundImage(episodeEntity, movieEntity, mediaFileFoundData.getPath(), mediaFileEntity.getDurationInMilliseconds() / 2);
             }
+            // Intro/outro detection is season-wide (it compares sibling episodes), so it runs as
+            // its own event once this file's analysis is committed — after commit, or the handler
+            // would still see the old duration/detector version. Idempotent on the handler side,
+            // so firing once per analyzed episode is fine.
+            episodeEntity.ifPresent(episode -> {
+                DetectSegmentsData detectSegmentsData = DetectSegmentsData.builder()
+                        .eventType(EventType.DETECT_SEGMENTS)
+                        .seasonEntityUUID(episode.getSeasonEntity().getId())
+                        .directoryEntityUUID(directoryEntity.getId())
+                        .build();
+                AfterCommitPublisher.publishAfterCommit(() ->
+                        messageSender.sendDetectSegments(detectSegmentsData, directoryEntity.getName()));
+            });
         });
     }
 

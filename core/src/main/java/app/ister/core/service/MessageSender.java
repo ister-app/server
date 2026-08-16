@@ -60,6 +60,11 @@ public class MessageSender {
         send(APP_ISTER_SERVER_SUBTITLE_FILE_FOUND, directoryName, subtitleFileFoundData);
     }
 
+    /** Directory-scoped, like sendMediaFileFound: detection runs on the node owning the files. */
+    public void sendDetectSegments(DetectSegmentsData detectSegmentsData, String directoryName) {
+        send(APP_ISTER_SERVER_DETECT_SEGMENTS, directoryName, detectSegmentsData);
+    }
+
     public void sendUpdateImagesRequested(UpdateImagesRequestedData updateImagesRequestedData, String directoryName) {
         send(APP_ISTER_SERVER_UPDATE_IMAGES_REQUESTED, directoryName, updateImagesRequestedData);
     }

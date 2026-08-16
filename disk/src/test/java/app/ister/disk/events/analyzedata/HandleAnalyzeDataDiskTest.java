@@ -14,6 +14,7 @@ import app.ister.core.eventdata.AnalyzeData;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MediaFileEpisodeRepository;
+import app.ister.core.repository.MediaFileSegmentRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.repository.MetadataRepository;
@@ -63,6 +64,8 @@ class HandleAnalyzeDataDiskTest {
     private MetadataRepository metadataRepository;
     @Mock
     private MediaFileStreamRepository mediaFileStreamRepository;
+    @Mock
+    private MediaFileSegmentRepository mediaFileSegmentRepository;
     @Mock
     private OtherPathFileRepository otherPathFileRepository;
     @Mock

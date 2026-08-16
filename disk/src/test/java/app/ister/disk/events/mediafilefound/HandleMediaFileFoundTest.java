@@ -81,7 +81,7 @@ class HandleMediaFileFoundTest {
     @Test
     void happyFlowWithEpisodeThatHasImages() {
         DirectoryEntity directoryEntity = DirectoryEntity.builder().build();
-        EpisodeEntity episodeEntity = EpisodeEntity.builder()
+        EpisodeEntity episodeEntity = EpisodeEntity.builder().seasonEntity(testSeason())
                 .id(UUID.randomUUID())
                 .imagesEntities(List.of(
                         ImageEntity.builder().build()
@@ -117,7 +117,7 @@ class HandleMediaFileFoundTest {
     void handleWithMediaFileNotFoundSkipsProcessing() {
         DirectoryEntity directoryEntity = DirectoryEntity.builder().build();
         UUID episodeId = UUID.randomUUID();
-        EpisodeEntity episodeEntity = EpisodeEntity.builder().id(episodeId).imagesEntities(new ArrayList<>()).build();
+        EpisodeEntity episodeEntity = EpisodeEntity.builder().seasonEntity(testSeason()).id(episodeId).imagesEntities(new ArrayList<>()).build();
         String filePath = "/home/path";
         MediaFileFoundData data = MediaFileFoundData.builder()
                 .eventType(EventType.MEDIA_FILE_FOUND)
@@ -171,7 +171,7 @@ class HandleMediaFileFoundTest {
         ReflectionTestUtils.setField(subject, "dirOfFFmpeg", "/usr/bin");
         DirectoryEntity directoryEntity = DirectoryEntity.builder().build();
         UUID episodeId = UUID.randomUUID();
-        EpisodeEntity episodeEntity = EpisodeEntity.builder().id(episodeId).imagesEntities(new ArrayList<>()).build();
+        EpisodeEntity episodeEntity = EpisodeEntity.builder().seasonEntity(testSeason()).id(episodeId).imagesEntities(new ArrayList<>()).build();
         String filePath = "/home/path/episode.mkv";
         MediaFileFoundData data = MediaFileFoundData.builder()
                 .eventType(EventType.MEDIA_FILE_FOUND)
@@ -233,7 +233,7 @@ class HandleMediaFileFoundTest {
         ReflectionTestUtils.setField(subject, "dirOfFFmpeg", "/usr/bin");
         DirectoryEntity directoryEntity = DirectoryEntity.builder().build();
         UUID episodeId = UUID.randomUUID();
-        EpisodeEntity episodeEntity = EpisodeEntity.builder().id(episodeId).imagesEntities(new ArrayList<>()).build();
+        EpisodeEntity episodeEntity = EpisodeEntity.builder().seasonEntity(testSeason()).id(episodeId).imagesEntities(new ArrayList<>()).build();
         String filePath = "/home/path/episode.mkv";
         MediaFileFoundData data = MediaFileFoundData.builder()
                 .eventType(EventType.MEDIA_FILE_FOUND)
@@ -258,14 +258,16 @@ class HandleMediaFileFoundTest {
         subject.handle(data);
 
         verify(mediaFileRepositoryMock).save(mediaFileEntity);
-        verifyNoInteractions(messageSenderMock);
+        // The failed background must not be announced; the season's segment detection still fires.
+        verify(messageSenderMock, never()).sendImageFound(any(), any());
+        verify(messageSenderMock).sendDetectSegments(any(), any());
     }
 
     @Test
     void listenerCallsHandleWithCorrectEventType() {
         DirectoryEntity directoryEntity = DirectoryEntity.builder().build();
         UUID episodeId = UUID.randomUUID();
-        EpisodeEntity episodeEntity = EpisodeEntity.builder()
+        EpisodeEntity episodeEntity = EpisodeEntity.builder().seasonEntity(testSeason())
                 .id(episodeId)
                 .imagesEntities(List.of(ImageEntity.builder().build()))
                 .build();
@@ -318,8 +320,8 @@ class HandleMediaFileFoundTest {
                 .mediaFileEntityId(fileId).episodeEntityId(episode7Id).partNumber(1).build();
 
         when(directoryRepositoryMock.findById(directoryEntity.getId())).thenReturn(Optional.of(directoryEntity));
-        when(episodeRepositoryMock.findById(episode6Id)).thenReturn(Optional.of(EpisodeEntity.builder().id(episode6Id).build()));
-        when(episodeRepositoryMock.findById(episode7Id)).thenReturn(Optional.of(EpisodeEntity.builder().id(episode7Id).build()));
+        when(episodeRepositoryMock.findById(episode6Id)).thenReturn(Optional.of(EpisodeEntity.builder().seasonEntity(testSeason()).id(episode6Id).build()));
+        when(episodeRepositoryMock.findById(episode7Id)).thenReturn(Optional.of(EpisodeEntity.builder().seasonEntity(testSeason()).id(episode7Id).build()));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directoryEntity, filePath)).thenReturn(Optional.of(mediaFileEntity));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(eq(mediaFileEntity), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 5400000L));
         when(mediaFileEpisodeRepositoryMock.findByMediaFileEntityIdOrderByPartNumber(fileId)).thenReturn(List.of(part0, part1));
@@ -340,5 +342,9 @@ class HandleMediaFileFoundTest {
         verify(mediaFileFoundCreateBackgroundMock).createBackground(any(), any(), any(), eq(1325000L));
         verify(mediaFileFoundCreateBackgroundMock).createBackground(any(), any(), any(), eq(4025000L));
         verify(messageSenderMock, times(2)).sendImageFound(any(ImageFoundData.class), eq("cache"));
+    }
+
+    private static SeasonEntity testSeason() {
+        return SeasonEntity.builder().id(UUID.randomUUID()).build();
     }
 }
