@@ -43,7 +43,8 @@ public class UserSettingsService {
      * @param maxVideoHeight highest video variant to pre-transcode, or null for every variant
      */
     public record UserSettings(List<String> preferredAudioLanguages, List<String> preferredSubtitleLanguages,
-                               boolean directPlay, boolean transcode, Integer maxVideoHeight) {
+                               boolean directPlay, boolean transcode, Integer maxVideoHeight,
+                               boolean autoSkipIntro) {
     }
 
     /** The caller's settings, or the defaults when they never saved any. */
@@ -67,7 +68,7 @@ public class UserSettingsService {
 
     /** Settings for a user without a row: the app-wide languages, everything else unrestricted. */
     public UserSettings defaults() {
-        return new UserSettings(defaultLanguages, defaultLanguages, true, true, null);
+        return new UserSettings(defaultLanguages, defaultLanguages, true, true, null, false);
     }
 
     // Sonar FP: Lombok @SuperBuilder declares builder() on the subclass itself
@@ -83,12 +84,14 @@ public class UserSettingsService {
         entity.setDirectPlay(settings.directPlay());
         entity.setTranscode(settings.transcode());
         entity.setMaxVideoHeight(settings.maxVideoHeight());
+        entity.setAutoSkipIntro(settings.autoSkipIntro());
 
         return toSettings(userSettingsRepository.save(entity));
     }
 
     private static UserSettings toSettings(UserSettingsEntity entity) {
         return new UserSettings(entity.getPreferredAudioLanguages(), entity.getPreferredSubtitleLanguages(),
-                entity.isDirectPlay(), entity.isTranscode(), entity.getMaxVideoHeight());
+                entity.isDirectPlay(), entity.isTranscode(), entity.getMaxVideoHeight(),
+                entity.isAutoSkipIntro());
     }
 }

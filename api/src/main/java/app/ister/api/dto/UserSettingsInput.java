@@ -9,5 +9,6 @@ import java.util.List;
  * @param maxVideoHeight highest video variant to pre-transcode (720 or 480); null means every variant
  */
 public record UserSettingsInput(List<String> preferredAudioLanguages, List<String> preferredSubtitleLanguages,
-                                boolean directPlay, boolean transcode, Integer maxVideoHeight) {
+                                boolean directPlay, boolean transcode, Integer maxVideoHeight,
+                                boolean autoSkipIntro) {
 }

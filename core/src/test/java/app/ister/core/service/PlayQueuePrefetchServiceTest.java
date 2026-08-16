@@ -57,7 +57,7 @@ class PlayQueuePrefetchServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(userSettingsService.forUser(USER_ID)).thenReturn(
-                new UserSettingsService.UserSettings(List.of("nl", "en"), List.of("nl"), true, true, null));
+                new UserSettingsService.UserSettings(List.of("nl", "en"), List.of("nl"), true, true, null, false));
         ReflectionTestUtils.setField(subject, "prefetchEnabled", true);
         ReflectionTestUtils.setField(subject, "videoThresholdSeconds", 120L);
         ReflectionTestUtils.setField(subject, "trackThresholdSeconds", 60L);

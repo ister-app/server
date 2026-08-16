@@ -55,7 +55,7 @@ class PreTranscodeServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(userSettingsService.forUser(any())).thenReturn(
-                new UserSettingsService.UserSettings(List.of("en", "nl"), List.of("nl"), true, true, null));
+                new UserSettingsService.UserSettings(List.of("en", "nl"), List.of("nl"), true, true, null, false));
         lenient().when(episodeRepository.findNextEpisodeId(any(), anyInt(), anyInt())).thenReturn(List.of());
     }
 
@@ -217,9 +217,9 @@ class PreTranscodeServiceTest {
         EpisodeEntity ep = episode(UUID.randomUUID(), 1, mediaFile(mediaFileId, "disk1"));
 
         when(userSettingsService.forUser(userId1)).thenReturn(
-                new UserSettingsService.UserSettings(List.of("nl"), List.of("nl"), true, true, 480));
+                new UserSettingsService.UserSettings(List.of("nl"), List.of("nl"), true, true, 480, false));
         when(userSettingsService.forUser(userId2)).thenReturn(
-                new UserSettingsService.UserSettings(List.of("en"), List.of("en"), true, true, 720));
+                new UserSettingsService.UserSettings(List.of("en"), List.of("en"), true, true, 720, false));
         when(userRepository.findAll()).thenReturn(List.of(user(userId1), user(userId2)));
         when(continueWatchingService.entriesFor(userId1)).thenReturn(List.of(episodeEntry(userId1, ep)));
         when(continueWatchingService.entriesFor(userId2)).thenReturn(List.of(episodeEntry(userId2, ep)));
@@ -240,9 +240,9 @@ class PreTranscodeServiceTest {
         EpisodeEntity ep = episode(UUID.randomUUID(), 1, mediaFile(UUID.randomUUID(), "disk1"));
 
         when(userSettingsService.forUser(cappedUser)).thenReturn(
-                new UserSettingsService.UserSettings(List.of("nl"), List.of(), true, true, 480));
+                new UserSettingsService.UserSettings(List.of("nl"), List.of(), true, true, 480, false));
         when(userSettingsService.forUser(uncappedUser)).thenReturn(
-                new UserSettingsService.UserSettings(List.of("nl"), List.of(), true, true, null));
+                new UserSettingsService.UserSettings(List.of("nl"), List.of(), true, true, null, false));
         when(userRepository.findAll()).thenReturn(List.of(user(cappedUser), user(uncappedUser)));
         when(continueWatchingService.entriesFor(cappedUser)).thenReturn(List.of(episodeEntry(cappedUser, ep)));
         when(continueWatchingService.entriesFor(uncappedUser)).thenReturn(List.of(episodeEntry(uncappedUser, ep)));

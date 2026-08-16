@@ -806,6 +806,8 @@ type UserSettings {
     transcode: Boolean!
     "Highest video variant to pre-transcode (720 or 480); null means every variant."
     maxVideoHeight: Int
+    "Auto-seek past detected intros during playback."
+    autoSkipIntro: Boolean!
 }
 
 input UserSettingsInput {
@@ -814,6 +816,8 @@ input UserSettingsInput {
     directPlay: Boolean!
     transcode: Boolean!
     maxVideoHeight: Int
+    "Defaulted so clients predating the field keep working."
+    autoSkipIntro: Boolean! = false
 }
 
 input CreatePlayQueueInput {
@@ -916,6 +920,26 @@ type MediaFile {
     pageCount: Int
     "The file format taken from the path extension, uppercased (EPUB, CBZ, PDF, MKV, ...). Null when the path has no extension."
     format: String
+    "Detected intro/outro ranges; empty until season-wide detection has run for this file."
+    segments: [MediaSegment!]
+}
+
+enum MediaSegmentType {
+    INTRO
+    OUTRO
+}
+
+"""
+A detected intro or outro (credits) range, in absolute file time — the same timeline as playback
+position and MediaFilePart. For a multi-episode file episodeId says whose intro/outro it is; null
+for single-episode files.
+"""
+type MediaSegment {
+    id: ID!
+    type: MediaSegmentType!
+    startInMilliseconds: Float!
+    endInMilliseconds: Float!
+    episodeId: ID
 }
 
 type Directory {
