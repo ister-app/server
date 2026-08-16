@@ -48,7 +48,10 @@ public class HandleDetectSegments implements Handle<DetectSegmentsData> {
     /** Bump to re-run detection on every file via the scanner's backfill. */
     // v2: near-silent frames are excluded from matching (v1 detected a bogus
     // whole-window outro on files with silent audio tracks).
-    public static final int DETECTOR_VERSION = 2;
+    // v3: intro start capped to the first half of the episode (on short episodes
+    // the whole file fits the intro window, and a shared *outro* run near the end
+    // could win the longest-run contest and be accepted as the intro).
+    public static final int DETECTOR_VERSION = 3;
 
     static final long INTRO_WINDOW_MS = 10 * 60_000L;
     static final long OUTRO_WINDOW_MS = 4 * 60_000L;
@@ -166,9 +169,12 @@ public class HandleDetectSegments implements Handle<DetectSegmentsData> {
 
     static boolean acceptIntro(Segment run, long sliceLengthMs) {
         long maxLength = Math.min(INTRO_MAX_MS, sliceLengthMs / 4);
+        // The start cap is also relative: on episodes shorter than twice
+        // INTRO_MAX_START the shared *outro* would otherwise qualify as an intro.
+        long maxStart = Math.min(INTRO_MAX_START_MS, sliceLengthMs / 2);
         return run.lengthMs() >= INTRO_MIN_MS
                 && run.lengthMs() <= maxLength
-                && run.startMs() <= INTRO_MAX_START_MS;
+                && run.startMs() <= maxStart;
     }
 
     static boolean acceptOutro(Segment run, long windowLengthMs) {

@@ -145,6 +145,8 @@ class HandleDetectSegmentsTest {
         assertFalse(HandleDetectSegments.acceptIntro(seg(0, 160_000), 40 * 60_000L), "too long");
         assertFalse(HandleDetectSegments.acceptIntro(seg(0, 100_000), 300_000), "over 25% of the episode");
         assertFalse(HandleDetectSegments.acceptIntro(seg(360_000, 390_000), 40 * 60_000L), "starts too late");
+        assertFalse(HandleDetectSegments.acceptIntro(seg(267_000, 297_000), 300_000),
+            "a run in the back half of a short episode is the outro, not the intro");
 
         assertTrue(HandleDetectSegments.acceptOutro(seg(200_000, 240_000), 240_000));
         assertFalse(HandleDetectSegments.acceptOutro(seg(200_000, 215_000), 240_000), "too short");
