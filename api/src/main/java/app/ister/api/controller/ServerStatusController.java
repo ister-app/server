@@ -7,6 +7,7 @@ import app.ister.core.eventdata.EventFailureStatusData;
 import app.ister.core.eventdata.NodeActivityStatusData;
 import app.ister.core.eventdata.PlaybackStatusData;
 import app.ister.core.eventdata.QueueStatsStatusData;
+import app.ister.core.eventdata.TranscodeActivityStatusData;
 import app.ister.core.service.PlaybackSharingService;
 import app.ister.core.service.UserService;
 import app.ister.core.status.FollowerRegistry;
@@ -15,6 +16,7 @@ import app.ister.core.status.PlaybackSessionRegistry;
 import app.ister.core.status.QueueStatsRegistry;
 import app.ister.core.status.RecentFailuresBuffer;
 import app.ister.core.status.ServerStatusBroadcaster;
+import app.ister.core.status.TranscodeActivityRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SubscriptionMapping;
@@ -42,6 +44,7 @@ public class ServerStatusController {
 
     private final ServerStatusBroadcaster broadcaster;
     private final NodeActivityRegistry nodeActivityRegistry;
+    private final TranscodeActivityRegistry transcodeActivityRegistry;
     private final QueueStatsRegistry queueStatsRegistry;
     private final RecentFailuresBuffer recentFailuresBuffer;
     private final PlaybackSessionRegistry playbackSessionRegistry;
@@ -77,7 +80,11 @@ public class ServerStatusController {
                 nodeActivityRegistry.nodesSnapshot().stream().map(ServerActivityEvent::from).toList(),
                 queueStatsRegistry.snapshot().stream().map(ServerActivityEvent.QueueStat::from).toList(),
                 recentFailuresBuffer.snapshot().stream().map(ServerActivityEvent.EventFailure::from).toList(),
-                visibleSessions(playbackSessionRegistry.snapshot(), viewerId));
+                visibleSessions(playbackSessionRegistry.snapshot(), viewerId),
+                transcodeActivityRegistry.nodesSnapshot().stream()
+                        .flatMap(node -> node.getPasses().stream()
+                                .map(pass -> ServerActivityEvent.TranscodePass.from(node.getNodeName(), pass)))
+                        .toList());
     }
 
     /** Filters the session list to what {@code viewerId} may see and stamps each with a
@@ -103,6 +110,7 @@ public class ServerStatusController {
             case NodeActivityStatusData data -> ServerActivityEvent.from(data);
             case QueueStatsStatusData data -> ServerActivityEvent.from(data);
             case EventFailureStatusData data -> ServerActivityEvent.from(data);
+            case TranscodeActivityStatusData data -> ServerActivityEvent.from(data);
             case PlaybackStatusData _ -> null; // playback flows through nowPlaying
             default -> null;
         };

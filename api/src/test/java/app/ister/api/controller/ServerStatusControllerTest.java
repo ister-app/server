@@ -7,6 +7,7 @@ import app.ister.core.eventdata.EventFailureStatusData;
 import app.ister.core.eventdata.NodeActivityStatusData;
 import app.ister.core.eventdata.PlaybackStatusData;
 import app.ister.core.eventdata.QueueStatsStatusData;
+import app.ister.core.eventdata.TranscodeActivityStatusData;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.service.PlaybackSharingService;
 import app.ister.core.service.UserService;
@@ -16,6 +17,7 @@ import app.ister.core.status.PlaybackSessionRegistry;
 import app.ister.core.status.QueueStatsRegistry;
 import app.ister.core.status.RecentFailuresBuffer;
 import app.ister.core.status.ServerStatusBroadcaster;
+import app.ister.core.status.TranscodeActivityRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.Authentication;
@@ -38,6 +40,7 @@ class ServerStatusControllerTest {
 
     private ServerStatusBroadcaster broadcaster;
     private NodeActivityRegistry nodeActivityRegistry;
+    private TranscodeActivityRegistry transcodeActivityRegistry;
     private QueueStatsRegistry queueStatsRegistry;
     private RecentFailuresBuffer recentFailuresBuffer;
     private PlaybackSessionRegistry playbackSessionRegistry;
@@ -52,6 +55,7 @@ class ServerStatusControllerTest {
     void setUp() {
         broadcaster = new ServerStatusBroadcaster();
         nodeActivityRegistry = new NodeActivityRegistry();
+        transcodeActivityRegistry = new TranscodeActivityRegistry();
         queueStatsRegistry = new QueueStatsRegistry();
         recentFailuresBuffer = new RecentFailuresBuffer();
         playbackSessionRegistry = new PlaybackSessionRegistry();
@@ -62,8 +66,9 @@ class ServerStatusControllerTest {
         // Default the visibility gate open; the filtering test overrides it per owner.
         lenient().when(playbackSharingService.canView(any(), any())).thenReturn(true);
         lenient().when(playbackSharingService.canControl(any(), any(), any(), any())).thenReturn(true);
-        controller = new ServerStatusController(broadcaster, nodeActivityRegistry, queueStatsRegistry,
-                recentFailuresBuffer, playbackSessionRegistry, followerRegistry, playbackSharingService, userService);
+        controller = new ServerStatusController(broadcaster, nodeActivityRegistry, transcodeActivityRegistry,
+                queueStatsRegistry, recentFailuresBuffer, playbackSessionRegistry, followerRegistry,
+                playbackSharingService, userService);
     }
 
     private static PlaybackStatusData playback(UUID playQueueId) {
@@ -91,14 +96,20 @@ class ServerStatusControllerTest {
                 List.of(new QueueStatsStatusData.QueueStat("app.ister.server.MovieFound", 5, 3))));
         broadcaster.emitActivity(EventFailureStatusData.builder().nodeName("node-a").timestamp(Instant.now())
                 .queue("app.ister.server.MovieFound").errorMessage("boom").build());
+        broadcaster.emitActivity(new TranscodeActivityStatusData("node-a", Instant.now(),
+                List.of(new TranscodeActivityStatusData.TranscodePass(
+                        "id-1", "movie.mkv", "video_720p", true, Instant.now()))));
 
-        assertEquals(3, received.size());
+        assertEquals(4, received.size());
         assertEquals(ServerActivityEvent.ServerActivityEventType.NODE_ACTIVITY, received.get(0).type());
         assertEquals(3L, received.get(0).processedCount());
         assertEquals(ServerActivityEvent.ServerActivityEventType.QUEUE_STATS, received.get(1).type());
         assertEquals(5, received.get(1).queueStats().getFirst().depth());
         assertEquals(ServerActivityEvent.ServerActivityEventType.FAILURE, received.get(2).type());
         assertEquals("boom", received.get(2).failure().errorMessage());
+        assertEquals(ServerActivityEvent.ServerActivityEventType.TRANSCODE_ACTIVITY, received.get(3).type());
+        assertEquals("movie.mkv", received.get(3).transcodes().getFirst().title());
+        assertEquals("node-a", received.get(3).transcodes().getFirst().nodeName());
     }
 
     @Test
@@ -175,6 +186,9 @@ class ServerStatusControllerTest {
         recentFailuresBuffer.add(EventFailureStatusData.builder().nodeName("node-a")
                 .timestamp(Instant.now()).queue("q").errorMessage("boom").build());
         playbackSessionRegistry.update(playback(UUID.randomUUID()));
+        transcodeActivityRegistry.update(new TranscodeActivityStatusData("node-a", Instant.now(),
+                List.of(new TranscodeActivityStatusData.TranscodePass(
+                        "id-1", "movie.mkv", "video_720p", false, Instant.now()))));
 
         ServerActivitySnapshot snapshot = controller.serverActivitySnapshot(authentication);
 
@@ -182,6 +196,8 @@ class ServerStatusControllerTest {
         assertEquals(1, snapshot.queueStats().size());
         assertEquals(1, snapshot.recentFailures().size());
         assertEquals(1, snapshot.nowPlaying().size());
+        assertEquals(1, snapshot.transcodes().size());
+        assertEquals("node-a", snapshot.transcodes().getFirst().nodeName());
     }
 
     @Test

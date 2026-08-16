@@ -8,6 +8,7 @@ import app.ister.core.eventdata.NodeActivityStatusData;
 import app.ister.core.eventdata.PlaybackCommandData;
 import app.ister.core.eventdata.PlaybackStatusData;
 import app.ister.core.eventdata.QueueStatsStatusData;
+import app.ister.core.eventdata.TranscodeActivityStatusData;
 import org.springframework.amqp.rabbit.annotation.RabbitHandler;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.aot.hint.annotation.RegisterReflectionForBinding;
@@ -25,11 +26,13 @@ import org.springframework.stereotype.Component;
 // Jackson binding of the @RabbitHandler payloads in the GraalVM native image.
 @RegisterReflectionForBinding({NodeActivityStatusData.class, QueueStatsStatusData.class,
         EventFailureStatusData.class, PlaybackStatusData.class, PlaybackCommandData.class,
-        FollowerStatusData.class, DeviceCommandData.class, DevicePresenceData.class})
+        FollowerStatusData.class, DeviceCommandData.class, DevicePresenceData.class,
+        TranscodeActivityStatusData.class})
 @RabbitListener(queues = "#{statusQueue.name}")
 public class StatusEventListener {
 
     private final NodeActivityRegistry nodeActivityRegistry;
+    private final TranscodeActivityRegistry transcodeActivityRegistry;
     private final QueueStatsRegistry queueStatsRegistry;
     private final RecentFailuresBuffer recentFailuresBuffer;
     private final PlaybackSessionRegistry playbackSessionRegistry;
@@ -37,11 +40,13 @@ public class StatusEventListener {
     private final DevicePresenceRegistry devicePresenceRegistry;
     private final ServerStatusBroadcaster broadcaster;
 
-    public StatusEventListener(NodeActivityRegistry nodeActivityRegistry, QueueStatsRegistry queueStatsRegistry,
+    public StatusEventListener(NodeActivityRegistry nodeActivityRegistry,
+                               TranscodeActivityRegistry transcodeActivityRegistry, QueueStatsRegistry queueStatsRegistry,
                                RecentFailuresBuffer recentFailuresBuffer, PlaybackSessionRegistry playbackSessionRegistry,
                                FollowerRegistry followerRegistry, DevicePresenceRegistry devicePresenceRegistry,
                                ServerStatusBroadcaster broadcaster) {
         this.nodeActivityRegistry = nodeActivityRegistry;
+        this.transcodeActivityRegistry = transcodeActivityRegistry;
         this.queueStatsRegistry = queueStatsRegistry;
         this.recentFailuresBuffer = recentFailuresBuffer;
         this.playbackSessionRegistry = playbackSessionRegistry;
@@ -53,6 +58,12 @@ public class StatusEventListener {
     @RabbitHandler
     public void onNodeActivity(NodeActivityStatusData data) {
         nodeActivityRegistry.updateNode(data);
+        broadcaster.emitActivity(data);
+    }
+
+    @RabbitHandler
+    public void onTranscodeActivity(TranscodeActivityStatusData data) {
+        transcodeActivityRegistry.update(data);
         broadcaster.emitActivity(data);
     }
 

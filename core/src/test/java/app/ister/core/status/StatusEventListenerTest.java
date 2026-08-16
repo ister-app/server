@@ -7,6 +7,7 @@ import app.ister.core.eventdata.NodeActivityStatusData;
 import app.ister.core.eventdata.PlaybackCommandData;
 import app.ister.core.eventdata.PlaybackStatusData;
 import app.ister.core.eventdata.QueueStatsStatusData;
+import app.ister.core.eventdata.TranscodeActivityStatusData;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -27,6 +28,9 @@ class StatusEventListenerTest {
 
     @Mock
     private NodeActivityRegistry nodeActivityRegistry;
+
+    @Mock
+    private TranscodeActivityRegistry transcodeActivityRegistry;
 
     @Mock
     private QueueStatsRegistry queueStatsRegistry;
@@ -52,6 +56,17 @@ class StatusEventListenerTest {
         verify(nodeActivityRegistry).updateNode(data);
         verify(broadcaster).emitActivity(data);
         verifyNoInteractions(queueStatsRegistry, recentFailuresBuffer, playbackSessionRegistry);
+    }
+
+    @Test
+    void onTranscodeActivityUpdatesTheRegistryAndBroadcasts() {
+        TranscodeActivityStatusData data = TranscodeActivityStatusData.builder().nodeName("node1").build();
+
+        subject.onTranscodeActivity(data);
+
+        verify(transcodeActivityRegistry).update(data);
+        verify(broadcaster).emitActivity(data);
+        verifyNoInteractions(nodeActivityRegistry, queueStatsRegistry, recentFailuresBuffer, playbackSessionRegistry);
     }
 
     @Test

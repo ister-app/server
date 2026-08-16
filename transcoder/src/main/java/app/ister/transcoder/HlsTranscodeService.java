@@ -235,6 +235,20 @@ public class HlsTranscodeService {
     /** Passes currently executing on a pool thread, by generation key. */
     private final ConcurrentHashMap<String, RunningPass> runningPasses = new ConcurrentHashMap<>();
 
+    /** Immutable view of one running pass, for status publication (see TranscodeActivityPublisher). */
+    public record RunningPassView(String generationKey, String mediaFileId, boolean background,
+                                  long startedAtMillis) {
+    }
+
+    /** The passes currently executing, oldest first. */
+    public List<RunningPassView> runningPassesSnapshot() {
+        return runningPasses.values().stream()
+                .map(pass -> new RunningPassView(pass.generationKey, pass.mediaFileId, pass.background,
+                        pass.startedAtMillis))
+                .sorted(Comparator.comparingLong(RunningPassView::startedAtMillis))
+                .toList();
+    }
+
     @PostConstruct
     void init() {
         concurrentFileSlots = new Semaphore(maxConcurrentFiles);

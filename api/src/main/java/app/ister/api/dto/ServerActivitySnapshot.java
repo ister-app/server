@@ -7,5 +7,6 @@ public record ServerActivitySnapshot(
         List<ServerActivityEvent> nodes,
         List<ServerActivityEvent.QueueStat> queueStats,
         List<ServerActivityEvent.EventFailure> recentFailures,
-        List<PlaybackSession> nowPlaying) {
+        List<PlaybackSession> nowPlaying,
+        List<ServerActivityEvent.TranscodePass> transcodes) {
 }

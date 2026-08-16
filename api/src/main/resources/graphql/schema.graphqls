@@ -434,6 +434,7 @@ enum ServerActivityEventType {
     NODE_ACTIVITY
     QUEUE_STATS
     FAILURE
+    TRANSCODE_ACTIVITY
 }
 
 "One status update from one node; exactly one of processing/queueStats/failure is set, matching `type`."
@@ -449,11 +450,30 @@ type ServerActivityEvent {
     failedCount: Int
     queueStats: [QueueStat!]
     failure: EventFailure
+    "The node's currently running FFmpeg transcode passes (TRANSCODE_ACTIVITY); replaces the node's previous list."
+    transcodes: [TranscodePass!]
 }
 
 type ProcessingItem {
     queue: String!
     eventType: String!
+    startedAt: String!
+    "What is being worked on (file name / entity title); null until the handler reports it."
+    subject: String
+    "Machine token for the current sub-step (e.g. \"probe\", \"crop\"); clients map it to a label and must tolerate unknown tokens."
+    step: String
+}
+
+"One running FFmpeg transcode pass on a node."
+type TranscodePass {
+    nodeName: String!
+    mediaFileId: ID!
+    "Display name of the media file (basename of its path)."
+    title: String
+    "The pass's slice of the generation key, e.g. \"video_720p\" or \"audio_0_128k\"."
+    quality: String!
+    "True for pre-transcode/prefetch work running at background priority."
+    background: Boolean!
     startedAt: String!
 }
 
@@ -511,6 +531,8 @@ type ServerActivitySnapshot {
     "Recently dead-lettered events (newest first, max 100, in-memory)."
     recentFailures: [EventFailure!]!
     nowPlaying: [PlaybackSession!]!
+    "Currently running FFmpeg transcode passes across all nodes."
+    transcodes: [TranscodePass!]!
 }
 
 enum SortingEnum {

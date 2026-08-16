@@ -154,6 +154,27 @@ class GraphQlSubscriptionIntegrationTest {
         assertNotNull(frame2, "second serverActivity frame should arrive");
     }
 
+    @Test
+    void transcodeActivityTravelsTheStatusExchangeToTheSubscription() throws Exception {
+        connectAndInit();
+        subscribe("sub-3", "subscription { serverActivity { type nodeName "
+                + "transcodes { nodeName mediaFileId title quality background startedAt } } }");
+        awaitNext("sub-3", 15); // subscriber attached (see serverActivitySubscriptionDeliversFrames)
+
+        messageSender.sendStatus(app.ister.core.eventdata.TranscodeActivityStatusData.builder()
+                .nodeName("it-node").timestamp(Instant.now())
+                .passes(java.util.List.of(app.ister.core.eventdata.TranscodeActivityStatusData.TranscodePass.builder()
+                        .mediaFileId(UUID.randomUUID().toString()).title("movie.mkv").quality("video_720p")
+                        .background(true).startedAt(Instant.now()).build()))
+                .build());
+
+        JsonNode frame = awaitNextMatching("sub-3", 15,
+                node -> "TRANSCODE_ACTIVITY".equals(node.at("/payload/data/serverActivity/type").asText()));
+        assertEquals("movie.mkv", frame.at("/payload/data/serverActivity/transcodes/0/title").asText());
+        assertEquals("video_720p", frame.at("/payload/data/serverActivity/transcodes/0/quality").asText());
+        assertTrue(frame.at("/payload/data/serverActivity/transcodes/0/background").asBoolean());
+    }
+
     private static PlaybackStatusData playbackStatus(UUID playQueueId, PlayState state, int progress) {
         return PlaybackStatusData.builder()
                 .playQueueId(playQueueId)
