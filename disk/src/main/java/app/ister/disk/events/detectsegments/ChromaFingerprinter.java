@@ -17,20 +17,35 @@ final class ChromaFingerprinter {
     static final double MIN_FREQ = 62.0;
     static final double MAX_FREQ = 3500.0;
 
+    /**
+     * Frames whose raw PCM RMS is below this (~-56 dBFS on 16-bit) are marked unvoiced: gradient
+     * hashes of near-silence are pure noise-floor comparisons, identical for any two silent
+     * passages, and would otherwise "match" across episodes — the all-silent fixture files
+     * produced a bogus whole-window outro exactly that way.
+     */
+    static final double SILENCE_RMS = 50.0;
+
     private static final int CHROMA_BINS = 12;
     private static final int ENERGY_BANDS = 8;
 
     private ChromaFingerprinter() {
     }
 
+    /** A hash sequence plus, per frame, whether the audio was loud enough to be meaningful. */
+    record Fingerprint(int[] hashes, boolean[] voiced) {
+        int length() {
+            return hashes.length;
+        }
+    }
+
     static long hopMillis(int sampleRate) {
         return HOP_SIZE * 1000L / sampleRate;
     }
 
-    /** One 32-bit hash per hop; empty input (or shorter than one frame) gives an empty array. */
-    static int[] fingerprint(short[] pcm, int sampleRate) {
+    /** One 32-bit hash per hop; empty input (or shorter than one frame) gives an empty result. */
+    static Fingerprint fingerprint(short[] pcm, int sampleRate) {
         if (pcm.length < FFT_SIZE) {
-            return new int[0];
+            return new Fingerprint(new int[0], new boolean[0]);
         }
         int frames = 1 + (pcm.length - FFT_SIZE) / HOP_SIZE;
         int[] chromaBinOfFftBin = binMapping(sampleRate, true);
@@ -38,16 +53,20 @@ final class ChromaFingerprinter {
         double[] window = hannWindow();
 
         int[] hashes = new int[frames];
+        boolean[] voiced = new boolean[frames];
         double[] prevChroma = null;
         double[] prevBands = null;
         double[] re = new double[FFT_SIZE];
         double[] im = new double[FFT_SIZE];
         for (int f = 0; f < frames; f++) {
             int offset = f * HOP_SIZE;
+            double energy = 0;
             for (int i = 0; i < FFT_SIZE; i++) {
                 re[i] = pcm[offset + i] * window[i];
                 im[i] = 0;
+                energy += (double) pcm[offset + i] * pcm[offset + i];
             }
+            voiced[f] = Math.sqrt(energy / FFT_SIZE) >= SILENCE_RMS;
             fft(re, im);
             double[] chroma = new double[CHROMA_BINS];
             double[] bands = new double[ENERGY_BANDS];
@@ -67,7 +86,7 @@ final class ChromaFingerprinter {
             prevChroma = chroma;
             prevBands = bands;
         }
-        return hashes;
+        return new Fingerprint(hashes, voiced);
     }
 
     /**

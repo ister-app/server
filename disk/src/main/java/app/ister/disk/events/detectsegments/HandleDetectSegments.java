@@ -46,7 +46,9 @@ import static app.ister.disk.events.detectsegments.SegmentMatcher.Segment;
 public class HandleDetectSegments implements Handle<DetectSegmentsData> {
 
     /** Bump to re-run detection on every file via the scanner's backfill. */
-    public static final int DETECTOR_VERSION = 1;
+    // v2: near-silent frames are excluded from matching (v1 detected a bogus
+    // whole-window outro on files with silent audio tracks).
+    public static final int DETECTOR_VERSION = 2;
 
     static final long INTRO_WINDOW_MS = 10 * 60_000L;
     static final long OUTRO_WINDOW_MS = 4 * 60_000L;
@@ -108,8 +110,8 @@ public class HandleDetectSegments implements Handle<DetectSegmentsData> {
         // Fingerprints are recomputed per event but shared within it, so the common case —
         // one event per episode of a freshly scanned season, the last one doing all the work —
         // decodes each window once, not once per pairing.
-        Map<UUID, int[]> introPrints = new HashMap<>();
-        Map<UUID, int[]> outroPrints = new HashMap<>();
+        Map<UUID, ChromaFingerprinter.Fingerprint> introPrints = new HashMap<>();
+        Map<UUID, ChromaFingerprinter.Fingerprint> outroPrints = new HashMap<>();
         Map<UUID, List<MediaFileSegmentEntity>> segmentsByFile = new LinkedHashMap<>();
         int minSupport = slices.size() == 2 ? 1 : 2;
 
@@ -218,13 +220,15 @@ public class HandleDetectSegments implements Handle<DetectSegmentsData> {
                         0, mediaFile.getDurationInMilliseconds())));
     }
 
-    private int[] introPrint(Map<UUID, int[]> cache, EpisodeSlice slice) {
+    private ChromaFingerprinter.Fingerprint introPrint(
+            Map<UUID, ChromaFingerprinter.Fingerprint> cache, EpisodeSlice slice) {
         return print(cache, slice, s -> audioPcmReader.readMonoPcm(
                 Path.of(s.mediaFile().getPath()), dirOfFFmpeg,
                 s.sliceStartMs(), Math.min(INTRO_WINDOW_MS, s.sliceLengthMs())));
     }
 
-    private int[] outroPrint(Map<UUID, int[]> cache, EpisodeSlice slice) {
+    private ChromaFingerprinter.Fingerprint outroPrint(
+            Map<UUID, ChromaFingerprinter.Fingerprint> cache, EpisodeSlice slice) {
         return print(cache, slice, s -> audioPcmReader.readMonoPcm(
                 Path.of(s.mediaFile().getPath()), dirOfFFmpeg,
                 s.sliceEndMs() - outroWindowLengthMs(s), outroWindowLengthMs(s)));
@@ -234,7 +238,8 @@ public class HandleDetectSegments implements Handle<DetectSegmentsData> {
         return Math.min(OUTRO_WINDOW_MS, slice.sliceLengthMs());
     }
 
-    private int[] print(Map<UUID, int[]> cache, EpisodeSlice slice, Function<EpisodeSlice, short[]> pcm) {
+    private ChromaFingerprinter.Fingerprint print(Map<UUID, ChromaFingerprinter.Fingerprint> cache,
+                                                  EpisodeSlice slice, Function<EpisodeSlice, short[]> pcm) {
         return cache.computeIfAbsent(slice.episodeId(),
                 id -> ChromaFingerprinter.fingerprint(pcm.apply(slice), AudioPcmReader.SAMPLE_RATE));
     }

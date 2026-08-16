@@ -3,6 +3,7 @@ package app.ister.disk.events.detectsegments;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChromaFingerprinterTest {
@@ -38,8 +39,8 @@ class ChromaFingerprinterTest {
         for (int i = 0; i < loud.length; i++) {
             soft[i] = (short) (loud[i] / 4);
         }
-        int[] loudPrint = ChromaFingerprinter.fingerprint(loud, SAMPLE_RATE);
-        int[] softPrint = ChromaFingerprinter.fingerprint(soft, SAMPLE_RATE);
+        int[] loudPrint = ChromaFingerprinter.fingerprint(loud, SAMPLE_RATE).hashes();
+        int[] softPrint = ChromaFingerprinter.fingerprint(soft, SAMPLE_RATE).hashes();
         // Quantization flips near-tie gradient bits, so not bit-exact — but well within
         // the matcher's Hamming tolerance on average.
         double avgHamming = 0;
@@ -52,7 +53,7 @@ class ChromaFingerprinterTest {
 
     @Test
     void fingerprintVariesOverAChangingMelody() {
-        int[] hashes = ChromaFingerprinter.fingerprint(melody(30_000, 20), SAMPLE_RATE);
+        int[] hashes = ChromaFingerprinter.fingerprint(melody(30_000, 20), SAMPLE_RATE).hashes();
         long distinct = java.util.Arrays.stream(hashes).distinct().count();
         assertTrue(distinct > hashes.length / 4,
                 "expected varied hashes over a changing melody, got " + distinct + " distinct of " + hashes.length);
@@ -60,7 +61,30 @@ class ChromaFingerprinterTest {
 
     @Test
     void shortInputGivesAnEmptyFingerprint() {
-        assertEquals(0, ChromaFingerprinter.fingerprint(new short[100], SAMPLE_RATE).length);
+        assertEquals(0, ChromaFingerprinter.fingerprint(new short[100], SAMPLE_RATE).length());
+    }
+
+    @Test
+    void silenceIsUnvoicedAndMusicIsVoiced() {
+        var silent = ChromaFingerprinter.fingerprint(new short[SAMPLE_RATE * 10], SAMPLE_RATE);
+        for (boolean v : silent.voiced()) {
+            assertFalse(v, "silent frames must be unvoiced");
+        }
+        var loud = ChromaFingerprinter.fingerprint(melody(10_000, 3), SAMPLE_RATE);
+        for (boolean v : loud.voiced()) {
+            assertTrue(v, "melody frames must be voiced");
+        }
+    }
+
+    @Test
+    void voicedFlipsAtTheMelodyToSilenceBoundary() {
+        short[] audio = new short[SAMPLE_RATE * 20];
+        System.arraycopy(melody(10_000, 3), 0, audio, 0, SAMPLE_RATE * 10);
+        var print = ChromaFingerprinter.fingerprint(audio, SAMPLE_RATE);
+        int boundaryFrame = (SAMPLE_RATE * 10 - ChromaFingerprinter.FFT_SIZE)
+                / ChromaFingerprinter.HOP_SIZE;
+        assertTrue(print.voiced()[boundaryFrame - 1], "just before the boundary: voiced");
+        assertFalse(print.voiced()[boundaryFrame + 3], "after the boundary: unvoiced");
     }
 
     /**

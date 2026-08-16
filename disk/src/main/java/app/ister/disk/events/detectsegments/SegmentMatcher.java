@@ -38,19 +38,22 @@ final class SegmentMatcher {
     /**
      * The longest audio run that {@code a} shares with {@code b}, in {@code a}'s window time.
      * Scans every alignment offset, then walks the best one for the longest gap-tolerant run.
+     * Unvoiced (near-silent) frames never score and never match: silence fingerprints alike
+     * everywhere, so counting it would align any two quiet passages.
      */
-    static Optional<Segment> longestCommonRun(int[] a, int[] b, long hopMs) {
-        if (a.length == 0 || b.length == 0) {
+    static Optional<Segment> longestCommonRun(
+            ChromaFingerprinter.Fingerprint a, ChromaFingerprinter.Fingerprint b, long hopMs) {
+        if (a.length() == 0 || b.length() == 0) {
             return Optional.empty();
         }
         int bestOffset = 0;
         int bestScore = 0;
-        for (int offset = -(b.length - 1); offset < a.length; offset++) {
+        for (int offset = -(b.length() - 1); offset < a.length(); offset++) {
             int score = 0;
             int from = Math.max(0, offset);
-            int to = Math.min(a.length, b.length + offset);
+            int to = Math.min(a.length(), b.length() + offset);
             for (int i = from; i < to; i++) {
-                if (Integer.bitCount(a[i] ^ b[i - offset]) <= ALIGN_MAX_HAMMING) {
+                if (pairMatches(a, b, i, offset, ALIGN_MAX_HAMMING)) {
                     score++;
                 }
             }
@@ -65,15 +68,27 @@ final class SegmentMatcher {
         return longestRunAtOffset(a, b, bestOffset, hopMs);
     }
 
-    private static Optional<Segment> longestRunAtOffset(int[] a, int[] b, int offset, long hopMs) {
+    /** Both frames voiced and their hashes within the Hamming budget. */
+    private static boolean pairMatches(ChromaFingerprinter.Fingerprint a,
+                                       ChromaFingerprinter.Fingerprint b,
+                                       int i, int offset, int maxHamming) {
+        return a.voiced()[i]
+                && b.voiced()[i - offset]
+                && Integer.bitCount(a.hashes()[i] ^ b.hashes()[i - offset]) <= maxHamming;
+    }
+
+    private static Optional<Segment> longestRunAtOffset(
+            ChromaFingerprinter.Fingerprint a, ChromaFingerprinter.Fingerprint b, int offset, long hopMs) {
         int from = Math.max(0, offset);
-        int to = Math.min(a.length, b.length + offset);
+        int to = Math.min(a.length(), b.length() + offset);
         int bestStart = -1;
         int bestLength = 0;
         int runStart = -1;
         int lastMatch = -1;
         for (int i = from; i < to; i++) {
-            if (Integer.bitCount(a[i] ^ b[i - offset]) <= RUN_MAX_HAMMING) {
+            // An unvoiced pair counts as a mismatch: it cannot start a run, and
+            // RUN_MAX_GAP bounds how much silence a run may bridge.
+            if (pairMatches(a, b, i, offset, RUN_MAX_HAMMING)) {
                 if (runStart < 0 || i - lastMatch > RUN_MAX_GAP + 1) {
                     runStart = i;
                 }

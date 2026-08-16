@@ -22,7 +22,7 @@ class SegmentMatcherTest {
         System.arraycopy(shared, 0, a, 100, shared.length);
         System.arraycopy(shared, 0, b, 400, shared.length);
 
-        Optional<Segment> run = SegmentMatcher.longestCommonRun(a, b, HOP_MS);
+        Optional<Segment> run = SegmentMatcher.longestCommonRun(voiced(a), voiced(b), HOP_MS);
 
         assertTrue(run.isPresent());
         assertEquals(100 * HOP_MS, run.get().startMs());
@@ -40,7 +40,7 @@ class SegmentMatcherTest {
         a[140] = ~a[140];
         a[141] = ~a[141];
 
-        Optional<Segment> run = SegmentMatcher.longestCommonRun(a, b, HOP_MS);
+        Optional<Segment> run = SegmentMatcher.longestCommonRun(voiced(a), voiced(b), HOP_MS);
 
         assertTrue(run.isPresent());
         assertEquals(200 * HOP_MS, run.get().lengthMs(), "the gap must not split the run");
@@ -49,13 +49,15 @@ class SegmentMatcherTest {
     @Test
     void unrelatedEpisodesShareNothing() {
         Optional<Segment> run = SegmentMatcher.longestCommonRun(
-                randomHashes(1000, 4), randomHashes(1000, 5), HOP_MS);
+                voiced(randomHashes(1000, 4)), voiced(randomHashes(1000, 5)), HOP_MS);
         assertTrue(run.isEmpty());
     }
 
     @Test
     void emptyFingerprintsShareNothing() {
-        assertTrue(SegmentMatcher.longestCommonRun(new int[0], randomHashes(100, 1), HOP_MS).isEmpty());
+        assertTrue(SegmentMatcher
+        .longestCommonRun(voiced(new int[0]), voiced(randomHashes(100, 1)), HOP_MS)
+        .isEmpty());
     }
 
     @Test
@@ -99,6 +101,40 @@ class SegmentMatcherTest {
                 new Segment(3_000, 40_000), new Segment(4_000, 41_000)), 2);
         assertTrue(segment.isPresent());
         assertEquals(0, segment.get().startMs());
+    }
+
+    @Test
+    void allSilentWindowsShareNothing() {
+        // Regression: silent audio fingerprints identically everywhere, which produced a
+        // bogus whole-window "outro" on fixture files with deliberate silent tracks.
+        var silentA = ChromaFingerprinter.fingerprint(
+                new short[AudioPcmReader.SAMPLE_RATE * 60], AudioPcmReader.SAMPLE_RATE);
+        var silentB = ChromaFingerprinter.fingerprint(
+                new short[AudioPcmReader.SAMPLE_RATE * 60], AudioPcmReader.SAMPLE_RATE);
+        assertTrue(SegmentMatcher.longestCommonRun(silentA, silentB, HOP_MS).isEmpty());
+    }
+
+    @Test
+    void aRunDoesNotExtendIntoSharedSilence() {
+        // Both episodes: the same 20 s melody followed by 40 s of silence.
+        short[] audio = new short[AudioPcmReader.SAMPLE_RATE * 60];
+        System.arraycopy(ChromaFingerprinterTest.melody(20_000, 5), 0, audio, 0,
+                AudioPcmReader.SAMPLE_RATE * 20);
+        var a = ChromaFingerprinter.fingerprint(audio, AudioPcmReader.SAMPLE_RATE);
+        var b = ChromaFingerprinter.fingerprint(audio.clone(), AudioPcmReader.SAMPLE_RATE);
+
+        Optional<Segment> run = SegmentMatcher.longestCommonRun(a, b, HOP_MS);
+
+        assertTrue(run.isPresent());
+        assertTrue(Math.abs(run.get().endMs() - 20_000) <= 2_000,
+                "run must stop at the silence boundary, ended at " + run.get().endMs());
+    }
+
+    /** Hash sequence where every frame is loud enough to count. */
+    private static ChromaFingerprinter.Fingerprint voiced(int[] hashes) {
+        boolean[] flags = new boolean[hashes.length];
+        java.util.Arrays.fill(flags, true);
+        return new ChromaFingerprinter.Fingerprint(hashes, flags);
     }
 
     private static int[] randomHashes(int length, long seed) {
