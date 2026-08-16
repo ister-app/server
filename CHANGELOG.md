@@ -1,5 +1,38 @@
 # Changelog
 
+## server v2.14.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.14.0` |
+| `ghcr.io/ister-app/migrations` | `2.14.0` |
+
+### Features
+
+- feat(disk): detect baked-in black bars with cropdetect ([`88eb0fa`](https://github.com/ister-app/server/commit/88eb0fa))
+
+### Fixes
+
+- fix(disk): decode cropdetect samples instead of streamcopying ([`3a3d47b`](https://github.com/ister-app/server/commit/3a3d47b))
+- fix(disk): let rescans reach MediaFileScanner.analyze for existing files ([`087a458`](https://github.com/ister-app/server/commit/087a458))
+- fix(worker): pace MusicBrainz requests globally to one per second ([`8b52c77`](https://github.com/ister-app/server/commit/8b52c77))
+- fix(transcoder): cap sanitized subtitle cues at six seconds ([`5a27ba5`](https://github.com/ister-app/server/commit/5a27ba5))
+- fix(transcoder): write each subtitle cue only into its start segment ([`ec761eb`](https://github.com/ister-app/server/commit/ec761eb))
+- fix(transcoder): sanitize bogus subtitle cue durations and version the VTT cache ([`0e1f4d6`](https://github.com/ister-app/server/commit/0e1f4d6))
+- fix(disk): OCR language fallback and subtitle re-extract on rescan ([`3accf45`](https://github.com/ister-app/server/commit/3accf45))
+
+### Other
+
+- chore: rebuild snapshot image ([`2d6f075`](https://github.com/ister-app/server/commit/2d6f075))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.14.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.13.0...v2.14.0
+
 ## server v2.13.0
 
 | Image | Tag |
