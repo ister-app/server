@@ -36,6 +36,24 @@ final class ChromaFingerprinter {
         int length() {
             return hashes.length;
         }
+
+        // Content-based equality: the default record implementation compares array identity.
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Fingerprint(int[] otherHashes, boolean[] otherVoiced)
+                    && java.util.Arrays.equals(hashes, otherHashes)
+                    && java.util.Arrays.equals(voiced, otherVoiced);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * java.util.Arrays.hashCode(hashes) + java.util.Arrays.hashCode(voiced);
+        }
+
+        @Override
+        public String toString() {
+            return "Fingerprint[frames=" + hashes.length + "]";
+        }
     }
 
     static long hopMillis(int sampleRate) {
@@ -148,16 +166,17 @@ final class ChromaFingerprinter {
     /** In-place iterative radix-2 FFT; length must be a power of two. */
     static void fft(double[] re, double[] im) {
         int n = re.length;
-        // Bit-reversal permutation.
-        for (int i = 1, j = 0; i < n; i++) {
+        // Bit-reversal permutation. `reversed` is the running bit-reversed index of i.
+        int reversed = 0;
+        for (int i = 1; i < n; i++) {
             int bit = n >> 1;
-            for (; (j & bit) != 0; bit >>= 1) {
-                j ^= bit;
+            for (; (reversed & bit) != 0; bit >>= 1) {
+                reversed ^= bit;
             }
-            j |= bit;
-            if (i < j) {
-                double t = re[i]; re[i] = re[j]; re[j] = t;
-                t = im[i]; im[i] = im[j]; im[j] = t;
+            reversed |= bit;
+            if (i < reversed) {
+                double t = re[i]; re[i] = re[reversed]; re[reversed] = t;
+                t = im[i]; im[i] = im[reversed]; im[reversed] = t;
             }
         }
         for (int len = 2; len <= n; len <<= 1) {

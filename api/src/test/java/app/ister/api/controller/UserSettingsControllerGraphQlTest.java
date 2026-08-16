@@ -48,9 +48,12 @@ class UserSettingsControllerGraphQlTest {
         when(userSettingsService.get(any())).thenReturn(
                 new UserSettings(List.of("en"), List.of(), true, true, null, true));
 
-        graphQlTester.document("{ userSettings { directPlay autoSkipIntro } }")
+        Boolean autoSkipIntro = graphQlTester
+                .document("{ userSettings { directPlay autoSkipIntro } }")
                 .execute()
-                .path("userSettings.autoSkipIntro").entity(Boolean.class).isEqualTo(true);
+                .path("userSettings.autoSkipIntro").entity(Boolean.class).get();
+
+        assertTrue(autoSkipIntro);
     }
 
     @Test

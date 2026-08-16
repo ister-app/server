@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -96,7 +97,7 @@ class HandleDetectSegmentsTest {
         subject.handle(event());
 
         ArgumentCaptor<List<MediaFileSegmentEntity>> captor = ArgumentCaptor.captor();
-        verify(mediaFileSegmentRepository, org.mockito.Mockito.times(3)).saveAll(captor.capture());
+        verify(mediaFileSegmentRepository, times(3)).saveAll(captor.capture());
         for (List<MediaFileSegmentEntity> rows : captor.getAllValues()) {
             MediaFileSegmentEntity intro = rows.stream().filter(r -> r.getType() == SegmentType.INTRO)
                     .findFirst().orElseThrow();
@@ -112,7 +113,7 @@ class HandleDetectSegmentsTest {
             rows.forEach(r -> assertEquals(null, r.getEpisodeEntityId()));
         }
         files.forEach(f -> assertEquals(HandleDetectSegments.DETECTOR_VERSION, f.getSegmentDetectorVersion()));
-        verify(mediaFileRepository, org.mockito.Mockito.times(3)).save(any());
+        verify(mediaFileRepository, times(3)).save(any());
     }
 
     @Test

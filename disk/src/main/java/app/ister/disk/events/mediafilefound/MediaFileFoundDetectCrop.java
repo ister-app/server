@@ -106,7 +106,10 @@ public class MediaFileFoundDetectCrop {
 
     /** Union of the picture areas: keeps everything any sample considered picture. */
     static CropRect union(List<CropRect> samples) {
-        int x = Integer.MAX_VALUE, y = Integer.MAX_VALUE, right = 0, bottom = 0;
+        int x = Integer.MAX_VALUE;
+        int y = Integer.MAX_VALUE;
+        int right = 0;
+        int bottom = 0;
         for (CropRect s : samples) {
             x = Math.min(x, s.x());
             y = Math.min(y, s.y());

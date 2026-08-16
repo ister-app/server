@@ -54,7 +54,7 @@ public class HlsSubtitleService {
             Path marker = generationMarker(cacheDir, subtitleId);
             return Files.exists(marker)
                     && String.valueOf(SUBTITLE_GENERATION).equals(Files.readString(marker).trim());
-        } catch (IOException e) {
+        } catch (IOException _) {
             return false;
         }
     }

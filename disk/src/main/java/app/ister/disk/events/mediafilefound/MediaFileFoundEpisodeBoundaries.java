@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Computes where each episode starts inside a multi-episode media file (s04e06-e07.mkv).
@@ -58,15 +59,15 @@ public class MediaFileFoundEpisodeBoundaries {
         if (chapterStarts.size() > episodeCount) {
             // Scene markers: for every boundary pick the chapter closest to the equal-split point,
             // as long as that keeps the boundaries increasing and no episode implausibly short.
-            List<Long> starts = pickNearestChapters(chapterStarts, durationInMilliseconds, episodeCount);
-            if (starts != null) {
-                return starts;
+            Optional<List<Long>> starts = pickNearestChapters(chapterStarts, durationInMilliseconds, episodeCount);
+            if (starts.isPresent()) {
+                return starts.get();
             }
         }
         return equalSplit(durationInMilliseconds, episodeCount);
     }
 
-    private static List<Long> pickNearestChapters(List<Long> chapterStarts, long durationInMilliseconds, int episodeCount) {
+    private static Optional<List<Long>> pickNearestChapters(List<Long> chapterStarts, long durationInMilliseconds, int episodeCount) {
         long expectedLength = durationInMilliseconds / episodeCount;
         List<Long> starts = new ArrayList<>(List.of(0L));
         for (int boundary = 1; boundary < episodeCount; boundary++) {
@@ -77,11 +78,11 @@ public class MediaFileFoundEpisodeBoundaries {
             long previous = starts.getLast();
             if (nearest - previous < MIN_SEGMENT_FRACTION * expectedLength
                     || durationInMilliseconds - nearest < MIN_SEGMENT_FRACTION * expectedLength) {
-                return null;
+                return Optional.empty();
             }
             starts.add(nearest);
         }
-        return starts;
+        return Optional.of(starts);
     }
 
     private static List<Long> equalSplit(long durationInMilliseconds, int episodeCount) {

@@ -34,7 +34,7 @@ public class SubtitleFilePathParser {
      * - /mnt/shows/Show (2018)/Season 01/s01e01.en.srt
      * - /mnt/shows/Show (2018)/Season 01/s01e01.mkv
      */
-    public static Boolean mediaFileAndSubtitleFileBelongTogether(String mediaFilePath, String subtitleFilePath) {
+    public static boolean mediaFileAndSubtitleFileBelongTogether(String mediaFilePath, String subtitleFilePath) {
         return subtitleFilePath.contains(removeExtension(mediaFilePath));
     }
 

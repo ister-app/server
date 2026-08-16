@@ -109,46 +109,43 @@ public class MediaFileScanner implements Scanner {
                     .size(size).build();
             mediaFileRepository.save(entity);
             createEpisodeLinks(entity, episodeIds);
-            messageSender.sendMediaFileFound(MediaFileFoundData.builder()
-                    .eventType(EventType.MEDIA_FILE_FOUND)
-                    .directoryEntityUUID(directoryEntity.getId())
-                    .episodeEntityUUID(episodeId)
-                    .episodeEntityUUIDs(episodeIds.isEmpty() ? null : episodeIds)
-                    .movieEntityUUID(movieId)
-                    .path(path.toString()).build(), directoryEntity.getName());
-        } else if (episodeIds.size() > 1
-                && mediaFileEpisodeRepository.findByMediaFileEntityIdOrderByPartNumber(mediaFile.get().getId()).isEmpty()) {
+            sendMediaFileFound(directoryEntity, path, episodeId, episodeIds.isEmpty() ? null : episodeIds, movieId);
+        } else {
+            maybeBackfill(directoryEntity, path, mediaFile.get(), episodeEntity, episodeId, episodeIds, movieId);
+        }
+        return Optional.ofNullable(episodeEntity.orElse(null));
+    }
+
+    /**
+     * One backfill per file per rescan, in priority order, for files that predate a
+     * feature: multi-episode links, crop detection, intro/outro segments, subtitle OCR.
+     * Each branch is idempotent, so firing at most one of them per pass converges over
+     * a few rescans without flooding the analyzer.
+     */
+    private void maybeBackfill(DirectoryEntity directoryEntity, Path path, MediaFileEntity mediaFile,
+                               Optional<EpisodeEntity> episodeEntity, UUID episodeId, List<UUID> episodeIds,
+                               UUID movieId) {
+        if (episodeIds.size() > 1
+                && mediaFileEpisodeRepository.findByMediaFileEntityIdOrderByPartNumber(mediaFile.getId()).isEmpty()) {
             // Backfill for files scanned before multi-episode support: the file row exists but the
             // range episodes and their link rows do not. Create them and re-analyze so the episode
             // boundaries get computed. Idempotent: the next rescan finds the link rows and skips this.
             log.info("Backfilling multi-episode links for {}", path);
-            createEpisodeLinks(mediaFile.get(), episodeIds);
-            messageSender.sendMediaFileFound(MediaFileFoundData.builder()
-                    .eventType(EventType.MEDIA_FILE_FOUND)
-                    .directoryEntityUUID(directoryEntity.getId())
-                    .episodeEntityUUID(episodeId)
-                    .episodeEntityUUIDs(episodeIds)
-                    .movieEntityUUID(null)
-                    .path(path.toString()).build(), directoryEntity.getName());
+            createEpisodeLinks(mediaFile, episodeIds);
+            sendMediaFileFound(directoryEntity, path, episodeId, episodeIds, null);
         } else if (cropDetectBackfill
-                && !cropDetectRequested.contains(mediaFile.get().getId())
-                && needsCropDetect(mediaFile.get().getId())) {
+                && !cropDetectRequested.contains(mediaFile.getId())
+                && needsCropDetect(mediaFile.getId())) {
             // Backfill for files analyzed before crop detection existed: null
             // crop columns on a video stream mean detection never ran (a
             // detected "no bars" is stored as the full frame). Re-analysis
             // writes the columns, so this fires at most once per file.
-            cropDetectRequested.add(mediaFile.get().getId());
+            cropDetectRequested.add(mediaFile.getId());
             log.info("Detecting baked-in black bars for {}", path);
-            messageSender.sendMediaFileFound(MediaFileFoundData.builder()
-                    .eventType(EventType.MEDIA_FILE_FOUND)
-                    .directoryEntityUUID(directoryEntity.getId())
-                    .episodeEntityUUID(episodeId)
-                    .episodeEntityUUIDs(episodeIds.isEmpty() ? null : episodeIds)
-                    .movieEntityUUID(movieId)
-                    .path(path.toString()).build(), directoryEntity.getName());
+            sendMediaFileFound(directoryEntity, path, episodeId, episodeIds.isEmpty() ? null : episodeIds, movieId);
         } else if (segmentDetectBackfill
                 && episodeEntity.isPresent()
-                && needsSegmentDetect(mediaFile.get())
+                && needsSegmentDetect(mediaFile)
                 && segmentDetectRequested.add(episodeEntity.get().getSeasonEntity().getId())) {
             // Backfill for episode files analyzed before intro/outro detection existed: a null
             // (or outdated) detector version means detection never ran — "ran, found nothing"
@@ -160,23 +157,27 @@ public class MediaFileScanner implements Scanner {
                     .seasonEntityUUID(episodeEntity.get().getSeasonEntity().getId())
                     .directoryEntityUUID(directoryEntity.getId())
                     .build(), directoryEntity.getName());
-        } else if (!subtitleReextractRequested.contains(mediaFile.get().getId())
-                && needsSubtitleReextract(mediaFile.get().getId())) {
+        } else if (!subtitleReextractRequested.contains(mediaFile.getId())
+                && needsSubtitleReextract(mediaFile.getId())) {
             // Backfill for files whose image subtitles (DVD/PGS bitmaps) never produced an
             // OCR'd SRT — scanned before OCR existed, or the OCR failed (e.g. an untagged
             // language before the fallback). Re-analysis re-runs extraction; idempotent
             // because stream rows are rewritten and existing SRTs on disk are skipped.
-            subtitleReextractRequested.add(mediaFile.get().getId());
+            subtitleReextractRequested.add(mediaFile.getId());
             log.info("Re-extracting image subtitles for {}", path);
-            messageSender.sendMediaFileFound(MediaFileFoundData.builder()
-                    .eventType(EventType.MEDIA_FILE_FOUND)
-                    .directoryEntityUUID(directoryEntity.getId())
-                    .episodeEntityUUID(episodeId)
-                    .episodeEntityUUIDs(episodeIds.isEmpty() ? null : episodeIds)
-                    .movieEntityUUID(movieId)
-                    .path(path.toString()).build(), directoryEntity.getName());
+            sendMediaFileFound(directoryEntity, path, episodeId, episodeIds.isEmpty() ? null : episodeIds, movieId);
         }
-        return Optional.ofNullable(episodeEntity.orElse(null));
+    }
+
+    private void sendMediaFileFound(DirectoryEntity directoryEntity, Path path, UUID episodeId,
+                                    List<UUID> episodeIds, UUID movieId) {
+        messageSender.sendMediaFileFound(MediaFileFoundData.builder()
+                .eventType(EventType.MEDIA_FILE_FOUND)
+                .directoryEntityUUID(directoryEntity.getId())
+                .episodeEntityUUID(episodeId)
+                .episodeEntityUUIDs(episodeIds)
+                .movieEntityUUID(movieId)
+                .path(path.toString()).build(), directoryEntity.getName());
     }
 
     /**

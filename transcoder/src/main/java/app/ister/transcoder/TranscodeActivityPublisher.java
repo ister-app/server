@@ -15,7 +15,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -72,7 +72,7 @@ public class TranscodeActivityPublisher {
                         Instant.ofEpochMilli(pass.startedAtMillis())))
                 .toList();
         long nowMillis = System.currentTimeMillis();
-        boolean unchanged = Objects.equals(passes, lastPasses);
+        boolean unchanged = passes.equals(lastPasses);
         if (unchanged && passes.isEmpty()) {
             return; // Idle, and the empty transition (if any) was already published.
         }
@@ -98,20 +98,26 @@ public class TranscodeActivityPublisher {
                 return cached;
             }
         }
-        String title = readOnlyTransaction.execute(status -> {
-            try {
-                return mediaFileRepository.findById(UUID.fromString(mediaFileId))
-                        .map(file -> Path.of(file.getPath()).getFileName().toString())
-                        .orElse(null);
-            } catch (IllegalArgumentException e) {
-                return null; // Not a UUID-keyed pass; leave the title empty.
-            }
-        });
+        String title = lookupTitle(mediaFileId).orElse(null);
         if (title != null) {
             synchronized (titleCache) {
                 titleCache.put(mediaFileId, title);
             }
         }
         return title;
+    }
+
+    /** Basename of the media file's path; empty for non-UUID pass keys or a missing row. */
+    private Optional<String> lookupTitle(String mediaFileId) {
+        UUID id;
+        try {
+            id = UUID.fromString(mediaFileId);
+        } catch (IllegalArgumentException _) {
+            return Optional.empty(); // Not a UUID-keyed pass; leave the title empty.
+        }
+        return Optional.ofNullable(readOnlyTransaction.execute(status ->
+                mediaFileRepository.findById(id)
+                        .map(file -> Path.of(file.getPath()).getFileName().toString())
+                        .orElse(null)));
     }
 }

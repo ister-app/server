@@ -24,6 +24,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -85,50 +86,66 @@ public class MediaFileFoundExtractSubtitles {
             if (stream.getCodecType() != StreamCodecType.SUBTITLE) {
                 continue;
             }
-            String lang = normalizeLanguage(stream.getLanguage());
-            String srtFilename = mediaFile.getId() + "_" + stream.getStreamIndex() + "_" + lang + ".srt";
-            Path srtPath = Paths.get(cacheDir.getPath(), srtFilename);
-
-            String codecName = stream.getCodecName() != null ? stream.getCodecName().toLowerCase() : "";
-            boolean extracted = false;
-
-            if (Files.exists(srtPath)) {
-                log.debug("SRT already extracted, skipping: {}", srtPath);
-                extracted = true;
-            } else if (TEXT_SUBTITLE_CODECS.contains(codecName)) {
-                extracted = extractTextSubtitle(mediaFile.getPath(), subIdx, srtPath, ffmpegDir);
-            } else if (IMAGE_SUBTITLE_CODECS.contains(codecName)) {
-                String ocrLang = resolveOcrLanguage(lang, streams);
-                if (ocrLang == null) {
-                    log.warn("No usable OCR language for {} stream {} — set app.ister.server.subtitle-ocr-default-language to enable OCR for untagged subtitles",
-                            mediaFile.getPath(), stream.getStreamIndex());
-                } else {
-                    extracted = extractImageSubtitle(mediaFile.getPath(), subIdx, srtPath, ocrLang, ffmpegDir);
-                    // An untagged stream keeps "und" in its filename, but the
-                    // row gets the OCR language so the player's
-                    // language-preference matching can find it.
-                    if (extracted && "und".equals(lang)) {
-                        lang = ocrLang;
-                    }
-                }
-            } else {
-                log.debug("Skipping subtitle stream {} with unsupported codec: {}", stream.getStreamIndex(), codecName);
-            }
-
-            if (extracted) {
-                result.add(MediaFileStreamEntity.builder()
-                        .mediaFileEntity(mediaFile)
-                        .streamIndex(stream.getStreamIndex())
-                        .codecName("subtitle srt")
-                        .codecType(StreamCodecType.EXTERNAL_SUBTITLE)
-                        .language(lang)
-                        .title(stream.getTitle())
-                        .path(srtPath.toString())
-                        .build());
-            }
+            extractOne(mediaFile, streams, stream, subIdx, cacheDir, ffmpegDir).ifPresent(result::add);
             subIdx++;
         }
         return result;
+    }
+
+    private Optional<MediaFileStreamEntity> extractOne(
+            MediaFileEntity mediaFile, List<MediaFileStreamEntity> streams, MediaFileStreamEntity stream,
+            int subIdx, DirectoryEntity cacheDir, String ffmpegDir) {
+        String lang = normalizeLanguage(stream.getLanguage());
+        String srtFilename = mediaFile.getId() + "_" + stream.getStreamIndex() + "_" + lang + ".srt";
+        Path srtPath = Paths.get(cacheDir.getPath(), srtFilename);
+
+        String codecName = stream.getCodecName() != null ? stream.getCodecName().toLowerCase() : "";
+        boolean extracted = false;
+
+        if (Files.exists(srtPath)) {
+            log.debug("SRT already extracted, skipping: {}", srtPath);
+            extracted = true;
+        } else if (TEXT_SUBTITLE_CODECS.contains(codecName)) {
+            extracted = extractTextSubtitle(mediaFile.getPath(), subIdx, srtPath, ffmpegDir);
+        } else if (IMAGE_SUBTITLE_CODECS.contains(codecName)) {
+            String effectiveLang = ocrExtract(mediaFile, streams, stream, subIdx, srtPath, lang, ffmpegDir);
+            if (effectiveLang != null) {
+                extracted = true;
+                lang = effectiveLang;
+            }
+        } else {
+            log.debug("Skipping subtitle stream {} with unsupported codec: {}", stream.getStreamIndex(), codecName);
+        }
+
+        if (!extracted) {
+            return Optional.empty();
+        }
+        return Optional.of(MediaFileStreamEntity.builder()
+                .mediaFileEntity(mediaFile)
+                .streamIndex(stream.getStreamIndex())
+                .codecName("subtitle srt")
+                .codecType(StreamCodecType.EXTERNAL_SUBTITLE)
+                .language(lang)
+                .title(stream.getTitle())
+                .path(srtPath.toString())
+                .build());
+    }
+
+    /** OCRs an image subtitle; returns the language for the stream row, or null when not extracted. */
+    private String ocrExtract(MediaFileEntity mediaFile, List<MediaFileStreamEntity> streams,
+                              MediaFileStreamEntity stream, int subIdx, Path srtPath, String lang, String ffmpegDir) {
+        String ocrLang = resolveOcrLanguage(lang, streams);
+        if (ocrLang == null) {
+            log.warn("No usable OCR language for {} stream {} — set app.ister.server.subtitle-ocr-default-language to enable OCR for untagged subtitles",
+                    mediaFile.getPath(), stream.getStreamIndex());
+            return null;
+        }
+        if (!extractImageSubtitle(mediaFile.getPath(), subIdx, srtPath, ocrLang, ffmpegDir)) {
+            return null;
+        }
+        // An untagged stream keeps "und" in its filename, but the row gets the OCR
+        // language so the player's language-preference matching can find it.
+        return "und".equals(lang) ? ocrLang : lang;
     }
 
     private String normalizeLanguage(String lang) {

@@ -84,35 +84,13 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
 
     @Override
     public FileVisitResult visitFile(Path path, BasicFileAttributes basicFileAttributes) {
-        boolean isMusic = libraryTypeIs(LibraryType.MUSIC);
-        boolean isBook = libraryTypeIs(LibraryType.BOOK);
-        boolean isComic = libraryTypeIs(LibraryType.COMIC);
-        boolean directoryScoped = isMusic || isBook || isComic;
-        List<Scanner> scannerList;
-        if (isMusic) {
-            scannerList = List.of(scanners.audio(), scanners.image(), scanners.nfo());
-        } else if (isBook) {
-            scannerList = List.of(scanners.epub(), scanners.audio(), scanners.image(), scanners.nfo());
-        } else if (isComic) {
-            scannerList = List.of(scanners.comic(), scanners.image());
-        } else {
-            scannerList = List.of(scanners.mediaFile(), scanners.image(), scanners.nfo(), scanners.subtitle());
-        }
-        for (Scanner scanner : scannerList) {
+        boolean directoryScoped = libraryTypeIs(LibraryType.MUSIC) || libraryTypeIs(LibraryType.BOOK)
+                || libraryTypeIs(LibraryType.COMIC);
+        for (Scanner scanner : scannersForLibrary()) {
             boolean canAnalyze = directoryScoped
                     ? directoryScopedAnalyzable(scanner, path, basicFileAttributes)
                     : scanner.analyzable(path, basicFileAttributes.isRegularFile(), basicFileAttributes.size());
-            boolean alreadyScanned;
-            if (directoryScoped && scanner instanceof AudioScanner) {
-                alreadyScanned = scannedCache.foundMusicAudioPath(path.toString());
-            } else if (scanner instanceof MediaFileScanner) {
-                // Media files re-run analyze on every rescan (cheap when
-                // up-to-date) so its backfills can fire; see foundMediaFilePath.
-                alreadyScanned = scannedCache.foundMediaFilePath(path.toString());
-            } else {
-                alreadyScanned = scannedCache.foundPath(path.toString());
-            }
-            if (canAnalyze && !alreadyScanned) {
+            if (canAnalyze && !alreadyScanned(scanner, directoryScoped, path)) {
                 log.debug("Found file: {}, for scanner: {}", path, scanner);
                 messageSender.sendFileScanRequested(FileScanRequestedData.builder()
                         .path(path)
@@ -124,6 +102,31 @@ class AnalyzerSimpleFileVisitor extends SimpleFileVisitor<Path> {
             }
         }
         return FileVisitResult.CONTINUE;
+    }
+
+    private List<Scanner> scannersForLibrary() {
+        if (libraryTypeIs(LibraryType.MUSIC)) {
+            return List.of(scanners.audio(), scanners.image(), scanners.nfo());
+        }
+        if (libraryTypeIs(LibraryType.BOOK)) {
+            return List.of(scanners.epub(), scanners.audio(), scanners.image(), scanners.nfo());
+        }
+        if (libraryTypeIs(LibraryType.COMIC)) {
+            return List.of(scanners.comic(), scanners.image());
+        }
+        return List.of(scanners.mediaFile(), scanners.image(), scanners.nfo(), scanners.subtitle());
+    }
+
+    private boolean alreadyScanned(Scanner scanner, boolean directoryScoped, Path path) {
+        if (directoryScoped && scanner instanceof AudioScanner) {
+            return scannedCache.foundMusicAudioPath(path.toString());
+        }
+        if (scanner instanceof MediaFileScanner) {
+            // Media files re-run analyze on every rescan (cheap when
+            // up-to-date) so its backfills can fire; see foundMediaFilePath.
+            return scannedCache.foundMediaFilePath(path.toString());
+        }
+        return scannedCache.foundPath(path.toString());
     }
 
     /** Music and book libraries use the directory-aware analyzable overloads (path parsing needs the library root). */

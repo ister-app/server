@@ -6,6 +6,7 @@ import app.ister.core.enums.DeviceCommandType;
 import app.ister.core.enums.DevicePlatform;
 import app.ister.core.enums.MediaType;
 import app.ister.core.eventdata.DeviceCommandData;
+import app.ister.core.eventdata.PlaybackStatusData;
 import app.ister.core.service.DeviceService;
 import app.ister.core.service.UserService;
 import app.ister.core.status.DeviceCommandService;
@@ -130,8 +131,8 @@ public class DeviceController {
             return false;
         }
         if (args.command() == DeviceCommandType.HANDOFF_QUEUE) {
-            // The queue moves on to targetDeviceId, so that device must be an own, online one too;
-            // a handoff to the device itself would be a no-op loop.
+            // The queue moves on to the target device, which must therefore also be an own and
+            // online device. Handing off to the sending device itself would be a pointless loop.
             if (args.targetDeviceId() == null || args.targetDeviceId().equals(args.deviceId())
                     || deviceService.findOwned(userId, args.targetDeviceId()).isEmpty()
                     || !devicePresenceRegistry.isOnline(userId, args.targetDeviceId())) {
@@ -140,7 +141,7 @@ public class DeviceController {
             // The recipient must actually be the device playing the queue; a session without a
             // device id is allowed through and left to the recipient's own-live-queue guard.
             UUID sessionDeviceId = playbackSessionRegistry.find(args.playQueueId())
-                    .map(session -> session.getDeviceId()).orElse(null);
+                    .map(PlaybackStatusData::getDeviceId).orElse(null);
             if (sessionDeviceId != null && !sessionDeviceId.equals(args.deviceId())) {
                 return false;
             }
