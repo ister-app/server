@@ -1,5 +1,38 @@
 # Changelog
 
+## server v2.15.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.15.0` |
+| `ghcr.io/ister-app/migrations` | `2.15.0` |
+
+### Features
+
+- feat(transcoder): publish running transcode passes on the status exchange ([`40d8d1a`](https://github.com/ister-app/server/commit/40d8d1a))
+- feat(core): report subject and sub-step on in-flight activity items ([`58f3068`](https://github.com/ister-app/server/commit/58f3068))
+- feat(api): expose media segments and autoSkipIntro over GraphQL ([`05124b4`](https://github.com/ister-app/server/commit/05124b4))
+- feat(disk): audio-fingerprint intro/outro detection per season ([`6d0c93c`](https://github.com/ister-app/server/commit/6d0c93c))
+- feat(database): media file segments table, detector sentinel and autoSkipIntro setting ([`b3caf22`](https://github.com/ister-app/server/commit/b3caf22))
+
+### Fixes
+
+- fix(disk): chunk segment detection to stay under the RabbitMQ consumer timeout ([`d6f4104`](https://github.com/ister-app/server/commit/d6f4104))
+- fix(disk): cap intro start to the first half of an episode ([`d498a3c`](https://github.com/ister-app/server/commit/d498a3c))
+- fix(disk): ignore near-silent audio in segment detection ([`0353aea`](https://github.com/ister-app/server/commit/0353aea))
+
+### Other
+
+- refactor: resolve the 18 open SonarCloud issues ([`4969b9d`](https://github.com/ister-app/server/commit/4969b9d))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.15.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.14.0...v2.15.0
+
 ## server v2.14.0
 
 | Image | Tag |
