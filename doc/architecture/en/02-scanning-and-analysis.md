@@ -84,6 +84,16 @@ detection everywhere via the same backfill. Known limitation: a season spread ov
 only pairs the episodes local to each node — a node holding a single stray episode detects nothing
 for it.
 
+That idempotence is serial, not concurrent. Recomputing a file is a delete-then-insert, and two
+transactions doing it for the same season neither see nor cancel each other's rows, so a
+re-analysis sweep — one message per file, all for the same few seasons — stored every segment once
+per consumer. A chunk therefore claims its season with a **non-blocking** advisory lock
+(`pg_try_advisory_xact_lock`, namespace 1, key `hashtext(seasonId)`); a message that does not get
+the claim is dropped rather than retried, because the holder's chunk chain covers the whole season
+anyway. Blocking instead would idle a listener thread for the minutes a season takes and walk into
+the same `consumer_timeout`. A unique index on (file, type, episode) with `NULLS NOT DISTINCT`
+(V39, which also de-duplicated the existing rows) is the backstop.
+
 One message detects at most `app.ister.server.segment-detect.chunk-size` episodes (default 4):
 fingerprinting a whole season in one go can outlast RabbitMQ's `consumer_timeout` (default
 30 minutes), which closes the channel and requeues the message forever. Like the blur-hash sweep,

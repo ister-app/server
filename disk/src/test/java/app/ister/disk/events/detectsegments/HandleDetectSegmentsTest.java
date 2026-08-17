@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -100,6 +101,7 @@ class HandleDetectSegmentsTest {
             lenient().when(mediaFileEpisodeService.segmentFor(file.getId(), episode.getId())).thenReturn(Optional.empty());
         }
         lenient().when(episodeRepository.findBySeasonEntityIdOrderByNumberAsc(SEASON_ID)).thenReturn(episodes);
+        lenient().when(mediaFileSegmentRepository.tryLockSeason(anyInt(), any())).thenReturn(true);
     }
 
     @Test
@@ -178,6 +180,20 @@ class HandleDetectSegmentsTest {
 
         assertFalse(pcmRead, "no PCM should be decoded for an already-detected season");
         verify(mediaFileSegmentRepository, never()).saveAll(any());
+        verify(messageSender, never()).sendDetectSegments(any(), anyString());
+    }
+
+    @Test
+    void aSeasonClaimedByAnotherTransactionIsSkippedEntirely() {
+        when(mediaFileSegmentRepository.tryLockSeason(anyInt(), eq(SEASON_ID))).thenReturn(false);
+
+        subject.handle(event());
+
+        assertFalse(pcmRead, "the holder of the lock is already doing this season's audio work");
+        verify(mediaFileSegmentRepository, never()).deleteAllByMediaFileEntityId(any());
+        verify(mediaFileSegmentRepository, never()).saveAll(any());
+        files.forEach(f -> assertEquals(null, f.getSegmentDetectorVersion()));
+        // No successor either: the transaction that holds the season keeps the chain going.
         verify(messageSender, never()).sendDetectSegments(any(), anyString());
     }
 

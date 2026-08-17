@@ -41,8 +41,11 @@ import static app.ister.disk.events.detectsegments.SegmentMatcher.Segment;
  *
  * <p>Fired once per analyzed episode file, so it must be (and is) idempotent: episodes whose file
  * already carries {@code segmentDetectorVersion == DETECTOR_VERSION} are only used as comparison
- * material, never re-detected. Only files in the event's directory are considered — a season
- * spread over nodes only pairs its local episodes (documented limitation).
+ * material, never re-detected. That idempotence is serial, not concurrent — the recompute is a
+ * delete-then-insert, and two transactions doing it at once neither see nor cancel each other's
+ * rows — so a season is claimed with a non-blocking advisory lock and unclaimed messages are
+ * dropped. Only files in the event's directory are considered — a season spread over nodes only
+ * pairs its local episodes (documented limitation).
  */
 @Slf4j
 @Service
@@ -98,6 +101,16 @@ public class SegmentDetectionChunkProcessor {
 
     @Transactional
     public Chunk process(UUID seasonEntityId, UUID directoryEntityId, int chunkSize) {
+        if (!mediaFileSegmentRepository.tryLockSeason(
+                MediaFileSegmentRepository.SEGMENT_DETECTION_LOCK_NAMESPACE, seasonEntityId)) {
+            // Another transaction is detecting this season. Every analyzed episode file publishes a
+            // DETECT_SEGMENTS for its season, so a re-analysis sweep delivers many messages for the
+            // same season at once; letting them run side by side both duplicated the fingerprinting
+            // and stored each segment once per consumer (their delete-then-insert cannot see each
+            // other's rows). Drop this one: the holder's chunk chain finishes the season.
+            log.debug("Season {} is already being detected, skipping this message", seasonEntityId);
+            return new Chunk(0, 0, null);
+        }
         episodeRepository.findBySeasonEntityIdOrderByNumberAsc(seasonEntityId).stream()
                 .findFirst()
                 .map(EpisodeEntity::getSeasonEntity)

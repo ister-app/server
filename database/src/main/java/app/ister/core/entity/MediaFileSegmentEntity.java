@@ -20,6 +20,9 @@ import java.util.UUID;
  * file each contained episode gets its own rows, disambiguated by {@code episodeEntityId}; for
  * single-episode files that column is null. "Detection ran but found nothing" is not a row here —
  * it is {@code MediaFileEntity.segmentDetectorVersion} being set.
+ *
+ * <p>At most one row per (file, type, episode), enforced by a unique index with NULLS NOT DISTINCT
+ * (V39) rather than a JPA constraint, which cannot express that null-matching.
  */
 // Plain UUID columns instead of @ManyToOne: consumers are RabbitMQ listeners and batch
 // resolvers where lazy navigation would throw (no Hibernate session on listener threads).

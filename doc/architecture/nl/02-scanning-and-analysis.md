@@ -89,6 +89,17 @@ dezelfde backfill. Bekende beperking: een seizoen verspreid over meerdere nodes 
 afleveringen die lokaal op elke node staan — een node met één losse aflevering detecteert er niets
 voor.
 
+Die idempotentie geldt serieel, niet gelijktijdig. Het herberekenen van een bestand is een
+delete-gevolgd-door-insert, en twee transacties die dat voor hetzelfde seizoen doen zien noch
+annuleren elkaars rijen, dus een heranalyse-sweep — één bericht per bestand, allemaal voor dezelfde
+paar seizoenen — sloeg elk segment één keer per consumer op. Een chunk claimt zijn seizoen daarom
+met een **niet-blokkerende** advisory lock (`pg_try_advisory_xact_lock`, namespace 1, sleutel
+`hashtext(seasonId)`); een bericht dat de claim niet krijgt wordt weggegooid in plaats van opnieuw
+geprobeerd, want de keten van de houder dekt het hele seizoen toch al. Blokkeren zou een
+listener-thread minutenlang stilzetten en opnieuw tegen dezelfde `consumer_timeout` aanlopen. Een
+unieke index op (bestand, type, aflevering) met `NULLS NOT DISTINCT` (V39, die ook de bestaande
+dubbelen opruimt) is het vangnet.
+
 Eén bericht detecteert maximaal `app.ister.server.segment-detect.chunk-size` afleveringen
 (standaard 4): een heel seizoen in één keer fingerprinten kan langer duren dan RabbitMQ's
 `consumer_timeout` (standaard 30 minuten), waarna het kanaal wordt gesloten en het bericht

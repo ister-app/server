@@ -10,6 +10,7 @@ import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.MediaFileSegmentEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.NodeEntity;
 import app.ister.core.entity.PersonEntity;
@@ -25,9 +26,11 @@ import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.MediaType;
+import app.ister.core.enums.SegmentType;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.enums.StreamCodecType;
+import jakarta.persistence.PersistenceException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Limit;
@@ -56,6 +59,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -91,6 +95,9 @@ class PostgresRepositoryIntegrationTest {
 
     @Autowired
     private MediaFileStreamRepository mediaFileStreamRepository;
+
+    @Autowired
+    private MediaFileSegmentRepository mediaFileSegmentRepository;
 
     @Autowired
     private MovieRepository movieRepository;
@@ -952,6 +959,41 @@ class PostgresRepositoryIntegrationTest {
                 user, existing.getPlayQueueItemId(), movie);
 
         assertEquals(existing.getId(), found.orElseThrow().getId());
+    }
+
+    /**
+     * The season claim is a native PostgreSQL call with a UUID bound into hashtext, which only a
+     * real database can prove: a mock would happily accept SQL Hibernate cannot bind.
+     */
+    @Test
+    void aSeasonCanBeClaimedForSegmentDetection() {
+        assertTrue(mediaFileSegmentRepository.tryLockSeason(
+                MediaFileSegmentRepository.SEGMENT_DETECTION_LOCK_NAMESPACE, UUID.randomUUID()));
+    }
+
+    /**
+     * V39: two detectors racing on one season used to store the same segment once per consumer.
+     * The index has to catch that even for single-episode files, where the disambiguating column
+     * is null on both rows — hence NULLS NOT DISTINCT.
+     */
+    @Test
+    void theSameSegmentCannotBeStoredTwiceForAFile() {
+        MediaFileEntity mediaFile = persistMediaFile("segment-dupes.mkv");
+        mediaFileSegmentRepository.save(segment(mediaFile, 0, 30_000));
+        em.flush();
+
+        mediaFileSegmentRepository.save(segment(mediaFile, 0, 30_000));
+
+        assertThrows(PersistenceException.class, em::flush);
+    }
+
+    private static MediaFileSegmentEntity segment(MediaFileEntity mediaFile, long startMs, long endMs) {
+        return MediaFileSegmentEntity.builder()
+                .mediaFileEntityId(mediaFile.getId())
+                .type(SegmentType.INTRO)
+                .startInMilliseconds(startMs)
+                .endInMilliseconds(endMs)
+                .build();
     }
 
     private MediaFileEntity persistMediaFile(String path) {
