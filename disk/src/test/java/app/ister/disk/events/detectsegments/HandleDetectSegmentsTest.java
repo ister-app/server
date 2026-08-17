@@ -138,11 +138,13 @@ class HandleDetectSegmentsTest {
 
         subject.handle(event());
 
-        // Only the chunk's two episodes are detected and stamped; the third stays pending.
+        // Only the chunk's two episodes are detected and stamped; pending is ordered from the
+        // season's ends inward, so the first and the last episode go first and the middle one
+        // stays pending.
         verify(mediaFileSegmentRepository, times(2)).saveAll(any());
         assertEquals(SegmentDetectionChunkProcessor.DETECTOR_VERSION, files.get(0).getSegmentDetectorVersion());
-        assertEquals(SegmentDetectionChunkProcessor.DETECTOR_VERSION, files.get(1).getSegmentDetectorVersion());
-        assertEquals(null, files.get(2).getSegmentDetectorVersion());
+        assertEquals(null, files.get(1).getSegmentDetectorVersion());
+        assertEquals(SegmentDetectionChunkProcessor.DETECTOR_VERSION, files.get(2).getSegmentDetectorVersion());
 
         ArgumentCaptor<DetectSegmentsData> successor = ArgumentCaptor.captor();
         verify(messageSender).sendDetectSegments(successor.capture(), eq("disk1"));
@@ -233,12 +235,20 @@ class HandleDetectSegmentsTest {
     @Test
     void acceptanceWindows() {
         assertTrue(SegmentDetectionChunkProcessor.acceptIntro(seg(0, 30_000), 40 * 60_000L));
-        assertFalse(SegmentDetectionChunkProcessor.acceptIntro(seg(0, 10_000), 40 * 60_000L), "too short");
+        assertTrue(SegmentDetectionChunkProcessor.acceptIntro(seg(340_000, 360_000), 40 * 60_000L),
+            "an intro after a long cold open (within 8 minutes) is accepted");
+        assertFalse(SegmentDetectionChunkProcessor.acceptIntro(seg(0, 8_000), 40 * 60_000L), "too short");
         assertFalse(SegmentDetectionChunkProcessor.acceptIntro(seg(0, 160_000), 40 * 60_000L), "too long");
         assertFalse(SegmentDetectionChunkProcessor.acceptIntro(seg(0, 100_000), 300_000), "over 25% of the episode");
-        assertFalse(SegmentDetectionChunkProcessor.acceptIntro(seg(360_000, 390_000), 40 * 60_000L), "starts too late");
+        assertFalse(SegmentDetectionChunkProcessor.acceptIntro(seg(500_000, 530_000), 40 * 60_000L), "starts too late");
         assertFalse(SegmentDetectionChunkProcessor.acceptIntro(seg(267_000, 297_000), 300_000),
             "a run in the back half of a short episode is the outro, not the intro");
+
+        // A template is a confirmed intro, so a shorter single match suffices.
+        assertTrue(SegmentDetectionChunkProcessor.acceptTemplateIntro(seg(0, 9_000), 40 * 60_000L));
+        assertFalse(SegmentDetectionChunkProcessor.acceptTemplateIntro(seg(0, 7_000), 40 * 60_000L), "too short");
+        assertFalse(SegmentDetectionChunkProcessor.acceptTemplateIntro(seg(500_000, 530_000), 40 * 60_000L),
+            "starts too late");
 
         assertTrue(SegmentDetectionChunkProcessor.acceptOutro(seg(200_000, 240_000), 240_000));
         assertFalse(SegmentDetectionChunkProcessor.acceptOutro(seg(200_000, 215_000), 240_000), "too short");
@@ -254,6 +264,61 @@ class HandleDetectSegmentsTest {
         List<EpisodeSlice> neighbours = SegmentDetectionChunkProcessor.neighboursOf(slices, slices.get(3));
         assertEquals(List.of(slices.get(2), slices.get(4), slices.get(1), slices.get(5)), neighbours);
         assertEquals(2, SegmentDetectionChunkProcessor.neighboursOf(slices.subList(0, 3), slices.get(0)).size());
+    }
+
+    @Test
+    void endsInwardOrdersFromBothEndsAndKeepsMultiEpisodeSlicesTogether() {
+        MediaFileEntity fileA = fileWithId();
+        MediaFileEntity fileB = fileWithId();
+        MediaFileEntity fileC = fileWithId();
+        MediaFileEntity fileD = fileWithId();
+        EpisodeSlice a = new EpisodeSlice(fileA, UUID.randomUUID(), false, 0, 1);
+        EpisodeSlice b1 = new EpisodeSlice(fileB, UUID.randomUUID(), true, 0, 1);
+        EpisodeSlice b2 = new EpisodeSlice(fileB, UUID.randomUUID(), true, 1, 2);
+        EpisodeSlice c = new EpisodeSlice(fileC, UUID.randomUUID(), false, 0, 1);
+        EpisodeSlice d = new EpisodeSlice(fileD, UUID.randomUUID(), false, 0, 1);
+
+        List<EpisodeSlice> ordered = SegmentDetectionChunkProcessor.endsInward(List.of(a, b1, b2, c, d));
+
+        // First, last, then inward — with fileB's two slices moving as one unit.
+        assertEquals(List.of(a, d, b1, b2, c), ordered);
+    }
+
+    @Test
+    void templateModeFindsTheIntroOnceTheSeasonHasThreeConfirmedIntros() {
+        // A fourth episode joins a season whose first three are already detected with intros.
+        MediaFileEntity file = MediaFileEntity.builder().path("/shows/show/3.wav").size(1).build();
+        ReflectionTestUtils.setField(file, "id", UUID.randomUUID());
+        ReflectionTestUtils.setField(file, "directoryEntityId", DIRECTORY_ID);
+        file.setDurationInMilliseconds(EPISODE_MS);
+        files.add(file);
+        EpisodeEntity episode = EpisodeEntity.builder().number(4).build();
+        ReflectionTestUtils.setField(episode, "id", UUID.randomUUID());
+        episodes.add(episode);
+        when(mediaFileEpisodeService.filesForEpisode(episode.getId())).thenReturn(List.of(file));
+        when(mediaFileEpisodeService.segmentFor(file.getId(), episode.getId())).thenReturn(Optional.empty());
+        for (int i = 0; i < 3; i++) {
+            files.get(i).setSegmentDetectorVersion(SegmentDetectionChunkProcessor.DETECTOR_VERSION);
+        }
+        when(mediaFileSegmentRepository.findByMediaFileEntityIdIn(any())).thenAnswer(invocation ->
+                files.subList(0, 3).stream().map(f -> MediaFileSegmentEntity.builder()
+                        .mediaFileEntityId(f.getId())
+                        .type(SegmentType.INTRO)
+                        .startInMilliseconds(0)
+                        .endInMilliseconds(INTRO_MS)
+                        .build()).toList());
+
+        subject.handle(event());
+
+        ArgumentCaptor<List<MediaFileSegmentEntity>> captor = ArgumentCaptor.captor();
+        verify(mediaFileSegmentRepository).saveAll(captor.capture());
+        MediaFileSegmentEntity intro = captor.getValue().stream()
+                .filter(r -> r.getType() == SegmentType.INTRO).findFirst().orElseThrow();
+        assertEquals(file.getId(), intro.getMediaFileEntityId());
+        assertEquals(0, intro.getStartInMilliseconds());
+        assertTrue(Math.abs(intro.getEndInMilliseconds() - INTRO_MS) <= 2_000,
+                "intro end was " + intro.getEndInMilliseconds());
+        assertEquals(SegmentDetectionChunkProcessor.DETECTOR_VERSION, file.getSegmentDetectorVersion());
     }
 
     private static MediaFileEntity fileWithId() {

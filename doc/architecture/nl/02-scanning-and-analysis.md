@@ -67,11 +67,30 @@ vergelijken**: de disk-module decodeert korte vensters (eerste 10 / laatste 4 mi
 van elke aflevering) naar mono-PCM, fingerprint ze (`ChromaFingerprinter`, een chromaprint-achtige
 32-bits gradiënthash per 128 ms — ongevoelig voor volumeverschillen, zonder externe library), en
 `SegmentMatcher` zoekt de langste gedeelde run tussen een aflevering en maximaal vier
-seizoensburen. De mediaan van de grenzen over instemmende paren (minimaal twee, één bij seizoenen
-van twee afleveringen) wordt opgeslagen als `media_file_segment_entity`-rijen (`INTRO`/`OUTRO`) in
-**absolute bestandstijd**; in een multi-episode-bestand krijgt elke slice eigen rijen,
-gedisambigueerd via `episode_entity_id`. De player leest ze als `MediaFile.segments` voor zijn
-intro-overslaan- en volgende-aflevering-knoppen.
+seizoensburen. Omdat een lag tussen twee afleveringen die *tussen* twee hashframes valt elk
+framepaar uit elkaar trekt (de gedeelde run versplintert dan tot onder het minimum), wordt de
+vergelijkingskant op **vier kwart-hop-faseverschuivingen** (0/32/64/96 ms) gefingerprint en wint
+de fase met de langste run. De mediaan van de grenzen over instemmende paren (minimaal twee, één
+bij seizoenen van twee afleveringen) wordt opgeslagen als `media_file_segment_entity`-rijen
+(`INTRO`/`OUTRO`) in **absolute bestandstijd**; in een multi-episode-bestand krijgt elke slice
+eigen rijen, gedisambigueerd via `episode_entity_id`. De player leest ze als `MediaFile.segments`
+voor zijn intro-overslaan- en volgende-aflevering-knoppen. Een intro moet 10–150 s lang zijn en
+binnen de eerste 8 minuten beginnen — bewust ruime grenzen, want veel intro's dragen per
+aflevering een andere voice-over over dezelfde muziek (waardoor maar een deel van de audio
+identiek is) en lange cold opens duwen de intro ruim voorbij de vijf minuten.
+
+Intro-matching verloopt in twee fasen. Nog te detecteren afleveringen worden geordend van de
+**seizoensuiteinden naar binnen** (eerste, laatste, tweede, voorlaatste, …) en paarsgewijs
+gematcht zoals hierboven. Zodra drie afleveringen van het seizoen een bevestigde intro dragen,
+schakelen de resterende afleveringen over op **template-matching**: hun venster wordt gematcht
+tegen maximaal drie bevestigde intro's (eerste, middelste, laatste van het seizoen, zodat een
+intro-wissel halverwege beide varianten aanlevert). Een template is een bewezen intro, dus één
+match van ≥ 8 s volstaat waar de paarsgewijze fase twee instemmende buren eist — dat redt
+afleveringen met een intro-variant die geen van hun vier buren deelt — en een template van ~20 s
+door een venster schuiven is veel goedkoper dan twee volledige vensters tegen elkaar uitlijnen.
+Wanneer de laatste chunk van het seizoen klaar is, krijgen afleveringen die in de paarsgewijze
+fase faalden nog één template-poging. Outro's gebruiken altijd de paarsgewijze fase (hun venster
+van 4 minuten houdt dat goedkoop).
 
 Omdat de detectie afleveringen onderling vergelijkt kan ze niet in de per-bestand
 `MEDIA_FILE_FOUND`-handler draaien: die vuurt in plaats daarvan een seizoens-gescopeerd

@@ -64,11 +64,28 @@ Recurring intros and closing credits are found by **comparing audio across a sea
 module decodes short windows (first 10 / last 4 minutes of each episode's slice) to mono PCM,
 fingerprints them (`ChromaFingerprinter`, a chromaprint-style 32-bit gradient hash per 128 ms —
 loudness-invariant, no external library), and `SegmentMatcher` finds the longest shared run
-between an episode and up to four season neighbours. The median bounds over agreeing pairs (at
-least two, one for two-episode seasons) become `media_file_segment_entity` rows (`INTRO`/`OUTRO`)
-in **absolute file time**; in a multi-episode file each slice gets its own rows, disambiguated by
-`episode_entity_id`. The player reads them as `MediaFile.segments` for its skip-intro /
-next-episode buttons.
+between an episode and up to four season neighbours. Because a lag between two episodes that
+falls *between* hash frames shears every frame pair apart (the shared run then fragments below
+the minimum length), the comparison side is fingerprinted at **four quarter-hop phase shifts**
+(0/32/64/96 ms) and the phase with the longest run wins. The median bounds over agreeing pairs
+(at least two, one for two-episode seasons) become `media_file_segment_entity` rows
+(`INTRO`/`OUTRO`) in **absolute file time**; in a multi-episode file each slice gets its own
+rows, disambiguated by `episode_entity_id`. The player reads them as `MediaFile.segments` for its
+skip-intro / next-episode buttons. An intro must be 10–150 s long and start within the first
+8 minutes — the bounds are deliberately loose because many intros carry per-episode voice-over
+over the same music, leaving only part of the audio identical, and long cold opens push the intro
+well past the five-minute mark.
+
+Intro matching runs in two stages. Pending episodes are ordered from the season's **ends inward**
+(first, last, second, second-to-last, …), pairwise-matched as above. Once three episodes of the
+season carry a confirmed intro, the remaining episodes switch to **template matching**: their
+window is matched against up to three confirmed intros (first, middle, last of the season, so a
+mid-season variant switch still contributes both variants). A template is a known-good intro, so
+a single ≥ 8 s match suffices where the pairwise stage demands two agreeing neighbours — that
+rescues episodes whose intro variant none of their four neighbours share — and sliding a ~20 s
+template over a window is far cheaper than aligning two whole windows against each other. When
+the season's last chunk finishes, episodes that failed the pairwise stage get one template retry.
+Outros always use the pairwise stage (their 4-minute window keeps that cheap).
 
 Because detection is cross-episode it cannot run inside the per-file `MEDIA_FILE_FOUND` handler:
 that handler instead fires a season-scoped `DETECT_SEGMENTS` event **after its transaction
