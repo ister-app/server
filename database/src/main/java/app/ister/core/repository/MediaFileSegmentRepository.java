@@ -1,6 +1,7 @@
 package app.ister.core.repository;
 
 import app.ister.core.entity.MediaFileSegmentEntity;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
@@ -18,7 +19,16 @@ public interface MediaFileSegmentRepository extends CrudRepository<MediaFileSegm
 
     List<MediaFileSegmentEntity> findByMediaFileEntityIdIn(Collection<UUID> mediaFileEntityIds);
 
-    void deleteAllByMediaFileEntityId(UUID mediaFileEntityId);
+    /**
+     * Bulk delete on purpose, not a derived delete: callers replace a file's segments
+     * (delete-then-insert) inside one transaction, and Hibernate flushes inserts before
+     * entity deletes — a derived delete would make the re-insert collide with the not yet
+     * deleted old row on the (file, type, episode) unique index. The bulk statement runs
+     * immediately, so the delete really precedes the insert.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("delete from MediaFileSegmentEntity s where s.mediaFileEntityId = :mediaFileEntityId")
+    void deleteAllByMediaFileEntityId(@Param("mediaFileEntityId") UUID mediaFileEntityId);
 
     /**
      * Tries to claim a season for segment detection, without blocking: true when this transaction

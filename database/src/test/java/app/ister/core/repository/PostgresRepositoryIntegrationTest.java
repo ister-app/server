@@ -987,6 +987,28 @@ class PostgresRepositoryIntegrationTest {
         assertThrows(PersistenceException.class, em::flush);
     }
 
+    /**
+     * Re-detection replaces a file's segments with delete-then-insert in one transaction.
+     * Hibernate flushes inserts before entity deletes, so with a derived delete the new row
+     * used to collide with the old one on the (file, type, episode) unique index — the delete
+     * has to be a bulk statement that runs immediately. Only a real database with the index
+     * in place can prove the ordering.
+     */
+    @Test
+    void reDetectionCanReplaceAnExistingSegment() {
+        MediaFileEntity mediaFile = persistMediaFile("segment-replace.mkv");
+        mediaFileSegmentRepository.save(segment(mediaFile, 0, 30_000));
+        em.flush();
+
+        mediaFileSegmentRepository.deleteAllByMediaFileEntityId(mediaFile.getId());
+        mediaFileSegmentRepository.save(segment(mediaFile, 500, 31_000));
+        em.flush();
+
+        List<MediaFileSegmentEntity> segments = mediaFileSegmentRepository.findByMediaFileEntityId(mediaFile.getId());
+        assertEquals(1, segments.size());
+        assertEquals(500, segments.getFirst().getStartInMilliseconds());
+    }
+
     private static MediaFileSegmentEntity segment(MediaFileEntity mediaFile, long startMs, long endMs) {
         return MediaFileSegmentEntity.builder()
                 .mediaFileEntityId(mediaFile.getId())
