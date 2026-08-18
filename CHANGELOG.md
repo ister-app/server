@@ -1,5 +1,28 @@
 # Changelog
 
+## server v2.16.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.16.0` |
+| `ghcr.io/ister-app/migrations` | `2.16.0` |
+
+### Features
+
+- feat(disk): more robust intro detection (detector v4) ([`5fa12fc`](https://github.com/ister-app/server/commit/5fa12fc))
+
+### Fixes
+
+- fix(disk): claim a season before detecting its segments ([`f7b7af9`](https://github.com/ister-app/server/commit/f7b7af9))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.16.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.15.0...v2.16.0
+
 ## server v2.15.0
 
 | Image | Tag |
