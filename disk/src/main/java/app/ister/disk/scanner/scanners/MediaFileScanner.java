@@ -203,13 +203,16 @@ public class MediaFileScanner implements Scanner {
 
     /**
      * True when the file has an image-codec subtitle stream without an OCR'd
-     * counterpart at the same stream index.
+     * counterpart at the same stream index. Streams whose extraction was already
+     * attempted and failed (extractionFailed) are skipped — retrying them every
+     * scan would loop forever on e.g. a bitmap subtitle OCR cannot read.
      */
     boolean needsSubtitleReextract(UUID mediaFileId) {
         var imageSubs = mediaFileStreamRepository
                 .findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.SUBTITLE).stream()
                 .filter(s -> s.getCodecName() != null
                         && MediaFileFoundExtractSubtitles.IMAGE_SUBTITLE_CODECS.contains(s.getCodecName().toLowerCase()))
+                .filter(s -> !Boolean.TRUE.equals(s.getExtractionFailed()))
                 .toList();
         if (imageSubs.isEmpty()) {
             return false;

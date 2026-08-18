@@ -101,13 +101,16 @@ public class MediaFileFoundExtractSubtitles {
 
         String codecName = stream.getCodecName() != null ? stream.getCodecName().toLowerCase() : "";
         boolean extracted = false;
+        boolean attempted = false;
 
         if (Files.exists(srtPath)) {
             log.debug("SRT already extracted, skipping: {}", srtPath);
             extracted = true;
         } else if (TEXT_SUBTITLE_CODECS.contains(codecName)) {
+            attempted = true;
             extracted = extractTextSubtitle(mediaFile.getPath(), subIdx, srtPath, ffmpegDir);
         } else if (IMAGE_SUBTITLE_CODECS.contains(codecName)) {
+            attempted = true;
             String effectiveLang = ocrExtract(mediaFile, streams, stream, subIdx, srtPath, lang, ffmpegDir);
             if (effectiveLang != null) {
                 extracted = true;
@@ -118,6 +121,12 @@ public class MediaFileFoundExtractSubtitles {
         }
 
         if (!extracted) {
+            if (attempted) {
+                // Persisted marker so the scanner's re-extract backfill does not re-fire a
+                // full re-analysis for this stream on every scan; a re-analysis for any
+                // other reason rewrites the stream rows and retries the extraction.
+                stream.setExtractionFailed(true);
+            }
             return Optional.empty();
         }
         return Optional.of(MediaFileStreamEntity.builder()

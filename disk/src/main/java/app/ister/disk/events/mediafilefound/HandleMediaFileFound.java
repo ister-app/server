@@ -195,6 +195,9 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             NodeEntity cacheNode = nodeService.getOrCreateNodeEntityForThisNode();
             DirectoryEntity cacheDisk = directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, cacheNode).stream().findFirst().orElseThrow();
             mediaFileStreamRepository.saveAll(mediaFileFoundExtractSubtitles.extractSubtitles(mediaFileEntity, streams, cacheDisk, dirOfFFmpeg));
+            // Extraction marks failed attempts on the source subtitle rows (extractionFailed);
+            // save again so the marker is persisted even if these entities ever stop being managed.
+            mediaFileStreamRepository.saveAll(streams);
         });
         return mediaFile;
     }

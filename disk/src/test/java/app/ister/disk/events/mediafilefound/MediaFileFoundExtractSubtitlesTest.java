@@ -109,6 +109,55 @@ class MediaFileFoundExtractSubtitlesTest {
         assertTrue(result.isEmpty());
     }
 
+    @Test
+    void failedExtractionMarksStreamAsExtractionFailed() {
+        // Nonexistent ffmpeg dir: the attempt fails, and the persisted marker must be set
+        // so the scanner's backfill stops re-firing a full re-analysis for this stream.
+        for (String codec : List.of("subrip", "dvd_subtitle")) {
+            MediaFileStreamEntity stream = MediaFileStreamEntity.builder()
+                    .codecType(StreamCodecType.SUBTITLE)
+                    .codecName(codec)
+                    .streamIndex(0)
+                    .language("eng")
+                    .build();
+
+            subject.extractSubtitles(mediaFile, List.of(stream), cacheDirEntity, "/nonexistent/ffmpeg/dir");
+
+            assertEquals(Boolean.TRUE, stream.getExtractionFailed(), "Expected failure marker for codec: " + codec);
+        }
+    }
+
+    @Test
+    void unsupportedCodecDoesNotMarkExtractionFailed() {
+        MediaFileStreamEntity stream = MediaFileStreamEntity.builder()
+                .codecType(StreamCodecType.SUBTITLE)
+                .codecName("unknown_codec")
+                .streamIndex(0)
+                .language("eng")
+                .build();
+
+        subject.extractSubtitles(mediaFile, List.of(stream), cacheDirEntity, "/nonexistent/ffmpeg/dir");
+
+        assertNull(stream.getExtractionFailed());
+    }
+
+    @Test
+    void cachedSrtDoesNotMarkExtractionFailed() throws IOException {
+        MediaFileStreamEntity stream = MediaFileStreamEntity.builder()
+                .codecType(StreamCodecType.SUBTITLE)
+                .codecName("dvd_subtitle")
+                .streamIndex(0)
+                .language("eng")
+                .build();
+        Files.writeString(cacheDir.resolve(mediaFile.getId() + "_0_eng.srt"), "srt");
+
+        List<MediaFileStreamEntity> result = subject.extractSubtitles(
+                mediaFile, List.of(stream), cacheDirEntity, "/nonexistent/ffmpeg/dir");
+
+        assertEquals(1, result.size());
+        assertNull(stream.getExtractionFailed());
+    }
+
     static Stream<Arguments> languageNormalizationCases() {
         return Stream.of(
                 Arguments.of(null, "und"),

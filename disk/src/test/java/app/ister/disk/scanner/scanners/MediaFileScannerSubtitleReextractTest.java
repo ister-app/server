@@ -86,6 +86,23 @@ class MediaFileScannerSubtitleReextractTest {
     }
 
     @Test
+    void imageSubtitleMarkedExtractionFailedNeedsNoReextract() {
+        MediaFileStreamEntity failed = stream(StreamCodecType.SUBTITLE, "dvd_subtitle", 3);
+        failed.setExtractionFailed(true);
+        givenSubtitleStreams(failed);
+        assertFalse(subject.needsSubtitleReextract(mediaFileId));
+    }
+
+    @Test
+    void unmarkedImageSubtitleNextToFailedOneStillNeedsReextract() {
+        MediaFileStreamEntity failed = stream(StreamCodecType.SUBTITLE, "dvd_subtitle", 3);
+        failed.setExtractionFailed(true);
+        givenSubtitleStreams(failed, stream(StreamCodecType.SUBTITLE, "dvd_subtitle", 4));
+        givenExtractedStreams();
+        assertTrue(subject.needsSubtitleReextract(mediaFileId));
+    }
+
+    @Test
     void fileWithoutSubtitleStreamsNeedsNoReextract() {
         givenSubtitleStreams();
         assertFalse(subject.needsSubtitleReextract(mediaFileId));

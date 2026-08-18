@@ -63,4 +63,14 @@ public class MediaFileStreamEntity extends BaseEntity {
     @Setter
     @Column(name = "crop_height")
     private Integer cropHeight;
+
+    /**
+     * True when extracting this subtitle stream to SRT was attempted during analysis
+     * but failed (OCR error, no usable OCR language, ffmpeg failure). Null = never
+     * attempted or not applicable. The scanner's re-extract backfill skips streams
+     * marked true, so a permanently failing extraction does not re-trigger a full
+     * re-analysis on every scan; a re-analysis rewrites the rows and retries anyway.
+     */
+    @Setter
+    private Boolean extractionFailed;
 }
