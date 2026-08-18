@@ -4,6 +4,9 @@
       "pattern": "disk.*\\.properties"
     },
     {
+      "pattern": "iso-639-3\\.tab"
+    },
+    {
       "pattern": "org/apache/pdfbox/resources/.*"
     },
     {

@@ -59,8 +59,16 @@ public class MediaFileFoundExtractSubtitles {
 
     @PostConstruct
     void loadLangMap() {
-        try (var stream = getClass().getResourceAsStream("/iso-639-3.tab");
-             var reader = new BufferedReader(new InputStreamReader(stream))) {
+        var resource = getClass().getResourceAsStream("/iso-639-3.tab");
+        if (resource == null) {
+            // Reaching this means the resource is missing from the artifact — for the GraalVM
+            // native image it must be listed in this module's resource-config.json. Without the
+            // map, 639-2/B tags (fre, dut, ger) stay unnormalized and tesseract, which only has
+            // 639-3 traineddata, fails every OCR for them.
+            log.error("iso-639-3.tab not found on the classpath; subtitle language normalization is disabled");
+            return;
+        }
+        try (var reader = new BufferedReader(new InputStreamReader(resource))) {
             var _ = reader.readLine(); // skip header
             String line;
             while ((line = reader.readLine()) != null) {
