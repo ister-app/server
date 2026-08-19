@@ -1,5 +1,26 @@
 # Changelog
 
+## server v2.16.1
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.16.1` |
+| `ghcr.io/ister-app/migrations` | `2.16.1` |
+
+### Fixes
+
+- fix(disk): ship iso-639-3.tab in the native image so OCR languages normalize ([`e58a318`](https://github.com/ister-app/server/commit/e58a318))
+- fix(disk): remember failed subtitle extractions so scans stop retrying them ([`d3a6e45`](https://github.com/ister-app/server/commit/d3a6e45))
+- fix(disk): bulk-delete segments so re-detection survives the unique index ([`bc07c24`](https://github.com/ister-app/server/commit/bc07c24))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.16.1
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.16.0...v2.16.1
+
 ## server v2.16.0
 
 | Image | Tag |
