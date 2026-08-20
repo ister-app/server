@@ -50,6 +50,20 @@ So: `pg_dump` on a schedule, and don't bother backing up the caches.
 - **Live activity** — the `serverActivity` GraphQL subscription (surfaced in the client's
   activity page) shows what each node is busy with right now.
 
+## One-off upgrade steps
+
+**Artists are merged on first start after the `V43` migration.** Until then an artist could exist
+several times over — "ABBA" next to "Abba", and "X feat. Y" as a third artist neither X nor Y could
+see. `V43` rewrites the `feat.` names to their primary artist (crediting the guest on the tracks
+involved), merges the duplicates into one person, and locks identity down on the case-insensitive
+name. Play history and ratings are preserved: where two rows collide the furthest progress and the
+highest rating survive. The migration is **not reversible** — take a backup first (see
+[Backup](#backup)).
+
+Afterwards, run the `reindexSearch` GraphQL mutation once: the merged persons leave stale documents
+in Typesense. Featured guests on files that were never named in an artist row are picked up by a
+normal re-scan.
+
 ## Troubleshooting
 
 **No metadata after a scan (bare filenames, no posters)** — almost always a missing or wrong

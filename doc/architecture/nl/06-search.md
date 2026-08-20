@@ -42,6 +42,10 @@ De GraphQL-mutation `reindexSearch` stuurt `SEARCH_REINDEX_REQUESTED`. De handle
 collection (`media_v<timestamp>`), pagineert door alle entiteiten en importeert ze, en **zet dan de
 alias om** en dropt oude collections — zoeken blijft live tijdens de rebuild.
 
+Een databasemigratie die entiteiten achter de index om verwijdert of hernoemt — bijvoorbeeld de
+samenvoeging van dubbele artiesten in `V43` — laat verouderde persoonsdocumenten achter; draai
+`reindexSearch` daarom één keer na een upgrade voorbij die migratie.
+
 ## Meertalig schema
 
 Het collection-schema en de `query_by`-lijst worden gegenereerd uit `LanguageProperties.tags()`:

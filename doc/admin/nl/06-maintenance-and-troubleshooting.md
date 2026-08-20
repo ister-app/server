@@ -53,6 +53,20 @@ Dus: `pg_dump` op een schema, en doe geen moeite om de caches te back-uppen.
 - **Live activiteit** — de GraphQL-subscription `serverActivity` (zichtbaar op de
   activiteitenpagina van de client) toont waar elke node op dit moment mee bezig is.
 
+## Eenmalige upgrade-stappen
+
+**Artiesten worden samengevoegd bij de eerste start na migratie `V43`.** Tot dan kon één artiest
+meerdere keren bestaan — "ABBA" naast "Abba", en "X feat. Y" als derde artiest die noch X noch Y
+kon zien. `V43` herschrijft de `feat.`-namen naar hun primaire artiest (en crediteert de gast op de
+betrokken nummers), voegt de dubbelen samen tot één persoon en legt de identiteit vast op de naam
+zonder hoofdlettergevoeligheid. Kijkgeschiedenis en ratings blijven behouden: waar twee rijen
+botsen, winnen de verste voortgang en de hoogste rating. De migratie is **niet omkeerbaar** — maak
+eerst een back-up (zie [Back-up](#back-up)).
+
+Draai daarna één keer de GraphQL-mutation `reindexSearch`: de samengevoegde personen laten
+verouderde documenten in Typesense achter. Featured gasten in bestanden die nooit in een
+artiestenrij stonden, komen mee met een gewone hersan.
+
 ## Probleemoplossing
 
 **Geen metadata na een scan (kale bestandsnamen, geen posters)** — vrijwel altijd een

@@ -42,6 +42,10 @@ The `reindexSearch` GraphQL mutation sends `SEARCH_REINDEX_REQUESTED`. The handl
 collection (`media_v<timestamp>`), pages through all entities and imports them, then **swaps the
 alias** and drops old collections — search stays live during the rebuild.
 
+A database migration that deletes or renames entities behind the index's back — the duplicate-artist
+merge of `V43`, for instance — leaves stale person documents, so run `reindexSearch` once after
+upgrading past it.
+
 ## Multilingual schema
 
 The collection schema and the `query_by` list are generated from `LanguageProperties.tags()`: each
