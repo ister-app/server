@@ -74,10 +74,11 @@ public class AlbumController {
             return filtered.get();
         }
         // Albums the artist is credited on but does not own: compilations and guest appearances.
-        if (args.appearsOnArtistId().isPresent()) {
+        Optional<UUID> appearsOnArtistId = args.appearsOnArtistId();
+        if (appearsOnArtistId.isPresent()) {
             Collection<UUID> libraries = visibleLibraryIds(args.libraryId(), authentication);
             return libraries.isEmpty() ? Page.empty(pageable)
-                    : albumRepository.findAppearsOnForPerson(args.appearsOnArtistId().get(), libraries, pageable);
+                    : albumRepository.findAppearsOnForPerson(appearsOnArtistId.get(), libraries, pageable);
         }
         Optional<UUID> artistId = args.artistId();
         if (artistId.isPresent()) {
