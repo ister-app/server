@@ -15,6 +15,15 @@ import java.util.UUID;
 public interface PersonRepository extends JpaRepository<PersonEntity, UUID> {
     Optional<PersonEntity> findByLibraryEntityAndName(LibraryEntity libraryEntity, String name);
 
+    /**
+     * Person lookup by identity rather than spelling (see {@code PersonNames.normalize}). "First"
+     * because duplicates from before the merge migration may still exist in older databases; the
+     * oldest row is the one that owns the albums.
+     */
+    Optional<PersonEntity> findFirstByLibraryEntityAndNameNormalizedOrderByDateCreatedAsc(LibraryEntity libraryEntity, String nameNormalized);
+
+    Optional<PersonEntity> findFirstByNameNormalizedAndLibraryEntityIsNullOrderByDateCreatedAsc(String nameNormalized);
+
     Page<PersonEntity> findByLibraryEntity(LibraryEntity libraryEntity, Pageable pageable);
 
     Page<PersonEntity> findByLibraryEntityIdIn(Collection<UUID> libraryIds, Pageable pageable);

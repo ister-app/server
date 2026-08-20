@@ -92,6 +92,13 @@ Grease_ Soundtrack (1991)/        # plat: geen artiestenmap
   nummer komt het tracknummer uit de audiotags.
 - Een **plat album** direct onder de library-root (zonder artiestenmap) mag; de artiest komt dan
   uit de `album_artist`-tag in de bestanden.
+- Tags bepalen wie wat uitvoert: `album_artist` identificeert het album, `artist` de uitvoerder van
+  het losse nummer — op een verzamelalbum bestaat de echte artiest alleen in die tag per track. Een
+  `feat.`/`ft.`/`featuring`-gast mag in de `artist`-tag blijven staan: de server crediteert de
+  primaire artiest en de gast apart, zodat het nummer op beide artiestenpagina's verschijnt. Een
+  ampersand blijft ongemoeid ("Simon & Garfunkel" blijft één artiest).
+- Artiestennamen worden vergeleken zonder te letten op hoofdletters en dubbele spaties, dus "ABBA"
+  en "Abba" zijn één artiest.
 - Audioformaten: `mp3`, `flac`, `aac`, `opus`, `ogg`, `wav`, `m4a`, `wma`.
 - Speciale bestanden: `artist.nfo` en artiestafbeeldingen (`artist.jpg`, `folder.jpg`) op
   artiestenniveau; `album.nfo` en hoezen (`cover.jpg`, `folder.png`) op albumniveau. Andere

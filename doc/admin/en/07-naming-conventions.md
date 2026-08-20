@@ -90,6 +90,12 @@ Grease_ Soundtrack (1991)/        # flat: no artist folder
   track number is taken from the audio tags.
 - A **flat album** directly under the library root (no artist folder) is allowed; the artist then
   comes from the `album_artist` tag in the files.
+- Tags decide who performs what: `album_artist` identifies the album, `artist` the performer of the
+  individual track — on a compilation that per-track tag is the only place the real artist exists.
+  A `feat.`/`ft.`/`featuring` guest may stay in the `artist` tag: the server credits the primary
+  artist and the guest separately, so the track shows up on both artist pages. An ampersand is left
+  alone ("Simon & Garfunkel" stays one artist).
+- Artist names are matched ignoring case and repeated spaces, so "ABBA" and "Abba" are one artist.
 - Audio formats: `mp3`, `flac`, `aac`, `opus`, `ogg`, `wav`, `m4a`, `wma`.
 - Special files: `artist.nfo` and artist images (`artist.jpg`, `folder.jpg`) at artist level;
   `album.nfo` and covers (`cover.jpg`, `folder.png`) at album level. Other `.nfo` names are

@@ -5,12 +5,15 @@ import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
+import app.ister.core.entity.PersonEntity;
+import app.ister.core.entity.TrackCreditEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.SearchEntityType;
 import app.ister.core.enums.SubtitleFormat;
+import app.ister.core.enums.TrackCreditType;
 import app.ister.core.eventdata.AudioFileFoundData;
 import app.ister.core.eventdata.ImageFoundData;
 import app.ister.core.eventdata.TranscodeRequestedData;
@@ -21,6 +24,7 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.repository.MetadataRepository;
+import app.ister.core.repository.TrackCreditRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
@@ -29,6 +33,7 @@ import app.ister.core.Handle;
 import app.ister.core.utils.Jaffree;
 import app.ister.disk.events.mediafilefound.MediaFileFoundCheckForStreams;
 import app.ister.disk.events.mediafilefound.MediaFileFoundGetDuration;
+import app.ister.disk.scanner.ArtistTagParser;
 import com.github.kokorin.jaffree.ffprobe.Format;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -42,6 +47,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.Month;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.nio.file.Path;
@@ -61,6 +67,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final MetadataRepository metadataRepository;
     private final TrackRepository trackRepository;
+    private final TrackCreditRepository trackCreditRepository;
     private final AlbumRepository albumRepository;
     private final ChapterRepository chapterRepository;
     private final ImageRepository imageRepository;
@@ -83,6 +90,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                                 MediaFileStreamRepository mediaFileStreamRepository,
                                 MetadataRepository metadataRepository,
                                 TrackRepository trackRepository,
+                                TrackCreditRepository trackCreditRepository,
                                 AlbumRepository albumRepository,
                                 ChapterRepository chapterRepository,
                                 ImageRepository imageRepository,
@@ -98,6 +106,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         this.mediaFileStreamRepository = mediaFileStreamRepository;
         this.metadataRepository = metadataRepository;
         this.trackRepository = trackRepository;
+        this.trackCreditRepository = trackCreditRepository;
         this.albumRepository = albumRepository;
         this.chapterRepository = chapterRepository;
         this.imageRepository = imageRepository;
@@ -247,10 +256,55 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
      */
     private void updateTrackArtistFromTag(TrackEntity track, Format format) {
         String tagArtist = extractArtistTag(format);
-        if (tagArtist == null || tagArtist.equals(track.getPersonEntity().getName())) return;
+        if (tagArtist == null) return;
         var library = track.getAlbumEntity().getLibraryEntity();
-        track.setPersonEntity(scannerHelperService.getOrCreatePerson(library, tagArtist));
-        trackRepository.save(track);
+        ArtistTagParser.Credits credits = ArtistTagParser.parse(tagArtist);
+
+        PersonEntity primary = credits.primary().equals(track.getPersonEntity().getName())
+                ? track.getPersonEntity()
+                : scannerHelperService.getOrCreatePerson(library, credits.primary());
+        if (!primary.equals(track.getPersonEntity())) {
+            track.setPersonEntity(primary);
+            trackRepository.save(track);
+        }
+
+        List<PersonEntity> guests = credits.featured().stream()
+                .map(name -> scannerHelperService.getOrCreatePerson(library, name))
+                .toList();
+        writeTrackCredits(track, primary, guests);
+    }
+
+    /**
+     * The credits are rewritten from scratch on every scan of the file: a corrected tag must not
+     * leave the previous artist credited, and a re-scan must not double the rows.
+     */
+    private void writeTrackCredits(TrackEntity track, PersonEntity primary, List<PersonEntity> guests) {
+        List<TrackCreditEntity> existing = trackCreditRepository.findByTrackEntity_IdOrderByPositionAsc(track.getId());
+        List<PersonEntity> wanted = new ArrayList<>();
+        wanted.add(primary);
+        guests.stream().filter(guest -> !guest.equals(primary)).forEach(guest -> {
+            if (!wanted.contains(guest)) wanted.add(guest);
+        });
+
+        List<UUID> wantedIds = wanted.stream().map(PersonEntity::getId).toList();
+        List<TrackCreditEntity> stale = existing.stream()
+                .filter(credit -> !wantedIds.contains(credit.getPersonEntity().getId()))
+                .toList();
+        if (!stale.isEmpty()) trackCreditRepository.deleteAll(stale);
+
+        for (int position = 0; position < wanted.size(); position++) {
+            PersonEntity person = wanted.get(position);
+            TrackCreditType type = position == 0 ? TrackCreditType.PRIMARY : TrackCreditType.FEATURED;
+            int index = position;
+            TrackCreditEntity credit = existing.stream()
+                    .filter(c -> c.getPersonEntity().getId().equals(person.getId()))
+                    .findFirst()
+                    .orElseGet(() -> TrackCreditEntity.builder().trackEntity(track).personEntity(person)
+                            .creditType(type).position(index).build());
+            credit.setCreditType(type);
+            credit.setPosition(position);
+            trackCreditRepository.save(credit);
+        }
     }
 
     /**

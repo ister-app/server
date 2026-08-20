@@ -24,7 +24,7 @@ See the [scan-flow diagram](../diagrams/scan-flow.md). `scanLibrary()` sends
 | File | Event | Handler work |
 | --- | --- | --- |
 | Video | `MEDIA_FILE_FOUND` | ffprobe streams + duration, extract embedded subs to SRT, screenshot as backdrop |
-| Audio | `AUDIO_FILE_FOUND` | ffprobe, ID3 tags (title/track no, track artist from the `artist` tag with the path artist as fallback), embedded cover, clear the HLS cache |
+| Audio | `AUDIO_FILE_FOUND` | ffprobe, ID3 tags (title/track no, track credits from the `artist` tag — primary artist plus `feat.` guests — with the path artist as fallback), embedded cover, clear the HLS cache |
 | `.epub` (BOOK library) | `EPUB_FILE_FOUND` | OPF title/language/description, media overlays from content, cover from the zip |
 | `.cbz`/`.pdf`/`.epub` (COMIC library) | `COMIC_FILE_FOUND` (epubs reuse `EPUB_FILE_FOUND`) | page count, `ComicInfo.xml`, cover extraction |
 | `.srt` | `SUBTITLE_FILE_FOUND` | link SRT to episode as an `EXTERNAL_SUBTITLE` stream |
@@ -33,6 +33,13 @@ See the [scan-flow diagram](../diagrams/scan-flow.md). `scanLibrary()` sends
 
 Entity creation goes through `ScannerHelperService.getOrCreate*`, which also fires the `*_FOUND`
 enrichment events and the search-index creation events.
+
+`getOrCreatePerson` looks a person up on the **normalized** name (`PersonNames.normalize`:
+lower-case, collapsed whitespace — mirrored by the generated `person_entity.name_normalized`
+column), so "ABBA" on one album and "Abba" on the next are one artist. The stored `name` keeps the
+spelling seen first, as the display value. `ArtistTagParser` splits a `feat.`/`ft.`/`featuring` tag
+into the primary artist and its guests; an ampersand is never split, because "Simon & Garfunkel"
+and "Mumford & Sons" are single acts.
 
 ### Multi-episode files
 

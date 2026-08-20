@@ -9,6 +9,7 @@ import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.utils.Jaffree;
 import app.ister.disk.scanner.BookPathObject;
+import app.ister.disk.scanner.ArtistTagParser;
 import app.ister.disk.scanner.MusicPathObject;
 import app.ister.disk.scanner.enums.FileType;
 import lombok.RequiredArgsConstructor;
@@ -163,7 +164,8 @@ public class AudioScanner implements Scanner {
             if (format != null) {
                 String tag = format.getTag("album_artist");
                 if (tag == null) tag = format.getTag("ALBUM_ARTIST");
-                if (tag != null && !tag.isBlank()) return tag;
+                // An album artist carries no guests: "X feat. Y" identifies album X of artist X.
+                if (tag != null && !tag.isBlank()) return ArtistTagParser.primary(tag);
             }
         } catch (Exception e) {
             log.warn("Could not read album_artist tag from {}: {}", path, e.getMessage());

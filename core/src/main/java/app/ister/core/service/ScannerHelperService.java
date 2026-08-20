@@ -90,8 +90,9 @@ public class ScannerHelperService {
      * Check if the database contains a person with the given parameters.
      * - If it exists return it.
      * - Else, if a library-less person with the same name exists (created from TMDB cast
-     *   credits), claim that person for this library. Deduplication is on exact name, so a
-     *   band named exactly like an actor would be merged — accepted trade-off.
+     *   credits), claim that person for this library. Deduplication is on the name ignoring case
+     *   and repeated whitespace, so a band named like an actor would be merged — accepted
+     *   trade-off.
      * - Else create and return it.
      */
     public PersonEntity getOrCreatePerson(LibraryEntity libraryEntity, String artistName) {
@@ -106,10 +107,14 @@ public class ScannerHelperService {
      */
     public PersonEntity getOrCreatePerson(LibraryEntity libraryEntity, String artistName, int birthYear) {
         Integer year = birthYear > 0 ? birthYear : null;
-        return personRepository.findByLibraryEntityAndName(libraryEntity, artistName)
+        // Lookup is on the normalized name, so "ABBA" on one album and "Abba" on the next are one
+        // artist; the stored name keeps the spelling that was seen first, as the display value.
+        String normalized = PersonNames.normalize(artistName);
+        return personRepository.findFirstByLibraryEntityAndNameNormalizedOrderByDateCreatedAsc(libraryEntity, normalized)
                 .map(existing -> fillBirthYearIfMissing(existing, year))
                 .orElseGet(() -> {
-                    PersonEntity personEntity = personRepository.findFirstByNameAndLibraryEntityIsNull(artistName)
+                    PersonEntity personEntity = personRepository
+                            .findFirstByNameNormalizedAndLibraryEntityIsNullOrderByDateCreatedAsc(normalized)
                             .orElseGet(() -> PersonEntity.builder().name(artistName).build());
                     personEntity.setLibraryEntity(libraryEntity);
                     if (year != null && personEntity.getBirthYear() == null) {

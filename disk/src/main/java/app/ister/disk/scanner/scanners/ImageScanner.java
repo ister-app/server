@@ -14,6 +14,7 @@ import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.utils.Jaffree;
+import app.ister.disk.scanner.ArtistTagParser;
 import app.ister.disk.scanner.BookPathObject;
 import app.ister.disk.scanner.ComicPathObject;
 import app.ister.disk.scanner.MusicPathObject;
@@ -222,7 +223,8 @@ public class ImageScanner implements Scanner {
                             if (format != null) {
                                 String tag = format.getTag("album_artist");
                                 if (tag == null) tag = format.getTag("ALBUM_ARTIST");
-                                if (tag != null && !tag.isBlank()) return tag;
+                                // Same reading as AudioScanner, or the cover would land on another album.
+                                if (tag != null && !tag.isBlank()) return ArtistTagParser.primary(tag);
                             }
                         } catch (Exception e) {
                             log.warn("Could not read album_artist from {}: {}", audioFile, e.getMessage());

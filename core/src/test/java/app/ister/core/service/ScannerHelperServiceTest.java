@@ -165,7 +165,7 @@ class ScannerHelperServiceTest {
     @Test
     void getOrCreatePersonReturnsExistingArtist() {
         PersonEntity existing = PersonEntity.builder().name("The Beatles").build();
-        when(personRepository.findByLibraryEntityAndName(library, "The Beatles"))
+        when(personRepository.findFirstByLibraryEntityAndNameNormalizedOrderByDateCreatedAsc(library, "the beatles"))
                 .thenReturn(Optional.of(existing));
 
         assertEquals(existing, subject.getOrCreatePerson(library, "The Beatles"));
@@ -174,8 +174,19 @@ class ScannerHelperServiceTest {
     }
 
     @Test
+    void getOrCreatePersonMatchesRegardlessOfCaseAndSpacing() {
+        PersonEntity existing = PersonEntity.builder().name("ABBA").build();
+        when(personRepository.findFirstByLibraryEntityAndNameNormalizedOrderByDateCreatedAsc(library, "abba"))
+                .thenReturn(Optional.of(existing));
+
+        assertEquals(existing, subject.getOrCreatePerson(library, "  Abba "));
+        verify(personRepository, never()).save(any());
+        verify(serverEventService, never()).createPersonFoundEvent(any());
+    }
+
+    @Test
     void getOrCreatePersonCreatesNewArtist() {
-        when(personRepository.findByLibraryEntityAndName(library, "The Beatles"))
+        when(personRepository.findFirstByLibraryEntityAndNameNormalizedOrderByDateCreatedAsc(library, "the beatles"))
                 .thenReturn(Optional.empty());
 
         PersonEntity result = subject.getOrCreatePerson(library, "The Beatles");
@@ -188,9 +199,9 @@ class ScannerHelperServiceTest {
     @Test
     void getOrCreatePersonClaimsLibrarylessTmdbPerson() {
         PersonEntity actor = PersonEntity.builder().name("Lady Gaga").tmdbId(90633L).build();
-        when(personRepository.findByLibraryEntityAndName(library, "Lady Gaga"))
+        when(personRepository.findFirstByLibraryEntityAndNameNormalizedOrderByDateCreatedAsc(library, "lady gaga"))
                 .thenReturn(Optional.empty());
-        when(personRepository.findFirstByNameAndLibraryEntityIsNull("Lady Gaga"))
+        when(personRepository.findFirstByNameNormalizedAndLibraryEntityIsNullOrderByDateCreatedAsc("lady gaga"))
                 .thenReturn(Optional.of(actor));
 
         PersonEntity result = subject.getOrCreatePerson(library, "Lady Gaga");
@@ -203,9 +214,9 @@ class ScannerHelperServiceTest {
 
     @Test
     void getOrCreatePersonSeedsBirthYearFromFolderOnNewArtist() {
-        when(personRepository.findByLibraryEntityAndName(library, "Ariana Grande"))
+        when(personRepository.findFirstByLibraryEntityAndNameNormalizedOrderByDateCreatedAsc(library, "ariana grande"))
                 .thenReturn(Optional.empty());
-        when(personRepository.findFirstByNameAndLibraryEntityIsNull("Ariana Grande"))
+        when(personRepository.findFirstByNameNormalizedAndLibraryEntityIsNullOrderByDateCreatedAsc("ariana grande"))
                 .thenReturn(Optional.empty());
 
         PersonEntity result = subject.getOrCreatePerson(library, "Ariana Grande", 1993);
@@ -218,7 +229,7 @@ class ScannerHelperServiceTest {
     @Test
     void getOrCreatePersonFillsMissingBirthYearOnExistingArtist() {
         PersonEntity existing = PersonEntity.builder().name("Ariana Grande").build();
-        when(personRepository.findByLibraryEntityAndName(library, "Ariana Grande"))
+        when(personRepository.findFirstByLibraryEntityAndNameNormalizedOrderByDateCreatedAsc(library, "ariana grande"))
                 .thenReturn(Optional.of(existing));
 
         PersonEntity result = subject.getOrCreatePerson(library, "Ariana Grande", 1993);
@@ -230,7 +241,7 @@ class ScannerHelperServiceTest {
     @Test
     void getOrCreatePersonDoesNotOverrideExistingBirthYear() {
         PersonEntity existing = PersonEntity.builder().name("Ariana Grande").birthYear(1990).build();
-        when(personRepository.findByLibraryEntityAndName(library, "Ariana Grande"))
+        when(personRepository.findFirstByLibraryEntityAndNameNormalizedOrderByDateCreatedAsc(library, "ariana grande"))
                 .thenReturn(Optional.of(existing));
 
         PersonEntity result = subject.getOrCreatePerson(library, "Ariana Grande", 1993);

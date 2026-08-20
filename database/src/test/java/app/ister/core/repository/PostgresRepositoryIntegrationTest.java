@@ -108,6 +108,9 @@ class PostgresRepositoryIntegrationTest {
     private TrackRepository trackRepository;
 
     @Autowired
+    private PersonRepository personRepository;
+
+    @Autowired
     private EpisodeRepository episodeRepository;
 
     @Autowired
@@ -697,6 +700,30 @@ class PostgresRepositoryIntegrationTest {
         Page<TrackEntity> newestAdded = trackRepository.findInLibraries(List.of(library.getId()),
                 SortingEnum.DATE_CREATED, SortingOrder.DESCENDING, PageRequest.of(0, 10));
         assertEquals(3, newestAdded.getTotalElements());
+    }
+
+    /**
+     * Person identity: the generated {@code name_normalized} column is what makes "ABBA" and "Abba"
+     * one artist, and {@link app.ister.core.entity.PersonNames#normalize} must produce exactly the
+     * same string — the scanner looks persons up with the Java version and the database enforces
+     * uniqueness on the SQL one.
+     */
+    @Test
+    void personNameNormalizationMatchesTheJavaImplementation() {
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music-normalize").build());
+        List<String> names = List.of("ABBA", "  Abba   Gold ", "Alice  DeeJay", "2 BROTHERS ON THE 4TH FLOOR",
+                "Mumford & Sons", "Sinéad O'Connor", "IZZY");
+
+        for (String name : names) {
+            PersonEntity person = em.persistFlushFind(PersonEntity.builder().libraryEntity(library).name(name).build());
+            em.refresh(person);
+            assertEquals(app.ister.core.entity.PersonNames.normalize(name), person.getNameNormalized(),
+                    "SQL and Java normalization disagree on: " + name);
+        }
+
+        assertTrue(personRepository.findFirstByLibraryEntityAndNameNormalizedOrderByDateCreatedAsc(
+                library, app.ister.core.entity.PersonNames.normalize(" abba ")).isPresent(),
+                "a differently spelled name finds the existing person");
     }
 
     /**

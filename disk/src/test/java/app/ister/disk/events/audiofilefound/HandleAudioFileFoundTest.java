@@ -10,11 +10,13 @@ import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
+import app.ister.core.entity.TrackCreditEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.LibraryType;
+import app.ister.core.enums.TrackCreditType;
 import app.ister.core.enums.SearchEntityType;
 import app.ister.core.eventdata.AudioFileFoundData;
 import app.ister.core.eventdata.ImageFoundData;
@@ -24,6 +26,7 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.repository.MetadataRepository;
+import app.ister.core.repository.TrackCreditRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
@@ -83,6 +86,8 @@ class HandleAudioFileFoundTest {
     private MetadataRepository metadataRepositoryMock;
     @Mock
     private TrackRepository trackRepositoryMock;
+    @Mock
+    private TrackCreditRepository trackCreditRepositoryMock;
     @Mock
     private AlbumRepository albumRepositoryMock;
     @Mock
@@ -591,6 +596,119 @@ class HandleAudioFileFoundTest {
         verify(trackRepositoryMock).save(track);
         // The album keeps its own artist: its identity for the cover and NFO scanners.
         assertEquals(albumArtist, album.getPersonEntity());
+    }
+
+    @Test
+    void handleCreditsThePrimaryArtistAndTheFeaturedGuest() {
+        DirectoryEntity directory = DirectoryEntity.builder().build();
+        ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
+
+        UUID mediaFileId = UUID.randomUUID();
+        MediaFileEntity mediaFile = MediaFileEntity.builder().path(PATH).size(1000L).build();
+        ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
+
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
+        PersonEntity albumArtist = PersonEntity.builder().libraryEntity(library).name("Various Artists").build();
+        ReflectionTestUtils.setField(albumArtist, "id", UUID.randomUUID());
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(albumArtist).name("Album").releaseYear(2003).build();
+        TrackEntity track = TrackEntity.builder().personEntity(albumArtist).albumEntity(album).number(1).discNumber(1)
+                .metadataEntities(new ArrayList<>()).build();
+        ReflectionTestUtils.setField(track, "id", TRACK_ID);
+        PersonEntity primary = PersonEntity.builder().libraryEntity(library).name("Blu Cantrell").build();
+        ReflectionTestUtils.setField(primary, "id", UUID.randomUUID());
+        PersonEntity guest = PersonEntity.builder().libraryEntity(library).name("Sean Paul").build();
+        ReflectionTestUtils.setField(guest, "id", UUID.randomUUID());
+
+        FFprobe ffprobe = mock(FFprobe.class, RETURNS_SELF);
+        FFprobeResult result = mock(FFprobeResult.class);
+        Format format = mock(Format.class);
+        when(jaffreeMock.getFFPROBE()).thenReturn(ffprobe);
+        when(ffprobe.execute()).thenReturn(result);
+        when(result.getFormat()).thenReturn(format);
+        when(format.getTag(anyString())).thenReturn(null);
+        when(format.getTag("track")).thenReturn("1");
+        when(format.getTag("disc")).thenReturn("1");
+        when(format.getTag("title")).thenReturn("Breathe");
+        when(format.getTag("artist")).thenReturn("Blu Cantrell ft. Sean Paul");
+
+        when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any()))
+                .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
+        when(trackRepositoryMock.findById(TRACK_ID)).thenReturn(Optional.of(track));
+        when(scannerHelperServiceMock.getOrCreatePerson(library, "Blu Cantrell")).thenReturn(primary);
+        when(scannerHelperServiceMock.getOrCreatePerson(library, "Sean Paul")).thenReturn(guest);
+
+        subject.handle(AudioFileFoundData.builder()
+                .eventType(EventType.AUDIO_FILE_FOUND)
+                .directoryEntityUUID(DIRECTORY_ID)
+                .trackEntityUUID(TRACK_ID)
+                .path(PATH).build());
+
+        // The guest never becomes the track artist, but is credited alongside the primary one.
+        assertEquals(primary, track.getPersonEntity());
+        ArgumentCaptor<TrackCreditEntity> credits = ArgumentCaptor.forClass(TrackCreditEntity.class);
+        verify(trackCreditRepositoryMock, times(2)).save(credits.capture());
+        assertEquals(List.of(primary, guest),
+                credits.getAllValues().stream().map(TrackCreditEntity::getPersonEntity).toList());
+        assertEquals(List.of(TrackCreditType.PRIMARY, TrackCreditType.FEATURED),
+                credits.getAllValues().stream().map(TrackCreditEntity::getCreditType).toList());
+        assertEquals(List.of(0, 1), credits.getAllValues().stream().map(TrackCreditEntity::getPosition).toList());
+    }
+
+    @Test
+    void handleRewritesStaleCreditsInsteadOfDoublingThem() {
+        DirectoryEntity directory = DirectoryEntity.builder().build();
+        ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
+
+        UUID mediaFileId = UUID.randomUUID();
+        MediaFileEntity mediaFile = MediaFileEntity.builder().path(PATH).size(1000L).build();
+        ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
+
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("Anouk").build();
+        ReflectionTestUtils.setField(artist, "id", UUID.randomUUID());
+        PersonEntity wrong = PersonEntity.builder().libraryEntity(library).name("Typo Artist").build();
+        ReflectionTestUtils.setField(wrong, "id", UUID.randomUUID());
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Album").releaseYear(2024).build();
+        TrackEntity track = TrackEntity.builder().personEntity(artist).albumEntity(album).number(1).discNumber(1)
+                .metadataEntities(new ArrayList<>()).build();
+        ReflectionTestUtils.setField(track, "id", TRACK_ID);
+        TrackCreditEntity stale = TrackCreditEntity.builder().trackEntity(track).personEntity(wrong)
+                .creditType(TrackCreditType.FEATURED).position(1).build();
+        TrackCreditEntity existing = TrackCreditEntity.builder().trackEntity(track).personEntity(artist)
+                .creditType(TrackCreditType.PRIMARY).position(0).build();
+
+        FFprobe ffprobe = mock(FFprobe.class, RETURNS_SELF);
+        FFprobeResult result = mock(FFprobeResult.class);
+        Format format = mock(Format.class);
+        when(jaffreeMock.getFFPROBE()).thenReturn(ffprobe);
+        when(ffprobe.execute()).thenReturn(result);
+        when(result.getFormat()).thenReturn(format);
+        when(format.getTag(anyString())).thenReturn(null);
+        when(format.getTag("track")).thenReturn("1");
+        when(format.getTag("disc")).thenReturn("1");
+        when(format.getTag("title")).thenReturn("Nobody's Wife");
+        when(format.getTag("artist")).thenReturn("Anouk");
+
+        when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any()))
+                .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
+        when(trackRepositoryMock.findById(TRACK_ID)).thenReturn(Optional.of(track));
+        when(trackCreditRepositoryMock.findByTrackEntity_IdOrderByPositionAsc(TRACK_ID))
+                .thenReturn(List.of(existing, stale));
+
+        subject.handle(AudioFileFoundData.builder()
+                .eventType(EventType.AUDIO_FILE_FOUND)
+                .directoryEntityUUID(DIRECTORY_ID)
+                .trackEntityUUID(TRACK_ID)
+                .path(PATH).build());
+
+        verify(trackCreditRepositoryMock).deleteAll(List.of(stale));
+        verify(trackCreditRepositoryMock, times(1)).save(existing);
     }
 
     @Test

@@ -25,7 +25,7 @@ Zie het [scan-flow-diagram](../diagrams/scan-flow.md). `scanLibrary()` stuurt pe
 | Bestand | Event | Wat de handler doet |
 | --- | --- | --- |
 | Video | `MEDIA_FILE_FOUND` | ffprobe: streams + duur, embedded subs naar SRT extraheren, screenshot als achtergrond |
-| Audio | `AUDIO_FILE_FOUND` | ffprobe, ID3-tags (titel/tracknr, track-artiest uit de `artist`-tag met de pad-artiest als fallback), embedded cover, HLS-cache leegmaken |
+| Audio | `AUDIO_FILE_FOUND` | ffprobe, ID3-tags (titel/tracknr, track-credits uit de `artist`-tag — primaire artiest plus `feat.`-gasten — met de pad-artiest als fallback), embedded cover, HLS-cache leegmaken |
 | `.epub` (BOOK-library) | `EPUB_FILE_FOUND` | OPF: titel/taal/beschrijving, media overlays uit de inhoud, cover uit de zip |
 | `.cbz`/`.pdf`/`.epub` (COMIC-library) | `COMIC_FILE_FOUND` (epubs hergebruiken `EPUB_FILE_FOUND`) | paginatelling, `ComicInfo.xml`, cover extraheren |
 | `.srt` | `SUBTITLE_FILE_FOUND` | SRT als `EXTERNAL_SUBTITLE`-stream aan de episode koppelen |
@@ -34,6 +34,14 @@ Zie het [scan-flow-diagram](../diagrams/scan-flow.md). `scanLibrary()` stuurt pe
 
 Entity-creatie loopt via `ScannerHelperService.getOrCreate*`, dat ook de `*_FOUND`-verrijkingsevents
 en de creatie-events voor de zoekindex afvuurt.
+
+`getOrCreatePerson` zoekt een persoon op de **genormaliseerde** naam (`PersonNames.normalize`:
+kleine letters, samengetrokken spaties — gespiegeld door de gegenereerde kolom
+`person_entity.name_normalized`), zodat "ABBA" op het ene album en "Abba" op het volgende één
+artiest zijn. De opgeslagen `name` houdt de eerst geziene schrijfwijze als weergavenaam.
+`ArtistTagParser` splitst een `feat.`/`ft.`/`featuring`-tag in de primaire artiest en haar gasten;
+op een ampersand wordt nooit gesplitst, want "Simon & Garfunkel" en "Mumford & Sons" zijn
+bandnamen.
 
 ### Multi-episode-bestanden
 
