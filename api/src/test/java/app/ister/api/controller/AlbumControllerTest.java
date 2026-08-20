@@ -10,6 +10,7 @@ import app.ister.core.enums.SortingOrder;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.ImageRepository;
+import app.ister.core.repository.LibraryRepository;
 import app.ister.core.service.LibraryAccessService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +25,7 @@ import org.springframework.security.core.Authentication;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -48,6 +50,9 @@ class AlbumControllerTest {
 
     @Mock
     private ImageRepository imageRepository;
+
+    @Mock
+    private LibraryRepository libraryRepository;
 
     @Mock
     private LibraryAccessService libraryAccessService;
@@ -95,7 +100,7 @@ class AlbumControllerTest {
 
         Page<AlbumEntity> result = subject.albums(new AlbumController.AlbumsArguments(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.of(personId), Optional.empty(), Optional.empty()), authentication);
+                Optional.of(personId), Optional.empty(), Optional.empty(), Optional.empty()), authentication);
 
         assertEquals(1, result.getContent().size());
         assertEquals("Abbey Road", result.getContent().get(0).getName());
@@ -108,7 +113,7 @@ class AlbumControllerTest {
 
         Page<AlbumEntity> result = subject.albums(new AlbumController.AlbumsArguments(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.of(personId), Optional.empty(), Optional.empty()), authentication);
+                Optional.of(personId), Optional.empty(), Optional.empty(), Optional.empty()), authentication);
 
         assertTrue(result.isEmpty());
     }
@@ -123,7 +128,7 @@ class AlbumControllerTest {
 
         Page<AlbumEntity> result = subject.albums(new AlbumController.AlbumsArguments(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.of(libraryId), Optional.empty()), authentication);
+                Optional.empty(), Optional.empty(), Optional.of(libraryId), Optional.empty()), authentication);
 
         assertEquals(1, result.getContent().size());
     }
@@ -181,7 +186,7 @@ class AlbumControllerTest {
 
         Page<AlbumEntity> result = subject.albums(new AlbumController.AlbumsArguments(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty()), authentication);
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()), authentication);
 
         assertEquals(1, result.getContent().size());
     }
@@ -195,8 +200,40 @@ class AlbumControllerTest {
 
         Page<AlbumEntity> result = subject.albums(new AlbumController.AlbumsArguments(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(SortingOrder.DESCENDING),
-                Optional.empty(), Optional.empty(), Optional.empty()), authentication);
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()), authentication);
 
         assertEquals(1, result.getContent().size());
+    }
+
+    @Test
+    void albumsWithAppearsOnArtistIdReturnsGuestAppearances() {
+        UUID personId = UUID.randomUUID();
+        UUID libraryId = UUID.randomUUID();
+        AlbumEntity compilation = AlbumEntity.builder().name("Now That's What I Call Music").build();
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.of(Set.of(libraryId)));
+        when(albumRepository.findAppearsOnForPerson(eq(personId), eq(Set.of(libraryId)), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(compilation)));
+
+        Page<AlbumEntity> result = subject.albums(new AlbumController.AlbumsArguments(
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.of(personId), Optional.empty(), Optional.empty()), authentication);
+
+        assertEquals(1, result.getContent().size());
+        assertEquals("Now That's What I Call Music", result.getContent().get(0).getName());
+        verify(albumRepository, never()).findByPersonEntity(any(), any());
+    }
+
+    @Test
+    void albumsWithAppearsOnArtistIdAndDeniedLibraryReturnsEmpty() {
+        UUID personId = UUID.randomUUID();
+        UUID libraryId = UUID.randomUUID();
+        when(libraryAccessService.canAccess(eq(libraryId), any())).thenReturn(false);
+
+        Page<AlbumEntity> result = subject.albums(new AlbumController.AlbumsArguments(
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.of(personId), Optional.of(libraryId), Optional.empty()), authentication);
+
+        assertTrue(result.isEmpty());
+        verify(albumRepository, never()).findAppearsOnForPerson(any(), any(), any());
     }
 }

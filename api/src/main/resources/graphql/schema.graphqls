@@ -28,14 +28,22 @@ type Query {
     libraries: [Library!]
     persons(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID, filter: MediaFilterInput): PersonPage
     personById(id: ID): Person
-    albums(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, artistId: ID, libraryId: ID, filter: MediaFilterInput): AlbumPage
+    """
+    Albums of a music library. `artistId` returns the albums the artist owns (is the album artist of);
+    `appearsOnArtistId` returns the albums the artist is credited on without owning them — compilations
+    and guest appearances. `filter` takes precedence over both.
+    """
+    albums(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, artistId: ID, appearsOnArtistId: ID, libraryId: ID, filter: MediaFilterInput): AlbumPage
     albumById(id: ID): Album
     trackById(id: ID): Track
     """
     Tracks of a music library, across albums. NAME sorts on the tag/metadata title,
     RELEASE_YEAR on the earliest metadata release date; tracks without one sort last.
+    `artistId` narrows to every track the artist is credited on (as primary or featured artist)
+    plus every track on an album they own, so compilations and guest appearances are included.
+    `filter` takes precedence over `artistId`.
     """
-    tracks(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID, filter: MediaFilterInput): TrackPage
+    tracks(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, artistId: ID, libraryId: ID, filter: MediaFilterInput): TrackPage
     books(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, authorId: ID, libraryId: ID): BookPage
     bookById(id: ID): Book
     seriesById(id: ID): Series
@@ -1231,11 +1239,27 @@ type Album {
     rating: Int
 }
 
+enum TrackCreditType {
+    PRIMARY
+    FEATURED
+}
+
+"A person credited on a track, either as the primary artist or as a featured guest."
+type TrackCredit {
+    id: ID!
+    person: Person!
+    type: TrackCreditType!
+    position: Int!
+}
+
 type Track {
     id: ID!
     number: Int!
     discNumber: Int!
+    "The primary artist; the same person as the PRIMARY entry of `artists`."
     artist: Person!
+    "Everyone credited on this track: the primary artist first, then featured guests."
+    artists: [TrackCredit!]!
     album: Album!
     metadata: [Metadata!]
     mediaFile: [MediaFile!]

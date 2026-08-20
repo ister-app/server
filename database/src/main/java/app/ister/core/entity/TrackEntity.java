@@ -34,4 +34,9 @@ public class TrackEntity extends BaseEntity {
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "trackEntity")
     private List<MetadataEntity> metadataEntities;
+
+    /** Primary artist plus featured guests; the primary one is also {@link #personEntity}. */
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "trackEntity", orphanRemoval = true)
+    @OrderBy("position ASC")
+    private List<TrackCreditEntity> credits;
 }

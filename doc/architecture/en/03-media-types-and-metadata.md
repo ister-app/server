@@ -45,6 +45,11 @@ downloads the release-group cover; the disk-side `HandlePersonFound`/`HandleAlbu
 `artist.nfo`/`album.nfo`. Artists get a `birthYear` (MusicBrainz life-span, or the folder name)
 precisely so the TMDB actor dedup above can match them.
 
+Every track also carries **credits** (`TrackCreditEntity`): the primary artist — the same person as
+`TrackEntity.personEntity` — plus any featured guests, one row per person. That join table is what
+makes an artist's compilation and guest appearances reachable from their page
+([chapter 7](07-api-and-auth.md)); the album keeps a single album artist.
+
 ## Person bios and portraits (Wikipedia/Wikidata)
 
 `WikipediaService` (worker) enriches persons with multilingual biographies and portraits: Wikidata

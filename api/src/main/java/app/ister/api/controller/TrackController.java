@@ -5,13 +5,16 @@ import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
+import app.ister.core.entity.TrackCreditEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
+import app.ister.core.enums.TrackCreditType;
 import app.ister.core.filter.FilterKind;
 import app.ister.core.filter.MediaFilter;
 import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.PersonRepository;
+import app.ister.core.repository.TrackCreditRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import app.ister.core.service.LibraryAccessService;
@@ -20,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.Arguments;
 import org.springframework.graphql.data.method.annotation.BatchMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
@@ -28,6 +32,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +46,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TrackController {
     private final TrackRepository trackRepository;
+    private final TrackCreditRepository trackCreditRepository;
     private final PersonRepository personRepository;
     private final WatchStatusRepository watchStatusRepository;
     private final LibraryAccessService libraryAccessService;
@@ -55,32 +61,46 @@ public class TrackController {
                         track.getAlbumEntity().getLibraryEntity(), authentication));
     }
 
+    /** All arguments of the {@code tracks} query, bound as one object off the argument map. */
+    record TracksArguments(Optional<Integer> page, Optional<Integer> size,
+                           Optional<SortingEnum> sorting, Optional<SortingOrder> sortingOrder,
+                           Optional<UUID> artistId, Optional<UUID> libraryId,
+                           Optional<MediaFilter> filter) {
+    }
+
     @PreAuthorize("hasRole('user')")
     @QueryMapping
-    public Page<TrackEntity> tracks(
-            @Argument Optional<Integer> page,
-            @Argument Optional<Integer> size,
-            @Argument Optional<SortingEnum> sorting,
-            @Argument Optional<SortingOrder> sortingOrder,
-            @Argument Optional<UUID> libraryId,
-            @Argument Optional<MediaFilter> filter, Authentication authentication) {
-        Pageable pageable = Paging.unsorted(page, size, 20);
-        SortingEnum sort = sorting.orElse(SortingEnum.NAME);
-        SortingOrder order = sortingOrder.orElse(SortingOrder.ASCENDING);
+    public Page<TrackEntity> tracks(@Arguments TracksArguments args, Authentication authentication) {
+        Pageable pageable = Paging.unsorted(args.page(), args.size(), 20);
+        SortingEnum sort = args.sorting().orElse(SortingEnum.NAME);
+        SortingOrder order = args.sortingOrder().orElse(SortingOrder.ASCENDING);
         Optional<Page<TrackEntity>> filtered = filteredBrowse.page(
-                FilterKind.TRACK, filter, sort, order, libraryId, pageable, authentication);
+                FilterKind.TRACK, args.filter(), sort, order, args.libraryId(), pageable, authentication);
         if (filtered.isPresent()) {
             return filtered.get();
         }
-        if (libraryId.isPresent()) {
-            return libraryId.filter(id -> libraryAccessService.canAccess(id, authentication))
-                    .map(id -> trackRepository.findInLibraries(List.of(id), sort, order, pageable))
-                    .orElseGet(() -> Page.empty(pageable));
+        Collection<UUID> libraries = visibleLibraryIds(args.libraryId(), authentication);
+        if (libraries.isEmpty()) {
+            return Page.empty(pageable);
         }
-        Collection<UUID> libraries = libraryAccessService.allowedLibraryIds(authentication)
+        return args.artistId()
+                .map(artistId -> trackRepository.findForPersonInLibraries(artistId, libraries, sort, order, pageable))
+                .orElseGet(() -> trackRepository.findInLibraries(libraries, sort, order, pageable));
+    }
+
+    /**
+     * The libraries this query may read: the requested one if the user may see it, otherwise every
+     * library they are allowed to see. Empty means "nothing to return" — which also keeps an
+     * {@code IN ()} out of the generated SQL.
+     */
+    private Collection<UUID> visibleLibraryIds(Optional<UUID> libraryId, Authentication authentication) {
+        if (libraryId.isPresent()) {
+            return libraryAccessService.canAccess(libraryId.get(), authentication)
+                    ? List.of(libraryId.get()) : List.of();
+        }
+        return libraryAccessService.allowedLibraryIds(authentication)
                 .<Collection<UUID>>map(allowed -> allowed)
                 .orElseGet(() -> libraryRepository.findAll().stream().map(LibraryEntity::getId).toList());
-        return trackRepository.findInLibraries(libraries, sort, order, pageable);
     }
 
     // Since tracks carry their own tag-derived artist, an album's tracks no longer share one
@@ -93,6 +113,29 @@ public class TrackController {
         Map<TrackEntity, PersonEntity> result = new HashMap<>();
         tracks.forEach(t -> result.put(t, byId.get(t.getPersonEntity().getId())));
         return result;
+    }
+
+    // One credit query plus one person query per page, whatever the number of guests.
+    @BatchMapping(typeName = "Track", field = "artists")
+    public Map<TrackEntity, List<TrackCreditEntity>> artists(List<TrackEntity> tracks) {
+        List<UUID> trackIds = tracks.stream().map(TrackEntity::getId).toList();
+        Map<UUID, List<TrackCreditEntity>> byTrackId = trackCreditRepository.findByTrackEntity_IdIn(trackIds).stream()
+                .collect(Collectors.groupingBy(credit -> credit.getTrackEntity().getId()));
+        Map<TrackEntity, List<TrackCreditEntity>> result = new HashMap<>();
+        tracks.forEach(t -> result.put(t, byTrackId.getOrDefault(t.getId(), List.of()).stream()
+                .sorted(Comparator.comparingInt(TrackCreditEntity::getPosition))
+                .toList()));
+        return result;
+    }
+
+    @SchemaMapping(typeName = "TrackCredit", field = "person")
+    public PersonEntity creditPerson(TrackCreditEntity credit) {
+        return credit.getPersonEntity();
+    }
+
+    @SchemaMapping(typeName = "TrackCredit", field = "type")
+    public TrackCreditType creditType(TrackCreditEntity credit) {
+        return credit.getCreditType();
     }
 
     @BatchMapping(typeName = "Track", field = "playCount")

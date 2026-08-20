@@ -17,6 +17,7 @@ import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.SeasonEntity;
 import app.ister.core.entity.SeriesEntity;
 import app.ister.core.entity.ShowEntity;
+import app.ister.core.entity.TrackCreditEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
@@ -30,6 +31,7 @@ import app.ister.core.enums.SegmentType;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.enums.StreamCodecType;
+import app.ister.core.enums.TrackCreditType;
 import jakarta.persistence.PersistenceException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -695,6 +697,68 @@ class PostgresRepositoryIntegrationTest {
         Page<TrackEntity> newestAdded = trackRepository.findInLibraries(List.of(library.getId()),
                 SortingEnum.DATE_CREATED, SortingOrder.DESCENDING, PageRequest.of(0, 10));
         assertEquals(3, newestAdded.getTotalElements());
+    }
+
+    /**
+     * The artist page: every track credited to the artist, including the ones sitting on a
+     * compilation or on another artist's album, plus the albums those tracks live on.
+     */
+    @Test
+    void artistTrackBrowseIncludesGuestAppearances() {
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music-artist").build());
+        LibraryEntity hidden = em.persist(LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music-artist-hidden").build());
+        PersonEntity artist = em.persist(PersonEntity.builder().name("Artist-credited").build());
+        PersonEntity other = em.persist(PersonEntity.builder().name("Various Artists-credited").build());
+        AlbumEntity own = em.persist(AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Own").releaseYear(2020).build());
+        AlbumEntity compilation = em.persist(AlbumEntity.builder().libraryEntity(library).personEntity(other).name("Compilation").releaseYear(2021).build());
+        AlbumEntity elsewhere = em.persist(AlbumEntity.builder().libraryEntity(hidden).personEntity(other).name("Elsewhere").releaseYear(2021).build());
+
+        TrackEntity ownTrack = em.persist(TrackEntity.builder().albumEntity(own).personEntity(artist).number(1).discNumber(1).build());
+        // On someone else's album, as the track artist.
+        TrackEntity guestTrack = em.persist(TrackEntity.builder().albumEntity(compilation).personEntity(artist).number(1).discNumber(1).build());
+        // On someone else's album, only as a featured guest.
+        TrackEntity featuredTrack = em.persist(TrackEntity.builder().albumEntity(compilation).personEntity(other).number(2).discNumber(1).build());
+        em.persist(TrackCreditEntity.builder().trackEntity(featuredTrack).personEntity(other)
+                .creditType(TrackCreditType.PRIMARY).position(0).build());
+        em.persist(TrackCreditEntity.builder().trackEntity(featuredTrack).personEntity(artist)
+                .creditType(TrackCreditType.FEATURED).position(1).build());
+        // Nothing to do with the artist, and in a library the caller may not see.
+        TrackEntity strangerTrack = em.persist(TrackEntity.builder().albumEntity(elsewhere).personEntity(other).number(1).discNumber(1).build());
+        em.persist(MetadataEntity.builder().trackEntity(ownTrack).title("Alpha").released(LocalDate.of(2020, 1, 1)).build());
+        em.persist(MetadataEntity.builder().trackEntity(guestTrack).title("Beta").released(LocalDate.of(2021, 1, 1)).build());
+        em.persist(MetadataEntity.builder().trackEntity(strangerTrack).title("Gamma").build());
+        em.flush();
+
+        Page<TrackEntity> byName = trackRepository.findForPersonInLibraries(artist.getId(), List.of(library.getId()),
+                SortingEnum.NAME, SortingOrder.ASCENDING, PageRequest.of(0, 10));
+        assertEquals(List.of(ownTrack.getId(), guestTrack.getId(), featuredTrack.getId()), ids(byName),
+                "own, guest and featured tracks; the untitled featured one sorts last");
+        assertEquals(3, byName.getTotalElements(), "the count query totals the same filter");
+        assertFalse(ids(byName).contains(strangerTrack.getId()), "other libraries stay out");
+
+        assertEquals(List.of(guestTrack.getId(), ownTrack.getId(), featuredTrack.getId()),
+                ids(trackRepository.findForPersonInLibraries(artist.getId(), List.of(library.getId()),
+                        SortingEnum.NAME, SortingOrder.DESCENDING, PageRequest.of(0, 10))),
+                "untitled tracks sort last in both directions");
+
+        Page<TrackEntity> firstPage = trackRepository.findForPersonInLibraries(artist.getId(), List.of(library.getId()),
+                SortingEnum.NAME, SortingOrder.ASCENDING, PageRequest.of(0, 2));
+        assertEquals(List.of(ownTrack.getId(), guestTrack.getId()), ids(firstPage));
+        assertEquals(List.of(featuredTrack.getId()),
+                ids(trackRepository.findForPersonInLibraries(artist.getId(), List.of(library.getId()),
+                        SortingEnum.NAME, SortingOrder.ASCENDING, PageRequest.of(1, 2))),
+                "the id tie-break keeps paging stable");
+        assertEquals(3, trackRepository.findForPersonInLibraries(artist.getId(), List.of(library.getId()),
+                SortingEnum.DATE_CREATED, SortingOrder.DESCENDING, PageRequest.of(0, 10)).getTotalElements());
+
+        // The albums the artist appears on: the compilation once, never an album they own.
+        Page<AlbumEntity> appearsOn = albumRepository.findAppearsOnForPerson(artist.getId(),
+                List.of(library.getId()), PageRequest.of(0, 10));
+        assertEquals(List.of(compilation.getId()), ids(appearsOn),
+                "two credited tracks on one album stay one row");
+        assertEquals(1, appearsOn.getTotalElements());
+        assertTrue(albumRepository.findAppearsOnForPerson(other.getId(), List.of(library.getId()),
+                PageRequest.of(0, 10)).isEmpty(), "the compilation's own artist does not appear on it");
     }
 
     /** Same shape for episodes: metadata title/air date across every show of the library. */

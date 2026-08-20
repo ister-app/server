@@ -65,6 +65,13 @@ Drie kleine API-oppervlakken die de hoofdstukken hierboven slechts terloops rake
   `recentlyPlayedTracks` en `topRatedTracks` (allemaal per aanroepende gebruiker, `limit`
   begrensd op 1–50, standaard 10, library-gescoped zoals elke andere resolver).
   `PersonController` / `TrackController`.
+- **De muziek van een artiest** — `tracks(artistId:)` geeft elk nummer waarop de artiest
+  gecrediteerd staat, als primaire of featured artiest, plus de nummers op de albums die zij zelf
+  bezit; `albums(appearsOnArtistId:)` geeft de albums waarop zij gecrediteerd staat zonder ze te
+  bezitten (verzamelalbums, gastoptredens). `Track.artists` toont de credits zelf (`TrackCredit`:
+  persoon, `PRIMARY`/`FEATURED`, positie), terwijl `Track.artist` de primaire artiest blijft. Beide
+  queries zijn library-gescoped en pagineren en sorteren als de rest van het browse-oppervlak;
+  `filter` gaat voor het artiest-argument. `TrackController` / `AlbumController`.
 - **Playback-instellingen** — `userSettings` / `updateUserSettings` bevatten per gebruiker
   `preferredAudioLanguages`, `preferredSubtitleLanguages`, `directPlay`, `transcode` en
   `maxVideoHeight`. Ze gelden voor elke client van die gebruiker **en sturen pre-transcoding**:

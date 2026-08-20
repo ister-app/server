@@ -1,6 +1,7 @@
 package app.ister.api.controller;
 
 import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.MetadataEntity;
@@ -12,6 +13,7 @@ import app.ister.core.filter.MediaFilter;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.ImageRepository;
+import app.ister.core.repository.LibraryRepository;
 import app.ister.core.service.LibraryAccessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +29,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -41,6 +44,7 @@ public class AlbumController {
     private final AlbumRepository albumRepository;
     private final PersonRepository personRepository;
     private final ImageRepository imageRepository;
+    private final LibraryRepository libraryRepository;
     private final LibraryAccessService libraryAccessService;
     private final FilteredBrowse filteredBrowse;
 
@@ -54,8 +58,8 @@ public class AlbumController {
     /** All arguments of the {@code albums} query, bound as one object off the argument map. */
     record AlbumsArguments(Optional<Integer> page, Optional<Integer> size,
                            Optional<SortingEnum> sorting, Optional<SortingOrder> sortingOrder,
-                           Optional<UUID> artistId, Optional<UUID> libraryId,
-                           Optional<MediaFilter> filter) {
+                           Optional<UUID> artistId, Optional<UUID> appearsOnArtistId,
+                           Optional<UUID> libraryId, Optional<MediaFilter> filter) {
     }
 
     @PreAuthorize("hasRole('user')")
@@ -68,6 +72,12 @@ public class AlbumController {
                 args.sortingOrder().orElse(SortingOrder.ASCENDING), args.libraryId(), pageable, authentication);
         if (filtered.isPresent()) {
             return filtered.get();
+        }
+        // Albums the artist is credited on but does not own: compilations and guest appearances.
+        if (args.appearsOnArtistId().isPresent()) {
+            Collection<UUID> libraries = visibleLibraryIds(args.libraryId(), authentication);
+            return libraries.isEmpty() ? Page.empty(pageable)
+                    : albumRepository.findAppearsOnForPerson(args.appearsOnArtistId().get(), libraries, pageable);
         }
         Optional<UUID> artistId = args.artistId();
         if (artistId.isPresent()) {
@@ -85,6 +95,20 @@ public class AlbumController {
         return libraryAccessService.allowedLibraryIds(authentication)
                 .map(allowed -> albumRepository.findByLibraryEntityIdIn(allowed, pageable))
                 .orElseGet(() -> albumRepository.findAll(pageable));
+    }
+
+    /**
+     * The libraries this query may read: the requested one if the user may see it, otherwise every
+     * library they are allowed to see. Empty means "nothing to return".
+     */
+    private Collection<UUID> visibleLibraryIds(Optional<UUID> libraryId, Authentication authentication) {
+        if (libraryId.isPresent()) {
+            return libraryAccessService.canAccess(libraryId.get(), authentication)
+                    ? List.of(libraryId.get()) : List.of();
+        }
+        return libraryAccessService.allowedLibraryIds(authentication)
+                .<Collection<UUID>>map(allowed -> allowed)
+                .orElseGet(() -> libraryRepository.findAll().stream().map(LibraryEntity::getId).toList());
     }
 
     @SchemaMapping(typeName = "Album", field = "artist")

@@ -46,6 +46,11 @@ MusicBrainz en downloadt de release-group-cover; de disk-kant
 `birthYear` (MusicBrainz life-span, of de mapnaam) — precies zodat de TMDB-acteur-dedup hierboven ze
 kan matchen.
 
+Elke track draagt daarnaast **credits** (`TrackCreditEntity`): de primaire artiest — dezelfde persoon
+als `TrackEntity.personEntity` — plus eventuele featured gasten, één rij per persoon. Die koppeltabel
+maakt de verzamelalbum- en gastoptredens van een artiest bereikbaar vanaf haar pagina
+([hoofdstuk 7](07-api-and-auth.md)); het album houdt één albumartiest.
+
 ## Biografieën en portretten (Wikipedia/Wikidata)
 
 `WikipediaService` (worker) verrijkt personen met meertalige biografieën en portretten: Wikidata

@@ -72,6 +72,56 @@ public interface TrackRepository extends JpaRepository<TrackEntity, UUID> {
     Page<TrackEntity> findByAlbumEntityLibraryEntityIdIn(Collection<UUID> libraryIds, Pageable pageable);
 
     /**
+     * A page of every track credited to an artist within the given libraries: the artist has a
+     * track credit (primary or featured) on it, or owns the album it sits on. That is what puts
+     * compilation and guest appearances on the artist page. Sorting works exactly like
+     * {@link #findInLibraries}.
+     */
+    default Page<TrackEntity> findForPersonInLibraries(UUID personId, Collection<UUID> libraryIds, SortingEnum sorting,
+                                                       SortingOrder sortingOrder, Pageable pageable) {
+        boolean ascending = sortingOrder == SortingOrder.ASCENDING;
+        return switch (sorting) {
+            case NAME -> ascending ? findForPersonOrderByTitleAsc(personId, libraryIds, pageable)
+                    : findForPersonOrderByTitleDesc(personId, libraryIds, pageable);
+            case RELEASE_YEAR -> ascending ? findForPersonOrderByReleasedAsc(personId, libraryIds, pageable)
+                    : findForPersonOrderByReleasedDesc(personId, libraryIds, pageable);
+            case DATE_CREATED -> ascending ? findForPersonOrderByCreatedAsc(personId, libraryIds, pageable)
+                    : findForPersonOrderByCreatedDesc(personId, libraryIds, pageable);
+        };
+    }
+
+    String CREDITED_TO_PERSON =
+            " WHERE (t.personEntity.id = :personId OR t.albumEntity.personEntity.id = :personId"
+                    + " OR EXISTS (SELECT 1 FROM TrackCreditEntity c WHERE c.trackEntity = t AND c.personEntity.id = :personId))"
+                    + " AND t.albumEntity.libraryEntity.id IN :libraryIds ";
+    String TRACKS_FOR_PERSON = " FROM TrackEntity t LEFT JOIN t.metadataEntities m " + CREDITED_TO_PERSON;
+    String COUNT_TRACKS_FOR_PERSON = "SELECT COUNT(t) FROM TrackEntity t " + CREDITED_TO_PERSON;
+
+    @Query(value = "SELECT t" + TRACKS_FOR_PERSON + "GROUP BY t ORDER BY MIN(m.title) ASC NULLS LAST, t.id",
+            countQuery = COUNT_TRACKS_FOR_PERSON)
+    Page<TrackEntity> findForPersonOrderByTitleAsc(@Param("personId") UUID personId, @Param("libraryIds") Collection<UUID> libraryIds, Pageable pageable);
+
+    @Query(value = "SELECT t" + TRACKS_FOR_PERSON + "GROUP BY t ORDER BY MIN(m.title) DESC NULLS LAST, t.id",
+            countQuery = COUNT_TRACKS_FOR_PERSON)
+    Page<TrackEntity> findForPersonOrderByTitleDesc(@Param("personId") UUID personId, @Param("libraryIds") Collection<UUID> libraryIds, Pageable pageable);
+
+    @Query(value = "SELECT t" + TRACKS_FOR_PERSON + "GROUP BY t ORDER BY MIN(m.released) ASC NULLS LAST, t.id",
+            countQuery = COUNT_TRACKS_FOR_PERSON)
+    Page<TrackEntity> findForPersonOrderByReleasedAsc(@Param("personId") UUID personId, @Param("libraryIds") Collection<UUID> libraryIds, Pageable pageable);
+
+    @Query(value = "SELECT t" + TRACKS_FOR_PERSON + "GROUP BY t ORDER BY MIN(m.released) DESC NULLS LAST, t.id",
+            countQuery = COUNT_TRACKS_FOR_PERSON)
+    Page<TrackEntity> findForPersonOrderByReleasedDesc(@Param("personId") UUID personId, @Param("libraryIds") Collection<UUID> libraryIds, Pageable pageable);
+
+    @Query(value = "SELECT t FROM TrackEntity t" + CREDITED_TO_PERSON + "ORDER BY t.dateCreated ASC, t.id",
+            countQuery = COUNT_TRACKS_FOR_PERSON)
+    Page<TrackEntity> findForPersonOrderByCreatedAsc(@Param("personId") UUID personId, @Param("libraryIds") Collection<UUID> libraryIds, Pageable pageable);
+
+    @Query(value = "SELECT t FROM TrackEntity t" + CREDITED_TO_PERSON + "ORDER BY t.dateCreated DESC, t.id",
+            countQuery = COUNT_TRACKS_FOR_PERSON)
+    Page<TrackEntity> findForPersonOrderByCreatedDesc(@Param("personId") UUID personId, @Param("libraryIds") Collection<UUID> libraryIds, Pageable pageable);
+
+    /**
      * Returns a page of track IDs of an album in natural play order (disc number, track number).
      */
     @Query(value = """
@@ -92,7 +142,7 @@ public interface TrackRepository extends JpaRepository<TrackEntity, UUID> {
     List<UUID> findTrackIdsForAlbumShuffled(@Param("albumId") UUID albumId, @Param("seed") String seed, @Param("excludeId") UUID excludeId, @Param("limit") int limit, @Param("offset") int offset);
 
     /**
-     * The calling user's most played tracks of an artist (as track or album artist), most played
+     * The calling user's most played tracks of an artist (credited on the track, or the album artist), most played
      * first. Plays are watch-status rows: one per played play-queue item. Only plays up to
      * {@code asOf} count (on date_created — progress updates bump date_updated), so a play queue
      * paging through the ranking with its creation time as {@code asOf} sees a frozen order.
@@ -102,7 +152,8 @@ public interface TrackRepository extends JpaRepository<TrackEntity, UUID> {
             JOIN album_entity a ON t.album_entity_id = a.id
             JOIN watch_status_entity ws ON ws.track_entity_id = t.id AND ws.date_created <= :asOf
             JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
-            WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId)
+            WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId
+                   OR EXISTS (SELECT 1 FROM track_credit_entity tc WHERE tc.track_entity_id = t.id AND tc.person_entity_id = :personId))
             GROUP BY t.id
             ORDER BY COUNT(ws.id) DESC, MAX(ws.date_updated) DESC, t.id
             LIMIT :limit OFFSET :offset""", nativeQuery = true)
@@ -113,7 +164,8 @@ public interface TrackRepository extends JpaRepository<TrackEntity, UUID> {
             JOIN album_entity a ON t.album_entity_id = a.id
             JOIN watch_status_entity ws ON ws.track_entity_id = t.id AND ws.date_created <= :asOf
             JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
-            WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId)
+            WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId
+                   OR EXISTS (SELECT 1 FROM track_credit_entity tc WHERE tc.track_entity_id = t.id AND tc.person_entity_id = :personId))
               AND a.library_entity_id IN (:libraryIds)
             GROUP BY t.id
             ORDER BY COUNT(ws.id) DESC, MAX(ws.date_updated) DESC, t.id
@@ -126,7 +178,8 @@ public interface TrackRepository extends JpaRepository<TrackEntity, UUID> {
             JOIN album_entity a ON t.album_entity_id = a.id
             JOIN watch_status_entity ws ON ws.track_entity_id = t.id AND ws.date_created <= :asOf
             JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
-            WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId)
+            WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId
+                   OR EXISTS (SELECT 1 FROM track_credit_entity tc WHERE tc.track_entity_id = t.id AND tc.person_entity_id = :personId))
             GROUP BY t.id
             ORDER BY MAX(ws.date_updated) DESC, t.id
             LIMIT :limit OFFSET :offset""", nativeQuery = true)
@@ -137,7 +190,8 @@ public interface TrackRepository extends JpaRepository<TrackEntity, UUID> {
             JOIN album_entity a ON t.album_entity_id = a.id
             JOIN watch_status_entity ws ON ws.track_entity_id = t.id AND ws.date_created <= :asOf
             JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
-            WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId)
+            WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId
+                   OR EXISTS (SELECT 1 FROM track_credit_entity tc WHERE tc.track_entity_id = t.id AND tc.person_entity_id = :personId))
               AND a.library_entity_id IN (:libraryIds)
             GROUP BY t.id
             ORDER BY MAX(ws.date_updated) DESC, t.id
@@ -150,7 +204,8 @@ public interface TrackRepository extends JpaRepository<TrackEntity, UUID> {
             JOIN album_entity a ON t.album_entity_id = a.id
             JOIN rating_entity r ON r.track_entity_id = t.id
             JOIN user_entity u ON u.id = r.user_entity_id AND u.external_id = :externalId
-            WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId)
+            WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId
+                   OR EXISTS (SELECT 1 FROM track_credit_entity tc WHERE tc.track_entity_id = t.id AND tc.person_entity_id = :personId))
             ORDER BY r.value DESC, r.date_updated DESC, t.id
             LIMIT :limit OFFSET :offset""", nativeQuery = true)
     List<UUID> findTopRatedTrackIdsForPerson(@Param("personId") UUID personId, @Param("externalId") String externalId, @Param("limit") int limit, @Param("offset") int offset);
@@ -160,7 +215,8 @@ public interface TrackRepository extends JpaRepository<TrackEntity, UUID> {
             JOIN album_entity a ON t.album_entity_id = a.id
             JOIN rating_entity r ON r.track_entity_id = t.id
             JOIN user_entity u ON u.id = r.user_entity_id AND u.external_id = :externalId
-            WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId)
+            WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId
+                   OR EXISTS (SELECT 1 FROM track_credit_entity tc WHERE tc.track_entity_id = t.id AND tc.person_entity_id = :personId))
               AND a.library_entity_id IN (:libraryIds)
             ORDER BY r.value DESC, r.date_updated DESC, t.id
             LIMIT :limit OFFSET :offset""", nativeQuery = true)

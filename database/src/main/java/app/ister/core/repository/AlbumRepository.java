@@ -40,6 +40,24 @@ public interface AlbumRepository extends JpaRepository<AlbumEntity, UUID> {
 
     List<AlbumEntity> findByPersonEntityId(UUID personId);
 
+    /**
+     * Albums the artist appears on without owning them: at least one track is credited to the
+     * artist while the album artist is someone else. Compilations and guest appearances, in other
+     * words. An EXISTS rather than a join, so an album with several of the artist's tracks stays
+     * one row and the count query needs no DISTINCT.
+     */
+    String APPEARS_ON_FOR_PERSON = """
+             FROM AlbumEntity a
+            WHERE a.personEntity.id <> :personId
+              AND a.libraryEntity.id IN :libraryIds
+              AND EXISTS (SELECT 1 FROM TrackEntity t WHERE t.albumEntity = a
+                          AND (t.personEntity.id = :personId
+                               OR EXISTS (SELECT 1 FROM TrackCreditEntity c
+                                          WHERE c.trackEntity = t AND c.personEntity.id = :personId)))""";
+
+    @Query(value = "SELECT a" + APPEARS_ON_FOR_PERSON, countQuery = "SELECT COUNT(a)" + APPEARS_ON_FOR_PERSON)
+    Page<AlbumEntity> findAppearsOnForPerson(@Param("personId") UUID personId, @Param("libraryIds") Collection<UUID> libraryIds, Pageable pageable);
+
     List<AlbumEntity> findByLibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(LibraryType libraryType);
 
     /**

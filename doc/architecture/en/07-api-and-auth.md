@@ -61,6 +61,13 @@ Three small API surfaces that the chapters above only touch in passing:
   lists live on `Person`: `topPlayedTracks`, `recentlyPlayedTracks` and `topRatedTracks` (all
   per calling user, `limit` clamped to 1–50, default 10, library-scoped like every other
   resolver). `PersonController` / `TrackController`.
+- **An artist's music** — `tracks(artistId:)` returns every track the artist is credited on, as
+  primary or featured artist, plus the tracks on the albums they own; `albums(appearsOnArtistId:)`
+  returns the albums they are credited on without owning them (compilations, guest appearances).
+  `Track.artists` lists the credits themselves (`TrackCredit`: person, `PRIMARY`/`FEATURED`,
+  position) while `Track.artist` stays the primary artist. Both queries are library-scoped and page
+  and sort like the rest of the browse surface; `filter` takes precedence over the artist argument.
+  `TrackController` / `AlbumController`.
 - **Playback settings** — `userSettings` / `updateUserSettings` hold each user's
   `preferredAudioLanguages`, `preferredSubtitleLanguages`, `directPlay`, `transcode` and
   `maxVideoHeight`. They apply to every client of that user **and steer pre-transcoding**: only the

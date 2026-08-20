@@ -3,6 +3,7 @@ package app.ister.api.controller;
 import app.ister.core.entity.AlbumEntity;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.ImageRepository;
+import app.ister.core.repository.LibraryRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.service.LibraryAccessService;
 import org.junit.jupiter.api.AfterEach;
@@ -20,6 +21,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -46,6 +48,9 @@ class AlbumControllerGraphQlTest {
 
     @MockitoBean
     private ImageRepository imageRepository;
+
+    @MockitoBean
+    private LibraryRepository libraryRepository;
 
     @MockitoBean
     private LibraryAccessService libraryAccessService;
@@ -94,5 +99,22 @@ class AlbumControllerGraphQlTest {
                         """.formatted(libraryId))
                 .execute()
                 .path("albums.content[0].name").entity(String.class).isEqualTo("Abbey Road"));
+    }
+
+    @Test
+    void albumsQueryBindsTheAppearsOnArtistIdArgument() {
+        UUID personId = UUID.randomUUID();
+        UUID libraryId = UUID.randomUUID();
+        AlbumEntity compilation = AlbumEntity.builder().name("Top 40 Hits").releaseYear(2001).build();
+        compilation.setId(UUID.randomUUID());
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.of(Set.of(libraryId)));
+        when(albumRepository.findAppearsOnForPerson(eq(personId), any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(compilation)));
+
+        assertDoesNotThrow(() -> graphQlTester.document("""
+                        { albums(appearsOnArtistId: "%s") { content { id name } } }
+                        """.formatted(personId))
+                .execute()
+                .path("albums.content[0].name").entity(String.class).isEqualTo("Top 40 Hits"));
     }
 }
