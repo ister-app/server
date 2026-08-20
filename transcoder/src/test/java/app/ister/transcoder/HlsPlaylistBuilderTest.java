@@ -109,6 +109,34 @@ class HlsPlaylistBuilderTest {
     }
 
     @Test
+    void buildMasterPlaylistDropsEmbeddedSubtitleWhenExtractedCopyExists() {
+        UUID embeddedId = UUID.randomUUID();
+        UUID extractedId = UUID.randomUUID();
+        MediaFileStreamEntity embedded = subtitleStream(embeddedId, 2, "eng", null, "subrip", StreamCodecType.SUBTITLE);
+        MediaFileStreamEntity extracted = subtitleStream(extractedId, 2, "eng", null, "subtitle srt", StreamCodecType.EXTERNAL_SUBTITLE);
+        MediaFileEntity mediaFile = mediaFile(videoStream(0, 1920, 1080), audioStream(1, "eng", null), embedded, extracted);
+
+        String result = builder.buildMasterPlaylist(mediaFile, true, false, SubtitleFormat.WEBVTT);
+
+        assertTrue(result.contains("stream_sub_" + extractedId + "_webvtt.m3u8"));
+        assertFalse(result.contains("stream_sub_" + embeddedId + "_webvtt.m3u8"));
+    }
+
+    @Test
+    void buildMasterPlaylistKeepsEmbeddedSubtitleWithDifferentIndexThanExternal() {
+        UUID embeddedId = UUID.randomUUID();
+        UUID externalId = UUID.randomUUID();
+        MediaFileStreamEntity embedded = subtitleStream(embeddedId, 2, "eng", null, "subrip", StreamCodecType.SUBTITLE);
+        MediaFileStreamEntity external = subtitleStream(externalId, 3, "nld", null, "subtitle srt", StreamCodecType.EXTERNAL_SUBTITLE);
+        MediaFileEntity mediaFile = mediaFile(videoStream(0, 1920, 1080), audioStream(1, "eng", null), embedded, external);
+
+        String result = builder.buildMasterPlaylist(mediaFile, true, false, SubtitleFormat.WEBVTT);
+
+        assertTrue(result.contains("stream_sub_" + embeddedId + "_webvtt.m3u8"));
+        assertTrue(result.contains("stream_sub_" + externalId + "_webvtt.m3u8"));
+    }
+
+    @Test
     void buildMasterPlaylistSubtitleFallsBackToLangWhenNoTitle() {
         UUID subId = UUID.randomUUID();
         MediaFileStreamEntity sub = subtitleStream(subId, 2, "nld", null, "subrip", StreamCodecType.SUBTITLE);

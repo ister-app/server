@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Builds M3U8 playlist content — no I/O, no FFmpeg, no database access.
@@ -71,10 +72,17 @@ public class HlsPlaylistBuilder {
                 .filter(s -> s.getCodecType() == StreamCodecType.AUDIO)
                 .toList();
 
+        // An extracted SRT carries the stream_index of the embedded subtitle it came from;
+        // listing both would offer the same subtitle twice, so the embedded one is dropped.
+        Set<Integer> extractedIndexes = streams.stream()
+                .filter(s -> s.getCodecType() == StreamCodecType.EXTERNAL_SUBTITLE)
+                .map(MediaFileStreamEntity::getStreamIndex)
+                .collect(Collectors.toSet());
         List<MediaFileStreamEntity> subtitleStreams = streams.stream()
-                .filter(s -> (s.getCodecType() == StreamCodecType.EXTERNAL_SUBTITLE
-                        || s.getCodecType() == StreamCodecType.SUBTITLE)
-                        && !isImageSubtitle(s))
+                .filter(s -> s.getCodecType() == StreamCodecType.EXTERNAL_SUBTITLE
+                        || (s.getCodecType() == StreamCodecType.SUBTITLE
+                        && !isImageSubtitle(s)
+                        && !extractedIndexes.contains(s.getStreamIndex())))
                 .toList();
 
         // Index mapping: 0=COPY/direct, 1=720p/transcode, 2=480p/transcode
