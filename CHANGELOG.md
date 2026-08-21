@@ -1,5 +1,31 @@
 # Changelog
 
+## server v2.17.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.17.0` |
+| `ghcr.io/ister-app/migrations` | `2.17.0` |
+
+### Features
+
+- feat(scanner): normalise artist names and credit featured guests ([`4ea606d`](https://github.com/ister-app/server/commit/4ea606d))
+- feat(api): expose an artist's tracks and guest appearances ([`959afaf`](https://github.com/ister-app/server/commit/959afaf))
+
+### Fixes
+
+- fix(transcoder): drop embedded subtitle when an extracted copy exists ([`84616cc`](https://github.com/ister-app/server/commit/84616cc))
+- fix(sonar): resolve the four open issues ([`88668d8`](https://github.com/ister-app/server/commit/88668d8))
+- fix(db): merge duplicate artist rows ([`cac9123`](https://github.com/ister-app/server/commit/cac9123))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.17.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.16.1...v2.17.0
+
 ## server v2.16.1
 
 | Image | Tag |
