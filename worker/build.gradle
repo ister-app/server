@@ -14,7 +14,7 @@ dependencies {
 
     // Spring Cloud
     implementation 'org.springframework.cloud:spring-cloud-starter-openfeign:5.0.3'
-    implementation 'io.github.openfeign:feign-jackson:13.13'
+    implementation 'io.github.openfeign:feign-jackson:13.14'
 
     // XML and Validation APIs
     implementation 'jakarta.xml.bind:jakarta.xml.bind-api'
