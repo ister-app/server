@@ -134,6 +134,11 @@ public class AlbumController {
                 .orElse(0);
     }
 
+    @SchemaMapping(typeName = "Album", field = "dateAdded")
+    public String dateAdded(AlbumEntity albumEntity) {
+        return albumEntity.getDateCreated() == null ? null : albumEntity.getDateCreated().toString();
+    }
+
     @SchemaMapping(typeName = "Album", field = "tracks")
     public List<TrackEntity> tracks(AlbumEntity albumEntity) {
         return albumEntity.getTrackEntities();

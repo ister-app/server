@@ -143,6 +143,8 @@ class PersonControllerGraphQlTest {
                 .thenReturn(List.of(second.getId()));
         when(trackRepository.findTopRatedTrackIdsForPerson(eq(person.getId()), any(), eq(10), eq(0)))
                 .thenReturn(List.of());
+        when(trackRepository.findRecentlyAddedTrackIdsForPerson(eq(person.getId()), any(), eq(10), eq(0)))
+                .thenReturn(List.of(second.getId(), first.getId()));
         when(trackRepository.findAllById(anyCollection())).thenAnswer(invocation -> {
             java.util.Collection<UUID> ids = invocation.getArgument(0);
             return java.util.stream.Stream.of(second, first).filter(t -> ids.contains(t.getId())).toList();
@@ -153,13 +155,16 @@ class PersonControllerGraphQlTest {
                             topPlayedTracks { id }
                             recentlyPlayedTracks(limit: 5) { id }
                             topRatedTracks { id }
+                            recentlyAddedTracks { id }
                         } }
                         """.formatted(person.getId()))
                 .execute()
                 .path("personById.topPlayedTracks[0].id").entity(String.class).isEqualTo(first.getId().toString())
                 .path("personById.topPlayedTracks[1].id").entity(String.class).isEqualTo(second.getId().toString())
                 .path("personById.recentlyPlayedTracks[0].id").entity(String.class).isEqualTo(second.getId().toString())
-                .path("personById.topRatedTracks").entityList(Object.class).hasSize(0));
+                .path("personById.topRatedTracks").entityList(Object.class).hasSize(0)
+                .path("personById.recentlyAddedTracks[0].id").entity(String.class).isEqualTo(second.getId().toString())
+                .path("personById.recentlyAddedTracks[1].id").entity(String.class).isEqualTo(first.getId().toString()));
     }
 
     @Test

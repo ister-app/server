@@ -158,6 +158,16 @@ public class PersonController {
                 .orElseGet(() -> trackRepository.findTopRatedTrackIdsForPerson(personEntity.getId(), authentication.getName(), max, 0)));
     }
 
+    @SchemaMapping(typeName = "Person", field = "recentlyAddedTracks")
+    public List<TrackEntity> recentlyAddedTracks(PersonEntity personEntity, @Argument Optional<Integer> limit, Authentication authentication) {
+        int max = clampLimit(limit);
+        return tracksInOrder(libraryAccessService.allowedLibraryIds(authentication)
+                .map(allowed -> allowed.isEmpty()
+                        ? List.<UUID>of()
+                        : trackRepository.findRecentlyAddedTrackIdsForPersonInLibraries(personEntity.getId(), allowed, Instant.now(), max, 0))
+                .orElseGet(() -> trackRepository.findRecentlyAddedTrackIdsForPerson(personEntity.getId(), Instant.now(), max, 0)));
+    }
+
     private static int clampLimit(Optional<Integer> limit) {
         return Math.clamp(limit.orElse(10), 1, 50);
     }

@@ -75,14 +75,16 @@ class AlbumControllerGraphQlTest {
     void albumsQueryWithoutArgumentsBindsToEmptyOptionals() {
         AlbumEntity album = AlbumEntity.builder().name("Abbey Road").releaseYear(1969).build();
         album.setId(UUID.randomUUID());
+        album.setDateCreated(java.time.Instant.parse("2026-08-20T10:15:30Z"));
         when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
         when(albumRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(album)));
 
         assertDoesNotThrow(() -> graphQlTester.document("""
-                        { albums { content { id name } } }
+                        { albums { content { id name dateAdded } } }
                         """)
                 .execute()
-                .path("albums.content[0].name").entity(String.class).isEqualTo("Abbey Road"));
+                .path("albums.content[0].name").entity(String.class).isEqualTo("Abbey Road")
+                .path("albums.content[0].dateAdded").entity(String.class).isEqualTo("2026-08-20T10:15:30Z"));
     }
 
     @Test

@@ -739,11 +739,16 @@ input PlaylistInput {
     sortingOrder: SortingOrder
 }
 
-"Ranking of the library Discover top-lists. For books and series RECENTLY_PLAYED means recently read."
+"""
+Ranking of the library Discover top-lists and of ARTIST play queues. For books and series
+RECENTLY_PLAYED means recently read. RECENTLY_ADDED (newest in the library first) is an artist
+ranking only; the Discover `ranked*` lists return an empty page for it.
+"""
 enum RankKind {
     RECENTLY_PLAYED
     MOST_PLAYED
     HIGHEST_RATED
+    RECENTLY_ADDED
 }
 
 "Page order of a comic/manga series: western comics read LTR, unflipped manga RTL."
@@ -1209,6 +1214,11 @@ type Person {
     recentlyPlayedTracks(limit: Int): [Track!]!
     "The calling user's highest rated tracks of this artist, highest rating first."
     topRatedTracks(limit: Int): [Track!]!
+    """
+    The newest tracks of this artist (as primary/featured artist or album artist) by the date they
+    were added to the library, newest first. Not per user.
+    """
+    recentlyAddedTracks(limit: Int): [Track!]!
 }
 
 enum CreditType {
@@ -1237,6 +1247,8 @@ type Album {
     metadata: [Metadata!]
     "The calling user's rating (1-10), or null if unrated."
     rating: Int
+    "When the album was added to the library (ISO-8601)."
+    dateAdded: String
 }
 
 enum TrackCreditType {
@@ -1269,6 +1281,8 @@ type Track {
     playCount: Int
     "When the calling user last played this track (ISO-8601), or null when never played."
     lastPlayedAt: String
+    "When the track was added to the library (ISO-8601)."
+    dateAdded: String
 }
 
 type Book {

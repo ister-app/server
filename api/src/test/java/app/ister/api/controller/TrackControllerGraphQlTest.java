@@ -90,14 +90,17 @@ class TrackControllerGraphQlTest {
     void tracksQueryWithoutArgumentsBindsToEmptyOptionals() {
         UUID libraryId = UUID.randomUUID();
         when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.of(Set.of(libraryId)));
+        TrackEntity track = track();
+        track.setDateCreated(java.time.Instant.parse("2026-08-20T10:15:30Z"));
         when(trackRepository.findInLibraries(any(), any(), any(), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(track())));
+                .thenReturn(new PageImpl<>(List.of(track)));
 
         assertDoesNotThrow(() -> graphQlTester.document("""
-                        { tracks { content { id number } } }
+                        { tracks { content { id number dateAdded } } }
                         """)
                 .execute()
-                .path("tracks.content[0].number").entity(Integer.class).isEqualTo(1));
+                .path("tracks.content[0].number").entity(Integer.class).isEqualTo(1)
+                .path("tracks.content[0].dateAdded").entity(String.class).isEqualTo("2026-08-20T10:15:30Z"));
     }
 
     @Test

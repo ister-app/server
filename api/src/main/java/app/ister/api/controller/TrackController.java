@@ -162,6 +162,11 @@ public class TrackController {
                 .collect(Collectors.toMap(WatchStatusRepository.TrackPlayStats::getTrackId, Function.identity()));
     }
 
+    @SchemaMapping(typeName = "Track", field = "dateAdded")
+    public String dateAdded(TrackEntity trackEntity) {
+        return trackEntity.getDateCreated() == null ? null : trackEntity.getDateCreated().toString();
+    }
+
     @SchemaMapping(typeName = "Track", field = "album")
     public AlbumEntity album(TrackEntity trackEntity) {
         return trackEntity.getAlbumEntity();

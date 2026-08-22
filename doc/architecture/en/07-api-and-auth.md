@@ -60,7 +60,11 @@ Three small API surfaces that the chapters above only touch in passing:
   ([chapter 5](05-continue-watching-and-status.md)); both null when never played. Per-artist top
   lists live on `Person`: `topPlayedTracks`, `recentlyPlayedTracks` and `topRatedTracks` (all
   per calling user, `limit` clamped to 1–50, default 10, library-scoped like every other
-  resolver). `PersonController` / `TrackController`.
+  resolver), plus `recentlyAddedTracks` — not per user, newest in the library first, the same
+  artist predicate as `tracks(artistId:)`. `Album.dateAdded` and `Track.dateAdded` (ISO-8601)
+  expose when the row was created by a scan. Every `Person` list has a matching `RankKind` for
+  ARTIST play queues; `RECENTLY_ADDED` is artist-only (the Discover `ranked*` lists return an
+  empty page for it). `PersonController` / `TrackController`.
 - **An artist's music** — `tracks(artistId:)` returns every track the artist is credited on, as
   primary or featured artist, plus the tracks on the albums they own; `albums(appearsOnArtistId:)`
   returns the albums they are credited on without owning them (compilations, guest appearances).

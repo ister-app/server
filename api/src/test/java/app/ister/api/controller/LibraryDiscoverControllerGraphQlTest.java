@@ -225,12 +225,14 @@ class LibraryDiscoverControllerGraphQlTest {
                         { libraryById(id: "%s") {
                             rankedBooks(kind: MOST_PLAYED) { totalElements totalPages content { id } }
                             rankedSeries(kind: HIGHEST_RATED) { totalElements content { id } }
+                            rankedAlbums(kind: RECENTLY_ADDED) { totalElements content { id } }
                         } }
                         """.formatted(library.getId()))
                 .execute()
                 .path("libraryById.rankedBooks.totalElements").entity(Integer.class).isEqualTo(0)
                 .path("libraryById.rankedBooks.content").entityList(Object.class).hasSize(0)
-                .path("libraryById.rankedSeries.content").entityList(Object.class).hasSize(0));
+                .path("libraryById.rankedSeries.content").entityList(Object.class).hasSize(0)
+                .path("libraryById.rankedAlbums.content").entityList(Object.class).hasSize(0));
     }
 
     @Test

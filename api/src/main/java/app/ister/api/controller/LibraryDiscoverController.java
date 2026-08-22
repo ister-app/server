@@ -160,6 +160,8 @@ public class LibraryDiscoverController {
         UUID libraryId = library.getId();
         String user = authentication.getName();
         return switch (kind) {
+            // An artist-only ranking; Discover has its own recently-added row.
+            case RECENTLY_ADDED -> Page.empty(rankedPageable(page, size));
             case RECENTLY_PLAYED -> rankedPage(page, size, movieRepository,
                     (limit, offset) -> movieRepository.findRecentlyPlayedMovieIdsForLibrary(libraryId, user, limit, offset),
                     () -> movieRepository.countPlayedMoviesForLibrary(libraryId, user));
@@ -178,6 +180,8 @@ public class LibraryDiscoverController {
         UUID libraryId = library.getId();
         String user = authentication.getName();
         return switch (kind) {
+            // An artist-only ranking; Discover has its own recently-added row.
+            case RECENTLY_ADDED -> Page.empty(rankedPageable(page, size));
             case RECENTLY_PLAYED -> rankedPage(page, size, showRepository,
                     (limit, offset) -> showRepository.findRecentlyPlayedShowIdsForLibrary(libraryId, user, limit, offset),
                     () -> showRepository.countPlayedShowsForLibrary(libraryId, user));
@@ -196,6 +200,8 @@ public class LibraryDiscoverController {
         UUID libraryId = library.getId();
         String user = authentication.getName();
         return switch (kind) {
+            // An artist-only ranking; Discover has its own recently-added row.
+            case RECENTLY_ADDED -> Page.empty(rankedPageable(page, size));
             case RECENTLY_PLAYED -> rankedPage(page, size, albumRepository,
                     (limit, offset) -> albumRepository.findRecentlyPlayedAlbumIdsForLibrary(libraryId, user, limit, offset),
                     () -> albumRepository.countPlayedAlbumsForLibrary(libraryId, user));
@@ -214,6 +220,8 @@ public class LibraryDiscoverController {
         UUID libraryId = library.getId();
         String user = authentication.getName();
         return switch (kind) {
+            // An artist-only ranking; Discover has its own recently-added row.
+            case RECENTLY_ADDED -> Page.empty(rankedPageable(page, size));
             case RECENTLY_PLAYED -> rankedPage(page, size, bookRepository,
                     (limit, offset) -> bookRepository.findRecentlyReadBookIdsForLibrary(libraryId, user, limit, offset),
                     () -> bookRepository.countReadBooksForLibrary(libraryId, user));
@@ -230,6 +238,8 @@ public class LibraryDiscoverController {
         UUID libraryId = library.getId();
         String user = authentication.getName();
         return switch (kind) {
+            // An artist-only ranking; Discover has its own recently-added row.
+            case RECENTLY_ADDED -> Page.empty(rankedPageable(page, size));
             case RECENTLY_PLAYED -> rankedPage(page, size, seriesRepository,
                     (limit, offset) -> seriesRepository.findRecentlyReadSeriesIdsForLibrary(libraryId, user, limit, offset),
                     () -> seriesRepository.countReadSeriesForLibrary(libraryId, user));
@@ -243,6 +253,8 @@ public class LibraryDiscoverController {
         UUID libraryId = library.getId();
         String user = authentication.getName();
         return switch (kind) {
+            // An artist-only ranking; Discover has its own recently-added row.
+            case RECENTLY_ADDED -> Page.empty(rankedPageable(page, size));
             case RECENTLY_PLAYED -> rankedPage(page, size, podcastRepository,
                     (limit, offset) -> podcastRepository.findRecentlyPlayedPodcastIdsForLibrary(libraryId, user, limit, offset),
                     () -> podcastRepository.countPlayedPodcastsForLibrary(libraryId, user));

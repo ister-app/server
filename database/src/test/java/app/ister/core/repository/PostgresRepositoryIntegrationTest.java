@@ -648,6 +648,23 @@ class PostgresRepositoryIntegrationTest {
         assertEquals(List.of(hiddenTrack.getId(), trackB.getId()),
                 trackRepository.findTopPlayedTrackIdsForPerson(artist.getId(), "listener-top", asOf, 10, 1),
                 "offset pages the frozen ranking");
+
+        // Recently added: newest row first, not per user, same artist predicate and library scope.
+        assertEquals(List.of(hiddenTrack.getId(), trackB.getId(), trackA.getId()),
+                trackRepository.findRecentlyAddedTrackIdsForPerson(artist.getId(), Instant.now(), 10, 0));
+        assertEquals(List.of(trackB.getId(), trackA.getId()),
+                trackRepository.findRecentlyAddedTrackIdsForPersonInLibraries(artist.getId(), List.of(library.getId()), Instant.now(), 10, 0));
+        assertEquals(List.of(trackB.getId(), trackA.getId()),
+                trackRepository.findRecentlyAddedTrackIdsForPerson(albumArtist.getId(), Instant.now(), 10, 0),
+                "the album artist sees the album's tracks");
+        Instant beforeNew = Instant.now();
+        TrackEntity trackC = em.persistAndFlush(TrackEntity.builder().albumEntity(album).personEntity(artist).number(3).discNumber(1).build());
+        assertEquals(trackC.getId(),
+                trackRepository.findRecentlyAddedTrackIdsForPerson(artist.getId(), Instant.now(), 10, 0).getFirst(),
+                "a fresh asOf sees the new track");
+        assertEquals(List.of(hiddenTrack.getId(), trackB.getId(), trackA.getId()),
+                trackRepository.findRecentlyAddedTrackIdsForPerson(artist.getId(), beforeNew, 10, 0),
+                "the frozen asOf does not");
     }
 
     // --- library-wide browse (tracks/episodes) ---

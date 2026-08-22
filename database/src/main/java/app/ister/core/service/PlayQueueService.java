@@ -716,6 +716,11 @@ public class PlayQueueService {
                     .map(ids -> ids.isEmpty() ? List.<UUID>of()
                             : trackRepository.findTopRatedTrackIdsForPersonInLibraries(personId, externalId, ids, limit, offset))
                     .orElseGet(() -> trackRepository.findTopRatedTrackIdsForPerson(personId, externalId, limit, offset));
+            // Not per user; frozen at creation so a scan adding tracks mid-playback can't shift pages.
+            case RECENTLY_ADDED -> allowed
+                    .map(ids -> ids.isEmpty() ? List.<UUID>of()
+                            : trackRepository.findRecentlyAddedTrackIdsForPersonInLibraries(personId, ids, asOf, limit, offset))
+                    .orElseGet(() -> trackRepository.findRecentlyAddedTrackIdsForPerson(personId, asOf, limit, offset));
         };
     }
 

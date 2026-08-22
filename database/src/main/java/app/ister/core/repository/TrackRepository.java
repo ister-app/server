@@ -223,6 +223,32 @@ public interface TrackRepository extends JpaRepository<TrackEntity, UUID> {
     List<UUID> findTopRatedTrackIdsForPersonInLibraries(@Param("personId") UUID personId, @Param("externalId") String externalId, @Param("libraryIds") Collection<UUID> libraryIds, @Param("limit") int limit, @Param("offset") int offset);
 
     /**
+     * The newest tracks of an artist (credited on the track, or the album artist) by the date they were added
+     * to the library, newest first. Not per user. Only tracks added up to {@code asOf} count, so an ARTIST
+     * play queue paging with its creation time keeps a frozen order while a scan adds tracks.
+     */
+    @Query(value = """
+            SELECT t.id FROM track_entity t
+            JOIN album_entity a ON t.album_entity_id = a.id
+            WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId
+                   OR EXISTS (SELECT 1 FROM track_credit_entity tc WHERE tc.track_entity_id = t.id AND tc.person_entity_id = :personId))
+              AND t.date_created <= :asOf
+            ORDER BY t.date_created DESC, t.id
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findRecentlyAddedTrackIdsForPerson(@Param("personId") UUID personId, @Param("asOf") Instant asOf, @Param("limit") int limit, @Param("offset") int offset);
+
+    @Query(value = """
+            SELECT t.id FROM track_entity t
+            JOIN album_entity a ON t.album_entity_id = a.id
+            WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId
+                   OR EXISTS (SELECT 1 FROM track_credit_entity tc WHERE tc.track_entity_id = t.id AND tc.person_entity_id = :personId))
+              AND a.library_entity_id IN (:libraryIds)
+              AND t.date_created <= :asOf
+            ORDER BY t.date_created DESC, t.id
+            LIMIT :limit OFFSET :offset""", nativeQuery = true)
+    List<UUID> findRecentlyAddedTrackIdsForPersonInLibraries(@Param("personId") UUID personId, @Param("libraryIds") Collection<UUID> libraryIds, @Param("asOf") Instant asOf, @Param("limit") int limit, @Param("offset") int offset);
+
+    /**
      * Returns a page of track IDs of a whole library in a deterministic shuffled order derived from the seed.
      */
     @Query(value = """

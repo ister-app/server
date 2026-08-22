@@ -591,6 +591,25 @@ class PlayQueueServiceTest {
     }
 
     @Test
+    void createPlayQueueForArtistRecentlyAddedIsFrozenAtCreation() {
+        user = UserEntity.builder().id(UUID.randomUUID()).externalId("listener").build();
+        mockUser();
+        mockSaveAssignsItemIds();
+        UUID personId = UUID.randomUUID();
+        List<UUID> trackIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+        when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.empty());
+        when(trackRepository.findRecentlyAddedTrackIdsForPerson(eq(personId), any(Instant.class), eq(50), eq(0)))
+                .thenReturn(trackIds);
+
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.ARTIST, personId, null, false, RankKind.RECENTLY_ADDED, authentication);
+
+        assertEquals(trackIds, result.getItems().stream().map(PlayQueueItemEntity::getTrackEntityId).toList());
+        assertEquals(RankKind.RECENTLY_ADDED, result.getRankKind());
+        // Not a per-user ranking, but still frozen at the queue's creation time.
+        verify(trackRepository).findRecentlyAddedTrackIdsForPerson(personId, result.getDateCreated(), 50, 0);
+    }
+
+    @Test
     void createPlayQueueForArtistWithoutAnyAllowedLibraryThrows() {
         mockUser();
         mockSaveAssignsItemIds();

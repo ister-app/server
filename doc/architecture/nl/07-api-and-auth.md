@@ -63,8 +63,13 @@ Drie kleine API-oppervlakken die de hoofdstukken hierboven slechts terloops rake
   ([hoofdstuk 5](05-continue-watching-and-status.md)); beide null als de track nooit is
   afgespeeld. Toplijsten per artiest staan op `Person`: `topPlayedTracks`,
   `recentlyPlayedTracks` en `topRatedTracks` (allemaal per aanroepende gebruiker, `limit`
-  begrensd op 1–50, standaard 10, library-gescoped zoals elke andere resolver).
-  `PersonController` / `TrackController`.
+  begrensd op 1–50, standaard 10, library-gescoped zoals elke andere resolver), plus
+  `recentlyAddedTracks` — niet per gebruiker, nieuwst in de library eerst, hetzelfde
+  artiest-predicaat als `tracks(artistId:)`. `Album.dateAdded` en `Track.dateAdded` (ISO-8601)
+  tonen wanneer een scan de rij heeft aangemaakt. Elke `Person`-lijst heeft een bijpassende
+  `RankKind` voor ARTIST-afspeelwachtrijen; `RECENTLY_ADDED` is alleen voor artiesten (de
+  Discover-`ranked*`-lijsten geven er een lege pagina voor). `PersonController` /
+  `TrackController`.
 - **De muziek van een artiest** — `tracks(artistId:)` geeft elk nummer waarop de artiest
   gecrediteerd staat, als primaire of featured artiest, plus de nummers op de albums die zij zelf
   bezit; `albums(appearsOnArtistId:)` geeft de albums waarop zij gecrediteerd staat zonder ze te
