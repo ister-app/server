@@ -18,6 +18,15 @@ import java.util.stream.Collectors;
 public class HlsPlaylistBuilder {
 
     private static final String EXT_M3U8 = ".m3u8";
+
+    /**
+     * Marks which generation of the segment grid a cached playlist was written
+     * with. Players ignore unknown {@code #EXT-} tags; the server treats a cached
+     * playlist without the current tag as absent and regenerates it, so a cache
+     * directory written before the grid was trimmed per stream repairs itself on
+     * the next request instead of serving a segment nobody has forever.
+     */
+    static final String GRID_TAG = "#EXT-X-ISTER-GRID:2";
     private static final String PREFIX_STREAM_SUB = "stream_sub_";
     private static final String PREFIX_STREAM_VIDEO = "stream_video_";
 
@@ -283,6 +292,7 @@ public class HlsPlaylistBuilder {
         StringBuilder sb = new StringBuilder();
         sb.append("#EXTM3U\n");
         sb.append("#EXT-X-VERSION:6\n");
+        sb.append(GRID_TAG).append("\n");
         sb.append("#EXT-X-TARGETDURATION:").append(targetDuration).append("\n");
         sb.append("#EXT-X-MEDIA-SEQUENCE:0\n");
         sb.append("#EXT-X-PLAYLIST-TYPE:VOD\n");
@@ -300,6 +310,7 @@ public class HlsPlaylistBuilder {
         int targetDuration = (int) Math.ceil(totalDuration);
         return "#EXTM3U\n" +
                 "#EXT-X-VERSION:6\n" +
+                GRID_TAG + "\n" +
                 "#EXT-X-TARGETDURATION:" + targetDuration + "\n" +
                 "#EXT-X-MEDIA-SEQUENCE:0\n" +
                 "#EXT-X-PLAYLIST-TYPE:VOD\n" +

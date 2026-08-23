@@ -2070,4 +2070,35 @@ class HlsServiceTest {
     private static FfprobeService.VideoTiming timing(java.util.List<Double> keyframes) {
         return new FfprobeService.VideoTiming(keyframes, Double.NaN, Double.NaN);
     }
+
+    @Test
+    void aCachedPlaylistFromBeforeTheGridWasTrimmedIsRegenerated() throws IOException {
+        UUID id = UUID.randomUUID();
+        Path cacheDir = tempDir.resolve(id.toString());
+        Files.createDirectories(cacheDir);
+        // A playlist as it was written before the grid carried a generation tag,
+        // promising one segment more than the pass could write.
+        Files.writeString(cacheDir.resolve("stream_video_720p.m3u8"),
+                "#EXTM3U\n#EXT-X-VERSION:6\n#EXTINF:5.000000,\nseg_video_720p_00000.ts\n"
+                        + "#EXTINF:5.000000,\nseg_video_720p_00001.ts\n#EXT-X-ENDLIST\n");
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
+        when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
+
+        String playlist = hlsService.getStreamPlaylist(id, "stream_video_720p.m3u8");
+
+        assertTrue(playlist.contains("#EXT-X-ISTER-GRID:"), "the stale playlist should have been rebuilt");
+    }
+
+    @Test
+    void aCurrentPlaylistIsServedFromCacheUntouched() throws IOException {
+        UUID id = UUID.randomUUID();
+        Path cacheDir = tempDir.resolve(id.toString());
+        Files.createDirectories(cacheDir);
+        String cached = "#EXTM3U\n#EXT-X-VERSION:6\n#EXT-X-ISTER-GRID:2\n#EXTINF:5.000000,\n"
+                + "seg_video_720p_00000.ts\n#EXT-X-ENDLIST\n";
+        Files.writeString(cacheDir.resolve("stream_video_720p.m3u8"), cached);
+
+        assertEquals(cached, hlsService.getStreamPlaylist(id, "stream_video_720p.m3u8"));
+    }
 }

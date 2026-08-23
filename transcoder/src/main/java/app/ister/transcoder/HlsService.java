@@ -496,7 +496,7 @@ public class HlsService {
      */
     public String getStreamPlaylist(UUID mediaFileId, String streamFilename) throws IOException {
         Path cacheFile = cacheDir(mediaFileId).resolve(streamFilename);
-        if (Files.exists(cacheFile)) {
+        if (isCurrentPlaylist(cacheFile)) {
             Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(System.currentTimeMillis()));
             return Files.readString(cacheFile);
         }
@@ -866,9 +866,18 @@ public class HlsService {
     private void writeStreamPlaylistIfAbsent(UUID mediaFileId, String filename, SegmentGrid grid,
                                               HlsPlaylistBuilder.SegmentNamer namer) throws IOException {
         Path cacheFile = cacheDir(mediaFileId).resolve(filename);
-        if (!Files.exists(cacheFile)) {
+        if (!isCurrentPlaylist(cacheFile)) {
             writePlaylistAtomically(cacheFile, playlistBuilder.buildVodPlaylist(grid.starts(), grid.end(), namer));
         }
+    }
+
+    /**
+     * Whether a cached playlist was written with the current grid generation. One
+     * from before is treated as absent and regenerated — otherwise a directory
+     * cached while playlists could over-promise keeps serving that promise.
+     */
+    private static boolean isCurrentPlaylist(Path cacheFile) throws IOException {
+        return Files.exists(cacheFile) && Files.readString(cacheFile).contains(HlsPlaylistBuilder.GRID_TAG);
     }
 
     /**
