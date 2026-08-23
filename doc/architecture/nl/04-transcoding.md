@@ -26,7 +26,8 @@ keerzijde: passes encoderen sequentieel vanaf t=0, dus een sprong vooruit wacht 
 gevraagde segment heeft ingehaald.
 
 Dat geldt ook voor de `copy`-kwaliteiten (direct spelen): video wordt stream-gekopieerd en geknipt
-op hetzelfde keyframe-grid dat de playlists adverteren, en copy-audio laat elke MPEG-TS-native
+op hetzelfde raster dat de playlists adverteren (zie de volgende paragraaf voor waar dat raster
+ophoudt), en copy-audio laat elke MPEG-TS-native
 codec (AAC, MP3, AC-3, E-AC-3, DTS) ongemoeid en valt alleen terug op AAC voor codecs die MPEG-TS
 niet kan dragen. Copy-audio werd voorheen geadverteerd als één segment dat het hele bestand
 besloeg en on-demand werd gegenereerd; bij lange bestanden blokkeerde dat het eerste verzoek
@@ -34,6 +35,36 @@ minutenlang en verhongerde de audiostream van de client terwijl videosegmenten v
 Videopasses zetten bovendien `omit_video_pes_length=0`: zonder expliciete PES-lengtes is het
 laatste PES-pakket van elk segment onbegrensd, en een client die segmenten achter elkaar leest
 markeert dat op elke grens als corrupt — een decodeerhapering om de paar seconden.
+
+## Het grid stopt waar de stream stopt
+
+Het knipraster komt uit de video-keyframes, maar elke stream eindigt ergens anders, en een knip op
+of voorbij het einde van een stream levert helemaal geen bestand op — FFmpeg opent dat segment
+nooit. Een playlist die het tóch adverteerde beloofde dus iets waarop geen enkel verzoek ooit
+antwoord kon krijgen. Dat gebeurt in de praktijk in twee vormen: audio eindigt vaak eerder dan de
+container (heel gewoon in mkv), en een MPEG-TS-streamkopie van video eindigt op het laatste keyframe
+omdat de laatste GOP wegvalt.
+
+`SegmentGrid` wordt daarom per stream en per rol gebouwd: `HlsTranscodeService.gridFor` meet waar
+die stream eindigt — de videopakketscan rapporteert zowel het laatste keyframe (voor een kopie) als
+het einde van het laatste pakket (voor een re-encode), en audio krijgt één extra ffprobe die via
+`-read_intervals` alleen de laatste 30 seconden leest. Grenzen die minder dan een kwart seconde
+overlaten vervallen, en de laatste `#EXTINF` volgt het gemeten einde in plaats van de containerduur.
+Een probe die niets kan meten valt terug op de containerduur en knipt niets weg, zodat een mislukte
+probe een playlist nooit kan inkorten. Remote invoer wordt op deze manier nooit geprobed: die wordt
+gelezen via `/mediaFile/{id}/download`, dat geen byte-ranges serveert, dus een zoekende probe zou
+ontaarden in het hele bestand over het netwerk streamen.
+
+De playlist en de pass gaan allebei via `gridFor` met dezelfde argumenten, zodat wat geadverteerd
+wordt en wat geproduceerd wordt niet uit elkaar kunnen lopen. Als vangnet voor wat de meting niet
+kan bereiken worden de segmenten die een afgeronde pass schreef geteld vóórdat de done-marker wordt
+geschreven, en wordt de playlist daarop teruggeknipt; dat repareert meteen cachemappen van vóór deze
+wijziging. Een segment dat een afgeronde pass nooit schreef antwoordt 404, geen 503 — het komt niet
+meer, en "probeer opnieuw" liet clients urenlang opnieuw proberen.
+
+Het zichtbare gevolg: bij zo'n bestand kan de video een fractie van een seconde, en de audio een
+seconde of zo, eerder eindigen dan de containerduur zegt. Die frames werden nooit geleverd — ze
+werden alleen beloofd.
 
 ## Concurrency
 

@@ -24,14 +24,43 @@ segment, using `-f segment -segment_times` so the encoder never resets PTS — t
 A/V drift. The trade-off: passes encode sequentially from t=0, so a forward seek waits for the
 encoder to catch up to the requested segment.
 
-This includes the `copy` (direct-play) qualities: video is stream-copied and cut at the same
-keyframe grid the playlists advertise, and copy audio keeps any MPEG-TS-native codec (AAC, MP3,
+This includes the `copy` (direct-play) qualities: video is stream-copied and cut on the same grid
+the playlists advertise (see the next section for where that grid stops), and copy audio keeps any MPEG-TS-native codec (AAC, MP3,
 AC-3, E-AC-3, DTS) untouched, falling back to AAC only for codecs MPEG-TS cannot carry. Copy audio
 used to be advertised as a single whole-file segment generated on demand; on long files that
 blocked the first request for minutes and starved the client's audio stream while video segments
 raced ahead. Video passes also set `omit_video_pes_length=0`: without explicit PES lengths the
 final PES packet of every segment is unbounded, and a client reading segments back to back flags
 it corrupt on each boundary — a decode hiccup every few seconds.
+
+## The grid stops where the stream stops
+
+The cut grid comes from the video keyframes, but each stream ends somewhere else, and a cut at or
+past the end of a stream produces no file at all — FFmpeg never opens that segment. A playlist that
+advertised it was therefore promising something no request could ever be answered with. Two shapes
+of this occur in practice: audio commonly ends before the container does (ordinary in mkv), and an
+MPEG-TS stream copy of video ends at the last keyframe because it drops the final GOP.
+
+`SegmentGrid` is therefore built per stream and per role: `HlsTranscodeService.gridFor` measures
+where that stream ends — the video packet scan reports both the last keyframe (for a copy) and the
+end of the last packet (for a re-encode), and audio gets one extra ffprobe that reads only the final
+30 seconds through `-read_intervals`. Boundaries that would leave less than a quarter of a second
+are dropped, and the last `#EXTINF` follows the measured end rather than the container duration. A
+probe that cannot measure falls back to the container duration and trims nothing, so a failing probe
+can never shorten a playlist. Remote inputs are never probed this way: they are read over
+`/mediaFile/{id}/download`, which serves no byte ranges, so a seeking probe would degrade into
+streaming the whole file across the network.
+
+The playlist and the pass both go through `gridFor` with the same arguments, so what is advertised
+and what is produced cannot drift apart. As a net for the cases the measurement cannot reach, the
+segments a finished pass produced are counted before its done marker is written and the playlist is
+cut back to them; that also repairs cache directories written before this existed. A segment a
+completed pass never wrote answers 404, not 503 — it is not coming back, and "try again" made
+clients retry for hours.
+
+The visible consequence: for such a file the video can end a fraction of a second, and the audio a
+second or so, before the container duration says. Those frames were never delivered — they were only
+promised.
 
 ## Concurrency
 
