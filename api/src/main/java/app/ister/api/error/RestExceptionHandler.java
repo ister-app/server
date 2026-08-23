@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
+import app.ister.transcoder.SegmentUnavailableException;
+
 import java.io.IOException;
 import java.util.NoSuchElementException;
 
@@ -40,6 +42,18 @@ public class RestExceptionHandler {
     @ExceptionHandler(AsyncRequestNotUsableException.class)
     public void handleClientDisconnect(AsyncRequestNotUsableException ex) {
         log.debug("Client disconnected before response completed: {}", ex.getMessage());
+    }
+
+    /**
+     * A segment a finished pass never wrote. Not a 503: that says "try again",
+     * and a client took it literally — retrying for hours for a file that will
+     * never appear. 404 tells the truth and fails fast. Chosen over 410 because
+     * players (mpv, hls.js) already treat a 404 on a segment as end-of-stream.
+     */
+    @ExceptionHandler(SegmentUnavailableException.class)
+    public ProblemDetail handleSegmentUnavailable(SegmentUnavailableException ex) {
+        log.warn("Segment will never be produced: {}", ex.getMessage());
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "Segment not available");
     }
 
     @ExceptionHandler(IOException.class)

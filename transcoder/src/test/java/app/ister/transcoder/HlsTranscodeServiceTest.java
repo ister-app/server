@@ -1157,4 +1157,105 @@ class HlsTranscodeServiceTest {
     private static FfprobeService.VideoTiming timing(java.util.List<Double> keyframes) {
         return new FfprobeService.VideoTiming(keyframes, Double.NaN, Double.NaN);
     }
+
+    // ========== Playlist reconciliation ==========
+
+    private Path writePlaylist(String name, int entries) throws IOException {
+        StringBuilder sb = new StringBuilder("#EXTM3U\n#EXT-X-VERSION:6\n#EXT-X-TARGETDURATION:2\n"
+                + "#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n\n");
+        for (int i = 0; i < entries; i++) {
+            sb.append("#EXTINF:2.000000,\n")
+                    .append(String.format("seg_video_copy_%05d.ts%n", i));
+        }
+        sb.append("#EXT-X-ENDLIST\n");
+        Path p = tempDir.resolve(name);
+        Files.writeString(p, sb.toString());
+        return p;
+    }
+
+    private void writeSegments(String prefix, int count) throws IOException {
+        for (int i = 0; i < count; i++) {
+            Files.writeString(tempDir.resolve(String.format("%s%05d.ts", prefix, i)), "data");
+        }
+    }
+
+    private static long extinfCount(Path playlist) throws IOException {
+        return Files.readAllLines(playlist).stream().filter(l -> l.startsWith("#EXTINF:")).count();
+    }
+
+    @Test
+    void reconcileTrimsAPlaylistThatPromisesMoreThanThePassWrote() throws IOException {
+        Path playlist = writePlaylist("stream_video_copy.m3u8", 6);
+        writeSegments("seg_video_copy_", 5);
+
+        service.reconcilePlaylist(tempDir, "seg_video_copy_");
+
+        assertEquals(5, extinfCount(playlist));
+        String content = Files.readString(playlist);
+        assertTrue(content.contains("seg_video_copy_00004.ts"));
+        assertFalse(content.contains("seg_video_copy_00005.ts"));
+        assertTrue(content.endsWith("#EXT-X-ENDLIST\n"));
+        assertTrue(content.startsWith("#EXTM3U"));
+        assertFalse(Files.exists(tempDir.resolve("stream_video_copy.m3u8.tmp")));
+    }
+
+    @Test
+    void reconcileLeavesAMatchingPlaylistAlone() throws IOException {
+        Path playlist = writePlaylist("stream_video_copy.m3u8", 5);
+        writeSegments("seg_video_copy_", 5);
+        String before = Files.readString(playlist);
+
+        service.reconcilePlaylist(tempDir, "seg_video_copy_");
+
+        assertEquals(before, Files.readString(playlist));
+    }
+
+    @Test
+    void reconcileIgnoresEmptySegmentFiles() throws IOException {
+        Path playlist = writePlaylist("stream_video_copy.m3u8", 4);
+        writeSegments("seg_video_copy_", 3);
+        Files.writeString(tempDir.resolve("seg_video_copy_00003.ts"), "");
+
+        service.reconcilePlaylist(tempDir, "seg_video_copy_");
+
+        assertEquals(3, extinfCount(playlist));
+    }
+
+    @Test
+    void reconcileCutsAtAGapRatherThanCountingAroundIt() throws IOException {
+        // The index is the running order, so a hole cannot be closed by renumbering.
+        Path playlist = writePlaylist("stream_video_copy.m3u8", 6);
+        writeSegments("seg_video_copy_", 2);
+        Files.writeString(tempDir.resolve("seg_video_copy_00003.ts"), "data");
+
+        service.reconcilePlaylist(tempDir, "seg_video_copy_");
+
+        assertEquals(2, extinfCount(playlist));
+    }
+
+    @Test
+    void reconcileNotifiesSoARemotePlaylistCanBeReuploaded() throws IOException {
+        writePlaylist("stream_video_copy.m3u8", 6);
+        writeSegments("seg_video_copy_", 5);
+        List<Path> rewritten = new java.util.ArrayList<>();
+        service.setPlaylistRewrittenListener(rewritten::add);
+
+        service.reconcilePlaylist(tempDir, "seg_video_copy_");
+
+        assertEquals(1, rewritten.size());
+        assertEquals("stream_video_copy.m3u8", rewritten.getFirst().getFileName().toString());
+    }
+
+    @Test
+    void reconcileDoesNothingWithoutAPlaylist() {
+        assertDoesNotThrow(() -> service.reconcilePlaylist(tempDir, "seg_video_copy_"));
+    }
+
+    @Test
+    void playlistNameIsDerivedFromTheSegmentPrefix() {
+        assertEquals("stream_video_copy.m3u8", HlsTranscodeService.playlistNameFor("seg_video_copy_"));
+        assertEquals("stream_video_480p.m3u8", HlsTranscodeService.playlistNameFor("seg_video_480p_"));
+        assertEquals("stream_audio_1_192k.m3u8", HlsTranscodeService.playlistNameFor("seg_audio_1_192k_"));
+        assertNull(HlsTranscodeService.playlistNameFor("seg_sub_7_"));
+    }
 }

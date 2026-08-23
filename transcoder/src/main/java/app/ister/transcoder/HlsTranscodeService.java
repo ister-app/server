@@ -207,6 +207,13 @@ public class HlsTranscodeService {
         backgroundPassFinishedListener.set(listener);
     }
 
+    /** Called with a playlist that was rewritten after a pass; set by {@link HlsService} to re-upload it. */
+    private final AtomicReference<Consumer<Path>> playlistRewrittenListener = new AtomicReference<>();
+
+    public void setPlaylistRewrittenListener(Consumer<Path> listener) {
+        playlistRewrittenListener.set(listener);
+    }
+
     /** Bookkeeping for a pass that is currently executing on a pool thread. */
     private static final class RunningPass {
         final String generationKey;
@@ -690,6 +697,7 @@ public class HlsTranscodeService {
                 .setLogLevel(LogLevel.ERROR),
                 inputPath, "video pass " + quality.getLabel(),
                 cacheDir, SEG_VIDEO_PREFIX + quality.getLabel() + "_");
+        reconcilePlaylist(cacheDir, SEG_VIDEO_PREFIX + quality.getLabel() + "_");
         writeDoneMarker(cacheDir, SEG_VIDEO_PREFIX + quality.getLabel() + "_");
     }
 
@@ -769,6 +777,7 @@ public class HlsTranscodeService {
                 .setLogLevel(LogLevel.ERROR),
                 inputPath, "audio pass " + streamIdx + "/" + audioQuality.getLabel(),
                 cacheDir, String.format("seg_audio_%d_%s_", streamIdx, audioQuality.getLabel()));
+        reconcilePlaylist(cacheDir, String.format("seg_audio_%d_%s_", streamIdx, audioQuality.getLabel()));
         writeDoneMarker(cacheDir, String.format("seg_audio_%d_%s_", streamIdx, audioQuality.getLabel()));
     }
 
@@ -777,6 +786,97 @@ public class HlsTranscodeService {
      * segments) tells later pre-transcode runs to skip the pass: a preempted or crashed pass
      * leaves segments behind but no marker, so it is correctly restarted.
      */
+    /**
+     * Cuts a playlist back to what the finished pass actually wrote.
+     * <p>
+     * The grid is trimmed up front so this should never fire; it is the net for
+     * whatever the prediction cannot reach — a remote input whose audio end could
+     * not be probed, or FFmpeg dropping more than expected on a codec we have not
+     * seen. Counting the directory rather than reading an FFmpeg segment list is
+     * deliberate: it is the same thing the segment endpoint checks
+     * ({@code exists && size > 0}), it also repairs cache directories written
+     * before this existed, and it survives a restart mid-pass.
+     */
+    void reconcilePlaylist(Path cacheDir, String segmentPrefix) {
+        String playlistName = playlistNameFor(segmentPrefix);
+        if (playlistName == null) return;
+        Path playlist = cacheDir.resolve(playlistName);
+        try {
+            if (!Files.exists(playlist)) return;
+            int produced = countProducedSegments(cacheDir, segmentPrefix);
+            List<String> lines = Files.readAllLines(playlist);
+            long advertised = lines.stream().filter(l -> l.startsWith("#EXTINF:")).count();
+            if (produced >= advertised) return;
+
+            log.warn("Playlist {} advertised {} segments but the pass wrote {}; trimming it",
+                    playlistName, advertised, produced);
+            HlsService.writePlaylistAtomically(playlist, truncatePlaylist(lines, produced));
+            Consumer<Path> listener = playlistRewrittenListener.get();
+            if (listener != null) listener.accept(playlist);
+        } catch (IOException e) {
+            // A playlist we could not repair is the situation we already had.
+            log.warn("Could not reconcile playlist {}: {}", playlist, e.toString());
+        }
+    }
+
+    /**
+     * Segments written from index 0 without a gap. A gap in the middle is worse
+     * than a missing tail — the index is the running order — so the playlist is
+     * cut at the gap and it is logged as an error.
+     */
+    private int countProducedSegments(Path cacheDir, String segmentPrefix) throws IOException {
+        Set<Integer> present = new java.util.HashSet<>();
+        int highest = -1;
+        try (var files = Files.list(cacheDir)) {
+            for (Path p : files.toList()) {
+                String name = p.getFileName().toString();
+                if (!name.startsWith(segmentPrefix) || !name.endsWith(".ts")) continue;
+                if (Files.size(p) == 0) continue;
+                try {
+                    int idx = Integer.parseInt(
+                            name.substring(segmentPrefix.length(), name.length() - ".ts".length()));
+                    present.add(idx);
+                    highest = Math.max(highest, idx);
+                } catch (NumberFormatException _) {
+                    // Not one of ours.
+                }
+            }
+        }
+        int contiguous = 0;
+        while (present.contains(contiguous)) contiguous++;
+        if (contiguous <= highest) {
+            log.error("Segments {}* have a gap at index {} (highest written is {}); cutting the playlist there",
+                    segmentPrefix, contiguous, highest);
+        }
+        return contiguous;
+    }
+
+    private static String truncatePlaylist(List<String> lines, int keep) {
+        StringBuilder sb = new StringBuilder();
+        int kept = 0;
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (line.startsWith("#EXTINF:")) {
+                if (kept >= keep) break;
+                kept++;
+                sb.append(line).append("\n");
+                if (i + 1 < lines.size()) sb.append(lines.get(++i)).append("\n");
+                continue;
+            }
+            if (line.startsWith("#EXT-X-ENDLIST")) break;
+            sb.append(line).append("\n");
+        }
+        return sb.append("#EXT-X-ENDLIST\n").toString();
+    }
+
+    /** {@code seg_video_720p_} to {@code stream_video_720p.m3u8}, and the audio equivalent. */
+    static String playlistNameFor(String segmentPrefix) {
+        if (!segmentPrefix.startsWith("seg_") || !segmentPrefix.endsWith("_")) return null;
+        String middle = segmentPrefix.substring("seg_".length(), segmentPrefix.length() - 1);
+        if (!middle.startsWith("video_") && !middle.startsWith("audio_")) return null;
+        return "stream_" + middle + ".m3u8";
+    }
+
     private void writeDoneMarker(Path cacheDir, String segmentPrefix) {
         try {
             Files.writeString(cacheDir.resolve(DONE_MARKER_PREFIX + segmentPrefix), "");
@@ -1020,7 +1120,7 @@ public class HlsTranscodeService {
             Files.setLastModifiedTime(segmentPath, FileTime.fromMillis(System.currentTimeMillis()));
             return segmentPath;
         }
-        throw new IOException("Segment not produced by FFmpeg pass: " + segmentPath);
+        throw new SegmentUnavailableException("Segment not produced by FFmpeg pass: " + segmentPath);
     }
 
     /**

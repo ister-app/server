@@ -6,6 +6,8 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
 
+import app.ister.transcoder.SegmentUnavailableException;
+
 import java.io.IOException;
 import java.lang.reflect.Method;
 
@@ -46,5 +48,27 @@ class RestExceptionHandlerTest {
 
         assertNotNull(resolved);
         assertEquals("handleIo", resolved.getName());
+    }
+
+    /**
+     * A segment a finished pass never wrote must not look temporary: served as a
+     * 503 "try again" a downloading client retries it for hours.
+     */
+    @Test
+    void unavailableSegmentResolvesToItsOwnHandlerNotHandleIo() {
+        Method resolved = resolver.resolveMethod(new SegmentUnavailableException("gone"));
+
+        assertNotNull(resolved);
+        assertEquals("handleSegmentUnavailable", resolved.getName());
+    }
+
+    @Test
+    void unavailableSegmentMapsToNotFound() {
+        RestExceptionHandler subject = new RestExceptionHandler();
+
+        ProblemDetail result = subject.handleSegmentUnavailable(
+                new SegmentUnavailableException("Segment not produced by FFmpeg pass: seg_video_copy_01308.ts"));
+
+        assertEquals(HttpStatus.NOT_FOUND.value(), result.getStatus());
     }
 }

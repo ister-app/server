@@ -132,6 +132,24 @@ public class HlsService {
     @PostConstruct
     void registerBackgroundPassResume() {
         transcodeService.setBackgroundPassFinishedListener(this::startNextPendingPass);
+        transcodeService.setPlaylistRewrittenListener(this::reuploadPlaylistIfRemote);
+    }
+
+    /**
+     * A playlist that was corrected after its pass must reach the source node too,
+     * or that node keeps serving the version promising a segment nobody has.
+     */
+    private void reuploadPlaylistIfRemote(Path playlist) {
+        try {
+            UUID mediaFileId = UUID.fromString(playlist.getParent().getFileName().toString());
+            MediaFileEntity mediaFile = readOnlyTransaction.execute(_ ->
+                    mediaFileRepository.findById(mediaFileId).orElse(null));
+            if (mediaFile == null || !isRemote(mediaFile)) return;
+            remoteNodeClient.uploadFile(mediaFile.getDirectoryEntity().getNodeEntity().getUrl(),
+                    mediaFileId, playlist);
+        } catch (Exception e) {
+            log.warn("Could not re-upload corrected playlist {}: {}", playlist, e.toString());
+        }
     }
 
     /** Daemon thread pool for segment-upload watcher threads (remote transcoding). */
