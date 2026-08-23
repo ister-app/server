@@ -38,12 +38,16 @@ markeert dat op elke grens als corrupt — een decodeerhapering om de paar secon
 
 ## Het grid stopt waar de stream stopt
 
-Het knipraster komt uit de video-keyframes, maar elke stream eindigt ergens anders, en een knip op
-of voorbij het einde van een stream levert helemaal geen bestand op — FFmpeg opent dat segment
-nooit. Een playlist die het tóch adverteerde beloofde dus iets waarop geen enkel verzoek ooit
-antwoord kon krijgen. Dat gebeurt in de praktijk in twee vormen: audio eindigt vaak eerder dan de
-container (heel gewoon in mkv), en een MPEG-TS-streamkopie van video eindigt op het laatste keyframe
-omdat de laatste GOP wegvalt.
+Het knipraster komt uit de video-keyframes, maar elke stream eindigt ergens anders. De segment-muxer
+knipt op het eerste keyframe op of na elk gevraagd tijdstip, dus een knip waar niets meer te knippen
+valt levert geen bestand op — en een playlist die het tóch adverteerde beloofde iets waarop geen
+enkel verzoek ooit antwoord kon krijgen. Dat gebeurt in twee vormen: audio eindigt vaak eerder dan de
+container (heel gewoon in mkv), en de laatste knip van een videokopie kan precies op het allerlaatste
+keyframe landen, waar het van tijdstempelafronding en de kniptolerantie afhangt of hij nog splitst.
+
+Zo'n grens wegtrimmen kost niets. Het raster voedt de FFmpeg-pass én de playlist, dus het segment
+raakt niet verweesd — het vorige loopt in plaats daarvan door tot het einde van de stream, en een
+pakkettelling over een getrimd raster laat elk pakket van de bron nog aanwezig zien.
 
 `SegmentGrid` wordt daarom per stream en per rol gebouwd: `HlsTranscodeService.gridFor` meet waar
 die stream eindigt — de videopakketscan rapporteert zowel het laatste keyframe (voor een kopie) als
@@ -62,9 +66,9 @@ geschreven, en wordt de playlist daarop teruggeknipt; dat repareert meteen cache
 wijziging. Een segment dat een afgeronde pass nooit schreef antwoordt 404, geen 503 — het komt niet
 meer, en "probeer opnieuw" liet clients urenlang opnieuw proberen.
 
-Het zichtbare gevolg: bij zo'n bestand kan de video een fractie van een seconde, en de audio een
-seconde of zo, eerder eindigen dan de containerduur zegt. Die frames werden nooit geleverd — ze
-werden alleen beloofd.
+Het zichtbare gevolg: bij zo'n bestand kan de playlist een fractie van een seconde, en bij audio een
+seconde of zo, eerder eindigen dan de containerduur zegt. Er gaat geen beeld of geluid verloren — het
+laatste segment draagt het — alleen de geadverteerde duur is nu de eerlijke.
 
 ## Concurrency
 

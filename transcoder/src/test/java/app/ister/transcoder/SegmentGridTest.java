@@ -25,12 +25,22 @@ class SegmentGridTest {
 
     @Test
     void aCutOnTheVeryEndOfTheStreamIsDropped() {
-        // The video-copy case: an MPEG-TS copy ends at the last keyframe, so a cut
-        // there opens a segment with nothing left to put in it.
+        // The video-copy case: the cut lands on the last keyframe, and the muxer
+        // has nothing after it to cut at.
         SegmentGrid grid = SegmentGrid.trim(List.of(0.0, 2616.73, 2619.15), 2619.15, 2619.65);
 
         assertEquals(List.of(0.0, 2616.73), grid.starts());
         assertEquals(List.of(2616.73), grid.cutTimes());
+    }
+
+    @Test
+    void theLastSegmentPlaysToTheEndOfTheStreamEvenWhenTrimmedEarlier() {
+        // A copy is trimmed at the last keyframe but the segment itself runs on to
+        // the final packet, so the playlist duration follows that, not the cut.
+        SegmentGrid grid = SegmentGrid.trim(List.of(0.0, 2616.73, 2619.15), 2619.15, 2619.617, 2619.65);
+
+        assertEquals(List.of(0.0, 2616.73), grid.starts());
+        assertEquals(2619.617, grid.end());
     }
 
     @Test

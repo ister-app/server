@@ -10,26 +10,33 @@ import java.util.List;
  * the last one ends.
  * <p>
  * The grid comes from the video keyframes, but each stream ends somewhere else,
- * and a cut at or past the end of a stream produces no file at all — FFmpeg
- * simply never opens that segment. The playlist would then advertise a segment
- * that can never be served, which is a permanent failure dressed up as a
- * temporary one. So the grid is trimmed to the measured end of the stream it
- * belongs to, and the last segment's duration follows that same end instead of
- * the container duration.
+ * and a cut near or past the end of a stream can produce no file at all — the
+ * segment muxer cuts at the first keyframe at or after the requested time, and
+ * where there is none left it simply never opens that segment. The playlist
+ * would then advertise a segment that can never be served, which is a permanent
+ * failure dressed up as a temporary one.
+ * <p>
+ * Dropping such a boundary costs nothing: the grid feeds the pass as well as the
+ * playlist, so the segment is not orphaned — the previous one runs to the end of
+ * the stream instead. Verified by packet count: a trimmed grid carries every
+ * packet the source has.
  */
 @Slf4j
 public record SegmentGrid(List<Double> starts, double end) {
 
     /**
-     * A segment shorter than this is not worth advertising: the tail it would
-     * carry is within the cut tolerance ({@code -segment_time_delta 0.05}) plus
-     * timestamp jitter, and FFmpeg may or may not write it.
+     * A boundary this close to the end of a stream is not worth advertising:
+     * whether the muxer still opens a segment there depends on the cut tolerance
+     * ({@code -segment_time_delta 0.05}) and on timestamp rounding, and a
+     * boundary that turns out not to split leaves the playlist promising a file
+     * that will never exist.
      * <p>
      * This is an epsilon against a <i>measured</i> stream end, not a guess at how
-     * long a tail "should" be — in the broken cases the remaining tail is exactly
-     * 0.0 (a copy cut on the last keyframe) or negative (audio cut past its end),
-     * while healthy files leave one to three seconds. Three orders of magnitude
-     * of margin.
+     * long a tail "should" be — in the observed failures the remaining tail is
+     * 0.0001s (a copy cut landing on the last keyframe) or negative (audio cut
+     * past its own end), while healthy files leave one to three seconds. Three
+     * orders of magnitude of margin, and erring on the side of trimming only
+     * makes the previous segment longer.
      */
     static final double MIN_TAIL_SECONDS = 0.25;
 
@@ -47,7 +54,19 @@ public record SegmentGrid(List<Double> starts, double end) {
      *                  playlist.
      */
     public static SegmentGrid trim(List<Double> cutCandidates, double streamEnd, double totalDuration) {
-        double end = usableEnd(streamEnd, totalDuration);
+        return trim(cutCandidates, streamEnd, streamEnd, totalDuration);
+    }
+
+    /**
+     * @param trimEnd     the last position a cut can still land a segment on
+     * @param playlistEnd where the stream really ends — the last segment plays to
+     *                    here. For a video copy the two differ: a cut on the last
+     *                    keyframe may not split, while the segment itself does run
+     *                    on to the final packet.
+     */
+    public static SegmentGrid trim(List<Double> cutCandidates, double trimEnd, double playlistEnd,
+                                   double totalDuration) {
+        double end = usableEnd(trimEnd, totalDuration);
         List<Double> candidates = cutCandidates.isEmpty()
                 ? synthetic(end)
                 : cutCandidates;
@@ -55,7 +74,7 @@ public record SegmentGrid(List<Double> starts, double end) {
         // Nothing usable to trim against (both the probe and the duration are
         // unknown): keep every boundary. Guessing here would drop real segments.
         if (!(end > 0)) {
-            return new SegmentGrid(List.copyOf(candidates), end);
+            return new SegmentGrid(List.copyOf(candidates), usableEnd(playlistEnd, totalDuration));
         }
 
         List<Double> starts = new ArrayList<>();
@@ -69,7 +88,7 @@ public record SegmentGrid(List<Double> starts, double end) {
         if (dropped > 0) {
             log.debug("Trimmed {} segment boundaries past the end of the stream ({}s)", dropped, end);
         }
-        return new SegmentGrid(List.copyOf(starts), end);
+        return new SegmentGrid(List.copyOf(starts), usableEnd(playlistEnd, totalDuration));
     }
 
     /** The boundaries FFmpeg cuts at: every start except the implicit 0.0. */

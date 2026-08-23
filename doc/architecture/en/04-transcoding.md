@@ -35,11 +35,16 @@ it corrupt on each boundary — a decode hiccup every few seconds.
 
 ## The grid stops where the stream stops
 
-The cut grid comes from the video keyframes, but each stream ends somewhere else, and a cut at or
-past the end of a stream produces no file at all — FFmpeg never opens that segment. A playlist that
-advertised it was therefore promising something no request could ever be answered with. Two shapes
-of this occur in practice: audio commonly ends before the container does (ordinary in mkv), and an
-MPEG-TS stream copy of video ends at the last keyframe because it drops the final GOP.
+The cut grid comes from the video keyframes, but each stream ends somewhere else. The segment muxer
+cuts at the first keyframe at or after each requested time, so a cut with nothing left to cut at
+produces no file — and a playlist that advertised it was promising something no request could ever be
+answered with. Two shapes occur in practice: audio commonly ends before the container does (ordinary
+in mkv), and the last cut of a video copy can land on the very last keyframe, where whether it still
+splits depends on timestamp rounding and the cut tolerance.
+
+Trimming such a boundary costs nothing. The grid feeds the FFmpeg pass as well as the playlist, so
+the segment is not orphaned — the previous one runs to the end of the stream instead, and a packet
+count over a trimmed grid shows every packet of the source still present.
 
 `SegmentGrid` is therefore built per stream and per role: `HlsTranscodeService.gridFor` measures
 where that stream ends — the video packet scan reports both the last keyframe (for a copy) and the
@@ -58,9 +63,9 @@ cut back to them; that also repairs cache directories written before this existe
 completed pass never wrote answers 404, not 503 — it is not coming back, and "try again" made
 clients retry for hours.
 
-The visible consequence: for such a file the video can end a fraction of a second, and the audio a
-second or so, before the container duration says. Those frames were never delivered — they were only
-promised.
+The visible consequence: for such a file the playlist can end a fraction of a second, and for audio a
+second or so, before the container duration says. No media is lost — the final segment carries it —
+only the advertised duration is now the honest one.
 
 ## Concurrency
 

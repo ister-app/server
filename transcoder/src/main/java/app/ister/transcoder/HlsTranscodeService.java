@@ -1193,19 +1193,35 @@ public class HlsTranscodeService {
                 // they always exist — trimming could only drop a real one.
                 return SegmentGrid.trim(candidates, Double.NaN, totalDuration);
             }
-            return SegmentGrid.trim(candidates, streamEnd(filePath, role, totalDuration), totalDuration);
+            return SegmentGrid.trim(candidates,
+                    trimEnd(filePath, role, totalDuration),
+                    playlistEnd(filePath, role, totalDuration),
+                    totalDuration);
         });
     }
 
-    private double streamEnd(String filePath, StreamRole role, double totalDuration) {
+    /**
+     * The last position a cut can still land a segment on.
+     * <p>
+     * For a stream copy that is the last keyframe: the segment muxer cuts at the
+     * first keyframe at or after the requested time, so past the last one there
+     * is nothing left to cut at. A cut landing <i>on</i> the last keyframe is the
+     * uncertain case — synthetically it still splits, but the file this was found
+     * on did not — so it is trimmed too. That costs nothing: the previous segment
+     * simply runs to the end.
+     */
+    private double trimEnd(String filePath, StreamRole role, double totalDuration) {
+        if (role.kind() == StreamRole.Kind.VIDEO_COPY && !candidatesAreSynthetic(filePath)) {
+            return getVideoTiming(filePath).lastKeyframe();
+        }
+        return playlistEnd(filePath, role, totalDuration);
+    }
+
+    /** Where the stream really ends — what the last segment plays to. */
+    private double playlistEnd(String filePath, StreamRole role, double totalDuration) {
         if (candidatesAreSynthetic(filePath)) return Double.NaN;
         switch (role.kind()) {
-            case VIDEO_COPY -> {
-                // An MPEG-TS stream copy drops the final GOP, so it ends at the
-                // last keyframe rather than at the last packet.
-                return getVideoTiming(filePath).lastKeyframe();
-            }
-            case VIDEO_ENCODE -> {
+            case VIDEO_COPY, VIDEO_ENCODE -> {
                 return getVideoTiming(filePath).lastPacketEnd();
             }
             default -> {
