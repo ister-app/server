@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -68,11 +69,20 @@ class HlsSegmentBoundaryIntegrationTest {
 
     /** 12s of 2s-GOP h264 with an AC-3 (MPEG-TS-native) audio track. */
     private Path generateSource() {
-        Path src = tempDir.resolve("src.mkv");
+        return generateSource(12.0, 12.0, "src.mkv");
+    }
+
+    /**
+     * Video and audio of independent length — mkv routinely carries an audio track
+     * that stops before the video does, and the cut grid comes from the video
+     * keyframes, so the last cuts can land past the end of the audio.
+     */
+    private Path generateSource(double videoSeconds, double audioSeconds, String name) {
+        Path src = tempDir.resolve(name);
         jaffree.getFFMPEG()
-                .addInput(UrlInput.fromUrl("testsrc2=size=640x360:rate=24:duration=12")
+                .addInput(UrlInput.fromUrl("testsrc2=size=640x360:rate=24:duration=" + videoSeconds)
                         .setFormat("lavfi"))
-                .addInput(UrlInput.fromUrl("sine=frequency=440:duration=12")
+                .addInput(UrlInput.fromUrl("sine=frequency=440:duration=" + audioSeconds)
                         .setFormat("lavfi"))
                 .addOutput(UrlOutput.toPath(src)
                         .addArguments("-c:v", "libx264")
@@ -150,6 +160,57 @@ class HlsSegmentBoundaryIntegrationTest {
                     "expected the copy audio pass to produce multiple segments");
         }
         assertNoCorruptPackets(concatenate("seg_audio_1_copy_"));
+    }
+
+    /** Number of segment URIs a playlist advertises for {@code prefix}. */
+    private long advertised(SegmentGrid grid) {
+        return grid.segmentCount();
+    }
+
+    private long produced(String prefix) throws IOException {
+        try (Stream<Path> files = Files.list(tempDir)) {
+            return files.filter(p -> p.getFileName().toString().startsWith(prefix)
+                            && p.getFileName().toString().endsWith(".ts"))
+                    .count();
+        }
+    }
+
+    @Test
+    void audioEndingBeforeTheVideoIsNotAdvertisedPastItsOwnEnd() throws IOException {
+        // Video runs to 12s, audio stops at 9.3s. The cut grid (0,2,…,10) comes
+        // from the video keyframes, so the cut at 10s lands past the end of the
+        // audio and FFmpeg writes nothing for it — while the playlist used to
+        // promise that segment anyway, which is a permanent 503 for the client.
+        Path src = generateSource(12.0, 9.3, "short-audio.mkv");
+
+        service.startAudioPass(src.toString(), tempDir, 1, AudioQuality.COPY, "ac3");
+
+        SegmentGrid grid = service.gridFor(src.toString(), StreamRole.audio(1));
+        assertEquals(produced("seg_audio_1_copy_"), advertised(grid),
+                "the playlist must advertise exactly the segments the pass wrote");
+    }
+
+    @Test
+    void copyVideoIsNotAdvertisedPastWhereTheStreamCopyEnds() throws IOException {
+        Path src = generateSource();
+
+        service.startVideoPass(src.toString(), tempDir, VideoQuality.COPY);
+
+        SegmentGrid grid = service.gridFor(src.toString(), StreamRole.videoCopy());
+        assertEquals(produced("seg_video_copy_"), advertised(grid),
+                "the playlist must advertise exactly the segments the pass wrote");
+    }
+
+    @Test
+    void aHealthyFileKeepsEverySegment() throws IOException {
+        // The other side of the coin: trimming must not eat a real segment.
+        Path src = generateSource();
+
+        service.startVideoPass(src.toString(), tempDir, VideoQuality.Q480P);
+
+        SegmentGrid grid = service.gridFor(src.toString(), StreamRole.videoEncode());
+        assertEquals(produced("seg_video_480p_"), advertised(grid));
+        assertTrue(grid.segmentCount() >= 6, "expected a 12s file to cut into several segments");
     }
 
     @Test

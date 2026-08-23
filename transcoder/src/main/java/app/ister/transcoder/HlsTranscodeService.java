@@ -158,6 +158,15 @@ public class HlsTranscodeService {
     /** Cached total duration per file path — used to derive the pass timeout. */
     private final ConcurrentHashMap<String, Double> durationCache = new ConcurrentHashMap<>();
 
+    /** Cached video timing (grid + where a copy and a re-encode end) per file path. */
+    private final ConcurrentHashMap<String, FfprobeService.VideoTiming> videoTimingCache = new ConcurrentHashMap<>();
+
+    /** Cached measured stream ends, keyed by file path and ffprobe stream specifier. */
+    private final ConcurrentHashMap<String, Double> streamEndCache = new ConcurrentHashMap<>();
+
+    /** Cached segment grids per file path and stream role. */
+    private final ConcurrentHashMap<String, SegmentGrid> gridCache = new ConcurrentHashMap<>();
+
     /** Bounded thread pool for background FFmpeg passes (one pass per quality level). Initialised in {@link #init()}. */
     ExecutorService transcodeExecutor;
 
@@ -630,11 +639,12 @@ public class HlsTranscodeService {
         } catch (IOException e) {
             throw new IllegalStateException("Could not create cache dir: " + cacheDir, e);
         }
-        List<Double> keyframes = getCachedKeyframes(inputPath);
-        String segmentTimes = buildSegmentTimes(keyframes);
+        SegmentGrid grid = gridFor(inputPath,
+                quality == VideoQuality.COPY ? StreamRole.videoCopy() : StreamRole.videoEncode());
+        String segmentTimes = buildSegmentTimes(grid);
         Path outputPattern = cacheDir.resolve(SEG_VIDEO_PREFIX + quality.getLabel() + "_%05d.ts");
 
-        log.debug("Starting video pass: quality={} keyframes={} hwaccel={}", quality.getLabel(), keyframes.size(), hwaccelProperty);
+        log.debug("Starting video pass: quality={} segments={} hwaccel={}", quality.getLabel(), grid.segmentCount(), hwaccelProperty);
 
         HardwareAccel hw = HardwareAccel.fromString(hwaccelProperty);
 
@@ -705,8 +715,8 @@ public class HlsTranscodeService {
         } catch (IOException e) {
             throw new IllegalStateException("Could not create cache dir: " + cacheDir, e);
         }
-        List<Double> keyframes = getCachedKeyframes(inputPath);
-        String segmentTimes = buildSegmentTimes(keyframes);
+        SegmentGrid grid = gridFor(inputPath, StreamRole.audio(streamIdx));
+        String segmentTimes = buildSegmentTimes(grid);
         Path outputPattern = cacheDir.resolve(
                 String.format("seg_audio_%d_%s_%%05d.ts", streamIdx, audioQuality.getLabel()));
 
@@ -746,9 +756,11 @@ public class HlsTranscodeService {
             }
             output.addArguments(ARG_SEGMENT_TIMES, segmentTimes);
             output.addArguments(ARG_SEGMENT_TIME_DELTA, "0.05");
-        } else {
-            output.addArguments("-segment_time", "10");
         }
+        // No -segment_time fallback: a grid with a single start means one segment
+        // for the whole stream, and cutting it into ten-second pieces the playlist
+        // does not mention is exactly the mismatch this grid exists to prevent.
+        // Files without keyframes get a synthetic grid from SegmentGrid instead.
 
         executePassWithTimeout(ffmpegFor(background)
                 .addInput(UrlInput.fromUrl(inputPath))
@@ -1051,7 +1063,72 @@ public class HlsTranscodeService {
     }
 
     List<Double> getCachedKeyframes(String filePath) {
-        return keyframeCache.computeIfAbsent(filePath, ffprobeService::getKeyframes);
+        return keyframeCache.computeIfAbsent(filePath, path -> getVideoTiming(path).cutCandidates());
+    }
+
+    private FfprobeService.VideoTiming getVideoTiming(String filePath) {
+        return videoTimingCache.computeIfAbsent(filePath, ffprobeService::getVideoTiming);
+    }
+
+    /**
+     * The segment boundaries for one stream of a file: the shared keyframe grid,
+     * trimmed to where that particular stream ends.
+     * <p>
+     * Both the playlist and the FFmpeg pass go through here with the same
+     * arguments, so what is advertised and what is produced cannot drift apart.
+     */
+    public SegmentGrid gridFor(String filePath, StreamRole role) {
+        String key = filePath + "|" + role.kind() + "|" + role.audioStreamIndex();
+        return gridCache.computeIfAbsent(key, _ -> {
+            double totalDuration = getTotalDuration(filePath);
+            List<Double> candidates = getCachedKeyframes(filePath);
+            if (candidates.isEmpty() && (role.kind() == StreamRole.Kind.VIDEO_COPY
+                    || role.kind() == StreamRole.Kind.VIDEO_ENCODE)) {
+                // A video file with no detectable keyframes is broken; a synthetic
+                // grid would advertise cuts the pass cannot honour. Fail loudly.
+                throw new IllegalStateException("No keyframes found for " + filePath);
+            }
+            if (role.kind() == StreamRole.Kind.SUBTITLE) {
+                // Subtitle segments are written by HlsSubtitleService itself, so
+                // they always exist — trimming could only drop a real one.
+                return SegmentGrid.trim(candidates, Double.NaN, totalDuration);
+            }
+            return SegmentGrid.trim(candidates, streamEnd(filePath, role, totalDuration), totalDuration);
+        });
+    }
+
+    private double streamEnd(String filePath, StreamRole role, double totalDuration) {
+        if (candidatesAreSynthetic(filePath)) return Double.NaN;
+        switch (role.kind()) {
+            case VIDEO_COPY -> {
+                // An MPEG-TS stream copy drops the final GOP, so it ends at the
+                // last keyframe rather than at the last packet.
+                return getVideoTiming(filePath).lastKeyframe();
+            }
+            case VIDEO_ENCODE -> {
+                return getVideoTiming(filePath).lastPacketEnd();
+            }
+            default -> {
+                String selectStreams = role.selectStreams();
+                if (selectStreams == null || !isLocalInput(filePath)) return Double.NaN;
+                return streamEndCache.computeIfAbsent(filePath + "|" + selectStreams,
+                        _ -> ffprobeService.getStreamEnd(filePath, selectStreams, totalDuration));
+            }
+        }
+    }
+
+    private boolean candidatesAreSynthetic(String filePath) {
+        return getCachedKeyframes(filePath).isEmpty();
+    }
+
+    /**
+     * Remote media files are read over {@code /mediaFile/{id}/download}, which
+     * serves no byte ranges — a seeking probe there would stream the whole file
+     * across the network instead. Their audio end stays unmeasured; the
+     * post-pass reconciliation is the safety net for those.
+     */
+    private static boolean isLocalInput(String filePath) {
+        return !filePath.startsWith("http://") && !filePath.startsWith("https://");
     }
 
     double getTotalDuration(String filePath) {
@@ -1072,9 +1149,8 @@ public class HlsTranscodeService {
         durationCache.putIfAbsent(filePath, seconds);
     }
 
-    private String buildSegmentTimes(List<Double> keyframes) {
-        return keyframes.stream()
-                .skip(1) // skip 0.0; FFmpeg cuts at these positions
+    private String buildSegmentTimes(SegmentGrid grid) {
+        return grid.cutTimes().stream()
                 .map(t -> String.format(Locale.ROOT, "%.6f", t))
                 .collect(Collectors.joining(","));
     }

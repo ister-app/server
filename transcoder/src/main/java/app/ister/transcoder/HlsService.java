@@ -488,18 +488,15 @@ public class HlsService {
                     mediaFile.getDurationInMilliseconds());
         });
         seedProbeCachesForAudioOnly(ctx);
-        List<Double> keyframes = transcodeService.getCachedKeyframes(ctx.filePath());
-        double totalDuration = transcodeService.getTotalDuration(ctx.filePath());
-        if (keyframes.isEmpty() && ctx.audioOnly()) {
-            // Audio-only files are seeded with an empty keyframe list; mirror the synthetic
-            // 10s grid generateAllPlaylists uses (the audio pass falls back to
-            // -segment_time 10), or buildVodPlaylist throws. Video keeps throwing: its
-            // pass has no such fallback, so a synthetic playlist would not match.
-            keyframes = buildSyntheticKeyframes(totalDuration);
-        }
+        // The grid is trimmed to where this particular stream ends, and the pass is
+        // started from the very same call — so the playlist can only advertise
+        // segments FFmpeg will write. Audio-only files have no keyframes; the grid
+        // falls back to a synthetic one that the pass uses too.
+        SegmentGrid grid = transcodeService.gridFor(ctx.filePath(),
+                HlsPlaylistBuilder.roleOf(streamFilename));
         Files.createDirectories(cacheFile.getParent());
-        String content = playlistBuilder.buildStreamPlaylist(streamFilename, keyframes, totalDuration);
-        Files.writeString(cacheFile, content);
+        String content = playlistBuilder.buildStreamPlaylist(streamFilename, grid.starts(), grid.end());
+        writePlaylistAtomically(cacheFile, content);
         return content;
     }
 
@@ -663,7 +660,8 @@ public class HlsService {
         synchronized (lock) {
             if (!Files.exists(cacheFile)
                     || !subtitleService.isGenerationCurrent(cacheDir(mediaFileId), subtitleId)) {
-                subtitleService.generateSubtitleSegments(subtitleStream, mediaFilePath, mediaFileId, cacheDir(mediaFileId));
+                subtitleService.generateSubtitleSegments(subtitleStream, mediaFilePath, mediaFileId,
+                        cacheDir(mediaFileId), transcodeService.gridFor(mediaFilePath, StreamRole.subtitle()));
             }
         }
         return Files.readString(cacheFile, StandardCharsets.UTF_8);
@@ -711,7 +709,6 @@ public class HlsService {
         boolean audioOnly = isAudioOnly(mediaFile);
         seedProbeCachesForAudioOnly(new StreamPlaylistContext(filePath, audioOnly,
                 mediaFile.getDurationInMilliseconds()));
-        List<Double> rawKeyframes = transcodeService.getCachedKeyframes(filePath);
         double totalDuration = transcodeService.getTotalDuration(filePath);
 
         List<MediaFileStreamEntity> streams = mediaFile.getMediaFileStreamEntity();
@@ -737,9 +734,8 @@ public class HlsService {
         AudioQuality[] audioQualities = AudioQuality.values();
 
         boolean hasVideoStream = streams.stream().anyMatch(HlsPlaylistBuilder::isRealVideoStream);
-        List<Double> effectiveKeyframes = rawKeyframes.isEmpty() ? buildSyntheticKeyframes(totalDuration) : rawKeyframes;
-        if (rawKeyframes.isEmpty() && !audioOnly) {
-            log.warn("No keyframes found for {}, falling back to synthetic keyframes", filePath);
+        if (transcodeService.getCachedKeyframes(filePath).isEmpty() && !audioOnly) {
+            log.warn("No keyframes found for {}, falling back to a synthetic grid", filePath);
         }
 
         if (hasVideoStream) {
@@ -748,18 +744,20 @@ public class HlsService {
                 VideoQuality vq = videoQualities[i];
                 String filename = "stream_video_" + vq.getLabel() + EXT_M3U8;
                 String qualityLabel = vq.getLabel();
-                writeStreamPlaylistIfAbsent(mediaFileId, filename, effectiveKeyframes, totalDuration,
+                SegmentGrid grid = transcodeService.gridFor(filePath,
+                        vq == VideoQuality.COPY ? StreamRole.videoCopy() : StreamRole.videoEncode());
+                writeStreamPlaylistIfAbsent(mediaFileId, filename, grid,
                         (start, dur, idx) -> String.format(Locale.ROOT, "seg_video_%s_%05d.ts", qualityLabel, idx));
             }
         }
 
-        preGenerateAudioPlaylists(mediaFileId, audioStreams, audioQualities, includeVideo, effectiveKeyframes, totalDuration);
-        preGenerateSubtitlePlaylists(mediaFileId, subtitleStreams, subtitleFormat, effectiveKeyframes, totalDuration);
+        preGenerateAudioPlaylists(mediaFileId, filePath, audioStreams, audioQualities, includeVideo);
+        preGenerateSubtitlePlaylists(mediaFileId, filePath, subtitleStreams, subtitleFormat, totalDuration);
     }
 
-    private void preGenerateAudioPlaylists(UUID mediaFileId, List<MediaFileStreamEntity> audioStreams,
-                                            AudioQuality[] audioQualities, boolean[] includeVideo,
-                                            List<Double> keyframes, double totalDuration) throws IOException {
+    private void preGenerateAudioPlaylists(UUID mediaFileId, String filePath,
+                                            List<MediaFileStreamEntity> audioStreams,
+                                            AudioQuality[] audioQualities, boolean[] includeVideo) throws IOException {
         for (int qi = 0; qi < audioQualities.length; qi++) {
             if (!includeVideo[qi]) continue;
             AudioQuality aq = audioQualities[qi];
@@ -768,15 +766,16 @@ public class HlsService {
                 String filename = String.format(Locale.ROOT, "stream_audio_%d_%s" + EXT_M3U8, as.getStreamIndex(), aq.getLabel());
                 int streamIndex = as.getStreamIndex();
                 String bitrateLabel = aq.getLabel();
-                writeStreamPlaylistIfAbsent(mediaFileId, filename, keyframes, totalDuration,
+                SegmentGrid grid = transcodeService.gridFor(filePath, StreamRole.audio(streamIndex));
+                writeStreamPlaylistIfAbsent(mediaFileId, filename, grid,
                         (start, dur, idx) -> String.format(Locale.ROOT, "seg_audio_%d_%s_%05d.ts", streamIndex, bitrateLabel, idx));
             }
         }
     }
 
-    private void preGenerateSubtitlePlaylists(UUID mediaFileId, List<MediaFileStreamEntity> subtitleStreams,
-                                               SubtitleFormat subtitleFormat,
-                                               List<Double> keyframes, double totalDuration) throws IOException {
+    private void preGenerateSubtitlePlaylists(UUID mediaFileId, String filePath,
+                                               List<MediaFileStreamEntity> subtitleStreams,
+                                               SubtitleFormat subtitleFormat, double totalDuration) throws IOException {
         String formatLabel = subtitleFormat.name().toLowerCase();
         for (MediaFileStreamEntity ss : subtitleStreams) {
             String filename = "stream_sub_" + ss.getId() + "_" + formatLabel + EXT_M3U8;
@@ -785,7 +784,10 @@ public class HlsService {
                         playlistBuilder.buildSingleSegmentPlaylist(totalDuration, "sub_" + ss.getId() + ".srt"));
             } else {
                 UUID ssId = ss.getId();
-                writeStreamPlaylistIfAbsent(mediaFileId, filename, keyframes, totalDuration,
+                // Subtitle segments are written by HlsSubtitleService itself, so they
+                // always exist: this grid is deliberately untrimmed.
+                SegmentGrid grid = transcodeService.gridFor(filePath, StreamRole.subtitle());
+                writeStreamPlaylistIfAbsent(mediaFileId, filename, grid,
                         (start, dur, idx) -> String.format(Locale.ROOT, "seg_sub_%s_%05d.vtt", ssId, idx));
             }
         }
@@ -843,21 +845,25 @@ public class HlsService {
         }
     }
 
-    private List<Double> buildSyntheticKeyframes(double totalDuration) {
-        double interval = 10.0;
-        List<Double> keyframes = new ArrayList<>();
-        for (double t = 0; t < totalDuration; t += interval) {
-            keyframes.add(t);
-        }
-        return keyframes;
-    }
-
-    private void writeStreamPlaylistIfAbsent(UUID mediaFileId, String filename,
-                                              List<Double> keyframes, double totalDuration,
+    private void writeStreamPlaylistIfAbsent(UUID mediaFileId, String filename, SegmentGrid grid,
                                               HlsPlaylistBuilder.SegmentNamer namer) throws IOException {
         Path cacheFile = cacheDir(mediaFileId).resolve(filename);
         if (!Files.exists(cacheFile)) {
-            Files.writeString(cacheFile, playlistBuilder.buildVodPlaylist(keyframes, totalDuration, namer));
+            writePlaylistAtomically(cacheFile, playlistBuilder.buildVodPlaylist(grid.starts(), grid.end(), namer));
+        }
+    }
+
+    /**
+     * Writes a playlist through a temporary file: readers do a plain readString,
+     * and must see either the whole old file or the whole new one.
+     */
+    static void writePlaylistAtomically(Path target, String content) throws IOException {
+        Path tmp = target.resolveSibling(target.getFileName() + ".tmp");
+        Files.writeString(tmp, content);
+        try {
+            Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 

@@ -65,7 +65,7 @@ public class HlsSubtitleService {
      * {@code seg_sub_{subtitleId}_{%05d}.vtt}.
      */
     void generateSubtitleSegments(MediaFileStreamEntity stream, String mediaFilePath,
-                                   UUID mediaFileId, Path cacheDir) throws IOException {
+                                   UUID mediaFileId, Path cacheDir, SegmentGrid grid) throws IOException {
         String srtPath;
         if (stream.getCodecType() == StreamCodecType.EXTERNAL_SUBTITLE) {
             srtPath = stream.getPath();
@@ -74,10 +74,11 @@ public class HlsSubtitleService {
         }
 
         log.debug("Generating subtitle segments from SRT: mediaFileId={} subtitleId={}", mediaFileId, stream.getId());
-        List<Double> keyframes = ffprobeService.getKeyframes(mediaFilePath);
-        double totalDuration = ffprobeService.getTotalDuration(mediaFilePath);
+        // The grid comes from the caller so these .vtt files land on exactly the
+        // boundaries the subtitle playlist advertises — probing separately here is
+        // how the two drift apart.
         List<SrtCue> cues = parseSrt(srtPath);
-        writeVttSegments(cues, keyframes, totalDuration, cacheDir, stream.getId());
+        writeVttSegments(cues, grid.starts(), grid.end(), cacheDir, stream.getId());
         Files.writeString(generationMarker(cacheDir, stream.getId()),
                 String.valueOf(SUBTITLE_GENERATION), StandardCharsets.UTF_8);
     }

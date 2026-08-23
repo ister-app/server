@@ -176,7 +176,7 @@ class HlsServiceTest {
         MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream, audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
         hlsService.generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT);
@@ -197,7 +197,7 @@ class HlsServiceTest {
         MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream, audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
         hlsService.generateAllPlaylists(id, false, true, SubtitleFormat.WEBVTT);
@@ -219,7 +219,7 @@ class HlsServiceTest {
         MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream, audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
         hlsService.generateAllPlaylists(id, true, true, SubtitleFormat.WEBVTT);
@@ -240,7 +240,7 @@ class HlsServiceTest {
         MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream, audioStream, subtitleStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
         hlsService.generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT);
@@ -259,7 +259,7 @@ class HlsServiceTest {
         MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream, audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        when(ffprobeService.getKeyframes(any())).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming(any())).thenReturn(timing(List.of(0.0, 5.0)));
         when(ffprobeService.getTotalDuration(any())).thenReturn(10.0);
 
         hlsService.generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT);
@@ -267,7 +267,7 @@ class HlsServiceTest {
         hlsService.getMasterPlaylist(id, true, false, SubtitleFormat.WEBVTT);
 
         // ffprobe should only be called once (generateAllPlaylists call; subsequent calls hit cache)
-        verify(ffprobeService, times(1)).getKeyframes(any());
+        verify(ffprobeService, times(1)).getVideoTiming(any());
     }
 
     // ========== Stream playlists ==========
@@ -276,7 +276,7 @@ class HlsServiceTest {
     void getStreamPlaylistForVideo720pUsesKeyframes() throws IOException {
         UUID id = UUID.randomUUID();
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0, 10.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0, 10.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(15.0);
 
         String playlist = hlsService.getStreamPlaylist(id, "stream_video_720p.m3u8");
@@ -292,7 +292,7 @@ class HlsServiceTest {
         UUID id = UUID.randomUUID();
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(60.0);
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 30.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 30.0)));
 
         String playlist = hlsService.getStreamPlaylist(id, "stream_audio_1_copy.m3u8");
 
@@ -305,7 +305,7 @@ class HlsServiceTest {
     void getStreamPlaylistForAudio192kUsesKeyframes() throws IOException {
         UUID id = UUID.randomUUID();
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 4.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 4.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(8.0);
 
         String playlist = hlsService.getStreamPlaylist(id, "stream_audio_1_192k.m3u8");
@@ -318,9 +318,8 @@ class HlsServiceTest {
     void getStreamPlaylistUnknownFilenameThrows() {
         UUID id = UUID.randomUUID();
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
-        when(ffprobeService.getKeyframes(any())).thenReturn(List.of(0.0, 5.0));
-        when(ffprobeService.getTotalDuration(any())).thenReturn(10.0);
 
+        // Rejected on the filename alone, before anything is probed.
         assertThrows(IllegalArgumentException.class,
                 () -> hlsService.getStreamPlaylist(id, "stream_unknown_foo.m3u8"));
     }
@@ -329,13 +328,13 @@ class HlsServiceTest {
     void getStreamPlaylistIsCached() throws IOException {
         UUID id = UUID.randomUUID();
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
-        when(ffprobeService.getKeyframes(any())).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming(any())).thenReturn(timing(List.of(0.0, 5.0)));
         when(ffprobeService.getTotalDuration(any())).thenReturn(10.0);
 
         hlsService.getStreamPlaylist(id, "stream_video_720p.m3u8");
         hlsService.getStreamPlaylist(id, "stream_video_720p.m3u8");
 
-        verify(ffprobeService, times(1)).getKeyframes(any());
+        verify(ffprobeService, times(1)).getVideoTiming(any());
     }
 
     // ========== Subtitle segment (SRT to WebVTT) ==========
@@ -357,7 +356,7 @@ class HlsServiceTest {
 
         when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
         when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
         String segmentFilename = String.format("seg_sub_%s_00000.vtt", subtitleId);
@@ -396,7 +395,7 @@ class HlsServiceTest {
         when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
         when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
         // Two segments: 0-10s and 10-30s; "Inside" is in segment 0, "Outside" is in segment 1
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 10.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 10.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(30.0);
 
         String segmentFilename = String.format("seg_sub_%s_00000.vtt", subtitleId);
@@ -424,7 +423,7 @@ class HlsServiceTest {
 
         when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
         when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(4000.0);
 
         String segmentFilename = String.format("seg_sub_%s_00000.vtt", subtitleId);
@@ -441,7 +440,7 @@ class HlsServiceTest {
         UUID id = UUID.randomUUID();
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
         // Segments: 0-7s (7s), 7-10s (3s) → max=7 → target=7
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 7.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 7.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
         String playlist = hlsService.getStreamPlaylist(id, "stream_video_720p.m3u8");
@@ -453,7 +452,7 @@ class HlsServiceTest {
     void vodPlaylistThrowsWhenNoKeyframes() {
         UUID id = UUID.randomUUID();
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
-        when(ffprobeService.getKeyframes(any())).thenReturn(List.of());
+        when(ffprobeService.getVideoTiming(any())).thenReturn(timing(List.of()));
         when(ffprobeService.getTotalDuration(any())).thenReturn(10.0);
 
         assertThrows(IllegalStateException.class,
@@ -468,7 +467,7 @@ class HlsServiceTest {
         Path cacheDir = tempDir.resolve(id.toString());
         Files.createDirectories(cacheDir);
 
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0, 10.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0, 10.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -511,7 +510,7 @@ class HlsServiceTest {
         Path cacheDir = tempDir.resolve(id.toString());
         Files.createDirectories(cacheDir);
 
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -546,7 +545,7 @@ class HlsServiceTest {
         Path cacheDir = tempDir.resolve(id.toString());
         Files.createDirectories(cacheDir);
 
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -709,7 +708,7 @@ class HlsServiceTest {
 
         when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
         when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
         String segFilename = "seg_sub_" + subtitleId + "_00000.vtt";
@@ -718,7 +717,7 @@ class HlsServiceTest {
 
         assertEquals(first, second);
         // ffprobe is only called once: subtitle generation on first call, cache hit on second
-        verify(ffprobeService, times(1)).getKeyframes(any());
+        verify(ffprobeService, times(1)).getVideoTiming(any());
     }
 
     // ========== Hardware decoding ==========
@@ -731,7 +730,7 @@ class HlsServiceTest {
 
         ReflectionTestUtils.setField(transcodeService, "hwaccelProperty", "vaapi");
 
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -762,7 +761,7 @@ class HlsServiceTest {
 
         ReflectionTestUtils.setField(transcodeService, "hwaccelProperty", "nvdec");
 
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -795,7 +794,7 @@ class HlsServiceTest {
 
         ReflectionTestUtils.setField(transcodeService, "hwaccelProperty", "vaapi");
 
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -827,7 +826,7 @@ class HlsServiceTest {
         Path cacheDir = tempDir.resolve(id.toString());
         Files.createDirectories(cacheDir);
 
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -865,7 +864,7 @@ class HlsServiceTest {
         Files.createDirectories(cacheDir1);
         Files.createDirectories(cacheDir2);
 
-        when(ffprobeService.getKeyframes(any())).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming(any())).thenReturn(timing(List.of(0.0, 5.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -930,7 +929,7 @@ class HlsServiceTest {
         Path cacheDir = tempDir.resolve(id.toString());
         Files.createDirectories(cacheDir);
 
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -963,7 +962,7 @@ class HlsServiceTest {
         Path cacheDir = tempDir.resolve(id.toString());
         Files.createDirectories(cacheDir);
 
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -1004,7 +1003,7 @@ class HlsServiceTest {
         MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream(0, 1920, 1080), audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -1032,7 +1031,7 @@ class HlsServiceTest {
         MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream(0, 1920, 1080), audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -1062,7 +1061,7 @@ class HlsServiceTest {
         MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream(0, 1920, 1080), audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -1107,7 +1106,7 @@ class HlsServiceTest {
         MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream(0, 1920, 1080), audio1, audio2);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -1142,7 +1141,7 @@ class HlsServiceTest {
         MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream(0, 1920, 1080), audio1, audio2);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -1176,7 +1175,7 @@ class HlsServiceTest {
                 audioStream(7, "pol", "Polish"));
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -1203,7 +1202,7 @@ class HlsServiceTest {
                 audioStream(1, "jpn", "Japanese"), audioStream(2, "kor", "Korean"));
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -1230,7 +1229,7 @@ class HlsServiceTest {
                 audioStream(1, "nld", "Dutch"));
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
@@ -1258,7 +1257,7 @@ class HlsServiceTest {
         MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream, audioStream);
 
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
         // First call generates the cache
@@ -1266,7 +1265,7 @@ class HlsServiceTest {
         // Second call should not invoke ffprobe again
         hlsService.generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT);
 
-        verify(ffprobeService, times(1)).getKeyframes(any());
+        verify(ffprobeService, times(1)).getVideoTiming(any());
     }
 
     @Test
@@ -1308,7 +1307,7 @@ class HlsServiceTest {
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(remoteFile));
         when(nodeTokenManager.getDownloadToken()).thenReturn("node-token-123");
         String remoteUrl = "http://remote:8080/mediaFile/" + id + "/download?token=node-token-123";
-        when(ffprobeService.getKeyframes(remoteUrl)).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming(remoteUrl)).thenReturn(timing(List.of(0.0, 5.0)));
         when(ffprobeService.getTotalDuration(remoteUrl)).thenReturn(10.0);
 
         hlsService.generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT);
@@ -1444,7 +1443,7 @@ class HlsServiceTest {
         UUID id = UUID.randomUUID();
         MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv");
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        lenient().when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
+        lenient().when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0)));
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         lenient().when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
         lenient().when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
@@ -1470,7 +1469,7 @@ class HlsServiceTest {
         UUID id = UUID.randomUUID();
         MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv");
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        lenient().when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
+        lenient().when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0)));
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         lenient().when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
         lenient().when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
@@ -1734,7 +1733,7 @@ class HlsServiceTest {
         MediaFileStreamEntity sub = subtitleStream(subtitleId, 2, "eng", "English");
         MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", video, audio, sub);
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
         hlsService.generateAllPlaylists(id, true, false, SubtitleFormat.SRT);
@@ -1764,7 +1763,7 @@ class HlsServiceTest {
 
         when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
         when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
@@ -1803,7 +1802,7 @@ class HlsServiceTest {
 
         when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
         when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
         String vtt = hlsService.getSubtitleSegment(mediaFileId,
@@ -1840,7 +1839,7 @@ class HlsServiceTest {
 
         when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
         when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
         String vtt = hlsService.getSubtitleSegment(mediaFileId,
@@ -1866,7 +1865,7 @@ class HlsServiceTest {
 
         Path cacheFile = tempDir.resolve(id.toString()).resolve("master_d0_t1_sWEBVTT.m3u8");
         assertTrue(Files.exists(cacheFile));
-        verify(ffprobeService, never()).getKeyframes(any());
+        verify(ffprobeService, never()).getVideoTiming(any());
     }
 
     @Test
@@ -1899,7 +1898,7 @@ class HlsServiceTest {
 
         // Duration came from the entity, so no ffprobe at all ran for this file.
         verify(ffprobeService, never()).getTotalDuration(any());
-        verify(ffprobeService, never()).getKeyframes(any());
+        verify(ffprobeService, never()).getVideoTiming(any());
         assertTrue(Files.exists(tempDir.resolve(id.toString()).resolve("master_d0_t1_sWEBVTT.m3u8")));
     }
 
@@ -1924,7 +1923,7 @@ class HlsServiceTest {
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(remoteFile));
         when(nodeTokenManager.getDownloadToken()).thenReturn("token");
         String remoteUrl = "http://remote:8080/mediaFile/" + id + "/download?token=token";
-        when(ffprobeService.getKeyframes(remoteUrl)).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming(remoteUrl)).thenReturn(timing(List.of(0.0, 5.0)));
         when(ffprobeService.getTotalDuration(remoteUrl)).thenReturn(10.0);
         doThrow(new IOException("upload failed")).when(remoteNodeClient).uploadFile(any(), any(), any());
 
@@ -1999,7 +1998,7 @@ class HlsServiceTest {
         // Synthetic 10s grid: 0-10, 10-20, 20-25
         assertTrue(playlist.contains("seg_audio_0_192k_00000.ts"));
         assertTrue(playlist.contains("seg_audio_0_192k_00002.ts"));
-        verify(ffprobeService, never()).getKeyframes(any());
+        verify(ffprobeService, never()).getVideoTiming(any());
         verify(ffprobeService, never()).getTotalDuration(any());
     }
 
@@ -2060,5 +2059,15 @@ class HlsServiceTest {
                 .build();
         ReflectionTestUtils.setField(stream, "id", id);
         return stream;
+    }
+
+    /**
+     * A video probe that pins nothing down: NaN ends mean "could not be measured",
+     * so the grid falls back to the container duration and nothing is trimmed —
+     * the behaviour these tests were written against. Tests about trimming pass
+     * real ends instead.
+     */
+    private static FfprobeService.VideoTiming timing(java.util.List<Double> keyframes) {
+        return new FfprobeService.VideoTiming(keyframes, Double.NaN, Double.NaN);
     }
 }

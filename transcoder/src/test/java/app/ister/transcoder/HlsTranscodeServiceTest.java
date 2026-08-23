@@ -269,22 +269,22 @@ class HlsTranscodeServiceTest {
 
     @Test
     void getCachedKeyframesCallsFfprobeOnFirstCall() {
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0, 10.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0, 10.0)));
 
         List<Double> result = service.getCachedKeyframes("/test/video.mkv");
 
         assertEquals(List.of(0.0, 5.0, 10.0), result);
-        verify(ffprobeService, times(1)).getKeyframes("/test/video.mkv");
+        verify(ffprobeService, times(1)).getVideoTiming("/test/video.mkv");
     }
 
     @Test
     void getCachedKeyframesReturnsCachedResultOnSubsequentCalls() {
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
 
         service.getCachedKeyframes("/test/video.mkv");
         service.getCachedKeyframes("/test/video.mkv");
 
-        verify(ffprobeService, times(1)).getKeyframes("/test/video.mkv");
+        verify(ffprobeService, times(1)).getVideoTiming("/test/video.mkv");
     }
 
     // ========== getTotalDuration ==========
@@ -677,8 +677,9 @@ class HlsTranscodeServiceTest {
     // ========== startAudioPass ==========
 
     @Test
-    void startAudioPassUsesSegmentTimeWhenNoKeyframes() {
-        when(ffprobeService.getKeyframes("/test/audio.mkv")).thenReturn(List.of());
+    void startAudioPassCutsAudioOnlyFilesOnTheSameSyntheticGridAsThePlaylist() {
+        when(ffprobeService.getVideoTiming("/test/audio.mkv")).thenReturn(timing(List.of()));
+        when(ffprobeService.getTotalDuration("/test/audio.mkv")).thenReturn(30.0);
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
         when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
@@ -690,15 +691,16 @@ class HlsTranscodeServiceTest {
         List<String> args = outputArgsOf(ffmpegMock);
         assertContainsSequence(args, "-c:a", "aac");
         assertContainsSequence(args, "-b:a", "192k");
-        // Without keyframes there are no cut points to align to: fixed 10s segments, no -segment_times.
-        assertContainsSequence(args, "-segment_time", "10");
-        assertDoesNotContain(args, "-segment_times");
-        assertDoesNotContain(args, "-force_key_frames");
+        // A file without keyframes (audio-only) gets a synthetic 10s grid, and the
+        // pass cuts on exactly the boundaries the playlist advertises. A plain
+        // -segment_time would slice it into pieces the playlist never mentions.
+        assertContainsSequence(args, "-segment_times", "10.000000,20.000000");
+        assertDoesNotContain(args, "-segment_time");
     }
 
     @Test
     void startAudioPassCopiesWhenSourceIsAac() {
-        when(ffprobeService.getKeyframes("/test/audio.m4a")).thenReturn(List.of());
+        when(ffprobeService.getVideoTiming("/test/audio.m4a")).thenReturn(timing(List.of()));
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
         when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
@@ -716,7 +718,7 @@ class HlsTranscodeServiceTest {
 
     @Test
     void startAudioPassCopyQualityStreamCopiesMpegTsNativeCodec() {
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of());
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of()));
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
         when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
@@ -732,7 +734,7 @@ class HlsTranscodeServiceTest {
 
     @Test
     void startAudioPassCopyQualityTranscodesNonNativeCodecToAac() {
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of());
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of()));
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
         when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
@@ -748,7 +750,8 @@ class HlsTranscodeServiceTest {
 
     @Test
     void startVideoPassWritesExplicitPesLengthsForCleanSegmentBoundaries() {
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 2.0, 4.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 2.0, 4.0)));
+        when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(6.0);
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
         when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
@@ -768,7 +771,7 @@ class HlsTranscodeServiceTest {
     @Test
     void startAudioPassForceStopsStalledPassThatProducesNoOutput() {
         ReflectionTestUtils.setField(service, "passStallTimeoutSeconds", 0L);
-        when(ffprobeService.getKeyframes("/test/audio.mkv")).thenReturn(List.of());
+        when(ffprobeService.getVideoTiming("/test/audio.mkv")).thenReturn(timing(List.of()));
         when(ffprobeService.getTotalDuration("/test/audio.mkv")).thenReturn(30.0);
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
@@ -874,7 +877,7 @@ class HlsTranscodeServiceTest {
         ReflectionTestUtils.setField(service, "passTimeoutMultiplier", 0.0);
         ReflectionTestUtils.setField(service, "passTimeoutMinSeconds", 0L);
         ReflectionTestUtils.setField(service, "passStallTimeoutSeconds", 3600L);
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
@@ -893,7 +896,7 @@ class HlsTranscodeServiceTest {
         ReflectionTestUtils.setField(service, "passStallTimeoutSeconds", 0L);
         Path cacheDir = Files.createDirectories(tempDir.resolve("producing"));
         Files.writeString(cacheDir.resolve("seg_video_720p_00000.ts"), "data");
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
         TimesOutOnceFuture ffmpegFuture = new TimesOutOnceFuture();
@@ -913,7 +916,7 @@ class HlsTranscodeServiceTest {
         // Same timing as the test above, but with an empty cache dir: the stall check now trips.
         ReflectionTestUtils.setField(service, "passStallTimeoutSeconds", 0L);
         Path cacheDir = Files.createDirectories(tempDir.resolve("stalled"));
-        when(ffprobeService.getKeyframes("/test/video.mkv")).thenReturn(List.of(0.0, 5.0));
+        when(ffprobeService.getVideoTiming("/test/video.mkv")).thenReturn(timing(List.of(0.0, 5.0)));
         when(ffprobeService.getTotalDuration("/test/video.mkv")).thenReturn(10.0);
 
         TimesOutOnceFuture ffmpegFuture = new TimesOutOnceFuture();
@@ -936,7 +939,7 @@ class HlsTranscodeServiceTest {
 
     @Test
     void startAudioPassWritesDoneMarker() {
-        when(ffprobeService.getKeyframes("/test/audio.mkv")).thenReturn(List.of());
+        when(ffprobeService.getVideoTiming("/test/audio.mkv")).thenReturn(timing(List.of()));
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
         when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
@@ -994,7 +997,7 @@ class HlsTranscodeServiceTest {
         service.seedAudioOnlyKeyframes("/test/audio.mp3");
 
         assertEquals(List.of(), service.getCachedKeyframes("/test/audio.mp3"));
-        verify(ffprobeService, never()).getKeyframes("/test/audio.mp3");
+        verify(ffprobeService, never()).getVideoTiming("/test/audio.mp3");
     }
 
     @Test
@@ -1063,7 +1066,8 @@ class HlsTranscodeServiceTest {
 
     @Test
     void startAudioPassAlignsKeyframesWhenReencoding() {
-        when(ffprobeService.getKeyframes("/test/audio.mkv")).thenReturn(List.of(0.0, 5.0, 10.0));
+        when(ffprobeService.getVideoTiming("/test/audio.mkv")).thenReturn(timing(List.of(0.0, 5.0, 10.0)));
+        when(ffprobeService.getTotalDuration("/test/audio.mkv")).thenReturn(15.0);
         FFmpeg ffmpegMock = mock(FFmpeg.class, RETURNS_SELF);
         when(jaffree.getFFMPEG()).thenReturn(ffmpegMock);
         when(ffmpegMock.executeAsync()).thenReturn(completedFFmpegFuture());
@@ -1142,5 +1146,15 @@ class HlsTranscodeServiceTest {
         service.cleanupOldFiles();
 
         assertFalse(Files.exists(dir));
+    }
+
+    /**
+     * A video probe that pins nothing down: NaN ends mean "could not be measured",
+     * so the grid falls back to the container duration and nothing is trimmed —
+     * the behaviour these tests were written against. Tests about trimming pass
+     * real ends instead.
+     */
+    private static FfprobeService.VideoTiming timing(java.util.List<Double> keyframes) {
+        return new FfprobeService.VideoTiming(keyframes, Double.NaN, Double.NaN);
     }
 }

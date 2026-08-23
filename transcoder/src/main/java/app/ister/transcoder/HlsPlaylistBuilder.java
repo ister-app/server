@@ -200,7 +200,36 @@ public class HlsPlaylistBuilder {
      * Builds stream playlist content. Filename determines the type:
      * {@code stream_video_*}, {@code stream_audio_*}, or {@code stream_sub_*}.
      */
-    public String buildStreamPlaylist(String streamFilename, List<Double> keyframes, double totalDuration) {
+    /**
+     * Which stream a playlist filename belongs to. Kept next to the dispatch in
+     * {@link #buildStreamPlaylist} on purpose: the two parse the same filenames,
+     * and a grid built for the wrong role is exactly how a playlist and its pass
+     * drift apart.
+     */
+    static StreamRole roleOf(String streamFilename) {
+        if (streamFilename.startsWith(PREFIX_STREAM_VIDEO)) {
+            String quality = streamFilename.replace(PREFIX_STREAM_VIDEO, "").replace(EXT_M3U8, "");
+            return quality.equals(VideoQuality.COPY.getLabel())
+                    ? StreamRole.videoCopy()
+                    : StreamRole.videoEncode();
+        }
+        if (streamFilename.startsWith("stream_audio_")) {
+            String part = streamFilename.replace("stream_audio_", "").replace(EXT_M3U8, "");
+            return StreamRole.audio(Integer.parseInt(part.substring(0, part.lastIndexOf('_'))));
+        }
+        if (streamFilename.startsWith(PREFIX_STREAM_SUB)) {
+            return StreamRole.subtitle();
+        }
+        throw new IllegalArgumentException("Unknown stream filename: " + streamFilename);
+    }
+
+    /**
+     * @param endTime end of this stream — the last segment runs to here. Not the
+     *                container duration: a stream that ends earlier would get a
+     *                final segment its pass never writes.
+     */
+    public String buildStreamPlaylist(String streamFilename, List<Double> keyframes, double endTime) {
+        double totalDuration = endTime;
         if (streamFilename.startsWith(PREFIX_STREAM_VIDEO)) {
             String quality = streamFilename.replace(PREFIX_STREAM_VIDEO, "").replace(EXT_M3U8, "");
             return buildVodPlaylist(keyframes, totalDuration,
