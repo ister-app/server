@@ -1,5 +1,35 @@
 # Changelog
 
+## server v2.18.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.18.0` |
+| `ghcr.io/ister-app/migrations` | `2.18.0` |
+
+### Features
+
+- feat(api): recently added tracks per artist, RECENTLY_ADDED artist queues and dateAdded ([`91a6fcb`](https://github.com/ister-app/server/commit/91a6fcb))
+
+### Dependency updates
+
+- chore(deps): update docker/setup-buildx-action action to v4.3.0 ([`2312d6c`](https://github.com/ister-app/server/commit/2312d6c))
+- chore(deps): update docker.io/flyway/flyway docker tag to v13.3.0 ([`8db51a4`](https://github.com/ister-app/server/commit/8db51a4))
+- fix(deps): update dependency io.github.openfeign:feign-jackson to v13.14 ([`e601805`](https://github.com/ister-app/server/commit/e601805))
+- fix(deps): update dependency org.springframework.cloud:spring-cloud-starter-openfeign to v5.0.3 ([`46f9ab4`](https://github.com/ister-app/server/commit/46f9ab4))
+- fix(deps): update dependency com.google.jimfs:jimfs to v1.3.2 ([`4214a04`](https://github.com/ister-app/server/commit/4214a04))
+- chore(deps): update plugin org.graalvm.buildtools.native to v1.1.10 ([`86f1f70`](https://github.com/ister-app/server/commit/86f1f70))
+- chore(deps): update plugin org.springframework.boot to v4.1.1 ([`b78ce78`](https://github.com/ister-app/server/commit/b78ce78))
+- chore(deps): update gradle to v9.7.1 ([`b230483`](https://github.com/ister-app/server/commit/b230483))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.18.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.17.0...v2.18.0
+
 ## server v2.17.0
 
 | Image | Tag |
