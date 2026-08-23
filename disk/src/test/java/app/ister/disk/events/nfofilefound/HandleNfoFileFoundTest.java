@@ -17,6 +17,7 @@ import app.ister.core.eventdata.NfoFileFoundData;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.OtherPathFileRepository;
+import app.ister.core.service.BookSeriesService;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
 import org.junit.jupiter.api.Test;
@@ -62,6 +63,9 @@ class HandleNfoFileFoundTest {
 
     @Mock
     private ScannerHelperService scannerHelperService;
+
+    @Mock
+    private BookSeriesService bookSeriesService;
 
     @Test
     void handles() {
@@ -413,6 +417,42 @@ class HandleNfoFileFoundTest {
         assertEquals(LocalDate.of(1969, Month.SEPTEMBER, 26), saved.getReleased());
         assertEquals(book, saved.getBookEntity());
         assertEquals("file://" + nfoFile, saved.getSourceUri());
+        // No <set> in the nfo: no series assignment.
+        verifyNoInteractions(bookSeriesService);
+    }
+
+    /** A book album.nfo with a set element: series + index from the nfo, language from the extension. */
+    @Test
+    void analyzeBookNfoWithSetAssignsTheSeries(@TempDir Path tempDir) throws IOException {
+        Path bookDir = tempDir.resolve("John Flanagan").resolve("Broederband - De indringers");
+        Files.createDirectories(bookDir);
+        Path nfoFile = bookDir.resolve("album.nfo");
+        try (var in = HandleNfoFileFoundTest.class.getResourceAsStream("/nfo/album_book.nfo")) {
+            Files.write(nfoFile, in.readAllBytes());
+        }
+
+        UUID uuid = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.BOOK).name("Books").build();
+        DirectoryEntity directoryEntity = DirectoryEntity.builder().id(uuid).path(tempDir.toString()).libraryEntity(library).build();
+        PersonEntity author = PersonEntity.builder().libraryEntity(library).name("John Flanagan").build();
+        BookEntity book = BookEntity.builder().libraryEntity(library).personEntity(author)
+                .name("Broederband - De indringers").build();
+        NfoFileFoundData data = NfoFileFoundData.builder()
+                .directoryEntityUUID(uuid)
+                .path(nfoFile.toString())
+                .build();
+
+        when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
+        when(scannerHelperService.getOrCreatePerson(library, "John Flanagan", 0)).thenReturn(author);
+        when(scannerHelperService.getOrCreateBook(library, author, "Broederband - De indringers", 0)).thenReturn(book);
+
+        subject.handle(data);
+
+        // The index comes from the review opening "Broederband 2 - ..." — the title carries none.
+        verify(bookSeriesService).assignFromNfo(book, "Broederband", 2.0);
+        MetadataEntity saved = savedMetadata();
+        assertEquals("nld", saved.getLanguage());
+        assertEquals(book, saved.getBookEntity());
     }
 
     @Test

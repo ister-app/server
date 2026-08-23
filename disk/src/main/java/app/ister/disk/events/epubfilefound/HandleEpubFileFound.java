@@ -20,6 +20,7 @@ import app.ister.core.service.BookSeriesService;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
+import app.ister.core.util.LanguageTags;
 import app.ister.disk.epub.EpubInfo;
 import app.ister.disk.epub.EpubParser;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +36,6 @@ import java.time.Month;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -134,23 +134,11 @@ public class HandleEpubFileFound implements Handle<EpubFileFoundData> {
                         .build());
         metadata.setTitle(info.title());
         metadata.setDescription(info.description());
-        metadata.setLanguage(toIso3(info.language()));
+        metadata.setLanguage(LanguageTags.toIso3(info.language()));
         metadata.setReleased(info.releaseYear() > 0 ? LocalDate.of(info.releaseYear(), Month.JANUARY, 1) : null);
         metadataRepository.save(metadata);
         scannerHelperService.refreshBookReleaseYear(book);
         serverEventService.createSearchIndexEvent(SearchEntityType.BOOK, book.getId());
-    }
-
-    private String toIso3(String languageTag) {
-        if (languageTag == null || languageTag.isBlank()) {
-            return null;
-        }
-        try {
-            String iso3 = Locale.forLanguageTag(languageTag.strip()).getISO3Language();
-            return iso3.isBlank() ? null : iso3;
-        } catch (Exception _) {
-            return null;
-        }
     }
 
     private void extractCover(DirectoryEntity libraryDir, BookEntity book, EpubInfo info, String epubPath) {

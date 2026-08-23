@@ -9,10 +9,13 @@ import app.ister.core.eventdata.NfoFileFoundData;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.OtherPathFileRepository;
+import app.ister.core.service.BookSeriesService;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
+import app.ister.core.util.LanguageTags;
 import app.ister.core.Handle;
 import app.ister.disk.nfo.Parser;
+import app.ister.disk.nfo.SeriesIndexParser;
 import app.ister.disk.scanner.BookPathObject;
 import app.ister.disk.scanner.MusicPathObject;
 import app.ister.disk.scanner.PathObject;
@@ -40,6 +43,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
     private final OtherPathFileRepository otherPathFileRepository;
     private final ScannerHelperService scannerHelperService;
     private final ServerEventService serverEventService;
+    private final BookSeriesService bookSeriesService;
 
     @Override
     public EventType handles() {
@@ -189,8 +193,16 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
                 metadata.setDescription(parsed.getReview());
                 metadata.setReleased(released);
                 metadata.setGenre(parsed.getGenre());
+                metadata.setLanguage(LanguageTags.toIso3(parsed.getLanguage()));
                 var saved = metadataRepository.save(metadata);
                 setMetadataFk(directoryEntity, path, saved);
+                String setName = parsed.getSetName();
+                if (setName != null && !setName.isBlank()) {
+                    Double seriesIndex = SeriesIndexParser
+                            .parse(setName, parsed.getTitle(), parsed.getReview())
+                            .orElse(null);
+                    bookSeriesService.assignFromNfo(book, setName, seriesIndex);
+                }
                 scannerHelperService.refreshBookReleaseYear(book);
                 serverEventService.createSearchIndexEvent(SearchEntityType.BOOK, book.getId());
             });

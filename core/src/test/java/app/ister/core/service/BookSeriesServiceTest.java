@@ -159,6 +159,101 @@ class BookSeriesServiceTest {
         verify(serverEventService, never()).createBookFoundEvent(any());
     }
 
+    // ===== assignFromNfo =====
+
+    @Test
+    void assignFromNfoCreatesTheSeriesFromASingleBook() {
+        mockSeriesCreation();
+        BookEntity book = book("Broederband - De indringers");
+
+        subject.assignFromNfo(book, "Broederband", 2.0);
+
+        assertEquals("Broederband", book.getSeriesEntity().getName());
+        assertEquals(2.0, book.getSeriesIndex());
+        assertEquals("De indringers", book.getTitle());
+        verify(bookRepository).save(book);
+        verify(serverEventService).createSearchIndexEvent(SearchEntityType.BOOK, book.getId());
+    }
+
+    @Test
+    void assignFromNfoRefiresSerieslessSiblingsWhenTheSeriesIsNew() {
+        mockSeriesCreation();
+        BookEntity linked = book("Broederband - De indringers");
+        BookEntity seriesless = book("Alleen - maar niet eenzaam");
+        when(bookRepository.findByPersonEntityId(author.getId()))
+                .thenReturn(List.of(linked, seriesless));
+
+        subject.assignFromNfo(linked, "Broederband", 2.0);
+
+        verify(serverEventService).createBookFoundEvent(seriesless.getId());
+        verify(serverEventService, never()).createBookFoundEvent(linked.getId());
+    }
+
+    /** The fill case: the prefix heuristic assigned the series but left the position unknown. */
+    @Test
+    void assignFromNfoFillsAMissingIndexOnTheSameSeries() {
+        BookEntity book = book("Broederband - De indringers");
+        book.setSeriesEntity(SeriesEntity.builder().personEntity(author).name("broederband").build());
+
+        subject.assignFromNfo(book, "Broederband", 2.0);
+
+        assertEquals(2.0, book.getSeriesIndex());
+        verify(bookRepository).save(book);
+        verify(serverEventService).createSearchIndexEvent(SearchEntityType.BOOK, book.getId());
+        verify(seriesRepository, never()).save(any());
+    }
+
+    /** Fill-only: an index the epub wrote survives a later nfo parse, whatever the order. */
+    @Test
+    void assignFromNfoNeverOverwritesAnExistingIndex() {
+        BookEntity book = book("Broederband - De indringers");
+        book.setSeriesEntity(SeriesEntity.builder().personEntity(author).name("Broederband").build());
+        book.setSeriesIndex(2.0);
+
+        subject.assignFromNfo(book, "Broederband", 5.0);
+
+        assertEquals(2.0, book.getSeriesIndex());
+        verify(bookRepository, never()).save(any());
+        verify(serverEventService, never()).createSearchIndexEvent(any(), any());
+    }
+
+    /** A series assigned by epub metadata under another name is authoritative: nfo backs off. */
+    @Test
+    void assignFromNfoLeavesABookInADifferentSeriesAlone() {
+        BookEntity book = book("Broederband - De indringers");
+        book.setSeriesEntity(SeriesEntity.builder().personEntity(author).name("Brotherband").build());
+
+        subject.assignFromNfo(book, "Broederband", 2.0);
+
+        assertEquals("Brotherband", book.getSeriesEntity().getName());
+        assertNull(book.getSeriesIndex());
+        verify(bookRepository, never()).save(any());
+    }
+
+    @Test
+    void assignFromNfoIsANoOpWithoutASeriesName() {
+        BookEntity book = book("De indringers");
+
+        subject.assignFromNfo(book, "  ", 2.0);
+
+        assertNull(book.getSeriesEntity());
+        verify(bookRepository, never()).save(any());
+    }
+
+    @Test
+    void assignFromNfoSkipsComicVolumes() {
+        BookEntity volume = BookEntity.builder()
+                .id(UUID.randomUUID())
+                .libraryEntity(library)
+                .name("Volume 1")
+                .build();
+
+        subject.assignFromNfo(volume, "Some Series", 1.0);
+
+        assertNull(volume.getSeriesEntity());
+        verify(seriesRepository, never()).save(any());
+    }
+
     // ===== applyPrefixHeuristic =====
 
     @Test

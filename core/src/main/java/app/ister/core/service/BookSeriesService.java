@@ -20,12 +20,14 @@ import java.util.stream.Collectors;
 /**
  * Assigns books to a series ("De Grijze Jager") and derives the clean display title.
  *
- * <p>Two sources, with fixed precedence: series metadata from the epub itself (calibre or EPUB 3
- * belongs-to-collection) always wins and (re)writes the link on every scan; the path-prefix
- * heuristic only fills books that have no series yet. The heuristic requires at least two books of
- * the same author sharing the prefix, so a standalone book with " - " in its title is never split,
- * and titles like "Harry Potter en de Steen der Wijzen" (no separator after the series name) are
- * never touched.
+ * <p>Three sources, with fixed precedence: series metadata from the epub itself (calibre or EPUB 3
+ * belongs-to-collection) always wins and (re)writes the link on every scan; the album.nfo
+ * {@code <set>} element is explicit but fill-only (it creates or links a series only when the book
+ * has none, and fills a missing index — it never overwrites what epub metadata wrote); the
+ * path-prefix heuristic only fills books that have no series yet. The heuristic requires at least
+ * two books of the same author sharing the prefix, so a standalone book with " - " in its title is
+ * never split, and titles like "Harry Potter en de Steen der Wijzen" (no separator after the
+ * series name) are never touched.
  */
 @Service
 @Slf4j
@@ -56,15 +58,49 @@ public class BookSeriesService {
      * series does not re-fire on every volume; BOOK_FOUND never creates series, so no loop.
      */
     public void assignFromEpub(BookEntity book, String seriesName, Double seriesIndex) {
-        if (seriesName == null || seriesName.isBlank()) {
+        if (skipAssignment(book, seriesName)) {
             return;
         }
-        if (book.getPersonEntity() == null) {
-            // A comic volume: its series comes from the series directory, not from epub metadata,
-            // and book series are keyed per author.
+        link(book, seriesName.strip(), seriesIndex);
+    }
+
+    /**
+     * Series assignment from an album.nfo {@code <set>}: explicit like epub metadata (so a single
+     * book is enough to create the series, unlike the two-book prefix heuristic), but fill-only —
+     * a series or index the epub wrote is never overwritten, which keeps the outcome independent
+     * of event ordering. A book already in a series under a different name is left alone.
+     */
+    public void assignFromNfo(BookEntity book, String seriesName, Double seriesIndex) {
+        if (skipAssignment(book, seriesName)) {
             return;
         }
         String name = seriesName.strip();
+        if (book.getSeriesEntity() == null) {
+            link(book, name, seriesIndex);
+            return;
+        }
+        if (!book.getSeriesEntity().getName().equalsIgnoreCase(name)) {
+            log.debug("Nfo set '{}' ignored for book '{}': already in series '{}'",
+                    name, book.getName(), book.getSeriesEntity().getName());
+            return;
+        }
+        if (book.getSeriesIndex() == null && seriesIndex != null) {
+            book.setSeriesIndex(seriesIndex);
+            bookRepository.save(book);
+            serverEventService.createSearchIndexEvent(SearchEntityType.BOOK, book.getId());
+        }
+    }
+
+    private boolean skipAssignment(BookEntity book, String seriesName) {
+        if (seriesName == null || seriesName.isBlank()) {
+            return true;
+        }
+        // A comic volume: its series comes from the series directory, not from file metadata,
+        // and book series are keyed per author.
+        return book.getPersonEntity() == null;
+    }
+
+    private void link(BookEntity book, String name, Double seriesIndex) {
         boolean isNewSeries = seriesRepository
                 .findByPersonEntityAndName(book.getPersonEntity(), name).isEmpty();
         SeriesEntity series = getOrCreateSeries(book.getLibraryEntity(), book.getPersonEntity(), name);

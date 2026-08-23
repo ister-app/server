@@ -17,6 +17,7 @@ import app.ister.core.eventdata.PersonFoundData;
 import app.ister.core.eventdata.AudioFileFoundData;
 import app.ister.core.eventdata.EpisodeFoundData;
 import app.ister.core.eventdata.MovieFoundData;
+import app.ister.core.eventdata.NfoFileFoundData;
 import app.ister.core.eventdata.ShowFoundData;
 import app.ister.core.eventdata.UpdateImagesRequestedData;
 import app.ister.core.repository.AlbumRepository;
@@ -25,7 +26,9 @@ import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MediaFileRepository;
+import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.MovieRepository;
+import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.repository.SeriesRepository;
 import app.ister.core.repository.ShowRepository;
 import app.ister.core.repository.TrackRepository;
@@ -40,6 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -67,6 +71,8 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
     private final SeriesRepository seriesRepository;
     private final BookSeriesService bookSeriesService;
     private final MediaFileRepository mediaFileRepository;
+    private final MetadataRepository metadataRepository;
+    private final OtherPathFileRepository otherPathFileRepository;
     private final MessageSender messageSender;
     private final NodeService nodeService;
     private final DirectoryRepository directoryRepository;
@@ -150,8 +156,10 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
      * writes the release date and ISBN, then chains BOOK_FOUND itself — dispatching BOOK_FOUND
      * directly would race the Open Library lookup against the ISBN being stored). Books without
      * any epub file (audiobook-only), books without a cover, series books with missing Wikidata
-     * info and series-less books whose author has a series go straight to BOOK_FOUND. Finally
+     * info and series-less books whose author has a series go straight to BOOK_FOUND. Then
      * the series heuristic runs per author, so pre-existing libraries converge without a rescan.
+     * Finally books still missing a series or series position get their album.nfo re-dispatched
+     * (NFO_FILE_FOUND), the local fallback for audiobook-only books.
      */
     private void dispatchMissingBookMetadataEvents() {
         Set<UUID> dispatched = new HashSet<>();
@@ -197,12 +205,40 @@ public class AnalyzeLibraryRequestedHandle implements Handle<AnalyzeLibraryReque
                 .filter(dispatched::add)
                 .forEach(this::sendBookFound);
 
-        bookRepository.findByLibraryEntity_LibraryType(LibraryType.BOOK).stream()
+        List<BookEntity> books = bookRepository.findByLibraryEntity_LibraryType(LibraryType.BOOK);
+        books.stream()
                 .map(BookEntity::getPersonEntity)
                 .collect(Collectors.toMap(PersonEntity::getId, p -> p, (a, b) -> a))
                 .values()
                 .forEach(bookSeriesService::applyPrefixHeuristic);
         bookSeriesService.cleanupOrphanSeries();
+
+        // Books still missing a series or position re-parse their album.nfo: the nfo <set> and
+        // the "{series} {N} - " review opening are the only local source for audiobook-only books
+        // (no epub), and a plain rescan never re-fires NFO_FILE_FOUND for a known nfo file. Runs
+        // after the prefix heuristic so a heuristic-assigned series gets its index filled in the
+        // same pass. Fill-only in the handler, so re-dispatching is idempotent and stops matching
+        // once series and index are set.
+        books.stream()
+                .filter(book -> book.getSeriesEntity() == null || book.getSeriesIndex() == null)
+                .forEach(this::sendNfoFileFoundForBook);
+    }
+
+    private void sendNfoFileFoundForBook(BookEntity book) {
+        metadataRepository.findByBookEntityId(book.getId()).stream()
+                .filter(m -> m.getSourceUri() != null
+                        && m.getSourceUri().startsWith("file://")
+                        && m.getSourceUri().endsWith(".nfo"))
+                .map(otherPathFileRepository::findByMetadataEntity)
+                .flatMap(Optional::stream)
+                .forEach(nfoFile -> directoryRepository.findById(nfoFile.getDirectoryEntityId())
+                        .ifPresent(dir -> messageSender.sendNfoFileFound(
+                                NfoFileFoundData.builder()
+                                        .eventType(EventType.NFO_FILE_FOUND)
+                                        .directoryEntityUUID(dir.getId())
+                                        .path(nfoFile.getPath())
+                                        .build(),
+                                dir.getName())));
     }
 
     private void sendBookFound(UUID bookId) {

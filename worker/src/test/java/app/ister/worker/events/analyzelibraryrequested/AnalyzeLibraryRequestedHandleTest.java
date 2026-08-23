@@ -3,19 +3,25 @@ package app.ister.worker.events.analyzelibraryrequested;
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.NodeEntity;
+import app.ister.core.entity.OtherPathFileEntity;
 import app.ister.core.entity.PersonEntity;
+import app.ister.core.entity.SeriesEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.AnalyzeLibraryRequestedData;
 import app.ister.core.eventdata.BookFoundData;
 import app.ister.core.eventdata.EpubFileFoundData;
+import app.ister.core.eventdata.NfoFileFoundData;
 import app.ister.core.eventdata.PersonFoundData;
 import app.ister.core.eventdata.UpdateImagesRequestedData;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.MediaFileRepository;
+import app.ister.core.repository.MetadataRepository;
+import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
@@ -88,6 +94,12 @@ class AnalyzeLibraryRequestedHandleTest {
 
     @Mock
     private MediaFileRepository mediaFileRepository;
+
+    @Mock
+    private MetadataRepository metadataRepository;
+
+    @Mock
+    private OtherPathFileRepository otherPathFileRepository;
 
     @Mock
     private BookSeriesService bookSeriesService;
@@ -236,6 +248,46 @@ class AnalyzeLibraryRequestedHandleTest {
         ArgumentCaptor<BookFoundData> captor = ArgumentCaptor.forClass(BookFoundData.class);
         verify(messageSender).sendBookFound(captor.capture());
         assertEquals(seriesless.getId(), captor.getValue().getBookId());
+    }
+
+    @Test
+    void handleRedispatchesTheNfoOfBooksMissingASeriesPosition() {
+        NodeEntity nodeEntity = NodeEntity.builder().name("TestServer").build();
+        DirectoryEntity dir = DirectoryEntity.builder()
+                .id(UUID.randomUUID()).name("books-dir").directoryType(DirectoryType.LIBRARY).build();
+        PersonEntity author = PersonEntity.builder().id(UUID.randomUUID()).name("Author").build();
+        SeriesEntity series = SeriesEntity.builder().personEntity(author).name("Broederband").build();
+        BookEntity missingIndex = BookEntity.builder().id(UUID.randomUUID())
+                .personEntity(author).name("Broederband - De indringers").seriesEntity(series).build();
+        BookEntity complete = BookEntity.builder().id(UUID.randomUUID())
+                .personEntity(author).name("Broederband - De outsiders")
+                .seriesEntity(series).seriesIndex(1.0).build();
+        MetadataEntity nfoRow = MetadataEntity.builder()
+                .sourceUri("file:///books/Author/Broederband - De indringers/album.nfo").build();
+        MetadataEntity epubRow = MetadataEntity.builder()
+                .sourceUri("file:///books/Author/Broederband - De indringers.epub").build();
+        OtherPathFileEntity nfoFile = OtherPathFileEntity.builder()
+                .directoryEntityId(dir.getId())
+                .path("/books/Author/Broederband - De indringers/album.nfo")
+                .build();
+
+        when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(nodeEntity);
+        when(bookRepository.findByLibraryEntity_LibraryType(LibraryType.BOOK))
+                .thenReturn(List.of(missingIndex, complete));
+        when(metadataRepository.findByBookEntityId(missingIndex.getId()))
+                .thenReturn(List.of(epubRow, nfoRow));
+        when(otherPathFileRepository.findByMetadataEntity(nfoRow)).thenReturn(java.util.Optional.of(nfoFile));
+        when(directoryRepository.findById(dir.getId())).thenReturn(java.util.Optional.of(dir));
+
+        subject.handle(AnalyzeLibraryRequestedData.builder().eventType(EventType.ANALYZE_LIBRARY_REQUEST).build());
+
+        // Only the book without a position re-parses its nfo, and only the .nfo row qualifies —
+        // routed to the directory's node, like every disk-file event.
+        ArgumentCaptor<NfoFileFoundData> captor = ArgumentCaptor.forClass(NfoFileFoundData.class);
+        verify(messageSender).sendNfoFileFound(captor.capture(), eq("books-dir"));
+        assertEquals(nfoFile.getPath(), captor.getValue().getPath());
+        assertEquals(dir.getId(), captor.getValue().getDirectoryEntityUUID());
+        verify(metadataRepository, never()).findByBookEntityId(complete.getId());
     }
 
     @Test

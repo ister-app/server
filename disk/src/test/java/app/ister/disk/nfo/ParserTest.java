@@ -75,6 +75,20 @@ class ParserTest {
         assertNull(subject.getReview());
         assertNull(subject.getReleasedate());
         assertEquals(0, subject.getYear());
+        assertNull(subject.getSetName());
+        assertNull(subject.getLanguage());
+    }
+
+    /** A book library album.nfo: the set element carries the series, language is an Ister extension. */
+    @Test
+    void parseAlbumWithSetAndLanguage() {
+        InputStream resourceAsStream = ParserTest.class.getResourceAsStream("/nfo/album_book.nfo");
+        var subject = Parser.parseAlbum(resourceAsStream).orElseThrow();
+        assertEquals("Broederband - De indringers", subject.getTitle());
+        assertEquals("Broederband", subject.getSetName());
+        assertEquals("nl", subject.getLanguage());
+        assertTrue(subject.getReview().startsWith("Broederband 2 - Hal"));
+        assertEquals(2013, subject.getYear());
     }
 
     @Test

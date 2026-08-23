@@ -34,4 +34,25 @@ public class AlbumNfo {
     @XmlElement
     @XmlJavaTypeAdapter(DateAdapter.class)
     private LocalDate releasedate;
+
+    /**
+     * Ister extension, not part of the Kodi album nfo format: BCP-47 tag ("nl") for the language
+     * of the nfo's textual metadata. Absent in generator output that doesn't know it.
+     */
+    @XmlElement
+    private String language;
+
+    @XmlElement(name = "set")
+    private AlbumSet set;
+
+    /** The album set / book series name, or null when the nfo has no {@code <set>}. */
+    public String getSetName() {
+        return set == null ? null : set.getName();
+    }
+
+    @Getter
+    public static class AlbumSet {
+        @XmlElement
+        private String name;
+    }
 }
