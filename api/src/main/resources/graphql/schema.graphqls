@@ -4,6 +4,12 @@ type Query {
     serverActivitySnapshot: ServerActivitySnapshot!
     "Continue-watching entries, optionally narrowed to one library."
     recentlyWatched(libraryId: ID): [RecentlyWatched!]
+    """
+    The calling user's playback history for one media item, newest first. Movies, episodes,
+    tracks and podcast episodes have one entry per play; books and audiobook chapters keep a
+    single updated entry. BOOK/COMIC also includes the listens of the book's chapters.
+    """
+    playbackHistory(mediaType: MediaType!, mediaId: ID!): [WatchStatus!]!
     "One library by id; null when it does not exist or the caller may not access it."
     libraryById(id: ID!): Library
     episodeById(id: ID): Episode
@@ -153,6 +159,14 @@ type Mutation {
     reindexSearch: Boolean!
     "Sets the calling user's rating (1-10) for a media item. Pass rating: null to clear it. Returns true."
     setRating(mediaType: RatingMediaType!, mediaId: ID!, rating: Int): Boolean!
+    """
+    Records a play of the item as of now for the calling user: movies, episodes, tracks and
+    podcast episodes get a new watched history entry; BOOK/COMIC/CHAPTER mark their single
+    progress entry finished.
+    """
+    markPlayed(mediaType: MediaType!, mediaId: ID!): WatchStatus!
+    "Deletes one of the calling user's own watch-status entries. Returns true if an entry was deleted."
+    deleteWatchStatus(id: ID!): Boolean!
     """
     Stores the calling user's epub reading position for a book. location is an epubcfi string,
     progress runs 0.0-1.0; the book counts as read from 0.97. Reading has no play queue: there is
@@ -1517,4 +1531,8 @@ type WatchStatus {
     readingLocation: String
     "Epub reading progress 0.0-1.0; only on book-level rows."
     readingProgress: Float
+    "When this entry was created (ISO-8601)."
+    createdAt: String!
+    "When the play last progressed (ISO-8601); doubles as the played-at moment."
+    updatedAt: String!
 }

@@ -35,4 +35,14 @@ public class WatchStatusController {
     public app.ister.core.entity.PodcastEpisodeEntity podcastEpisode(WatchStatusEntity watchStatusEntity) {
         return watchStatusEntity.getPodcastEpisodeEntity();
     }
+
+    @SchemaMapping(typeName = "WatchStatus", field = "createdAt")
+    public String createdAt(WatchStatusEntity watchStatusEntity) {
+        return watchStatusEntity.getDateCreated().toString();
+    }
+
+    @SchemaMapping(typeName = "WatchStatus", field = "updatedAt")
+    public String updatedAt(WatchStatusEntity watchStatusEntity) {
+        return watchStatusEntity.getDateUpdated().toString();
+    }
 }

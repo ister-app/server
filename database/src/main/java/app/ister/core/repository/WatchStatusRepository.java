@@ -40,6 +40,18 @@ public interface WatchStatusRepository extends JpaRepository<WatchStatusEntity, 
 
     Optional<WatchStatusEntity> findByUserEntityAndPlayQueueItemIdAndTrackEntity(UserEntity userEntity, UUID playQueueItemId, app.ister.core.entity.TrackEntity trackEntity);
 
+    // Per-item playback history (GraphQL playbackHistory)
+    List<WatchStatusEntity> findByUserEntityExternalIdAndTrackEntity(String userEntityExternalId, app.ister.core.entity.TrackEntity trackEntity, Sort sort);
+
+    List<WatchStatusEntity> findByUserEntityExternalIdAndPodcastEpisodeEntity(String userEntityExternalId, app.ister.core.entity.PodcastEpisodeEntity podcastEpisodeEntity, Sort sort);
+
+    List<WatchStatusEntity> findByUserEntityExternalIdAndChapterEntity(String userEntityExternalId, ChapterEntity chapterEntity, Sort sort);
+
+    List<WatchStatusEntity> findByUserEntityExternalIdAndBookEntity(String userEntityExternalId, BookEntity bookEntity, Sort sort);
+
+    /** Listening history of a whole audiobook: the chapter rows of all the book's chapters. */
+    List<WatchStatusEntity> findByUserEntityExternalIdAndChapterEntityBookEntity(String userEntityExternalId, BookEntity bookEntity, Sort sort);
+
     List<WatchStatusEntity> findByUserEntityExternalIdAndPodcastEpisodeEntityIn(String userEntityExternalId, java.util.Collection<app.ister.core.entity.PodcastEpisodeEntity> podcastEpisodeEntities, Sort sort);
 
     List<WatchStatusEntity> findByUserEntityExternalIdAndChapterEntityIn(String userEntityExternalId, java.util.Collection<ChapterEntity> chapterEntities, Sort sort);
