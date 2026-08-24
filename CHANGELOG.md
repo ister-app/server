@@ -1,5 +1,35 @@
 # Changelog
 
+## server v2.19.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.19.0` |
+| `ghcr.io/ister-app/migrations` | `2.19.0` |
+
+### Features
+
+- feat(books): fill series and index from album.nfo for audiobook-only books ([`960d45d`](https://github.com/ister-app/server/commit/960d45d))
+
+### Fixes
+
+- fix(transcoder): correct why a boundary is trimmed, and keep the real duration ([`36cec50`](https://github.com/ister-app/server/commit/36cec50))
+- fix(transcoder): rebuild playlists cached before the grid was trimmed ([`3e07a30`](https://github.com/ister-app/server/commit/3e07a30))
+- fix(transcoder): reconcile a playlist with what its pass wrote, and 404 what is missing ([`5e5fb9c`](https://github.com/ister-app/server/commit/5e5fb9c))
+- fix(transcoder): trim the segment grid to the end of each stream ([`7545c54`](https://github.com/ister-app/server/commit/7545c54))
+
+### Other
+
+- docs(transcoding): describe where a stream's segment grid stops ([`0bfc6d7`](https://github.com/ister-app/server/commit/0bfc6d7))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.19.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.18.0...v2.19.0
+
 ## server v2.18.0
 
 | Image | Tag |
