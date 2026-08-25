@@ -940,6 +940,11 @@ type Episode {
     cast: [Credit!]
     "The calling user's rating (1-10), or null if unrated."
     rating: Int
+    "Runtime in minutes, from TMDB; null until analyzed."
+    runtime: Int
+    "TMDB community rating, 0-10 with one decimal."
+    voteAverage: Float
+    voteCount: Int
 }
 
 "One episode's time slice within a media file. Playback opens the file's HLS stream, seeks to startInMilliseconds and treats start + duration as end-of-episode."
@@ -1096,6 +1101,8 @@ type Metadata {
     description: String
     released: String
     genre: String
+    "Localized TMDB tagline; null for entities without one."
+    tagline: String
 }
 
 type Movie {
@@ -1109,6 +1116,30 @@ type Movie {
     cast: [Credit!]
     "The calling user's rating (1-10), or null if unrated."
     rating: Int
+    # TMDB enrichment; all null until the movie has been analyzed with a TMDB api key configured.
+    tmdbId: Int
+    imdbId: String
+    "TMDB community rating, 0-10 with one decimal."
+    voteAverage: Float
+    voteCount: Int
+    "Runtime in minutes."
+    runtime: Int
+    "Certification for the configured country (e.g. PG-13, 16)."
+    contentRating: String
+    "TMDB release status (Released, Post Production, ...)."
+    status: String
+    homepage: String
+    "Name of the TMDB collection this movie belongs to (e.g. \"The Lord of the Rings Collection\")."
+    collectionName: String
+    "Comma-separated production company names."
+    studios: String
+    "Comma-separated ISO 3166-1 production country codes."
+    originCountry: String
+    "Comma-separated TMDB keywords (English only)."
+    keywords: String
+    "Trailer video key; with trailerSite YouTube the url is https://www.youtube.com/watch?v=<key>."
+    trailerKey: String
+    trailerSite: String
 }
 
 type PlayQueue {
@@ -1505,6 +1536,28 @@ type Show {
     cast: [Credit!]
     "The calling user's rating (1-10), or null if unrated."
     rating: Int
+    # TMDB enrichment; all null until the show has been analyzed with a TMDB api key configured.
+    tmdbId: Int
+    imdbId: String
+    "TMDB community rating, 0-10 with one decimal."
+    voteAverage: Float
+    voteCount: Int
+    "Content rating for the configured country (e.g. TV-MA, 16)."
+    contentRating: String
+    "TMDB series status (Returning Series, Ended, Canceled, ...)."
+    status: String
+    homepage: String
+    "Comma-separated network names."
+    networks: String
+    "Comma-separated production company names."
+    studios: String
+    "Comma-separated ISO 3166-1 origin country codes."
+    originCountry: String
+    "Comma-separated TMDB keywords (English only)."
+    keywords: String
+    "Trailer video key; with trailerSite YouTube the url is https://www.youtube.com/watch?v=<key>."
+    trailerKey: String
+    trailerSite: String
 }
 
 type RecentlyWatched {
