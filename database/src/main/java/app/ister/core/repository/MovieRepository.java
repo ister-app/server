@@ -90,18 +90,13 @@ public interface MovieRepository extends JpaRepository<MovieEntity, UUID> {
     long countRatedMoviesForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId);
 
     /**
-     * Returns the IDs (UUID) of movies that have no {@link MetadataEntity} linked to them.
-     */
-    @Query("SELECT s.id FROM MovieEntity s LEFT JOIN s.metadataEntities m " +
-            "WHERE m IS NULL")
-    List<UUID> findIdsOfMoviesWithoutMetadata();
-
-    /**
-     * Returns the IDs (UUID) of movies that have no {@link MetadataEntity} linked to them
-     * and have a media file on the given node.
+     * Returns the IDs (UUID) of movies the metadata backfill should re-dispatch: movies without any
+     * {@link MetadataEntity} row, and movies whose TMDB enrichment columns were never filled
+     * (tmdbId is set by every successful TMDB fetch, so a null one marks a pre-V45 movie exactly
+     * once). Optionally scoped to one library.
      */
     @Query("SELECT DISTINCT mv.id FROM MovieEntity mv LEFT JOIN mv.metadataEntities m " +
-            "JOIN mv.mediaFileEntities mf JOIN mf.directoryEntity d " +
-            "WHERE m IS NULL AND d.nodeEntity.name = :nodeName")
-    List<UUID> findIdsOfMoviesWithoutMetadataForNode(@Param("nodeName") String nodeName);
+            "WHERE (m IS NULL OR mv.tmdbId IS NULL) " +
+            "AND (:libraryId IS NULL OR mv.libraryEntity.id = :libraryId)")
+    List<UUID> findIdsOfMoviesNeedingMetadata(@Param("libraryId") UUID libraryId);
 }

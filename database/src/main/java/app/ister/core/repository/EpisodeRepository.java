@@ -145,20 +145,14 @@ public interface EpisodeRepository extends JpaRepository<EpisodeEntity, UUID> {
                                  @Param("afterEpisode") int afterEpisode);
 
     /**
-     * Returns the IDs (UUID) of episodes that have no {@link MetadataEntity} linked to them.
-     */
-    @Query("SELECT s.id FROM EpisodeEntity s LEFT JOIN s.metadataEntities m " +
-            "WHERE m IS NULL")
-    List<UUID> findIdsOfEpisodesWithoutMetadata();
-
-    /**
-     * Returns the IDs (UUID) of episodes that have no {@link MetadataEntity} linked to them
-     * and have a media file on the given node.
+     * Returns the IDs (UUID) of episodes that have no {@link MetadataEntity} linked to them,
+     * optionally scoped to one library. Unlike movies/shows there is no tmdbId marker on episodes;
+     * re-enriching episodes that already have metadata needs the FORCE refresh flow.
      */
     @Query("SELECT DISTINCT e.id FROM EpisodeEntity e LEFT JOIN e.metadataEntities m " +
-            "JOIN e.mediaFileEntities mf JOIN mf.directoryEntity d " +
-            "WHERE m IS NULL AND d.nodeEntity.name = :nodeName")
-    List<UUID> findIdsOfEpisodesWithoutMetadataForNode(@Param("nodeName") String nodeName);
+            "WHERE m IS NULL " +
+            "AND (:libraryId IS NULL OR e.showEntity.libraryEntity.id = :libraryId)")
+    List<UUID> findIdsOfEpisodesWithoutMetadata(@Param("libraryId") UUID libraryId);
 
     interface IdOnly {
 

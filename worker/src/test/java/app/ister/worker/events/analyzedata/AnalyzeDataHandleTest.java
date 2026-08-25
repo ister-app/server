@@ -1,6 +1,7 @@
 package app.ister.worker.events.analyzedata;
 
 import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
@@ -8,6 +9,7 @@ import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.NodeEntity;
+import app.ister.core.entity.SeriesEntity;
 import app.ister.core.entity.ShowEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.DirectoryType;
@@ -15,6 +17,7 @@ import app.ister.core.enums.EventType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.AnalyzeData;
 import app.ister.core.repository.AlbumRepository;
+import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
@@ -24,9 +27,11 @@ import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.MovieRepository;
+import app.ister.core.repository.SeriesRepository;
 import app.ister.core.repository.ShowRepository;
 import app.ister.core.repository.TrackRepository;
 import app.ister.core.service.MessageSender;
+import app.ister.worker.events.common.FoundEventDispatcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -50,6 +55,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -73,6 +79,10 @@ class AnalyzeDataHandleTest {
     @Mock
     private TrackRepository trackRepository;
     @Mock
+    private BookRepository bookRepository;
+    @Mock
+    private SeriesRepository seriesRepository;
+    @Mock
     private DirectoryRepository directoryRepository;
     @Mock
     private MediaFileRepository mediaFileRepository;
@@ -84,6 +94,8 @@ class AnalyzeDataHandleTest {
     private ImageRepository imageRepository;
     @Mock
     private MessageSender messageSender;
+    @Mock
+    private FoundEventDispatcher dispatcher;
 
     @Test
     void handles() {
@@ -168,6 +180,74 @@ class AnalyzeDataHandleTest {
     }
 
     @Test
+    void handleLibraryIdBookTypeSendsAuthorFanOut() {
+        UUID libraryId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder()
+                .id(libraryId)
+                .libraryType(LibraryType.BOOK)
+                .build();
+        AnalyzeData data = AnalyzeData.builder()
+                .eventType(EventType.ANALYZE_DATA)
+                .libraryId(libraryId)
+                .build();
+
+        when(libraryRepository.findById(libraryId)).thenReturn(Optional.of(library));
+        when(personRepository.findByLibraryEntityId(libraryId))
+                .thenReturn(List.of(PersonEntity.builder().id(authorId).build()));
+
+        subject.handle(data);
+
+        ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
+        verify(messageSender).sendAnalyzeData(captor.capture());
+        assertEquals(authorId, captor.getValue().getPersonId());
+    }
+
+    @Test
+    void handleLibraryIdComicTypeSendsSeriesFanOut() {
+        UUID libraryId = UUID.randomUUID();
+        UUID seriesId = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder()
+                .id(libraryId)
+                .libraryType(LibraryType.COMIC)
+                .build();
+        AnalyzeData data = AnalyzeData.builder()
+                .eventType(EventType.ANALYZE_DATA)
+                .libraryId(libraryId)
+                .build();
+
+        when(libraryRepository.findById(libraryId)).thenReturn(Optional.of(library));
+        when(seriesRepository.findAllByLibraryEntityId(libraryId))
+                .thenReturn(List.of(SeriesEntity.builder().id(seriesId).build()));
+
+        subject.handle(data);
+
+        ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
+        verify(messageSender).sendAnalyzeData(captor.capture());
+        assertEquals(seriesId, captor.getValue().getSeriesId());
+    }
+
+    @Test
+    void handleLibraryIdUnsupportedTypeSkipsWithoutFanOut() {
+        UUID libraryId = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder()
+                .id(libraryId)
+                .name("Podcasts")
+                .libraryType(LibraryType.PODCAST)
+                .build();
+        AnalyzeData data = AnalyzeData.builder()
+                .eventType(EventType.ANALYZE_DATA)
+                .libraryId(libraryId)
+                .build();
+
+        when(libraryRepository.findById(libraryId)).thenReturn(Optional.of(library));
+
+        subject.handle(data);
+
+        verifyNoInteractions(messageSender, dispatcher);
+    }
+
+    @Test
     void handleShowIdSendsShowFoundAndEpisodeFanOut() {
         UUID showId = UUID.randomUUID();
         UUID episodeId1 = UUID.randomUUID();
@@ -185,7 +265,7 @@ class AnalyzeDataHandleTest {
 
         subject.handle(data);
 
-        verify(messageSender).sendShowFound(any());
+        verify(dispatcher).showFound(showId);
         ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
         verify(messageSender, times(2)).sendAnalyzeData(captor.capture());
         List<UUID> sentEpisodeIds = captor.getAllValues().stream().map(AnalyzeData::getEpisodeId).toList();
@@ -207,11 +287,11 @@ class AnalyzeDataHandleTest {
 
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
         when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(mf));
-        when(directoryRepository.findById(dir.getId())).thenReturn(Optional.of(dir));
+        when(directoryRepository.findAll()).thenReturn(List.of(dir));
 
         subject.handle(data);
 
-        verify(messageSender).sendEpisodeFound(any());
+        verify(dispatcher).episodeFound(episodeId);
         ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
         verify(messageSender).sendAnalyzeData(captor.capture(), eq("dir1"));
         assertEquals(episodeId, captor.getValue().getEpisodeId());
@@ -232,11 +312,11 @@ class AnalyzeDataHandleTest {
 
         when(movieRepository.findById(movieId)).thenReturn(Optional.of(movie));
         when(mediaFileRepository.findByMovieEntityId(movieId)).thenReturn(List.of(mf));
-        when(directoryRepository.findById(dir.getId())).thenReturn(Optional.of(dir));
+        when(directoryRepository.findAll()).thenReturn(List.of(dir));
 
         subject.handle(data);
 
-        verify(messageSender).sendMovieFound(any());
+        verify(dispatcher).movieFound(movieId);
         ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
         verify(messageSender).sendAnalyzeData(captor.capture(), eq("movies"));
         assertEquals(movieId, captor.getValue().getMovieId());
@@ -272,9 +352,10 @@ class AnalyzeDataHandleTest {
     }
 
     @Test
-    void handlePersonIdSendsPersonFoundAndAlbumFanOut() {
+    void handlePersonIdSendsPersonFoundGloballyAndPerNodeAndFansOutToAlbumsAndBooks() {
         UUID personId = UUID.randomUUID();
         UUID albumId1 = UUID.randomUUID();
+        UUID bookId1 = UUID.randomUUID();
         LibraryEntity library = LibraryEntity.builder().build();
         NodeEntity node = NodeEntity.builder().name("disk1").build();
         DirectoryEntity dir = DirectoryEntity.builder().nodeEntity(node).build();
@@ -293,15 +374,21 @@ class AnalyzeDataHandleTest {
 
         when(personRepository.findById(personId)).thenReturn(Optional.of(artist));
         when(albumRepository.findByPersonEntityId(personId)).thenReturn(List.of(album1));
+        when(bookRepository.findByPersonEntityId(personId))
+                .thenReturn(List.of(BookEntity.builder().id(bookId1).build()));
         when(directoryRepository.findByLibraryEntityAndDirectoryType(library, DirectoryType.LIBRARY))
                 .thenReturn(List.of(dir));
 
         subject.handle(data);
 
-        verify(messageSender).sendPersonFound(any(), eq("disk1"));
+        // Node-scoped alone only reaches the disk handler (artist.nfo); the global send is what
+        // makes the MusicBrainz/Open Library/Wikipedia enrichment actually run on a force refresh.
+        verify(dispatcher).personFoundToNode(personId, "disk1");
+        verify(dispatcher).personFoundGlobal(personId);
         ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
-        verify(messageSender).sendAnalyzeData(captor.capture());
-        assertEquals(albumId1, captor.getValue().getAlbumId());
+        verify(messageSender, times(2)).sendAnalyzeData(captor.capture());
+        assertEquals(albumId1, captor.getAllValues().get(0).getAlbumId());
+        assertEquals(bookId1, captor.getAllValues().get(1).getBookId());
     }
 
     @Test
@@ -331,7 +418,8 @@ class AnalyzeDataHandleTest {
 
         subject.handle(data);
 
-        verify(messageSender).sendAlbumFound(any(), eq("disk1"));
+        verify(dispatcher).albumFoundToNode(albumId, "disk1");
+        verify(dispatcher).albumFoundGlobal(albumId);
         ArgumentCaptor<AnalyzeData> captor = ArgumentCaptor.forClass(AnalyzeData.class);
         verify(messageSender).sendAnalyzeData(captor.capture());
         assertEquals(trackId1, captor.getValue().getTrackId());
@@ -366,16 +454,16 @@ class AnalyzeDataHandleTest {
 
             // The album-found consumers check for existing metadata/image rows: publishing before
             // the delete commits makes them skip the refetch and the album ends up cover-less.
-            verify(messageSender, never()).sendAlbumFound(any());
-            verify(messageSender, never()).sendAlbumFound(any(), any());
+            verify(dispatcher, never()).albumFoundGlobal(any());
+            verify(dispatcher, never()).albumFoundToNode(any(), any());
 
             TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
         } finally {
             TransactionSynchronizationManager.clearSynchronization();
         }
 
-        verify(messageSender).sendAlbumFound(any());
-        verify(messageSender).sendAlbumFound(any(), eq("disk1"));
+        verify(dispatcher).albumFoundGlobal(albumId);
+        verify(dispatcher).albumFoundToNode(albumId, "disk1");
     }
 
     @Test
@@ -394,7 +482,7 @@ class AnalyzeDataHandleTest {
 
         when(trackRepository.findById(trackId)).thenReturn(Optional.of(track));
         when(mediaFileRepository.findByTrackEntityId(trackId)).thenReturn(List.of(mf));
-        when(directoryRepository.findById(dir.getId())).thenReturn(Optional.of(dir));
+        when(directoryRepository.findAll()).thenReturn(List.of(dir));
 
         subject.handle(data);
 
@@ -419,5 +507,74 @@ class AnalyzeDataHandleTest {
         subject.handle(data);
 
         verify(messageSender, times(0)).sendAudioFileFound(any(), any());
+    }
+
+    @Test
+    void handleBookIdReparsesEpubsAfterWipingMetadata() {
+        UUID bookId = UUID.randomUUID();
+        DirectoryEntity dir = DirectoryEntity.builder().id(UUID.randomUUID()).name("books-dir").build();
+        BookEntity book = BookEntity.builder().id(bookId).name("Book").build();
+        MediaFileEntity epub = MediaFileEntity.builder().path("/books/Author/Book.epub").size(1L).build();
+        epub.setId(UUID.randomUUID());
+        epub.setDirectoryEntity(dir);
+        AnalyzeData data = AnalyzeData.builder()
+                .eventType(EventType.ANALYZE_DATA)
+                .bookId(bookId)
+                .build();
+
+        when(bookRepository.findById(bookId)).thenReturn(Optional.of(book));
+        when(mediaFileRepository.findByBookEntityId(bookId)).thenReturn(List.of(epub));
+        when(directoryRepository.findAll()).thenReturn(List.of(dir));
+
+        subject.handle(data);
+
+        verify(metadataRepository).deleteAll(any());
+        verify(imageRepository).deleteAll(any());
+        // The epub re-parse chains BOOK_FOUND itself after storing the ISBN.
+        verify(dispatcher).epubFileFound(dir, bookId, epub);
+        verify(dispatcher, never()).bookFound(any());
+    }
+
+    @Test
+    void handleBookIdWithoutEpubsSendsBookFoundDirectly() {
+        UUID bookId = UUID.randomUUID();
+        BookEntity audiobookOnly = BookEntity.builder().id(bookId).name("Audiobook").build();
+        AnalyzeData data = AnalyzeData.builder()
+                .eventType(EventType.ANALYZE_DATA)
+                .bookId(bookId)
+                .build();
+
+        when(bookRepository.findById(bookId)).thenReturn(Optional.of(audiobookOnly));
+        when(mediaFileRepository.findByBookEntityId(bookId)).thenReturn(List.of());
+
+        subject.handle(data);
+
+        verify(dispatcher).bookFound(bookId);
+    }
+
+    @Test
+    void handleSeriesIdSendsComicSeriesFoundAndReparsesEveryVolume() {
+        UUID seriesId = UUID.randomUUID();
+        UUID volumeId = UUID.randomUUID();
+        DirectoryEntity dir = DirectoryEntity.builder().id(UUID.randomUUID()).name("comics-dir").build();
+        SeriesEntity series = SeriesEntity.builder().id(seriesId).name("Series").build();
+        BookEntity volume = BookEntity.builder().id(volumeId).name("Vol 1").build();
+        MediaFileEntity cbz = MediaFileEntity.builder().path("/comics/Series/Vol 1.cbz").size(1L).build();
+        cbz.setId(UUID.randomUUID());
+        cbz.setDirectoryEntity(dir);
+        AnalyzeData data = AnalyzeData.builder()
+                .eventType(EventType.ANALYZE_DATA)
+                .seriesId(seriesId)
+                .build();
+
+        when(seriesRepository.findById(seriesId)).thenReturn(Optional.of(series));
+        when(bookRepository.findBySeriesEntityId(seriesId)).thenReturn(List.of(volume));
+        when(mediaFileRepository.findByBookEntityId(volumeId)).thenReturn(List.of(cbz));
+        when(directoryRepository.findAll()).thenReturn(List.of(dir));
+
+        subject.handle(data);
+
+        verify(dispatcher).comicSeriesFound(seriesId);
+        verify(dispatcher).comicVolumeFileFound(dir, volumeId, cbz);
     }
 }

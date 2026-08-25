@@ -84,7 +84,33 @@ public interface BookRepository extends JpaRepository<BookEntity, UUID> {
 
     List<BookEntity> findByPersonEntityId(UUID personId);
 
+    List<BookEntity> findBySeriesEntityId(UUID seriesId);
+
     List<BookEntity> findByLibraryEntity_LibraryType(LibraryType libraryType);
+
+    /**
+     * The distinct authors of a library type, for the series prefix heuristic — replaces loading
+     * every book just to derive this set. Optionally scoped to one library.
+     */
+    @Query("""
+            select distinct b.personEntity from BookEntity b
+            where b.libraryEntity.libraryType = :libraryType
+              and b.personEntity is not null
+              and (:libraryId is null or b.libraryEntity.id = :libraryId)""")
+    List<PersonEntity> findDistinctAuthors(@Param("libraryType") LibraryType libraryType,
+                                           @Param("libraryId") UUID libraryId);
+
+    /**
+     * Books still missing a series link or series position, whose album.nfo is the last local
+     * source — the backfill re-dispatches those nfo files. Optionally scoped to one library.
+     */
+    @Query("""
+            select b from BookEntity b
+            where b.libraryEntity.libraryType = :libraryType
+              and (b.seriesEntity is null or b.seriesIndex is null)
+              and (:libraryId is null or b.libraryEntity.id = :libraryId)""")
+    List<BookEntity> findBooksMissingSeriesInfo(@Param("libraryType") LibraryType libraryType,
+                                                @Param("libraryId") UUID libraryId);
 
     List<BookEntity> findByLibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(LibraryType libraryType);
 

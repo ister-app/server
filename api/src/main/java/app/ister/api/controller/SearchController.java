@@ -75,11 +75,11 @@ public class SearchController {
 
     @PreAuthorize("hasRole('admin')")
     @MutationMapping
-    public Boolean reindexSearch() {
+    public Boolean rebuildSearchIndex() {
         if (!searchQueryService.isEnabled()) {
             throw new SearchUnavailableException();
         }
-        log.debug("Start reindexSearch");
+        log.debug("Start rebuildSearchIndex");
         serverEventService.createSearchReindexEvent();
         return true;
     }

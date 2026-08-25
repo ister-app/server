@@ -2,7 +2,6 @@ package app.ister.worker.config;
 
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -10,9 +9,6 @@ import static app.ister.core.MessageQueue.*;
 
 @Configuration
 public class QueueConfig {
-
-    @Value("${app.ister.server.name}")
-    private String nodeName;
 
     @Bean
     JacksonJsonMessageConverter converter() {
@@ -40,8 +36,9 @@ public class QueueConfig {
     }
 
     @Bean
-    public Queue queueAnalyzeLibraryRequested() {
-        return new Queue(APP_ISTER_SERVER_ANALYZE_LIBRARY_REQUESTED + "." + nodeName);
+    public Queue queueMetadataBackfillRequested() {
+        // Global on purpose: one consumer wins, so the backfill runs once cluster-wide.
+        return new Queue(APP_ISTER_SERVER_METADATA_BACKFILL_REQUESTED);
     }
 
     @Bean

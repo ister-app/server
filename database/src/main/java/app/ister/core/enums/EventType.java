@@ -2,7 +2,7 @@ package app.ister.core.enums;
 
 public enum EventType {
     NEW_DIRECTORIES_SCAN_REQUEST,
-    ANALYZE_LIBRARY_REQUEST,
+    METADATA_BACKFILL_REQUESTED,
     FILE_SCAN_REQUESTED,
     SHOW_FOUND,
     EPISODE_FOUND,

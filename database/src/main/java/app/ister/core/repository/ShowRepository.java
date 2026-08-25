@@ -84,20 +84,13 @@ public interface ShowRepository extends JpaRepository<ShowEntity, UUID> {
     long countRatedShowsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId);
 
     /**
-     * Returns the IDs (UUID) of shows that have no {@link MetadataEntity} linked to them.
-     */
-    @Query("SELECT s.id FROM ShowEntity s LEFT JOIN s.metadataEntities m " +
-            "WHERE m IS NULL")
-    List<UUID> findIdsOfShowsWithoutMetadata();
-
-    /**
-     * Returns the IDs (UUID) of shows that have no {@link MetadataEntity} linked to them
-     * and have at least one episode with a media file on the given node.
+     * Returns the IDs (UUID) of shows the metadata backfill should re-dispatch: shows without any
+     * {@link MetadataEntity} row, and shows whose TMDB enrichment columns were never filled
+     * (tmdbId is set by every successful TMDB fetch, so a null one marks a pre-V45 show exactly
+     * once). Optionally scoped to one library.
      */
     @Query("SELECT DISTINCT s.id FROM ShowEntity s LEFT JOIN s.metadataEntities m " +
-            "WHERE m IS NULL AND s.id IN (" +
-            "SELECT DISTINCT ep.showEntity.id FROM EpisodeEntity ep " +
-            "JOIN ep.mediaFileEntities mf JOIN mf.directoryEntity d " +
-            "WHERE d.nodeEntity.name = :nodeName)")
-    List<UUID> findIdsOfShowsWithoutMetadataForNode(@Param("nodeName") String nodeName);
+            "WHERE (m IS NULL OR s.tmdbId IS NULL) " +
+            "AND (:libraryId IS NULL OR s.libraryEntity.id = :libraryId)")
+    List<UUID> findIdsOfShowsNeedingMetadata(@Param("libraryId") UUID libraryId);
 }

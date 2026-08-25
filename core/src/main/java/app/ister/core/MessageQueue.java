@@ -7,7 +7,7 @@ public class MessageQueue {
     public static final String APP_ISTER_SERVER_MEDIA_FILE_FOUND = "app.ister.server.MediaFileFound";
     public static final String APP_ISTER_SERVER_MOVIE_FOUND = "app.ister.server.MovieFound";
     public static final String APP_ISTER_SERVER_NEW_DIRECTORIES_SCAN_REQUESTED = "app.ister.server.NewDirectoriesScanRequested";
-    public static final String APP_ISTER_SERVER_ANALYZE_LIBRARY_REQUESTED = "app.ister.server.AnalyzeLibraryRequested";
+    public static final String APP_ISTER_SERVER_METADATA_BACKFILL_REQUESTED = "app.ister.server.MetadataBackfillRequested";
     public static final String APP_ISTER_SERVER_NFO_FILE_FOUND = "app.ister.server.NfoFileFound";
     public static final String APP_ISTER_SERVER_SHOW_FOUND = "app.ister.server.ShowFound";
     public static final String APP_ISTER_SERVER_SUBTITLE_FILE_FOUND = "app.ister.server.SubtitleFileFound";

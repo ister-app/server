@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,6 +37,12 @@ public interface MediaFileRepository extends CrudRepository<MediaFileEntity, UUI
 
     /** Epub files attached directly to a book. */
     List<MediaFileEntity> findByBookEntityId(UUID bookId);
+
+    /** Batch variant for the metadata backfill: epub files of many books in one query. */
+    List<MediaFileEntity> findByBookEntityIdIn(Collection<UUID> bookIds);
+
+    /** Batch variant for the metadata backfill: audio files of many tracks in one query. */
+    List<MediaFileEntity> findByTrackEntityIdIn(Collection<UUID> trackIds);
 
     List<MediaFileEntity> findByChapterEntity_BookEntityId(UUID bookId);
 

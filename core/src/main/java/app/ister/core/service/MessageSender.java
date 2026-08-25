@@ -71,8 +71,8 @@ public class MessageSender {
 
     // worker module
 
-    public void sendAnalyzeLibraryRequested(AnalyzeLibraryRequestedData analyzeLibraryRequestedData, String nodeName) {
-        send(APP_ISTER_SERVER_ANALYZE_LIBRARY_REQUESTED, nodeName, analyzeLibraryRequestedData);
+    public void sendMetadataBackfillRequested(MetadataBackfillRequestedData metadataBackfillRequestedData) {
+        send(APP_ISTER_SERVER_METADATA_BACKFILL_REQUESTED, metadataBackfillRequestedData);
     }
 
     public void sendEpisodeFound(EpisodeFoundData episodeFoundData) {

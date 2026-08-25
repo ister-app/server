@@ -21,4 +21,7 @@ public class AnalyzeData extends MessageData {
     private UUID personId;
     private UUID albumId;
     private UUID trackId;
+    private UUID bookId;
+    /** A comic series (SeriesEntity). */
+    private UUID seriesId;
 }

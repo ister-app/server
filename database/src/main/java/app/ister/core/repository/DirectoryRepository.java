@@ -20,4 +20,6 @@ public interface DirectoryRepository extends CrudRepository<DirectoryEntity, UUI
     List<DirectoryEntity> findByDirectoryType(DirectoryType directoryType);
 
     List<DirectoryEntity> findByLibraryEntityAndDirectoryType(LibraryEntity libraryEntity, DirectoryType directoryType);
+
+    List<DirectoryEntity> findByDirectoryTypeAndLibraryEntityId(DirectoryType directoryType, UUID libraryEntityId);
 }

@@ -1,10 +1,8 @@
 package app.ister.api.controller;
 
 import app.ister.core.entity.DirectoryEntity;
-import app.ister.core.entity.NodeEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.repository.DirectoryRepository;
-import app.ister.core.repository.NodeRepository;
 import app.ister.core.service.MessageSender;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,13 +27,10 @@ class ScannerControllerTest {
     private MessageSender messageSender;
 
     @Mock
-    private NodeRepository nodeRepository;
-
-    @Mock
     private DirectoryRepository directoryRepository;
 
     @Test
-    void scanLibrarySendsMessageForEachLibraryDirectory() {
+    void scanLibrariesSendsMessageForEachLibraryDirectory() {
         DirectoryEntity dir1 = DirectoryEntity.builder()
                 .name("movies")
                 .path("/movies")
@@ -51,41 +46,39 @@ class ScannerControllerTest {
 
         when(directoryRepository.findByDirectoryType(DirectoryType.LIBRARY)).thenReturn(List.of(dir1, dir2));
 
-        Boolean result = subject.scanLibrary();
+        Boolean result = subject.scanLibraries(null);
 
         assertTrue(result);
         verify(messageSender, times(2)).sendNewDirectoriesScanRequested(any(), any());
     }
 
     @Test
-    void scanLibraryReturnsTrueWhenNoDirectories() {
+    void scanLibrariesWithLibraryScansOnlyItsDirectories() {
+        UUID libraryId = UUID.randomUUID();
+        DirectoryEntity dir = DirectoryEntity.builder()
+                .name("movies")
+                .path("/movies")
+                .directoryType(DirectoryType.LIBRARY)
+                .build();
+        dir.setId(UUID.randomUUID());
+
+        when(directoryRepository.findByDirectoryTypeAndLibraryEntityId(DirectoryType.LIBRARY, libraryId))
+                .thenReturn(List.of(dir));
+
+        Boolean result = subject.scanLibraries(libraryId);
+
+        assertTrue(result);
+        verify(messageSender).sendNewDirectoriesScanRequested(any(), eq("movies"));
+        verify(directoryRepository, never()).findByDirectoryType(any());
+    }
+
+    @Test
+    void scanLibrariesReturnsTrueWhenNoDirectories() {
         when(directoryRepository.findByDirectoryType(DirectoryType.LIBRARY)).thenReturn(List.of());
 
-        Boolean result = subject.scanLibrary();
+        Boolean result = subject.scanLibraries(null);
 
         assertTrue(result);
         verify(messageSender, never()).sendNewDirectoriesScanRequested(any(), any());
-    }
-
-    @Test
-    void analyzeLibrarySendsMessageForEachNode() {
-        NodeEntity node1 = NodeEntity.builder().name("node1").url("http://node1").build();
-        NodeEntity node2 = NodeEntity.builder().name("node2").url("http://node2").build();
-        when(nodeRepository.findAll()).thenReturn(List.of(node1, node2));
-
-        Boolean result = subject.analyzeLibrary();
-
-        assertTrue(result);
-        verify(messageSender, times(2)).sendAnalyzeLibraryRequested(any(), any());
-    }
-
-    @Test
-    void analyzeLibraryReturnsTrueWhenNoNodes() {
-        when(nodeRepository.findAll()).thenReturn(List.of());
-
-        Boolean result = subject.analyzeLibrary();
-
-        assertTrue(result);
-        verify(messageSender, never()).sendAnalyzeLibraryRequested(any(), any());
     }
 }

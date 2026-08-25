@@ -101,18 +101,18 @@ class SearchControllerTest {
     }
 
     @Test
-    void reindexSearchSendsEvent() {
+    void rebuildSearchIndexSendsEvent() {
         when(searchQueryService.isEnabled()).thenReturn(true);
 
-        assertTrue(subject.reindexSearch());
+        assertTrue(subject.rebuildSearchIndex());
 
         verify(serverEventService).createSearchReindexEvent();
     }
 
     @Test
-    void reindexSearchThrowsWhenTypesenseIsNotConfigured() {
+    void rebuildSearchIndexThrowsWhenTypesenseIsNotConfigured() {
         when(searchQueryService.isEnabled()).thenReturn(false);
 
-        assertThrows(SearchUnavailableException.class, () -> subject.reindexSearch());
+        assertThrows(SearchUnavailableException.class, () -> subject.rebuildSearchIndex());
     }
 }

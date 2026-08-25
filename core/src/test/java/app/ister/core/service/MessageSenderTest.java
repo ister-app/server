@@ -84,10 +84,10 @@ class MessageSenderTest {
     }
 
     @Test
-    void sendAnalyzeLibraryRequested() {
-        AnalyzeLibraryRequestedData data = AnalyzeLibraryRequestedData.builder().build();
-        subject.sendAnalyzeLibraryRequested(data, "node1");
-        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_ANALYZE_LIBRARY_REQUESTED + ".node1", data);
+    void sendMetadataBackfillRequested() {
+        MetadataBackfillRequestedData data = MetadataBackfillRequestedData.builder().build();
+        subject.sendMetadataBackfillRequested(data);
+        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_METADATA_BACKFILL_REQUESTED, data);
     }
 
     @Test

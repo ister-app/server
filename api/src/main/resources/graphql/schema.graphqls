@@ -120,11 +120,28 @@ type Attribution {
 
 union SearchResult = Movie | Show | Episode | Person | Album | Track | Book | Podcast
 
+enum MetadataRefreshMode {
+    "Fetch only what is missing (metadata, artwork, image blur-hashes). Cheap, idempotent, safe to run anytime."
+    MISSING
+    "Delete stored metadata, artwork and stream info first, then re-fetch everything from the metadata services. Heavy and destructive; requires libraryId."
+    FORCE
+}
+
 type Mutation {
-    "Admin only."
-    scanLibrary: Boolean!
-    "Admin only."
-    analyzeLibrary: Boolean!
+    """
+    Admin only. Scans the library folders for newly added files, optionally limited to one
+    library. Cheap: already-known files are skipped. Does not re-fetch metadata for existing
+    items — that is refreshMetadata's job.
+    """
+    scanLibraries(libraryId: ID): Boolean!
+    """
+    Admin only. Fetches metadata and artwork. MISSING (the default) backfills items that lack
+    metadata, artwork or TMDB enrichment and recomputes missing image blur-hashes; libraryId
+    optionally narrows it to one library. FORCE requires libraryId and deletes that library's
+    stored metadata, artwork and stream info before re-fetching everything — heavy, hits the
+    external metadata services for every item in the library.
+    """
+    refreshMetadata(mode: MetadataRefreshMode! = MISSING, libraryId: ID): Boolean!
     createPlayQueue(input: CreatePlayQueueInput!): PlayQueue!
     """
     streamSettings: what the client is currently playing with; enables prefetching the next queue item in the same format.
@@ -141,22 +158,20 @@ type Mutation {
     "Appends all tracks of the album to the end of the queue, in natural play order (disc number, track number)."
     addPlayQueueAlbum(playQueueId: ID!, albumId: ID!): PlayQueue!
     createStreamToken: StreamToken!
-    "Admin only."
-    analyzeDataForEpisode(episodeId: ID!): Boolean!
-    "Admin only."
-    analyzeDataForMovie(movieId: ID!): Boolean!
-    "Admin only."
-    analyzeDataForShow(showId: ID!): Boolean!
-    "Admin only."
-    analyzeDataForLibrary(libraryId: ID!): Boolean!
-    "Admin only."
-    analyzeDataForPerson(personId: ID!): Boolean!
-    "Admin only."
-    analyzeDataForAlbum(albumId: ID!): Boolean!
-    "Admin only."
-    analyzeDataForTrack(trackId: ID!): Boolean!
-    "Admin only."
-    reindexSearch: Boolean!
+    "Admin only. Deletes and re-fetches metadata and artwork for one episode."
+    refreshEpisode(episodeId: ID!): Boolean!
+    "Admin only. Deletes and re-fetches metadata and artwork for one movie."
+    refreshMovie(movieId: ID!): Boolean!
+    "Admin only. Deletes and re-fetches metadata and artwork for one show and all its episodes."
+    refreshShow(showId: ID!): Boolean!
+    "Admin only. Deletes and re-fetches metadata and artwork for one person, fanning out to their albums (artists) and books (authors)."
+    refreshPerson(personId: ID!): Boolean!
+    "Admin only. Deletes and re-fetches metadata and artwork for one album and its tracks."
+    refreshAlbum(albumId: ID!): Boolean!
+    "Admin only. Deletes and re-reads metadata for one track from its audio files."
+    refreshTrack(trackId: ID!): Boolean!
+    "Admin only. Rebuilds the search index into a fresh collection and swaps it in; search stays available while it runs."
+    rebuildSearchIndex: Boolean!
     "Sets the calling user's rating (1-10) for a media item. Pass rating: null to clear it. Returns true."
     setRating(mediaType: RatingMediaType!, mediaId: ID!, rating: Int): Boolean!
     """

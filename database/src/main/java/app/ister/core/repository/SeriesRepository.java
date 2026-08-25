@@ -27,6 +27,8 @@ public interface SeriesRepository extends JpaRepository<SeriesEntity, UUID> {
 
     Page<SeriesEntity> findByLibraryEntityId(UUID libraryId, Pageable pageable);
 
+    List<SeriesEntity> findAllByLibraryEntityId(UUID libraryId);
+
     Page<SeriesEntity> findByLibraryEntityIdIn(Collection<UUID> libraryIds, Pageable pageable);
 
     List<SeriesEntity> findByLibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(LibraryType libraryType);
