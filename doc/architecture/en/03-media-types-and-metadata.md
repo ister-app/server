@@ -26,6 +26,19 @@ Adding a language requires a re-scan plus a reindex.
 `MetadataEntity` rows, and download posters/backdrops (emitted as `IMAGE_FOUND` on the cache
 directory).
 
+The details response is mined for more than title/overview. **Per language** the metadata row also
+carries the localized `genre` list (comma-separated names — this is what lights up the GENRE filter
+and the `genre_<tag>` search fields for video) and the `tagline`. **Language-independent** facts are
+columns on the entity itself, applied once on the first successful language: `tmdbId`, `imdbId`,
+`voteAverage`/`voteCount` (null while there are zero votes), `runtime` (movies/episodes, minutes),
+`status`, `homepage`, `originCountry`, `studios`, collection id/name (movies, from
+`belongs_to_collection`) and `networks` (shows). After the language loop, `TmdbExtrasService` makes
+a handful of extra endpoint calls per item — release dates/content ratings (certification for
+`app.ister.worker.tmdb.certification-country`, default `US`, falling back to US and then any),
+videos (one YouTube trailer key, preferring official trailers), keywords, and TV external ids
+(imdb). Each extras call is individually fault-tolerant: a failure logs and leaves the field null
+instead of dead-lettering the event (the chart e2e stubs TMDB with WireMock).
+
 Credits come along in the same pass: movie credits, show aggregate credits, and episode credits
 (cast + guest stars) become `PersonEntity` + `CreditEntity` rows, written directly to the database.
 A `CreditEntity` links a person to exactly one of movie/show/episode. A `PersonEntity` is shared

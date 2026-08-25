@@ -26,6 +26,19 @@ De `MOVIE_FOUND`- / `SHOW_FOUND`- / `EPISODE_FOUND`-handlers halen TMDB-details 
 `MetadataEntity`-rijen op en downloaden posters/achtergronden (verstuurd als `IMAGE_FOUND` op de
 cache-directory).
 
+Uit de details-response wordt meer gehaald dan titel/overview. **Per taal** krijgt de metadata-rij
+ook de gelokaliseerde `genre`-lijst (kommagescheiden namen — dit activeert het GENRE-filter en de
+`genre_<tag>`-zoekvelden voor video) en de `tagline`. **Taalonafhankelijke** feiten zijn kolommen op
+de entiteit zelf, één keer gezet bij de eerste geslaagde taal: `tmdbId`, `imdbId`,
+`voteAverage`/`voteCount` (null zolang er nul stemmen zijn), `runtime` (films/afleveringen, in
+minuten), `status`, `homepage`, `originCountry`, `studios`, collectie-id/-naam (films, uit
+`belongs_to_collection`) en `networks` (shows). Na de talenlus doet `TmdbExtrasService` per item nog
+een paar extra endpoint-aanroepen: release dates/content ratings (keuring voor
+`app.ister.worker.tmdb.certification-country`, standaard `US`, met terugval naar US en daarna
+willekeurig), videos (één YouTube-trailerkey, met voorkeur voor officiële trailers), keywords en
+TV-external-ids (imdb). Elke extras-aanroep is afzonderlijk fout-tolerant: een fout wordt gelogd en
+laat het veld null in plaats van het event te dead-letteren (de chart-e2e stubt TMDB met WireMock).
+
 Credits komen in dezelfde pass mee: movie credits, show aggregate credits en episode credits (cast
 + guest stars) worden `PersonEntity`- + `CreditEntity`-rijen, direct in de database geschreven. Een
 `CreditEntity` koppelt een persoon aan precies één van movie/show/episode. Een `PersonEntity` wordt

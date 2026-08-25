@@ -64,6 +64,13 @@ Afterwards, run the `reindexSearch` GraphQL mutation once: the merged persons le
 in Typesense. Featured guests on files that were never named in an artist row are picked up by a
 normal re-scan.
 
+**Extended TMDB metadata (`V45`) needs a one-time backfill.** Genres, community rating, runtime,
+tagline, certification, trailer, studios/networks, collection and keywords are only fetched when the
+movie/show/episode handlers run, so existing items stay empty until re-analyzed. After upgrading,
+run the `analyzeLibrary` GraphQL mutation once per movie and show library; the handlers overwrite
+metadata in place and the search index follows automatically (no `reindexSearch` needed — the
+`genre_<tag>` fields already exist in the collection schema).
+
 ## Troubleshooting
 
 **No metadata after a scan (bare filenames, no posters)** — almost always a missing or wrong

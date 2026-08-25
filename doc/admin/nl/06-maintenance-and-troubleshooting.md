@@ -67,6 +67,13 @@ Draai daarna één keer de GraphQL-mutation `reindexSearch`: de samengevoegde pe
 verouderde documenten in Typesense achter. Featured gasten in bestanden die nooit in een
 artiestenrij stonden, komen mee met een gewone hersan.
 
+**Uitgebreide TMDB-metadata (`V45`) vereist een eenmalige backfill.** Genres, community-rating,
+speelduur, tagline, keuring, trailer, studio's/netwerken, collectie en keywords worden alleen
+opgehaald wanneer de film-/show-/afleveringshandlers draaien; bestaande items blijven dus leeg tot
+een heranalyse. Draai na de upgrade één keer de GraphQL-mutation `analyzeLibrary` per film- en
+showbibliotheek; de handlers overschrijven de metadata ter plekke en de zoekindex volgt automatisch
+(geen `reindexSearch` nodig — de `genre_<tag>`-velden bestaan al in het collectieschema).
+
 ## Probleemoplossing
 
 **Geen metadata na een scan (kale bestandsnamen, geen posters)** — vrijwel altijd een
