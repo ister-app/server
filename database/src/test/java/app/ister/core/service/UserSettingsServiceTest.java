@@ -59,6 +59,8 @@ class UserSettingsServiceTest {
         assertTrue(settings.transcode());
         assertNull(settings.maxVideoHeight(), "no quality cap without saved settings");
         assertFalse(settings.autoSkipIntro(), "intros are not auto-skipped by default");
+        assertFalse(settings.hideSubtitlesMatchingAudio(),
+                "subtitles in the spoken language are shown unless the user opts out");
     }
 
     @Test
@@ -87,7 +89,7 @@ class UserSettingsServiceTest {
         when(userSettingsRepository.save(any(UserSettingsEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UserSettings saved = subject.update(authentication,
-                new UserSettings(List.of("nl", "en"), List.of("nl"), true, true, 720, true));
+                new UserSettings(List.of("nl", "en"), List.of("nl"), true, true, 720, true, true));
 
         ArgumentCaptor<UserSettingsEntity> captor = ArgumentCaptor.forClass(UserSettingsEntity.class);
         verify(userSettingsRepository).save(captor.capture());
@@ -97,6 +99,8 @@ class UserSettingsServiceTest {
         assertEquals(List.of("nl", "en"), saved.preferredAudioLanguages());
         assertEquals(720, saved.maxVideoHeight());
         assertTrue(saved.autoSkipIntro());
+        assertTrue(saved.hideSubtitlesMatchingAudio());
+        assertTrue(captor.getValue().isHideSubtitlesMatchingAudio());
     }
 
     @Test
@@ -112,7 +116,7 @@ class UserSettingsServiceTest {
         when(userSettingsRepository.findByUserEntity(user)).thenReturn(Optional.of(existing));
         when(userSettingsRepository.save(any(UserSettingsEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        subject.update(authentication, new UserSettings(List.of("nl"), List.of("nl"), false, true, null, false));
+        subject.update(authentication, new UserSettings(List.of("nl"), List.of("nl"), false, true, null, false, false));
 
         assertEquals(List.of("nl"), existing.getPreferredAudioLanguages());
         assertEquals(List.of("nl"), existing.getPreferredSubtitleLanguages());

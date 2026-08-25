@@ -7,8 +7,9 @@ import java.util.List;
  * way the player applies them.
  *
  * @param maxVideoHeight highest video variant to pre-transcode (720 or 480); null means every variant
+ * @param hideSubtitlesMatchingAudio leave subtitles off when the language picked is the spoken one
  */
 public record UserSettingsInput(List<String> preferredAudioLanguages, List<String> preferredSubtitleLanguages,
                                 boolean directPlay, boolean transcode, Integer maxVideoHeight,
-                                boolean autoSkipIntro) {
+                                boolean autoSkipIntro, boolean hideSubtitlesMatchingAudio) {
 }

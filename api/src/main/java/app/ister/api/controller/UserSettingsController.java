@@ -35,6 +35,7 @@ public class UserSettingsController {
     public UserSettings updateUserSettings(@Argument UserSettingsInput input, Authentication authentication) {
         return userSettingsService.update(authentication, new UserSettings(
                 input.preferredAudioLanguages(), input.preferredSubtitleLanguages(),
-                input.directPlay(), input.transcode(), input.maxVideoHeight(), input.autoSkipIntro()));
+                input.directPlay(), input.transcode(), input.maxVideoHeight(), input.autoSkipIntro(),
+                input.hideSubtitlesMatchingAudio()));
     }
 }

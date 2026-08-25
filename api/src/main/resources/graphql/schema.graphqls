@@ -857,6 +857,12 @@ type UserSettings {
     maxVideoHeight: Int
     "Auto-seek past detected intros during playback."
     autoSkipIntro: Boolean!
+    """
+    Leave subtitles off when the subtitle language that would be picked is the one already being
+    spoken. The two preference lists are applied independently, so without this a user with Dutch at
+    the top of both gets Dutch audio *and* Dutch subtitles.
+    """
+    hideSubtitlesMatchingAudio: Boolean!
 }
 
 input UserSettingsInput {
@@ -867,6 +873,8 @@ input UserSettingsInput {
     maxVideoHeight: Int
     "Defaulted so clients predating the field keep working."
     autoSkipIntro: Boolean! = false
+    "Defaulted so clients predating the field keep working."
+    hideSubtitlesMatchingAudio: Boolean! = false
 }
 
 input CreatePlayQueueInput {
