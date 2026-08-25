@@ -54,4 +54,8 @@ public class UserSettingsEntity extends BaseEntity {
     /** Auto-seek past detected intros during playback. */
     @Column(nullable = false)
     private boolean autoSkipIntro;
+
+    /** Leave subtitles off when the subtitle language picked is the one already being spoken. */
+    @Column(nullable = false)
+    private boolean hideSubtitlesMatchingAudio;
 }
