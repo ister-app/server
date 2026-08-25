@@ -35,6 +35,8 @@ class MetadataSaveTest {
                 .released(LocalDate.EPOCH)
                 .sourceUri("URI")
                 .description("DESCRIPTION")
+                .genres("Drama, Fantasy")
+                .tagline("TAGLINE")
                 .build();
         ShowEntity showEntity = ShowEntity.builder().build();
         EpisodeEntity episodeEntity = EpisodeEntity.builder().build();
@@ -46,6 +48,8 @@ class MetadataSaveTest {
                 .released(LocalDate.EPOCH)
                 .sourceUri("URI")
                 .description("DESCRIPTION")
+                .genre("Drama, Fantasy")
+                .tagline("TAGLINE")
                 .build();
         subject.save(tmdbResult, null, showEntity, episodeEntity);
         verify(metadataRepositoryMock).save(refEq(build));

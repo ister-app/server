@@ -32,6 +32,8 @@ public class MetadataSave {
                 .released(tmdbResult.getReleased())
                 .sourceUri(tmdbResult.getSourceUri())
                 .description(tmdbResult.getDescription())
+                .genre(tmdbResult.getGenres())
+                .tagline(tmdbResult.getTagline())
                 .build());
         if (movieEntity != null) {
             serverEventService.createSearchIndexEvent(SearchEntityType.MOVIE, movieEntity.getId());

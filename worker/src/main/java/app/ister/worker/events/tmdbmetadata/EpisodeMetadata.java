@@ -72,6 +72,9 @@ public class EpisodeMetadata {
                     .seriesTmdbId(tvSeriesResultsPage.getId())
                     .description(episode.getOverview().trim().isEmpty() ? null : episode.getOverview())
                     .backgroundUrl(episode.getStillPath() == null ? null : tmdbImageBase.url(episode.getStillPath()))
+                    .runtime(TmdbFieldUtil.positiveOrNull(episode.getRuntime()))
+                    .voteAverage(TmdbFieldUtil.withVotes(episode.getVoteCount(), episode.getVoteAverage()))
+                    .voteCount(TmdbFieldUtil.positiveOrNull(episode.getVoteCount()))
                     .build());
         } else {
             log.debug("Couldn't find Episode {} {} {}", seasonNumber, episodeNumber, language);

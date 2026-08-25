@@ -31,6 +31,7 @@ public class MovieFoundHandle implements Handle<MovieFoundData> {
     private final MetadataSave metaDataSave;
     private final ImageDownloadService imageDownloadService;
     private final CreditsService creditsService;
+    private final TmdbExtrasService tmdbExtrasService;
     private final LanguageProperties languageProperties;
 
     @Value("${app.ister.server.TMDB.apikey:}")
@@ -65,16 +66,33 @@ public class MovieFoundHandle implements Handle<MovieFoundData> {
                     saveImages(tmdbResult.get(), movieEntity);
                     if (tmdbMovieId == null) {
                         tmdbMovieId = tmdbResult.get().getTmdbId();
+                        applyDetails(tmdbResult.get(), movieEntity);
                     }
                 }
             }
-            // Credits are language independent: fetch once.
+            // Credits and extras are language independent: fetch once.
             if (tmdbMovieId != null) {
                 creditsService.fetchForMovie(movieEntity, tmdbMovieId);
+                tmdbExtrasService.fetchForMovie(movieEntity, tmdbMovieId);
             }
         } catch (IOException e) {
             throw new EventHandlingException("Download and saving image failed", e);
         }
+    }
+
+    /** Language-independent details fields, applied once (first successful language). */
+    private void applyDetails(TMDBResult tmdbResult, app.ister.core.entity.MovieEntity movieEntity) {
+        movieEntity.setTmdbId(tmdbResult.getTmdbId());
+        movieEntity.setImdbId(tmdbResult.getImdbId());
+        movieEntity.setVoteAverage(tmdbResult.getVoteAverage());
+        movieEntity.setVoteCount(tmdbResult.getVoteCount());
+        movieEntity.setRuntime(tmdbResult.getRuntime());
+        movieEntity.setStatus(tmdbResult.getStatus());
+        movieEntity.setHomepage(tmdbResult.getHomepage());
+        movieEntity.setCollectionTmdbId(tmdbResult.getCollectionTmdbId());
+        movieEntity.setCollectionName(tmdbResult.getCollectionName());
+        movieEntity.setStudios(tmdbResult.getStudios());
+        movieEntity.setOriginCountry(tmdbResult.getOriginCountry());
     }
 
     /** Downloads and saves the background and poster of one language-specific TMDB result. */

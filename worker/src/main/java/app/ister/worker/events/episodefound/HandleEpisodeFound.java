@@ -66,6 +66,10 @@ public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
                     saveImages(tmdbResult.get(), episodeEntity);
                     if (tmdbSeriesId == null) {
                         tmdbSeriesId = tmdbResult.get().getSeriesTmdbId();
+                        // Language independent, applied once (first successful language).
+                        episodeEntity.setRuntime(tmdbResult.get().getRuntime());
+                        episodeEntity.setVoteAverage(tmdbResult.get().getVoteAverage());
+                        episodeEntity.setVoteCount(tmdbResult.get().getVoteCount());
                     }
                 }
             }

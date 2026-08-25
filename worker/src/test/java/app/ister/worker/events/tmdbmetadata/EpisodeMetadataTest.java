@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -64,6 +65,44 @@ class EpisodeMetadataTest {
 
         Optional<TMDBResult> result = subject.getMetadata("Showname", 2024, 1, 1, "en");
         assertThat(result.get()).usingRecursiveComparison().isEqualTo(expected);
+    }
+
+    @Test
+    void mapsEnrichmentFields() throws FeignException {
+        when(tmdbClientMock._searchTv("Showname", null, null, null, null, 2024)).thenReturn(ResponseEntity.ok(searchTv200ResponseMock));
+        when(searchTv200ResponseMock.getResults()).thenReturn(List.of(searchTv200ResponseResultsInnerMock));
+        when(searchTv200ResponseResultsInnerMock.getId()).thenReturn(1);
+        when(tmdbClientMock._tvEpisodeDetails(1, 1, 1, "", "en")).thenReturn(ResponseEntity.ok(tvEpisodeDetails200ResponseMock));
+        when(tvEpisodeDetails200ResponseMock.getAirDate()).thenReturn("2024-04-01");
+        when(tvEpisodeDetails200ResponseMock.getOverview()).thenReturn("overview");
+        when(tvEpisodeDetails200ResponseMock.getEpisodeNumber()).thenReturn(1);
+        when(tvEpisodeDetails200ResponseMock.getName()).thenReturn("name");
+        when(tvEpisodeDetails200ResponseMock.getId()).thenReturn(1);
+        when(tvEpisodeDetails200ResponseMock.getRuntime()).thenReturn(45);
+        when(tvEpisodeDetails200ResponseMock.getVoteAverage()).thenReturn(new BigDecimal("8.1"));
+        when(tvEpisodeDetails200ResponseMock.getVoteCount()).thenReturn(321);
+
+        TMDBResult result = subject.getMetadata("Showname", 2024, 1, 1, "en").orElseThrow();
+
+        assertThat(result.getRuntime()).isEqualTo(45);
+        assertThat(result.getVoteAverage()).isEqualTo(new BigDecimal("8.1"));
+        assertThat(result.getVoteCount()).isEqualTo(321);
+    }
+
+    @Test
+    void zeroRuntimeBecomesNull() throws FeignException {
+        when(tmdbClientMock._searchTv("Showname", null, null, null, null, 2024)).thenReturn(ResponseEntity.ok(searchTv200ResponseMock));
+        when(searchTv200ResponseMock.getResults()).thenReturn(List.of(searchTv200ResponseResultsInnerMock));
+        when(searchTv200ResponseResultsInnerMock.getId()).thenReturn(1);
+        when(tmdbClientMock._tvEpisodeDetails(1, 1, 1, "", "en")).thenReturn(ResponseEntity.ok(tvEpisodeDetails200ResponseMock));
+        when(tvEpisodeDetails200ResponseMock.getAirDate()).thenReturn("2024-04-01");
+        when(tvEpisodeDetails200ResponseMock.getOverview()).thenReturn("overview");
+        when(tvEpisodeDetails200ResponseMock.getEpisodeNumber()).thenReturn(1);
+        when(tvEpisodeDetails200ResponseMock.getRuntime()).thenReturn(0);
+
+        TMDBResult result = subject.getMetadata("Showname", 2024, 1, 1, "en").orElseThrow();
+
+        assertThat(result.getRuntime()).isNull();
     }
 
     @Test

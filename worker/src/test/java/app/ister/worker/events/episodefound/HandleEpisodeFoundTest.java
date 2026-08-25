@@ -9,6 +9,7 @@ import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.eventdata.EpisodeFoundData;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.worker.events.tmdbmetadata.CreditsService;
 import app.ister.worker.events.tmdbmetadata.EpisodeMetadata;
 import app.ister.worker.events.tmdbmetadata.ImageDownloadService;
 import app.ister.worker.events.tmdbmetadata.ImageSave;
@@ -24,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -52,8 +54,44 @@ class HandleEpisodeFoundTest {
     @Mock
     private ImageDownloadService imageDownloadService;
 
+    @Mock
+    private CreditsService creditsService;
+
     @Spy
     private LanguageProperties languageProperties = new LanguageProperties();
+
+    @Test
+    void handleAppliesEnrichmentOnce() {
+        ReflectionTestUtils.setField(subject, "apikey", "test-key");
+        UUID episodeId = UUID.randomUUID();
+        ShowEntity show = ShowEntity.builder().name("Show").releaseYear(2024).build();
+        SeasonEntity season = SeasonEntity.builder().number(1).build();
+        EpisodeEntity episodeEntity = EpisodeEntity.builder()
+                .id(episodeId).number(1).showEntity(show).seasonEntity(season).build();
+        EpisodeFoundData data = EpisodeFoundData.builder()
+                .eventType(EventType.EPISODE_FOUND)
+                .episodeId(episodeId)
+                .build();
+        TMDBResult result = TMDBResult.builder()
+                .language("eng")
+                .title("Episode 1")
+                .seriesTmdbId(42)
+                .runtime(45)
+                .voteAverage(new BigDecimal("8.1"))
+                .voteCount(321)
+                .build();
+
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episodeEntity));
+        when(episodeMetadata.getMetadata(eq("Show"), eq(2024), eq(1), eq(1), anyString()))
+                .thenReturn(Optional.of(result));
+
+        subject.handle(data);
+
+        assertEquals(45, episodeEntity.getRuntime());
+        assertEquals(new BigDecimal("8.1"), episodeEntity.getVoteAverage());
+        assertEquals(321, episodeEntity.getVoteCount());
+        verify(creditsService).fetchForEpisode(episodeEntity, 42, 1, 1);
+    }
 
     @Test
     void handles() {

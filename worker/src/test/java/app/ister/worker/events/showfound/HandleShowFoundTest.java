@@ -7,11 +7,13 @@ import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.eventdata.ShowFoundData;
 import app.ister.core.repository.ShowRepository;
+import app.ister.worker.events.tmdbmetadata.CreditsService;
 import app.ister.worker.events.tmdbmetadata.ImageDownloadService;
 import app.ister.worker.events.tmdbmetadata.ImageSave;
 import app.ister.worker.events.tmdbmetadata.MetadataSave;
 import app.ister.worker.events.tmdbmetadata.ShowMetadata;
 import app.ister.worker.events.tmdbmetadata.TMDBResult;
+import app.ister.worker.events.tmdbmetadata.TmdbExtrasService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -23,6 +25,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import feign.FeignException;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -51,8 +54,53 @@ class HandleShowFoundTest {
     @Mock
     private ImageDownloadService imageDownloadService;
 
+    @Mock
+    private CreditsService creditsService;
+
+    @Mock
+    private TmdbExtrasService tmdbExtrasService;
+
     @Spy
     private LanguageProperties languageProperties = new LanguageProperties();
+
+    @Test
+    void handleAppliesEnrichmentOnceAndFetchesExtras() {
+        ReflectionTestUtils.setField(subject, "apikey", "test-key");
+        UUID showId = UUID.randomUUID();
+        ShowEntity showEntity = ShowEntity.builder().id(showId).name("Show").releaseYear(2024).build();
+        ShowFoundData data = ShowFoundData.builder()
+                .eventType(EventType.SHOW_FOUND)
+                .showId(showId)
+                .build();
+        TMDBResult result = TMDBResult.builder()
+                .language("eng")
+                .title("Show")
+                .tmdbId(42)
+                .voteAverage(new BigDecimal("8.4"))
+                .voteCount(24000)
+                .status("Ended")
+                .homepage("https://example.com")
+                .networks("HBO")
+                .studios("Revolution Sun Studios")
+                .originCountry("US, GB")
+                .build();
+
+        when(showRepository.findById(showId)).thenReturn(Optional.of(showEntity));
+        when(showMetadata.getMetadata(eq("Show"), eq(2024), anyString())).thenReturn(Optional.of(result));
+
+        subject.handle(data);
+
+        assertEquals(42, showEntity.getTmdbId());
+        assertEquals(new BigDecimal("8.4"), showEntity.getVoteAverage());
+        assertEquals(24000, showEntity.getVoteCount());
+        assertEquals("Ended", showEntity.getStatus());
+        assertEquals("https://example.com", showEntity.getHomepage());
+        assertEquals("HBO", showEntity.getNetworks());
+        assertEquals("Revolution Sun Studios", showEntity.getStudios());
+        assertEquals("US, GB", showEntity.getOriginCountry());
+        verify(creditsService).fetchForShow(showEntity, 42);
+        verify(tmdbExtrasService).fetchForShow(showEntity, 42);
+    }
 
     @Test
     void handles() {

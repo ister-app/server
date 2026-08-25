@@ -30,6 +30,7 @@ public class HandleShowFound implements Handle<app.ister.core.eventdata.ShowFoun
     private final MetadataSave metaDataSave;
     private final ImageDownloadService imageDownloadService;
     private final CreditsService creditsService;
+    private final TmdbExtrasService tmdbExtrasService;
     private final LanguageProperties languageProperties;
 
     @Value("${app.ister.server.TMDB.apikey:}")
@@ -64,16 +65,30 @@ public class HandleShowFound implements Handle<app.ister.core.eventdata.ShowFoun
                     saveImages(tmdbResult.get(), showEntity);
                     if (tmdbSeriesId == null) {
                         tmdbSeriesId = tmdbResult.get().getTmdbId();
+                        applyDetails(tmdbResult.get(), showEntity);
                     }
                 }
             }
-            // Credits are language independent: fetch once.
+            // Credits and extras are language independent: fetch once.
             if (tmdbSeriesId != null) {
                 creditsService.fetchForShow(showEntity, tmdbSeriesId);
+                tmdbExtrasService.fetchForShow(showEntity, tmdbSeriesId);
             }
         } catch (IOException e) {
             throw new EventHandlingException("Download and saving image failed", e);
         }
+    }
+
+    /** Language-independent details fields, applied once (first successful language). */
+    private void applyDetails(TMDBResult tmdbResult, app.ister.core.entity.ShowEntity showEntity) {
+        showEntity.setTmdbId(tmdbResult.getTmdbId());
+        showEntity.setVoteAverage(tmdbResult.getVoteAverage());
+        showEntity.setVoteCount(tmdbResult.getVoteCount());
+        showEntity.setStatus(tmdbResult.getStatus());
+        showEntity.setHomepage(tmdbResult.getHomepage());
+        showEntity.setNetworks(tmdbResult.getNetworks());
+        showEntity.setStudios(tmdbResult.getStudios());
+        showEntity.setOriginCountry(tmdbResult.getOriginCountry());
     }
 
     /** Downloads and saves the background and poster of one language-specific TMDB result. */
