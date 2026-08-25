@@ -88,16 +88,19 @@ A `PODCAST` library needs **no directory at all** — it is feed-based:
 
 ## Scanning and analyzing
 
-Two GraphQL mutations (also exposed in the client's admin screens):
+The maintenance mutations (also exposed in the client's admin screens):
 
-- **`scanLibrary`** — walks the directories, registers new/changed files, and kicks off metadata
-  fetching for anything new. Run it after adding media; there is no filesystem watcher.
-- **`analyzeLibrary`** — re-processes what is already known: probes media files for streams,
-  regenerates derived data, and backfills metadata that earlier scans missed (for example after
-  you add a TMDB key or a language). It does not discover new files.
+| Action | When to use it | Cost |
+| --- | --- | --- |
+| `scanLibraries(libraryId?)` | New files were added — there is no filesystem watcher. Optionally scoped to one library. | Cheap; known files are skipped. |
+| `refreshMetadata(MISSING, libraryId?)` | Backfill: fetch metadata/artwork only where missing (e.g. after adding a TMDB key), recompute missing blur-hashes. | Cheap and idempotent; safe anytime. |
+| `refreshMetadata(FORCE, libraryId)` | Rebuild one library: wipe stored metadata, artwork and stream info, then re-fetch everything (e.g. after a wrong match, or to pick up newly added fields on old items). | Heavy: an external fetch per item, ffprobe per file. |
+| `refreshMovie/Show/Episode/Person/Album/Track(id)` | The same wipe-and-refetch for a single item (the ⋮ menu on its detail page). | One item (a show fans out to its episodes). |
+| `rebuildSearchIndex` | Rebuild the Typesense index into a fresh collection (after enabling search or changing languages). | Reads the whole database once; search stays available. |
 
-Both are asynchronous — they queue events and return immediately; progress is visible in the
-client's activity view. Details of the pipeline are in the
+All are asynchronous — they queue events and return immediately; progress is visible in the
+client's activity view. A scan does **not** re-fetch metadata for existing items, and a MISSING
+refresh does not touch items that are already complete. Details of the pipeline are in the
 [architecture documentation](../../architecture/en/02-scanning-and-analysis.md).
 
 ## Where to next

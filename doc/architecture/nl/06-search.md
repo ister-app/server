@@ -38,13 +38,13 @@ Verzenders:
 
 ## Volledige reindex
 
-De GraphQL-mutation `reindexSearch` stuurt `SEARCH_REINDEX_REQUESTED`. De handler maakt een verse
+De GraphQL-mutation `rebuildSearchIndex` stuurt `SEARCH_REINDEX_REQUESTED`. De handler maakt een verse
 collection (`media_v<timestamp>`), pagineert door alle entiteiten en importeert ze, en **zet dan de
 alias om** en dropt oude collections — zoeken blijft live tijdens de rebuild.
 
 Een databasemigratie die entiteiten achter de index om verwijdert of hernoemt — bijvoorbeeld de
 samenvoeging van dubbele artiesten in `V43` — laat verouderde persoonsdocumenten achter; draai
-`reindexSearch` daarom één keer na een upgrade voorbij die migratie.
+`rebuildSearchIndex` daarom één keer na een upgrade voorbij die migratie.
 
 ## Meertalig schema
 
@@ -55,7 +55,7 @@ record, precies zodat de gelokaliseerde keys dynamisch blijven.
 
 Omdat het schema vastligt bij het aanmaken van de collection, kost **een taal toevoegen twee
 stappen**: een re-scan/analyze (om de nieuwe `MetadataEntity`-rijen aan te maken, zie [hoofdstuk
-3](03-media-types-and-metadata.md)) gevolgd door `reindexSearch`.
+3](03-media-types-and-metadata.md)) gevolgd door `rebuildSearchIndex`.
 
 ## Query'en
 

@@ -1,12 +1,12 @@
 # Library scan flow
 
-Triggered by the GraphQL mutation `scanLibrary()` (`ScannerController`). The directory walk fans
+Triggered by the GraphQL mutation `scanLibraries(libraryId?)` (`ScannerController`). The directory walk fans
 out into one `FILE_SCAN_REQUESTED` per file, which routes on extension to the type-specific
 handlers.
 
 ```mermaid
 flowchart TD
-    API([scanLibrary API]) -->|sends| A
+    API([scanLibraries API]) -->|sends| A
 
     A["NEW_DIRECTORIES_SCAN_REQUEST\n.{dirName}"]
     A --> B["HandleNewDirectoriesScanRequested\n📦 disk"]

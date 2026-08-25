@@ -177,5 +177,5 @@ de RSS-feed en worden naar de cache gedownload; zie
    hun seriemap — één niveau te diep of te ondiep betekent onzichtbaar.
 3. Controleer de extensie tegen de lijsten hierboven — al het andere wordt zonder foutmelding
    overgeslagen.
-4. Draai na een hernoeming opnieuw `scanLibrary`; hernoemingen worden pas bij een nieuwe scan
+4. Draai na een hernoeming opnieuw `scanLibraries`; hernoemingen worden pas bij een nieuwe scan
    opgepakt.

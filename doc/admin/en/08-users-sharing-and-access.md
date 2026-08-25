@@ -26,8 +26,8 @@ restart is needed — it takes effect on that user's next login.
 Everything is available to any authenticated user **except** these admin-only operations (enforced
 with `@PreAuthorize("hasRole('admin')")`):
 
-- Library scanning and analysis — `scanLibrary`, `analyzeLibrary`, and the `analyzeData…` mutations
-- Search maintenance — `reindexSearch`
+- Library scanning and metadata refresh — `scanLibraries`, `refreshMetadata`, and the per-item `refresh…` mutations
+- Search maintenance — `rebuildSearchIndex`
 - Podcast subscriptions — `subscribePodcast`, `unsubscribePodcast`
 - Library access management — `setLibraryVisibleToAll`, `setUserLibraryAccess`
 - The full `users` listing

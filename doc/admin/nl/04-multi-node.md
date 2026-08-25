@@ -70,7 +70,7 @@ bereiken), terwijl `APP_ISTER_CLUSTER_NAME` overal hetzelfde is.
 - De clusterpagina in de client (Instellingen → Cluster) toont elke node en zijn gezondheid —
   de snelste "draait alles?"-check.
 - Scans, metadata en opschoning draaien per node voor de directories die hij bezit; je start
-  `scanLibrary` één keer en elke node pakt zijn eigen deel op.
+  `scanLibraries` één keer en elke node pakt zijn eigen deel op.
 - Voor de interne werking van transcoderen over nodes heen, zie de
   [architectuurdocumentatie](../../architecture/nl/04-transcoding.md).
 

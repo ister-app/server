@@ -33,9 +33,9 @@ rebuildable:
 
 | Data | Where | Recovery |
 | --- | --- | --- |
-| Image cache, podcast downloads | `CACHE_DIR` | re-scan / `analyzeLibrary`; podcasts re-download |
+| Image cache, podcast downloads | `CACHE_DIR` | re-scan / `refreshMetadata`; podcasts re-download |
 | HLS segments | `TMP_DIR` | re-transcoded on demand |
-| Typesense index | Typesense volume | one `reindexSearch` mutation |
+| Typesense index | Typesense volume | one `rebuildSearchIndex` mutation |
 | RabbitMQ queues | broker | transient work; a lost message at worst delays metadata until the next scan |
 
 So: `pg_dump` on a schedule, and don't bother backing up the caches.
@@ -60,22 +60,29 @@ name. Play history and ratings are preserved: where two rows collide the furthes
 highest rating survive. The migration is **not reversible** — take a backup first (see
 [Backup](#backup)).
 
-Afterwards, run the `reindexSearch` GraphQL mutation once: the merged persons leave stale documents
+Afterwards, run the `rebuildSearchIndex` GraphQL mutation once: the merged persons leave stale documents
 in Typesense. Featured guests on files that were never named in an artist row are picked up by a
 normal re-scan.
 
 **Extended TMDB metadata (`V45`) needs a one-time backfill.** Genres, community rating, runtime,
 tagline, certification, trailer, studios/networks, collection and keywords are only fetched when the
-movie/show/episode handlers run, so existing items stay empty until re-analyzed. After upgrading,
-run the `analyzeLibrary` GraphQL mutation once per movie and show library; the handlers overwrite
-metadata in place and the search index follows automatically (no `reindexSearch` needed — the
-`genre_<tag>` fields already exist in the collection schema).
+movie/show/episode handlers run, so existing items stay empty until refreshed. After upgrading, run
+the `refreshMetadata` GraphQL mutation once (mode `MISSING`, the default): it picks up every movie
+and show whose enrichment columns were never filled. Episode runtime/votes have no such marker —
+re-enrich existing episodes with `refreshMetadata(mode: FORCE, libraryId: …)` per show library (or
+`refreshShow` per show). The search index follows automatically (no `rebuildSearchIndex` needed —
+the `genre_<tag>` fields already exist in the collection schema).
+
+**Force refreshes leave orphaned image files behind.** The FORCE flow and the per-item `refresh*`
+mutations delete image *rows* and re-download artwork under fresh names; the old cache files are
+reclaimed by the daily cache cleanup — which only logs until `CACHE_CLEANUP_DRY_RUN=false` (see
+above).
 
 ## Troubleshooting
 
 **No metadata after a scan (bare filenames, no posters)** — almost always a missing or wrong
 TMDB key (`app.ister.server.TMDB.apikey`, an *API read access token*): metadata fetching is
-skipped without it. Set it, then run `analyzeLibrary` to backfill. Also check the dead-letter
+skipped without it. Set it, then run `refreshMetadata` to backfill. Also check the dead-letter
 queue for rate-limit or network errors.
 
 **Playback never starts / no transcode** — the server can't run FFmpeg. Verify `FFMPEG_DIR`
@@ -93,7 +100,7 @@ enabling. See [Search](05-search-typesense.md).
 **Disk filling up** — check whether cache cleanup is still in dry-run (see above), and look at
 `CACHE_DIR`/`TMP_DIR` sizes versus podcast retention and pre-transcode activity.
 
-**New files not appearing** — there is no filesystem watcher; run `scanLibrary`. If files are
+**New files not appearing** — there is no filesystem watcher; run `scanLibraries`. If files are
 found but misclassified, compare their paths against
 [the expected layout](03-libraries-and-media-layout.md).
 

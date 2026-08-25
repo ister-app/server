@@ -14,7 +14,7 @@ flowchart TD
     A --> H["HandleSearchIndexRequested\n📦 search"]
     H -->|"load entity + map\nupsert/delete document"| TS[(Typesense\nalias 'media')]
 
-    API([reindexSearch API]) --> R["SEARCH_REINDEX_REQUESTED"]
+    API([rebuildSearchIndex API]) --> R["SEARCH_REINDEX_REQUESTED"]
     R --> RH["HandleSearchReindexRequested\n📦 search"]
     RH -->|"new collection media_v<ts>\npage through all entities + import\nswap alias, drop old collections"| TS
 ```

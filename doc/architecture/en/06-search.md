@@ -38,12 +38,12 @@ Emitters:
 
 ## Full reindex
 
-The `reindexSearch` GraphQL mutation sends `SEARCH_REINDEX_REQUESTED`. The handler creates a fresh
+The `rebuildSearchIndex` GraphQL mutation sends `SEARCH_REINDEX_REQUESTED`. The handler creates a fresh
 collection (`media_v<timestamp>`), pages through all entities and imports them, then **swaps the
 alias** and drops old collections — search stays live during the rebuild.
 
 A database migration that deletes or renames entities behind the index's back — the duplicate-artist
-merge of `V43`, for instance — leaves stale person documents, so run `reindexSearch` once after
+merge of `V43`, for instance — leaves stale person documents, so run `rebuildSearchIndex` once after
 upgrading past it.
 
 ## Multilingual schema
@@ -55,7 +55,7 @@ precisely so the localized keys stay dynamic.
 
 Because the schema is fixed at collection creation, **adding a language takes two steps**: a
 re-scan/analyze (to create the new `MetadataEntity` rows, see [chapter
-3](03-media-types-and-metadata.md)) followed by `reindexSearch`.
+3](03-media-types-and-metadata.md)) followed by `rebuildSearchIndex`.
 
 ## Querying
 

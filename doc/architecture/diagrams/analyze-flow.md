@@ -1,22 +1,24 @@
-# Analyze flows (library-wide and per-item)
+# Refresh flows (backfill and per-item force refresh)
 
-## Library analyze
+## Metadata backfill
 
-Triggered by the GraphQL mutation `analyzeLibrary()` (`ScannerController`): metadata is fetched
-for everything that lacks it, and the BlurHash sweep is kicked off per directory.
+Triggered by the GraphQL mutation `refreshMetadata(MISSING)` (`MetadataRefreshController`):
+metadata is fetched for everything that lacks it (movies/shows also when their TMDB enrichment
+columns were never filled). The controller kicks the BlurHash sweep per directory itself; the
+backfill event is **global**, so it runs exactly once cluster-wide.
 
 ```mermaid
 flowchart TD
-    API([analyzeLibrary API]) -->|"per node"| A
+    API([refreshMetadata MISSING]) -->|"per directory (incl. cache)"| C["UPDATE_IMAGES_REQUESTED\n.{dirName}"]
+    API -->|"one global event"| A
 
-    A["ANALYZE_LIBRARY_REQUEST\n.{nodeName}"]
-    A --> B["AnalyzeLibraryRequestedHandle\n📦 worker"]
+    A["METADATA_BACKFILL_REQUESTED"]
+    A --> B["MetadataBackfillHandle\n📦 worker"]
 
-    B -->|"per directory (incl. cache)"| C["UPDATE_IMAGES_REQUESTED\n.{dirName}"]
-    B -->|"shows without metadata"| D["SHOW_FOUND"]
+    B -->|"shows missing metadata/enrichment"| D["SHOW_FOUND"]
     B -->|"episodes without metadata"| E["EPISODE_FOUND"]
-    B -->|"movies without metadata"| F["MOVIE_FOUND"]
-    B -->|"artists without metadata"| G["PERSON_FOUND"]
+    B -->|"movies missing metadata/enrichment"| F["MOVIE_FOUND"]
+    B -->|"artists/authors without metadata"| G["PERSON_FOUND"]
     B -->|"albums without an image"| H["ALBUM_FOUND"]
     B -->|"tracks without metadata"| I["AUDIO_FILE_FOUND\n.{dirName}"]
 
@@ -50,24 +52,27 @@ flowchart TD
     NFO1 & NFO2 --> FIN2["HandleNfoFileFound\n📦 disk\nparse XML + save"]
 ```
 
-## Per-item reanalysis
+## Force refresh (per item or per library)
 
-Triggered by GraphQL calls such as `analyzeShow(id)`, `analyzeMovie(id)`, `analyzeEpisode(id)`, etc.
+Triggered by `refreshMetadata(FORCE, libraryId)` and the per-item calls `refreshShow(id)`,
+`refreshMovie(id)`, `refreshEpisode(id)`, `refreshPerson(id)`, `refreshAlbum(id)`,
+`refreshTrack(id)`. Destructive: stored metadata/artwork/stream info is deleted first, then
+everything is re-fetched.
 
 ```mermaid
 flowchart TD
-    API([analyzeItem API]) --> A
+    API([refresh* API]) --> A
 
     A["ANALYZE_DATA\nglobal or .{dirName}"]
 
     A --> W["AnalyzeDataHandle\n📦 worker"]
     A --> D["HandleAnalyzeDataDisk\n📦 disk"]
 
-    W -->|Library| W1["cascade to all\nshows / movies / artists"]
+    W -->|Library| W1["cascade per type:\nshows / movies / artists /\nauthors / comic series"]
     W -->|Show| W2["clears metadata\nSHOW_FOUND\n+ cascade to episodes"]
     W -->|Episode| W3["clears metadata +\nimages + streams\nEPISODE_FOUND\n+ ANALYZE_DATA.{dirName}"]
     W -->|Movie| W4["clears metadata +\nimages + streams\nMOVIE_FOUND\n+ ANALYZE_DATA.{dirName}"]
-    W -->|Artist| W5["PERSON_FOUND\n+ cascade to albums"]
+    W -->|Person| W5["PERSON_FOUND (global + per node)\n+ cascade to albums and books"]
     W -->|Album| W6["ALBUM_FOUND\n+ cascade to tracks"]
     W -->|Track| W7["AUDIO_FILE_FOUND.{dirName}"]
 

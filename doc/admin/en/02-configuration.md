@@ -36,7 +36,7 @@ dedicated short env var, listed below. Defaults are sensible for a single-node h
 | `app.ister.server.TMDB.apikey` | `APP_ISTER_SERVER_TMDB_APIKEY` | unset | TMDB **API read access token**. Without it, movie/show metadata fetching is skipped — you get bare filenames. |
 | `app.ister.server.TMDB.max-requests-per-second` | | `30` | stays under TMDB's ~40 rps limit |
 | `app.ister.worker.tmdb.certification-country` | | `US` | ISO 3166-1 country whose certification/content rating (e.g. `16`, `PG-13`, `TV-MA`) is stored on movies and shows; falls back to US, then any country that has one. |
-| `app.ister.languages` | `ISTER_LANGUAGES` | `en,nl` | comma-separated ISO-639-1 tags; first = primary. Drives which languages metadata is fetched in **and** which languages search indexes. Changing it requires a re-scan plus `reindexSearch` — see [Search](05-search-typesense.md). |
+| `app.ister.languages` | `ISTER_LANGUAGES` | `en,nl` | comma-separated ISO-639-1 tags; first = primary. Drives which languages metadata is fetched in **and** which languages search indexes. Changing it requires a re-scan plus `rebuildSearchIndex` — see [Search](05-search-typesense.md). |
 
 ## Search (Typesense)
 

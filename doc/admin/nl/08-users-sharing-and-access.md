@@ -28,8 +28,8 @@ serverherstart is niet nodig — het wordt actief bij de volgende login van die 
 Alles is beschikbaar voor elke geauthenticeerde gebruiker, **behalve** deze admin-only-operaties
 (afgedwongen met `@PreAuthorize("hasRole('admin')")`):
 
-- Libraries scannen en analyseren — `scanLibrary`, `analyzeLibrary` en de `analyzeData…`-mutations
-- Zoekonderhoud — `reindexSearch`
+- Libraries scannen en metadata verversen — `scanLibraries`, `refreshMetadata` en de per-item `refresh…`-mutations
+- Zoekonderhoud — `rebuildSearchIndex`
 - Podcastabonnementen — `subscribePodcast`, `unsubscribePodcast`
 - Beheer van librarytoegang — `setLibraryVisibleToAll`, `setUserLibraryAccess`
 - De volledige `users`-lijst

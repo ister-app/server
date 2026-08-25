@@ -4,9 +4,10 @@ description: Hoe Ister medialibraries scant en analyseert, van startup-bootstrap
 
 # Scannen en analyseren
 
-Twee losse flows vullen de database: **scannen** registreert wat er op disk staat, **analyseren**
-verrijkt dat met metadata van externe providers. Beide worden getriggerd vanuit `ScannerController`
-(GraphQL-mutations `scanLibrary()` / `analyzeLibrary()`), plus heranalyse-mutations per item.
+Twee losse flows vullen de database: **scannen** registreert wat er op disk staat
+(GraphQL-mutation `scanLibraries(libraryId?)`, `ScannerController`), **metadata verversen**
+verrijkt dat met metadata van externe providers (`refreshMetadata(mode, libraryId?)` en de
+per-item `refresh*`-mutations, `MetadataRefreshController`).
 
 ## Startup-bootstrap
 
@@ -18,7 +19,7 @@ maakt de cache-directories op disk aan en valideert de multi-node-configuratie. 
 
 ## Library scannen
 
-Zie het [scan-flow-diagram](../diagrams/scan-flow.md). `scanLibrary()` stuurt per directory een
+Zie het [scan-flow-diagram](../diagrams/scan-flow.md). `scanLibraries()` stuurt per directory een
 `NEW_DIRECTORIES_SCAN_REQUEST`; de disk-handler loopt door het filesystem en stuurt per bestand één
 `FILE_SCAN_REQUESTED`. `FileScanRequestedHandle` routeert op extensie (en library-type):
 
@@ -136,23 +137,36 @@ multi-episode-bestand nooit over een chunkgrens vallen), en publiceert `HandleDe
 ná die commit een opvolgerbericht voor hetzelfde seizoen. De versiekolom is de cursor en wordt ook
 bij een mislukte decode gestempeld, dus de keten termineert altijd.
 
-## Library analyseren
+## Metadata-backfill
 
-Zie het [analyze-flow-diagram](../diagrams/analyze-flow.md). `analyzeLibrary()` stuurt per node een
-`ANALYZE_LIBRARY_REQUEST`; de worker zoekt alles op waar metadata of afbeeldingen **ontbreken** en
-waaiert uit: `SHOW_FOUND` / `EPISODE_FOUND` / `MOVIE_FOUND` (TMDB), `PERSON_FOUND` / `ALBUM_FOUND`
-(MusicBrainz + NFO-lookup aan de disk-kant), `AUDIO_FILE_FOUND` voor tracks zonder metadata, en
-`UPDATE_IMAGES_REQUESTED` per directory voor de BlurHash-sweep. De pijplijnen per type staan in
+Zie het [refresh-flow-diagram](../diagrams/analyze-flow.md). `refreshMetadata(MISSING)` stuurt één
+**globaal** `METADATA_BACKFILL_REQUESTED`-event (precies één worker consumeert het, dus de backfill
+draait één keer cluster-breed; vroeger liep hij per node, wat op multi-node al het globaal
+gequery'de boek-/comic-/muziek-/persoonswerk dupliceerde). `MetadataBackfillHandle` zoekt alles op
+waar metadata, afbeeldingen of TMDB-verrijking **ontbreken** (films/shows matchen ook wanneer hun
+`tmdbId` nooit gevuld is — de V45-backfill-marker) en waaiert uit: `SHOW_FOUND` / `EPISODE_FOUND` /
+`MOVIE_FOUND` (TMDB), `PERSON_FOUND` / `ALBUM_FOUND` (MusicBrainz + NFO-lookup aan de disk-kant),
+`AUDIO_FILE_FOUND` voor tracks, `BOOK_FOUND`/`EPUB_FILE_FOUND` voor boeken, `COMIC_SERIES_FOUND`/
+`COMIC_FILE_FOUND` voor comics; een optionele `libraryId` beperkt alles tot één bibliotheek. De
+controller stuurt zelf `UPDATE_IMAGES_REQUESTED` per directory voor de BlurHash-sweep (die queues
+zijn al directory-scoped, dus het werk landt op de eigenaarsnode). De stappen draaien in aparte
+transacties in `MetadataBackfillService`; de boekserie-heuristiek draait één keer cluster-breed in
+een eigen schrijftransactie. De pijplijnen per type staan in
 [hoofdstuk 3](03-media-types-and-metadata.md).
 
-## Heranalyse per item
+## Force refresh (per item of per bibliotheek)
 
-Mutations als `analyzeShow(id)` en `analyzeMovie(id)` sturen `ANALYZE_DATA`, dat door **twee**
-handlers geconsumeerd wordt: `AnalyzeDataHandle` (worker) wist de metadata/afbeeldingen/streams van
-het item en cascadeert — een library waaiert uit naar al zijn shows/films/artiesten, een show naar
-zijn afleveringen, een album naar zijn tracks — en vuurt de `*_FOUND`-events opnieuw af;
-`HandleAnalyzeDataDisk` (disk) wist de HLS-cache en stuurt de bestandsniveau-events opnieuw
-(`MEDIA_FILE_FOUND`/`AUDIO_FILE_FOUND`, `NFO_FILE_FOUND`, `SUBTITLE_FILE_FOUND`).
+`refreshMetadata(FORCE, libraryId)` en de per-item-mutations (`refreshShow(id)`,
+`refreshMovie(id)`, …) sturen `ANALYZE_DATA`, dat door **twee** handlers geconsumeerd wordt:
+`AnalyzeDataHandle` (worker) wist de metadata/afbeeldingen/streams van het item en cascadeert —
+een library waaiert uit per type (shows, films, artiesten, boekauteurs, comicseries), een show
+naar zijn afleveringen, een persoon naar zijn albums *én* boeken, een album naar zijn tracks — en
+vuurt de `*_FOUND`-events opnieuw af (personen krijgen zowel de globale send voor de externe
+verrijking als de node-scoped send voor de artist.nfo-herparse); `HandleAnalyzeDataDisk` (disk)
+wist de HLS-cache en stuurt de bestandsniveau-events opnieuw
+(`MEDIA_FILE_FOUND`/`AUDIO_FILE_FOUND`, `NFO_FILE_FOUND`, `SUBTITLE_FILE_FOUND`). Verwijderde
+image-rijen laten hun cachebestanden achter (cross-node unlinken is onveilig); de dagelijkse
+cache-opschoning ruimt ze op.
 
 De `*_FOUND`-events worden pas gepubliceerd **nadat de wipe gecommit is**
 (`AfterCommitPublisher.publishAfterCommit`): hun consumers controleren op bestaande metadata- en

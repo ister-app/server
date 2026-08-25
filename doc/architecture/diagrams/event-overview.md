@@ -6,9 +6,9 @@ for the details of each path.
 ```mermaid
 graph LR
     subgraph Triggers
-        T1([scanLibrary API])
-        T2([analyzeLibrary API])
-        T3([analyzeItem API])
+        T1([scanLibraries API])
+        T2([refreshMetadata API])
+        T3([refresh* API])
         T4([Periodic task])
         T5([Playback])
     end
@@ -32,7 +32,7 @@ graph LR
     end
 
     subgraph worker module
-        W1[AnalyzeLibraryRequestedHandle]
+        W1[MetadataBackfillHandle]
         W2[AnalyzeDataHandle]
         W3[HandleShowFound]
         W4[HandleEpisodeFound]
@@ -87,7 +87,7 @@ graph LR
     T4 --> W10 --> H15 --> H4
     T4 --> W11
 
-    T6([reindexSearch API]) --> S2
+    T6([rebuildSearchIndex API]) --> S2
     W3 & W5 & W7 & H4 -.->|SEARCH_INDEX_REQUESTED| S1
 ```
 

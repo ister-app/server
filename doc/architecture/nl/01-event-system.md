@@ -48,9 +48,9 @@ base-URL zitten.
 
 | Scope | Events |
 | --- | --- |
-| **Node** `.{nodeName}` | `ANALYZE_LIBRARY_REQUEST` |
+| **Node** `.{nodeName}` | — |
 | **Directory** `.{dirName}` | `NEW_DIRECTORIES_SCAN_REQUEST`, `FILE_SCAN_REQUESTED`, `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `EPUB_FILE_FOUND`, `COMIC_FILE_FOUND`, `SUBTITLE_FILE_FOUND`, `IMAGE_FOUND`, `NFO_FILE_FOUND`, `UPDATE_IMAGES_REQUESTED`, `ANALYZE_DATA` (disk), `PRE_TRANSCODE_RECENTLY_WATCHED`, `TRANSCODE_REQUESTED`, `TRANSCODE_PASS_REQUESTED` |
-| **Globaal** | `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND`, `ALBUM_FOUND`, `BOOK_FOUND`, `COMIC_SERIES_FOUND`, `CHAPTER_FOUND` (geen consumer), `PODCAST_FOUND` (geen consumer), `PODCAST_EPISODE_FOUND` (geen consumer), `PODCAST_REFRESH_REQUESTED`, `CONTINUE_WATCHING_REBUILD_REQUESTED`, `ANALYZE_DATA` (worker), `SEARCH_INDEX_REQUESTED`, `SEARCH_REINDEX_REQUESTED` |
+| **Globaal** | `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND`, `ALBUM_FOUND`, `BOOK_FOUND`, `COMIC_SERIES_FOUND`, `CHAPTER_FOUND` (geen consumer), `PODCAST_FOUND` (geen consumer), `PODCAST_EPISODE_FOUND` (geen consumer), `PODCAST_REFRESH_REQUESTED`, `CONTINUE_WATCHING_REBUILD_REQUESTED`, `ANALYZE_DATA` (worker), `METADATA_BACKFILL_REQUESTED`, `SEARCH_INDEX_REQUESTED`, `SEARCH_REINDEX_REQUESTED` |
 | **Cache-directory** `.{nodeName}-cache-directory` | `PODCAST_EPISODE_DOWNLOAD_REQUESTED` (de download landt op de disk van die node) |
 
 `PRE_TRANSCODE_RECENTLY_WATCHED` is gescoped op disknaam in plaats van directorynaam (zie
@@ -75,7 +75,7 @@ base-URL zitten.
 | `HandlePersonFound` | disk | `PERSON_FOUND` | `NFO_FILE_FOUND` |
 | `HandleAlbumFound` | disk | `ALBUM_FOUND` | `NFO_FILE_FOUND`, `FILE_SCAN_REQUESTED` (heringest van lokale albumartwork zoals `cover.jpg`) |
 | `HandlePodcastEpisodeDownloadRequested` | disk | `PODCAST_EPISODE_DOWNLOAD_REQUESTED` | `AUDIO_FILE_FOUND` (op de cache-dir-queue → ffprobe + HLS-pregeneratie) |
-| `AnalyzeLibraryRequestedHandle` | worker | `ANALYZE_LIBRARY_REQUEST` | `UPDATE_IMAGES_REQUESTED`, `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND`, `ALBUM_FOUND`, `AUDIO_FILE_FOUND` |
+| `MetadataBackfillHandle` | worker | `METADATA_BACKFILL_REQUESTED` | `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND`, `ALBUM_FOUND`, `AUDIO_FILE_FOUND`, `BOOK_FOUND`, `COMIC_SERIES_FOUND`, `EPUB_FILE_FOUND`, `COMIC_FILE_FOUND`, `NFO_FILE_FOUND` |
 | `AnalyzeDataHandle` | worker | `ANALYZE_DATA` | cascade per entiteitstype |
 | `HandleShowFound` | worker | `SHOW_FOUND` | `IMAGE_FOUND` (+ cast credits direct in de database) |
 | `HandleEpisodeFound` | worker | `EPISODE_FOUND` | `IMAGE_FOUND` (+ cast/guest-star credits direct in de database) |

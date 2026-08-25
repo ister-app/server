@@ -23,7 +23,7 @@ titels, beschrijvingen en genres.
    TYPESENSE_API_KEY=<the key Typesense was started with>
    ```
 
-3. Herstart de server en draai dan eenmalig de GraphQL-mutation **`reindexSearch`** om de
+3. Herstart de server en draai dan eenmalig de GraphQL-mutation **`rebuildSearchIndex`** om de
    initiële index op te bouwen. Tot je dat doet is bestaande media niet doorzoekbaar — alleen
    items die na het inschakelen worden aangeraakt zouden binnendruppelen.
 
@@ -40,7 +40,7 @@ zichzelf:
 - metadataverrijking (TMDB en consorten) werkt het item bij zodra die binnenkomt,
 - verwijderingen halen het item uit de index.
 
-`reindexSearch` blijft het reparatiegereedschap: het bouwt opnieuw op in een **verse collectie
+`rebuildSearchIndex` blijft het reparatiegereedschap: het bouwt opnieuw op in een **verse collectie
 en wisselt een alias om**, zodat zoeken live blijft tijdens de rebuild. Grijp ernaar na het
 inschakelen van zoeken op een bestaande database, na het terugzetten van een databaseback-up,
 of als de index er ooit niet synchroon uitziet.
@@ -52,9 +52,9 @@ collectieschema ligt **vast bij aanmaak**, dus een taalwijziging is een kleine p
 
 1. Werk `ISTER_LANGUAGES` bij (bijv. `en,nl,de`) en herstart de server(s).
 2. Haal metadata opnieuw op zodat de rijen van de nieuwe taal in PostgreSQL bestaan: draai de
-   mutation `analyzeLibrary` (of een re-scan) — de index kan alleen metadata tonen die in de
+   mutation `refreshMetadata` (of een re-scan) — de index kan alleen metadata tonen die in de
    database bestaat.
-3. Draai eenmalig `reindexSearch`. Dat maakt een verse collectie met het nieuwe schema en
+3. Draai eenmalig `rebuildSearchIndex`. Dat maakt een verse collectie met het nieuwe schema en
    wisselt de alias om.
 
 Een taal verwijderen is hetzelfde minus stap 2: herindexeren laat de velden simpelweg vallen;
@@ -63,11 +63,11 @@ er wordt niets uit PostgreSQL verwijderd.
 ## Probleemoplossing
 
 - **Zoeken geeft helemaal niets terug** — óf `TYPESENSE_ENABLED` staat nog op `false`, óf de
-  API-key is verkeerd, óf `reindexSearch` is na het inschakelen nooit gedraaid. Het serverlog
+  API-key is verkeerd, óf `rebuildSearchIndex` is na het inschakelen nooit gedraaid. Het serverlog
   toont verbindingsfouten bij het opstarten en bij elke indexeerpoging.
 - **Nieuwe taal niet doorzoekbaar** — je hebt stap 2 of 3 hierboven overgeslagen.
 - **De index overleeft serverherstarts**, maar leeft alleen in de datamap van Typesense; raak
-  je dat volume kwijt, dan bouwt één `reindexSearch` alles opnieuw op uit PostgreSQL. Hij is
+  je dat volume kwijt, dan bouwt één `rebuildSearchIndex` alles opnieuw op uit PostgreSQL. Hij is
   wegwerpbaar — zie [Onderhoud](06-maintenance-and-troubleshooting.md#back-up).
 
 Hoe het indexeren intern werkt staat beschreven in de

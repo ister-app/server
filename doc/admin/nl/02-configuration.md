@@ -37,7 +37,7 @@ een single-node thuisopstelling.
 | `app.ister.server.TMDB.apikey` | `APP_ISTER_SERVER_TMDB_APIKEY` | niet gezet | TMDB **API read access token**. Zonder deze wordt het ophalen van film-/seriemetadata overgeslagen — je krijgt kale bestandsnamen. |
 | `app.ister.server.TMDB.max-requests-per-second` | | `30` | blijft onder TMDB's limiet van ~40 rps |
 | `app.ister.worker.tmdb.certification-country` | | `US` | ISO 3166-1-land waarvan de keuring/leeftijdsclassificatie (bv. `16`, `PG-13`, `TV-MA`) bij films en shows wordt opgeslagen; valt terug op US en daarna op een willekeurig land dat er een heeft. |
-| `app.ister.languages` | `ISTER_LANGUAGES` | `en,nl` | kommagescheiden ISO-639-1-tags; de eerste = primair. Bepaalt in welke talen metadata wordt opgehaald **én** welke talen de zoekindex krijgt. Wijzigen vereist een re-scan plus `reindexSearch` — zie [Zoeken](05-search-typesense.md). |
+| `app.ister.languages` | `ISTER_LANGUAGES` | `en,nl` | kommagescheiden ISO-639-1-tags; de eerste = primair. Bepaalt in welke talen metadata wordt opgehaald **én** welke talen de zoekindex krijgt. Wijzigen vereist een re-scan plus `rebuildSearchIndex` — zie [Zoeken](05-search-typesense.md). |
 
 ## Zoeken (Typesense)
 

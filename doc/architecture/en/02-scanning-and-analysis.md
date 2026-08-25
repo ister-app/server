@@ -4,9 +4,10 @@ description: How Ister scans media libraries and analyzes them for metadata, fro
 
 # Scanning and analysis
 
-Two distinct flows populate the database: **scanning** registers what is on disk, **analyzing**
-enriches it with metadata from external providers. Both are triggered from `ScannerController`
-(GraphQL mutations `scanLibrary()` / `analyzeLibrary()`), plus per-item reanalysis mutations.
+Two distinct flows populate the database: **scanning** registers what is on disk (GraphQL
+mutation `scanLibraries(libraryId?)`, `ScannerController`), **metadata refresh** enriches it with
+metadata from external providers (`refreshMetadata(mode, libraryId?)` and the per-item `refresh*`
+mutations, `MetadataRefreshController`).
 
 ## Startup bootstrap
 
@@ -17,7 +18,7 @@ validates the multi-node configuration. See the [startup diagram](../diagrams/st
 
 ## Library scan
 
-See the [scan-flow diagram](../diagrams/scan-flow.md). `scanLibrary()` sends
+See the [scan-flow diagram](../diagrams/scan-flow.md). `scanLibraries()` sends
 `NEW_DIRECTORIES_SCAN_REQUEST` per directory; the disk handler walks the filesystem and emits one
 `FILE_SCAN_REQUESTED` per file. `FileScanRequestedHandle` routes on extension (and library type):
 
@@ -126,22 +127,35 @@ multi-episode file never straddle a chunk boundary), and `HandleDetectSegments` 
 successor message for the same season only after that commit. The version column is the cursor,
 and it is stamped even when decoding fails, so the chain always terminates.
 
-## Library analyze
+## Metadata backfill
 
-See the [analyze-flow diagram](../diagrams/analyze-flow.md). `analyzeLibrary()` sends
-`ANALYZE_LIBRARY_REQUEST` per node; the worker finds everything **missing** metadata or images and
-fans out: `SHOW_FOUND` / `EPISODE_FOUND` / `MOVIE_FOUND` (TMDB), `PERSON_FOUND` / `ALBUM_FOUND`
-(MusicBrainz + NFO lookup on the disk side), `AUDIO_FILE_FOUND` for tracks without metadata, and
-`UPDATE_IMAGES_REQUESTED` per directory for the BlurHash sweep. The per-type pipelines are covered
-in [chapter 3](03-media-types-and-metadata.md).
+See the [refresh-flow diagram](../diagrams/analyze-flow.md). `refreshMetadata(MISSING)` sends one
+**global** `METADATA_BACKFILL_REQUESTED` event (consumed by exactly one worker, so the backfill
+runs once cluster-wide; it used to run per node, which duplicated all globally-queried book/comic/
+music/person work on multi-node installs). `MetadataBackfillHandle` finds everything **missing**
+metadata, artwork or TMDB enrichment (movies/shows also match when their `tmdbId` was never
+filled — the V45 backfill marker) and fans out: `SHOW_FOUND` / `EPISODE_FOUND` / `MOVIE_FOUND`
+(TMDB), `PERSON_FOUND` / `ALBUM_FOUND` (MusicBrainz + NFO lookup on the disk side),
+`AUDIO_FILE_FOUND` for tracks, `BOOK_FOUND`/`EPUB_FILE_FOUND` for books, `COMIC_SERIES_FOUND`/
+`COMIC_FILE_FOUND` for comics, and an optional `libraryId` scopes everything to one library. The
+controller sends `UPDATE_IMAGES_REQUESTED` per directory for the BlurHash sweep itself (those
+queues are directory-scoped, so the work lands on the owning node). The steps run in separate
+transactions in `MetadataBackfillService`; the book-series heuristic runs once cluster-wide in its
+own write transaction. The per-type pipelines are covered in
+[chapter 3](03-media-types-and-metadata.md).
 
-## Per-item reanalysis
+## Force refresh (per item or per library)
 
-Mutations like `analyzeShow(id)` and `analyzeMovie(id)` send `ANALYZE_DATA`, consumed by **two**
-handlers: `AnalyzeDataHandle` (worker) wipes the item's metadata/images/streams and cascades — a
-library fans out to all its shows/movies/artists, a show to its episodes, an album to its tracks —
-re-firing the `*_FOUND` events; `HandleAnalyzeDataDisk` (disk) clears the HLS cache and re-emits the
-file-level events (`MEDIA_FILE_FOUND`/`AUDIO_FILE_FOUND`, `NFO_FILE_FOUND`, `SUBTITLE_FILE_FOUND`).
+`refreshMetadata(FORCE, libraryId)` and the per-item mutations (`refreshShow(id)`,
+`refreshMovie(id)`, …) send `ANALYZE_DATA`, consumed by **two** handlers: `AnalyzeDataHandle`
+(worker) wipes the item's metadata/images/streams and cascades — a library fans out per type
+(shows, movies, artists, book authors, comic series), a show to its episodes, a person to their
+albums *and* books, an album to its tracks — re-firing the `*_FOUND` events (persons get both the
+global send for the external enrichment and the node-scoped send for the artist.nfo re-parse);
+`HandleAnalyzeDataDisk` (disk) clears the HLS cache and re-emits the file-level events
+(`MEDIA_FILE_FOUND`/`AUDIO_FILE_FOUND`, `NFO_FILE_FOUND`, `SUBTITLE_FILE_FOUND`). Deleted image
+rows leave their cache files behind (unlinking cross-node is unsafe); the daily cache cleanup
+reclaims them.
 
 The `*_FOUND` events are published **after the wipe has committed**
 (`AfterCommitPublisher.publishAfterCommit`): their consumers check for existing metadata/image rows

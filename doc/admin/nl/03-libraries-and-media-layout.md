@@ -91,17 +91,19 @@ Een `PODCAST`-library heeft **helemaal geen directory** nodig — hij is feed-ge
 
 ## Scannen en analyseren
 
-Twee GraphQL-mutations (ook beschikbaar in de beheerschermen van de client):
+De onderhouds-mutations (ook beschikbaar in de beheerschermen van de client):
 
-- **`scanLibrary`** — loopt door de directories, registreert nieuwe/gewijzigde bestanden en
-  start het ophalen van metadata voor alles wat nieuw is. Draai dit na het toevoegen van media;
-  er is geen filesystem-watcher.
-- **`analyzeLibrary`** — verwerkt opnieuw wat al bekend is: probet mediabestanden op streams,
-  regenereert afgeleide data en vult metadata aan die eerdere scans hebben gemist (bijvoorbeeld
-  nadat je een TMDB-key of een taal toevoegt). Het ontdekt geen nieuwe bestanden.
+| Actie | Wanneer | Kosten |
+| --- | --- | --- |
+| `scanLibraries(libraryId?)` | Er zijn nieuwe bestanden toegevoegd — er is geen filesystem-watcher. Optioneel per bibliotheek. | Goedkoop; bekende bestanden worden overgeslagen. |
+| `refreshMetadata(MISSING, libraryId?)` | Backfill: haal metadata/afbeeldingen alleen op waar ze ontbreken (bv. na het toevoegen van een TMDB-key), bereken ontbrekende blur-hashes. | Goedkoop en idempotent; altijd veilig. |
+| `refreshMetadata(FORCE, libraryId)` | Eén bibliotheek opnieuw opbouwen: opgeslagen metadata, afbeeldingen en streaminfo wissen en alles opnieuw ophalen (bv. na een verkeerde match, of om nieuwe velden op oude items te vullen). | Zwaar: een externe fetch per item, ffprobe per bestand. |
+| `refreshMovie/Show/Episode/Person/Album/Track(id)` | Dezelfde wipe-en-herfetch voor één item (het ⋮-menu op de detailpagina). | Eén item (een show waaiert uit naar zijn afleveringen). |
+| `rebuildSearchIndex` | De Typesense-index opnieuw opbouwen in een verse collectie (na het inschakelen van zoeken of het wijzigen van talen). | Leest de hele database één keer; zoeken blijft beschikbaar. |
 
-Beide zijn asynchroon — ze zetten events in de queue en keren meteen terug; de voortgang is
-zichtbaar in het activiteitenscherm van de client. De details van de pipeline staan in de
+Alle zijn asynchroon — ze zetten events in de queue en keren meteen terug; de voortgang is
+zichtbaar in het activiteitenscherm van de client. Een scan haalt **geen** metadata opnieuw op voor
+bestaande items, en een MISSING-verversing raakt items die al compleet zijn niet aan. De details van de pipeline staan in de
 [architectuurdocumentatie](../../architecture/nl/02-scanning-and-analysis.md).
 
 ## Verder lezen

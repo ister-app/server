@@ -34,9 +34,9 @@ op te bouwen:
 
 | Data | Waar | Herstel |
 | --- | --- | --- |
-| Afbeeldingscache, podcastdownloads | `CACHE_DIR` | re-scan / `analyzeLibrary`; podcasts worden opnieuw gedownload |
+| Afbeeldingscache, podcastdownloads | `CACHE_DIR` | re-scan / `refreshMetadata`; podcasts worden opnieuw gedownload |
 | HLS-segmenten | `TMP_DIR` | worden op verzoek opnieuw getranscodeerd |
-| Typesense-index | Typesense-volume | één `reindexSearch`-mutation |
+| Typesense-index | Typesense-volume | één `rebuildSearchIndex`-mutation |
 | RabbitMQ-queues | broker | vluchtig werk; een verloren bericht vertraagt hooguit metadata tot de volgende scan |
 
 Dus: `pg_dump` op een schema, en doe geen moeite om de caches te back-uppen.
@@ -63,23 +63,31 @@ zonder hoofdlettergevoeligheid. Kijkgeschiedenis en ratings blijven behouden: wa
 botsen, winnen de verste voortgang en de hoogste rating. De migratie is **niet omkeerbaar** — maak
 eerst een back-up (zie [Back-up](#back-up)).
 
-Draai daarna één keer de GraphQL-mutation `reindexSearch`: de samengevoegde personen laten
+Draai daarna één keer de GraphQL-mutation `rebuildSearchIndex`: de samengevoegde personen laten
 verouderde documenten in Typesense achter. Featured gasten in bestanden die nooit in een
 artiestenrij stonden, komen mee met een gewone hersan.
 
 **Uitgebreide TMDB-metadata (`V45`) vereist een eenmalige backfill.** Genres, community-rating,
 speelduur, tagline, keuring, trailer, studio's/netwerken, collectie en keywords worden alleen
 opgehaald wanneer de film-/show-/afleveringshandlers draaien; bestaande items blijven dus leeg tot
-een heranalyse. Draai na de upgrade één keer de GraphQL-mutation `analyzeLibrary` per film- en
-showbibliotheek; de handlers overschrijven de metadata ter plekke en de zoekindex volgt automatisch
-(geen `reindexSearch` nodig — de `genre_<tag>`-velden bestaan al in het collectieschema).
+een verversing. Draai na de upgrade één keer de GraphQL-mutation `refreshMetadata` (mode `MISSING`,
+de standaard): die pakt elke film en show op waarvan de verrijkingskolommen nooit gevuld zijn.
+Speelduur/stemmen van afleveringen hebben zo'n marker niet — ververs bestaande afleveringen met
+`refreshMetadata(mode: FORCE, libraryId: …)` per showbibliotheek (of `refreshShow` per show). De
+zoekindex volgt automatisch (geen `rebuildSearchIndex` nodig — de `genre_<tag>`-velden bestaan al
+in het collectieschema).
+
+**Force-verversingen laten verweesde afbeeldingsbestanden achter.** De FORCE-flow en de per-item
+`refresh*`-mutations verwijderen afbeeldings-*rijen* en downloaden artwork onder nieuwe namen; de
+oude cachebestanden worden opgeruimd door de dagelijkse cache-opschoning — die alleen logt tot
+`CACHE_CLEANUP_DRY_RUN=false` (zie hierboven).
 
 ## Probleemoplossing
 
 **Geen metadata na een scan (kale bestandsnamen, geen posters)** — vrijwel altijd een
 ontbrekende of verkeerde TMDB-key (`app.ister.server.TMDB.apikey`, een *API read access token*):
 zonder die wordt het ophalen van metadata overgeslagen. Stel hem in en draai dan
-`analyzeLibrary` om aan te vullen. Controleer ook de dead-letter-queue op rate-limit- of
+`refreshMetadata` om aan te vullen. Controleer ook de dead-letter-queue op rate-limit- of
 netwerkfouten.
 
 **Afspelen start nooit / geen transcode** — de server kan FFmpeg niet draaien. Controleer of
@@ -99,7 +107,7 @@ nooit geherindexeerd. Zie [Zoeken](05-search-typesense.md).
 en kijk naar de grootte van `CACHE_DIR`/`TMP_DIR` in verhouding tot podcastretentie en
 pre-transcode-activiteit.
 
-**Nieuwe bestanden verschijnen niet** — er is geen filesystem-watcher; draai `scanLibrary`.
+**Nieuwe bestanden verschijnen niet** — er is geen filesystem-watcher; draai `scanLibraries`.
 Worden bestanden wel gevonden maar verkeerd geclassificeerd, vergelijk hun paden dan met
 [de verwachte indeling](03-libraries-and-media-layout.md).
 

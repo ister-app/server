@@ -169,4 +169,4 @@ the RSS feed and downloaded into the cache; see [chapter 3](03-libraries-and-med
 2. Check the depth: episodes must sit in `Show (year)/Season N/`, comic volumes directly in their
    series folder — one level too deep or too shallow means invisible.
 3. Check the extension against the lists above — anything else is skipped without an error.
-4. After renaming, run `scanLibrary` again; renames are only picked up by a new scan.
+4. After renaming, run `scanLibraries` again; renames are only picked up by a new scan.

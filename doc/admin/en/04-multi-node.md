@@ -68,7 +68,7 @@ Points to copy from it: each node has its **own** `CACHE_DIR`, its own published
 
 - The client's cluster page (Settings → Cluster) shows every node and its health — the fastest
   "is everything up?" check.
-- Scans, metadata and cleanup run per node for the directories it owns; you trigger `scanLibrary`
+- Scans, metadata and cleanup run per node for the directories it owns; you trigger `scanLibraries`
   once and each node picks up its share.
 - For the internals of cross-node transcoding, see the
   [architecture documentation](../../architecture/en/04-transcoding.md).
