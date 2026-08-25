@@ -104,4 +104,7 @@ public class MetadataEntity extends BaseEntity {
     private LocalDate released;
     @Setter
     private String genre;
+    @Setter
+    @Column(columnDefinition = "text")
+    private String tagline;
 }

@@ -4,8 +4,10 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Entity
@@ -37,4 +39,13 @@ public class EpisodeEntity extends BaseEntity {
 
     @Column(nullable = false)
     private int number;
+
+    /** Runtime in minutes, from TMDB; null until analyzed. */
+    @Setter
+    private Integer runtime;
+    @Setter
+    @Column(precision = 3, scale = 1)
+    private BigDecimal voteAverage;
+    @Setter
+    private Integer voteCount;
 }
