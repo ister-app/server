@@ -1,5 +1,24 @@
 # Changelog
 
+## server v2.20.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `2.20.0` |
+| `ghcr.io/ister-app/migrations` | `2.20.0` |
+
+### Features
+
+- feat(history): per-item playback history with delete and mark-played ([`1ebb8a7`](https://github.com/ister-app/server/commit/1ebb8a7))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:2.20.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.19.0...v2.20.0
+
 ## server v2.19.0
 
 | Image | Tag |
