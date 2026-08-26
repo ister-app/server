@@ -19,6 +19,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -53,7 +54,7 @@ class FileControllerTest {
         when(imageEntity.getPath()).thenReturn(imageFile.toString());
         when(imageRepository.findById(id)).thenReturn(Optional.of(imageEntity));
 
-        ResponseEntity<InputStreamResource> response = controller.downloadImage(id);
+        ResponseEntity<InputStreamResource> response = controller.downloadImage(id, null);
 
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
@@ -68,7 +69,7 @@ class FileControllerTest {
         when(imageEntity.getPath()).thenReturn(tempDir.resolve("nonexistent.jpg").toString());
         when(imageRepository.findById(id)).thenReturn(Optional.of(imageEntity));
 
-        ResponseEntity<InputStreamResource> response = controller.downloadImage(id);
+        ResponseEntity<InputStreamResource> response = controller.downloadImage(id, null);
 
         assertEquals(404, response.getStatusCode().value());
     }
@@ -84,11 +85,68 @@ class FileControllerTest {
         when(imageEntity.getPath()).thenReturn(imageFile.toString());
         when(imageRepository.findById(id)).thenReturn(Optional.of(imageEntity));
 
-        ResponseEntity<InputStreamResource> response = controller.downloadImage(id);
+        ResponseEntity<InputStreamResource> response = controller.downloadImage(id, null);
 
         // Must not throw; content type resolved to a non-null value
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getHeaders().getContentType());
+    }
+
+    @Test
+    void downloadImageIsCacheableAndCarriesAnETag() throws IOException {
+        UUID id = UUID.randomUUID();
+        Path imageFile = tempDir.resolve("cover.jpg");
+        Files.writeString(imageFile, "fake image data");
+
+        ImageEntity imageEntity = mock(ImageEntity.class);
+        when(imageEntity.getPath()).thenReturn(imageFile.toString());
+        when(imageRepository.findById(id)).thenReturn(Optional.of(imageEntity));
+
+        ResponseEntity<InputStreamResource> response = controller.downloadImage(id, null);
+
+        assertNotNull(response.getHeaders().getETag());
+        assertEquals("private, max-age=86400", response.getHeaders().getCacheControl());
+    }
+
+    @Test
+    void downloadImageReturns304ForAMatchingETag() throws IOException {
+        UUID id = UUID.randomUUID();
+        Path imageFile = tempDir.resolve("cover.jpg");
+        Files.writeString(imageFile, "fake image data");
+
+        ImageEntity imageEntity = mock(ImageEntity.class);
+        when(imageEntity.getPath()).thenReturn(imageFile.toString());
+        when(imageRepository.findById(id)).thenReturn(Optional.of(imageEntity));
+
+        String etag = controller.downloadImage(id, null).getHeaders().getETag();
+        ResponseEntity<InputStreamResource> notModified = controller.downloadImage(id, etag);
+
+        assertEquals(304, notModified.getStatusCode().value());
+        assertNull(notModified.getBody());
+        assertEquals(etag, notModified.getHeaders().getETag());
+    }
+
+    @Test
+    void downloadImageETagChangesWhenTheFileIsReplacedInPlace() throws IOException {
+        UUID id = UUID.randomUUID();
+        Path imageFile = tempDir.resolve("cover.jpg");
+        Files.writeString(imageFile, "fake image data");
+
+        ImageEntity imageEntity = mock(ImageEntity.class);
+        when(imageEntity.getPath()).thenReturn(imageFile.toString());
+        when(imageRepository.findById(id)).thenReturn(Optional.of(imageEntity));
+
+        String before = controller.downloadImage(id, null).getHeaders().getETag();
+
+        // A rescan reuses the row for (directory, path), so the id survives a replaced file —
+        // the ETag is what tells a client its copy is stale.
+        Files.writeString(imageFile, "different image data");
+        Files.setLastModifiedTime(imageFile, FileTime.fromMillis(1_700_000_000_000L));
+
+        ResponseEntity<InputStreamResource> after = controller.downloadImage(id, before);
+
+        assertEquals(200, after.getStatusCode().value());
+        assertNotEquals(before, after.getHeaders().getETag());
     }
 
     // ========== downloadMediaFile ==========

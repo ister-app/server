@@ -7,11 +7,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.FileInputStream;
@@ -26,6 +29,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 //@SecurityRequirement(name = "oidc_auth")
 public class FileController {
+    /**
+     * Images are user-scoped (stream token / bearer, and MediaAccessEnforcementFilter gates them
+     * by library), so never {@code public}. Not {@code immutable} either, unlike the comic and
+     * epub resources: a scanned library image keeps its id when the file behind it is replaced in
+     * place, so clients have to be able to revalidate — which the ETag below makes cheap.
+     */
+    private static final String CACHE_CONTROL_REVALIDATE = "private, max-age=86400";
+
     private final ImageRepository imageRepository;
     private final MediaFileRepository mediaFileRepository;
 
@@ -33,11 +44,25 @@ public class FileController {
     private String tmpDir;
 
     @GetMapping("/images/{id}/download")
-    public ResponseEntity<InputStreamResource> downloadImage(@PathVariable UUID id) throws IOException {
+    public ResponseEntity<InputStreamResource> downloadImage(
+            @PathVariable UUID id,
+            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch)
+            throws IOException {
         var imageEntity = imageRepository.findById(id).orElseThrow();
         Path imagePath = Path.of(imageEntity.getPath());
         if (!Files.exists(imagePath)) {
             return ResponseEntity.notFound().build();
+        }
+        // Answer the conditional request before opening the stream: a 304 that returns past an
+        // open FileInputStream leaks a descriptor on every cache hit.
+        String etag = "\"%s-%d\"".formatted(
+                Long.toHexString(Files.getLastModifiedTime(imagePath).toMillis()),
+                Files.size(imagePath));
+        if (etag.equals(ifNoneMatch)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                    .eTag(etag)
+                    .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_REVALIDATE)
+                    .build();
         }
         String contentType = Files.probeContentType(imagePath);
         if (contentType == null) {
@@ -50,6 +75,8 @@ public class FileController {
             }
         };
         return ResponseEntity.ok()
+                .eTag(etag)
+                .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_REVALIDATE)
                 .contentType(MediaType.parseMediaType(contentType))
                 .body(resource);
     }
