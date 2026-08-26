@@ -47,6 +47,24 @@ between actors and music artists; TMDB cast members are deduplicated against exi
 (`movie`/`show`/`episode`, batch-resolved in `CreditController`), so a filmography is queryable via
 `personById { credits { movie/show/episode } }`.
 
+### Related shows
+
+`Show.related(limit)` (`ShowController`, `ShowRepository.findRelatedShowIds`) turns that same
+enrichment into a "more like this" list, without any extra provider call: it scores the other shows
+**of the same library** on shared TMDB keywords (3.0 each, capped at five so one long keyword list
+cannot dominate), shared genres (1.5 each) and shared cast members (1.0 each, capped at three). An
+overlapping network, origin country or a release year within five years adds half a point each, but
+only ranks shows that already share content — a common broadcast year is not a relation by itself.
+Shows that share nothing are left out, so a show without TMDB enrichment yields an empty list
+instead of arbitrary neighbours, and the list gets better with every `refreshMetadata`.
+
+Keywords, networks and origin countries are the comma-space joined strings on `show_entity`;
+genres live per language on the metadata rows, so the query pairs the two shows' metadata rows **on
+language** (the genre names themselves are translated) and takes the best-matching language. The
+candidates are by definition in the library the caller was already granted access to through
+`showById`, so the field needs no access check of its own. It is deliberately not a `@BatchMapping`:
+only the show detail page asks for it, one show at a time.
+
 ## Music (MusicBrainz)
 
 Artist directories become `PersonEntity` rows (`PERSON_FOUND`), albums `AlbumEntity`

@@ -84,6 +84,91 @@ public interface ShowRepository extends JpaRepository<ShowEntity, UUID> {
     long countRatedShowsForLibrary(@Param("libraryId") UUID libraryId, @Param("externalId") String externalId);
 
     /**
+     * Shows of the same library that resemble the given show, best match first.
+     *
+     * <p>The score is derived from the metadata the TMDB enrichment already stores: shared
+     * keywords weigh heaviest (3.0 each, capped at five so a single long keyword list cannot
+     * dominate), then shared genres (1.5 each), then shared cast members (1.0 each, capped at
+     * three). Network, origin country and a release year within five years add half a point each,
+     * but only rank shows that already share content: a common broadcast year on its own is not a
+     * relation. A show that shares nothing is left out entirely, so a show without TMDB enrichment
+     * simply yields an empty list instead of arbitrary neighbours.
+     *
+     * <p>Keywords/networks/countries are the comma-space joined strings written by
+     * {@code TmdbFieldUtil.joinNonBlank}; genres live per language on the metadata rows and are
+     * therefore compared within one language (the best-matching language wins), since the genre
+     * names themselves are translated.
+     */
+    @Query(value = """
+            WITH me AS (
+                SELECT s.id,
+                       s.library_entity_id,
+                       s.release_year,
+                       array_remove(string_to_array(lower(coalesce(s.keywords, '')), ', '), '') AS kw,
+                       array_remove(string_to_array(lower(coalesce(s.networks, '')), ', '), '') AS nets,
+                       array_remove(string_to_array(lower(coalesce(s.origin_country, '')), ', '), '') AS countries
+                FROM show_entity s
+                WHERE s.id = :showId
+            ),
+            candidate AS (
+                SELECT s.id,
+                       s.name,
+                       s.vote_average,
+                       s.release_year,
+                       array_remove(string_to_array(lower(coalesce(s.keywords, '')), ', '), '') AS kw,
+                       array_remove(string_to_array(lower(coalesce(s.networks, '')), ', '), '') AS nets,
+                       array_remove(string_to_array(lower(coalesce(s.origin_country, '')), ', '), '') AS countries
+                FROM show_entity s
+                CROSS JOIN me
+                WHERE s.library_entity_id = me.library_entity_id
+                  AND s.id <> me.id
+            ),
+            genre_overlap AS (
+                SELECT other.show_entity_id AS show_id,
+                       MAX(cardinality(ARRAY(
+                           SELECT unnest(array_remove(string_to_array(lower(mine.genre), ', '), ''))
+                           INTERSECT
+                           SELECT unnest(array_remove(string_to_array(lower(other.genre), ', '), ''))))) AS shared
+                FROM metadata_entity mine
+                JOIN me ON mine.show_entity_id = me.id
+                JOIN metadata_entity other ON other.language = mine.language
+                                          AND other.show_entity_id IS NOT NULL
+                                          AND other.show_entity_id <> me.id
+                WHERE mine.genre IS NOT NULL AND other.genre IS NOT NULL
+                GROUP BY other.show_entity_id
+            ),
+            cast_overlap AS (
+                SELECT theirs.show_entity_id AS show_id,
+                       COUNT(DISTINCT theirs.person_entity_id) AS shared
+                FROM credit_entity ours
+                JOIN me ON ours.show_entity_id = me.id
+                JOIN credit_entity theirs ON theirs.person_entity_id = ours.person_entity_id
+                                         AND theirs.show_entity_id IS NOT NULL
+                                         AND theirs.show_entity_id <> me.id
+                GROUP BY theirs.show_entity_id
+            ),
+            scored AS (
+                SELECT c.id,
+                       c.name,
+                       c.vote_average,
+                       3.0 * least(cardinality(ARRAY(SELECT unnest(c.kw) INTERSECT SELECT unnest(me.kw))), 5)
+                         + 1.5 * coalesce(g.shared, 0)
+                         + 1.0 * least(coalesce(ca.shared, 0), 3) AS content_score,
+                       CASE WHEN c.nets && me.nets THEN 0.5 ELSE 0 END
+                         + CASE WHEN c.countries && me.countries THEN 0.5 ELSE 0 END
+                         + CASE WHEN abs(c.release_year - me.release_year) <= 5 THEN 0.5 ELSE 0 END AS context_score
+                FROM candidate c
+                CROSS JOIN me
+                LEFT JOIN genre_overlap g ON g.show_id = c.id
+                LEFT JOIN cast_overlap ca ON ca.show_id = c.id
+            )
+            SELECT id FROM scored
+            WHERE content_score > 0
+            ORDER BY content_score + context_score DESC, vote_average DESC NULLS LAST, name ASC, id
+            LIMIT :limit""", nativeQuery = true)
+    List<UUID> findRelatedShowIds(@Param("showId") UUID showId, @Param("limit") int limit);
+
+    /**
      * Returns the IDs (UUID) of shows the metadata backfill should re-dispatch: shows without any
      * {@link MetadataEntity} row, and shows whose TMDB enrichment columns were never filled
      * (tmdbId is set by every successful TMDB fetch, so a null one marks a pre-V45 show exactly

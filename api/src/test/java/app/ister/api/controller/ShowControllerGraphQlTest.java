@@ -94,6 +94,28 @@ class ShowControllerGraphQlTest {
     }
 
     @Test
+    void showByIdResolvesRelatedShowsInRankedOrder() {
+        app.ister.core.entity.LibraryEntity library = app.ister.core.entity.LibraryEntity.builder().name("Shows").build();
+        library.setId(UUID.randomUUID());
+        ShowEntity source = ShowEntity.builder().name("Source").releaseYear(2015).libraryEntity(library).build();
+        source.setId(UUID.randomUUID());
+        ShowEntity related = ShowEntity.builder().name("Related").releaseYear(2016).libraryEntity(library).build();
+        related.setId(UUID.randomUUID());
+        when(showRepository.findById(source.getId())).thenReturn(java.util.Optional.of(source));
+        when(libraryAccessService.canAccess(any(app.ister.core.entity.LibraryEntity.class), any())).thenReturn(true);
+        // The limit argument must reach the repository, not just the default.
+        when(showRepository.findRelatedShowIds(source.getId(), 3)).thenReturn(List.of(related.getId()));
+        when(showRepository.findAllById(List.of(related.getId()))).thenReturn(List.of(related));
+
+        assertDoesNotThrow(() -> graphQlTester.document("""
+                        { showById(id: "%s") { name related(limit: 3) { name releaseYear } } }
+                        """.formatted(source.getId()))
+                .execute()
+                .path("showById.related[0].name").entity(String.class).isEqualTo("Related")
+                .path("showById.related[0].releaseYear").entity(Integer.class).isEqualTo(2016));
+    }
+
+    @Test
     void showByIdReturnsNullWhenNotFound() {
         when(showRepository.findById(any(UUID.class))).thenReturn(java.util.Optional.empty());
 

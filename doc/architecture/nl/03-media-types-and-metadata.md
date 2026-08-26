@@ -47,6 +47,25 @@ personen op **exacte naam + geboortejaar**. Het GraphQL-type `Credit` ontsluit d
 (`movie`/`show`/`episode`, batch-resolved in `CreditController`), zodat een filmografie opvraagbaar
 is via `personById { credits { movie/show/episode } }`.
 
+### Gerelateerde series
+
+`Show.related(limit)` (`ShowController`, `ShowRepository.findRelatedShowIds`) maakt van diezelfde
+verrijking een "meer zoals dit"-lijst, zonder ook maar één extra provider-aanroep: het scoort de
+andere shows **uit dezelfde bibliotheek** op gedeelde TMDB-keywords (3,0 per stuk, afgetopt op vijf
+zodat één lange keywordlijst niet alles overheerst), gedeelde genres (1,5 per stuk) en gedeelde
+castleden (1,0 per stuk, afgetopt op drie). Een overlappend netwerk, land van herkomst of een
+releasejaar binnen vijf jaar levert elk een halve punt op, maar rangschikt alleen shows die al
+inhoudelijk overlappen — een gedeeld uitzendjaar is op zichzelf geen relatie. Shows die niets delen
+vallen af, dus een show zonder TMDB-verrijking geeft een lege lijst in plaats van willekeurige buren,
+en de lijst wordt beter met elke `refreshMetadata`.
+
+Keywords, networks en origin countries zijn de met komma-spatie samengevoegde strings op
+`show_entity`; genres staan per taal op de metadata-rijen, dus de query koppelt de metadata-rijen van
+beide shows **op taal** (de genrenamen zijn immers vertaald) en neemt de best passende taal. De
+kandidaten zitten per definitie in de bibliotheek waartoe de aanroeper via `showById` al toegang
+kreeg, dus het veld heeft geen eigen toegangscontrole nodig. Het is bewust géén `@BatchMapping`:
+alleen de detailpagina van een show vraagt het op, voor één show tegelijk.
+
 ## Muziek (MusicBrainz)
 
 Artiest-directories worden `PersonEntity`-rijen (`PERSON_FOUND`), albums `AlbumEntity`

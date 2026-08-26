@@ -31,13 +31,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.function.LongSupplier;
-import java.util.stream.Collectors;
 
 /**
  * The library Discover view: {@code libraryById} plus the per-user ranked top-lists on
@@ -66,91 +62,91 @@ public class LibraryDiscoverController {
 
     @SchemaMapping(typeName = "Library", field = "recentlyPlayedMovies")
     public List<MovieEntity> recentlyPlayedMovies(LibraryEntity library, @Argument Optional<Integer> limit, Authentication authentication) {
-        return inOrder(movieRepository, movieRepository.findRecentlyPlayedMovieIdsForLibrary(
+        return Paging.inOrder(movieRepository, movieRepository.findRecentlyPlayedMovieIdsForLibrary(
                 library.getId(), authentication.getName(), clampLimit(limit), 0));
     }
 
     @SchemaMapping(typeName = "Library", field = "mostPlayedMovies")
     public List<MovieEntity> mostPlayedMovies(LibraryEntity library, @Argument Optional<Integer> limit, Authentication authentication) {
-        return inOrder(movieRepository, movieRepository.findMostPlayedMovieIdsForLibrary(
+        return Paging.inOrder(movieRepository, movieRepository.findMostPlayedMovieIdsForLibrary(
                 library.getId(), authentication.getName(), clampLimit(limit), 0));
     }
 
     @SchemaMapping(typeName = "Library", field = "highestRatedMovies")
     public List<MovieEntity> highestRatedMovies(LibraryEntity library, @Argument Optional<Integer> limit, Authentication authentication) {
-        return inOrder(movieRepository, movieRepository.findHighestRatedMovieIdsForLibrary(
+        return Paging.inOrder(movieRepository, movieRepository.findHighestRatedMovieIdsForLibrary(
                 library.getId(), authentication.getName(), clampLimit(limit), 0));
     }
 
     @SchemaMapping(typeName = "Library", field = "recentlyPlayedShows")
     public List<ShowEntity> recentlyPlayedShows(LibraryEntity library, @Argument Optional<Integer> limit, Authentication authentication) {
-        return inOrder(showRepository, showRepository.findRecentlyPlayedShowIdsForLibrary(
+        return Paging.inOrder(showRepository, showRepository.findRecentlyPlayedShowIdsForLibrary(
                 library.getId(), authentication.getName(), clampLimit(limit), 0));
     }
 
     @SchemaMapping(typeName = "Library", field = "mostPlayedShows")
     public List<ShowEntity> mostPlayedShows(LibraryEntity library, @Argument Optional<Integer> limit, Authentication authentication) {
-        return inOrder(showRepository, showRepository.findMostPlayedShowIdsForLibrary(
+        return Paging.inOrder(showRepository, showRepository.findMostPlayedShowIdsForLibrary(
                 library.getId(), authentication.getName(), clampLimit(limit), 0));
     }
 
     @SchemaMapping(typeName = "Library", field = "highestRatedShows")
     public List<ShowEntity> highestRatedShows(LibraryEntity library, @Argument Optional<Integer> limit, Authentication authentication) {
-        return inOrder(showRepository, showRepository.findHighestRatedShowIdsForLibrary(
+        return Paging.inOrder(showRepository, showRepository.findHighestRatedShowIdsForLibrary(
                 library.getId(), authentication.getName(), clampLimit(limit), 0));
     }
 
     @SchemaMapping(typeName = "Library", field = "recentlyPlayedAlbums")
     public List<AlbumEntity> recentlyPlayedAlbums(LibraryEntity library, @Argument Optional<Integer> limit, Authentication authentication) {
-        return inOrder(albumRepository, albumRepository.findRecentlyPlayedAlbumIdsForLibrary(
+        return Paging.inOrder(albumRepository, albumRepository.findRecentlyPlayedAlbumIdsForLibrary(
                 library.getId(), authentication.getName(), clampLimit(limit), 0));
     }
 
     @SchemaMapping(typeName = "Library", field = "mostPlayedAlbums")
     public List<AlbumEntity> mostPlayedAlbums(LibraryEntity library, @Argument Optional<Integer> limit, Authentication authentication) {
-        return inOrder(albumRepository, albumRepository.findMostPlayedAlbumIdsForLibrary(
+        return Paging.inOrder(albumRepository, albumRepository.findMostPlayedAlbumIdsForLibrary(
                 library.getId(), authentication.getName(), clampLimit(limit), 0));
     }
 
     @SchemaMapping(typeName = "Library", field = "highestRatedAlbums")
     public List<AlbumEntity> highestRatedAlbums(LibraryEntity library, @Argument Optional<Integer> limit, Authentication authentication) {
-        return inOrder(albumRepository, albumRepository.findHighestRatedAlbumIdsForLibrary(
+        return Paging.inOrder(albumRepository, albumRepository.findHighestRatedAlbumIdsForLibrary(
                 library.getId(), authentication.getName(), clampLimit(limit), 0));
     }
 
     @SchemaMapping(typeName = "Library", field = "recentlyReadBooks")
     public List<BookEntity> recentlyReadBooks(LibraryEntity library, @Argument Optional<Integer> limit, Authentication authentication) {
-        return inOrder(bookRepository, bookRepository.findRecentlyReadBookIdsForLibrary(
+        return Paging.inOrder(bookRepository, bookRepository.findRecentlyReadBookIdsForLibrary(
                 library.getId(), authentication.getName(), clampLimit(limit), 0));
     }
 
     @SchemaMapping(typeName = "Library", field = "highestRatedBooks")
     public List<BookEntity> highestRatedBooks(LibraryEntity library, @Argument Optional<Integer> limit, Authentication authentication) {
-        return inOrder(bookRepository, bookRepository.findHighestRatedBookIdsForLibrary(
+        return Paging.inOrder(bookRepository, bookRepository.findHighestRatedBookIdsForLibrary(
                 library.getId(), authentication.getName(), clampLimit(limit), 0));
     }
 
     @SchemaMapping(typeName = "Library", field = "recentlyReadSeries")
     public List<SeriesEntity> recentlyReadSeries(LibraryEntity library, @Argument Optional<Integer> limit, Authentication authentication) {
-        return inOrder(seriesRepository, seriesRepository.findRecentlyReadSeriesIdsForLibrary(
+        return Paging.inOrder(seriesRepository, seriesRepository.findRecentlyReadSeriesIdsForLibrary(
                 library.getId(), authentication.getName(), clampLimit(limit), 0));
     }
 
     @SchemaMapping(typeName = "Library", field = "recentlyPlayedPodcasts")
     public List<PodcastEntity> recentlyPlayedPodcasts(LibraryEntity library, @Argument Optional<Integer> limit, Authentication authentication) {
-        return inOrder(podcastRepository, podcastRepository.findRecentlyPlayedPodcastIdsForLibrary(
+        return Paging.inOrder(podcastRepository, podcastRepository.findRecentlyPlayedPodcastIdsForLibrary(
                 library.getId(), authentication.getName(), clampLimit(limit), 0));
     }
 
     @SchemaMapping(typeName = "Library", field = "mostPlayedPodcasts")
     public List<PodcastEntity> mostPlayedPodcasts(LibraryEntity library, @Argument Optional<Integer> limit, Authentication authentication) {
-        return inOrder(podcastRepository, podcastRepository.findMostPlayedPodcastIdsForLibrary(
+        return Paging.inOrder(podcastRepository, podcastRepository.findMostPlayedPodcastIdsForLibrary(
                 library.getId(), authentication.getName(), clampLimit(limit), 0));
     }
 
     @SchemaMapping(typeName = "Library", field = "highestRatedPodcasts")
     public List<PodcastEntity> highestRatedPodcasts(LibraryEntity library, @Argument Optional<Integer> limit, Authentication authentication) {
-        return inOrder(podcastRepository, podcastRepository.findHighestRatedPodcastIdsForLibrary(
+        return Paging.inOrder(podcastRepository, podcastRepository.findHighestRatedPodcastIdsForLibrary(
                 library.getId(), authentication.getName(), clampLimit(limit), 0));
     }
 
@@ -285,14 +281,8 @@ public class LibraryDiscoverController {
             Optional<Integer> page, Optional<Integer> size, JpaRepository<T, UUID> repository,
             RankedIdsQuery ids, LongSupplier total) {
         Pageable pageable = rankedPageable(page, size);
-        List<T> content = inOrder(repository, ids.fetch(pageable.getPageSize(), (int) pageable.getOffset()));
+        List<T> content = Paging.inOrder(repository, ids.fetch(pageable.getPageSize(), (int) pageable.getOffset()));
         return new PageImpl<>(content, pageable, total.getAsLong());
     }
 
-    /** Loads the entities of the ranked id list, preserving the list's order. */
-    private static <T extends BaseEntity> List<T> inOrder(JpaRepository<T, UUID> repository, List<UUID> ids) {
-        Map<UUID, T> byId = repository.findAllById(ids).stream()
-                .collect(Collectors.toMap(BaseEntity::getId, Function.identity()));
-        return ids.stream().map(byId::get).filter(Objects::nonNull).toList();
-    }
 }

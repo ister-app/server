@@ -89,6 +89,17 @@ public class ShowController {
         return showEntity.getSeasonEntities();
     }
 
+    /**
+     * Comparable shows from the same library. The candidates share the show's library, which the
+     * caller was already granted access to in {@code showById}, so no extra access check is needed
+     * here. Not a batch mapping: the field is only ever asked for on a single detail page.
+     */
+    @SchemaMapping(typeName = "Show", field = "related")
+    public List<ShowEntity> related(ShowEntity showEntity, @Argument Optional<Integer> limit) {
+        return Paging.inOrder(showRepository,
+                showRepository.findRelatedShowIds(showEntity.getId(), Math.clamp(limit.orElse(15), 1, 50)));
+    }
+
     @SchemaMapping(typeName = "Show", field = "metadata")
     public List<MetadataEntity> metadata(ShowEntity showEntity) {
         return showEntity.getMetadataEntities();

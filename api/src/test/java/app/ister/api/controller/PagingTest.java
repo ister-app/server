@@ -1,14 +1,21 @@
 package app.ister.api.controller;
 
+import app.ister.core.entity.ShowEntity;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
+import app.ister.core.repository.ShowRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyIterable;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class PagingTest {
 
@@ -60,5 +67,24 @@ class PagingTest {
 
         assertEquals(0, pageable.getPageNumber());
         assertEquals(1, pageable.getPageSize());
+    }
+
+    @Test
+    void inOrderRestoresTheRankedOrderAndDropsVanishedIds() {
+        ShowEntity first = show();
+        ShowEntity second = show();
+        UUID deleted = UUID.randomUUID();
+        ShowRepository repository = mock(ShowRepository.class);
+        // findAllById gives no order guarantee and silently omits ids that no longer exist.
+        when(repository.findAllById(anyIterable())).thenReturn(List.of(second, first));
+
+        assertEquals(List.of(first, second),
+                Paging.inOrder(repository, List.of(first.getId(), deleted, second.getId())));
+    }
+
+    private static ShowEntity show() {
+        ShowEntity show = ShowEntity.builder().name("Show").releaseYear(2020).build();
+        show.setId(UUID.randomUUID());
+        return show;
     }
 }

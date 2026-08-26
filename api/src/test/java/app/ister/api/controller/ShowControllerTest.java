@@ -252,6 +252,35 @@ class ShowControllerTest {
     }
 
     @Test
+    void relatedKeepsTheRankedOrderAndClampsTheLimit() {
+        ShowEntity source = show("Source");
+        ShowEntity first = show("First");
+        ShowEntity second = show("Second");
+        when(showRepository.findRelatedShowIds(source.getId(), 5))
+                .thenReturn(List.of(first.getId(), second.getId()));
+        // findAllById gives no order guarantee; the ranking must survive the hydration.
+        when(showRepository.findAllById(List.of(first.getId(), second.getId())))
+                .thenReturn(List.of(second, first));
+
+        assertEquals(List.of(first, second), subject.related(source, Optional.of(5)));
+
+        // Default and bounds.
+        when(showRepository.findRelatedShowIds(source.getId(), 15)).thenReturn(List.of());
+        when(showRepository.findRelatedShowIds(source.getId(), 50)).thenReturn(List.of());
+        when(showRepository.findRelatedShowIds(source.getId(), 1)).thenReturn(List.of());
+        when(showRepository.findAllById(List.<UUID>of())).thenReturn(List.of());
+        assertTrue(subject.related(source, Optional.empty()).isEmpty());
+        assertTrue(subject.related(source, Optional.of(500)).isEmpty());
+        assertTrue(subject.related(source, Optional.of(0)).isEmpty());
+    }
+
+    private ShowEntity show(String name) {
+        ShowEntity show = ShowEntity.builder().name(name).releaseYear(2020).libraryEntity(library()).build();
+        show.setId(UUID.randomUUID());
+        return show;
+    }
+
+    @Test
     void showForImageReturnsShowFromImage() {
         ShowEntity show = ShowEntity.builder().name("Test").releaseYear(2020).build();
         ImageEntity image = ImageEntity.builder().build();

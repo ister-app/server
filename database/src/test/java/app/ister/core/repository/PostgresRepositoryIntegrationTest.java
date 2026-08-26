@@ -443,6 +443,70 @@ class PostgresRepositoryIntegrationTest {
                         .map(CreditEntity::getId).toList());
     }
 
+    /**
+     * The related-shows scoring is one big native query, so nothing but a real PostgreSQL can
+     * verify it: array overlap on the comma-space joined keyword/network/country strings, the
+     * per-language genre comparison, and the cast self-join.
+     */
+    @Test
+    void relatedShowsScoreOnSharedMetadataAndStayInsideTheLibrary() {
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.SHOW).name("Shows-related").build());
+        LibraryEntity otherLibrary = em.persist(LibraryEntity.builder().libraryType(LibraryType.SHOW).name("Shows-related-other").build());
+
+        ShowEntity source = em.persist(ShowEntity.builder().libraryEntity(library).name("Source").releaseYear(2015).build());
+        source.setKeywords("time travel, dystopia, rebellion");
+        source.setNetworks("HBO");
+        source.setOriginCountry("US");
+
+        // Two shared keywords, a shared genre, a shared cast member: the strongest match.
+        ShowEntity best = em.persist(ShowEntity.builder().libraryEntity(library).name("Best").releaseYear(2016).build());
+        best.setKeywords("time travel, dystopia, robots");
+        best.setNetworks("HBO");
+        best.setOriginCountry("US");
+
+        // Genre overlap only: still related, but well below the keyword matches.
+        ShowEntity weak = em.persist(ShowEntity.builder().libraryEntity(library).name("Weak").releaseYear(1975).build());
+        weak.setKeywords("cooking");
+
+        // Shares nothing but the release year with Weak: a broadcast year is not a relation.
+        ShowEntity unrelated = em.persist(ShowEntity.builder().libraryEntity(library).name("Unrelated").releaseYear(1975).build());
+
+        // Same metadata as the best match, but in another library: out of scope.
+        ShowEntity foreign = em.persist(ShowEntity.builder().libraryEntity(otherLibrary).name("Foreign").releaseYear(2016).build());
+        foreign.setKeywords("time travel, dystopia, robots");
+
+        persistShowGenre(source, "eng", "Science Fiction, Drama");
+        persistShowGenre(source, "nld", "Sciencefiction, Drama");
+        persistShowGenre(best, "eng", "Science Fiction, Comedy");
+        // Only a Dutch row; the language join lines it up with the source's Dutch metadata.
+        persistShowGenre(weak, "nld", "Drama");
+        persistShowGenre(unrelated, "eng", "Documentary");
+        persistShowGenre(foreign, "eng", "Science Fiction");
+
+        PersonEntity actor = em.persist(PersonEntity.builder().name("Shared Actor").tmdbId(9911L).build());
+        persistShowCredit(source, actor, "rel-source");
+        persistShowCredit(best, actor, "rel-best");
+        em.flush();
+
+        assertEquals(List.of(best.getId(), weak.getId()),
+                showRepository.findRelatedShowIds(source.getId(), 10));
+        // The limit is applied after the ranking, so it keeps the best match.
+        assertEquals(List.of(best.getId()), showRepository.findRelatedShowIds(source.getId(), 1));
+        // Unrelated only shares a release year with Weak, which never qualifies on its own.
+        assertTrue(showRepository.findRelatedShowIds(unrelated.getId(), 10).isEmpty());
+    }
+
+    private void persistShowGenre(ShowEntity show, String language, String genre) {
+        em.persist(MetadataEntity.builder().showEntity(show).language(language).genre(genre).build());
+    }
+
+    private void persistShowCredit(ShowEntity show, PersonEntity person, String tmdbCreditId) {
+        CreditEntity credit = CreditEntity.builder()
+                .personEntity(person).creditType(CreditType.CAST).castOrder(0).tmdbCreditId(tmdbCreditId).build();
+        credit.setShowEntity(show);
+        em.persist(credit);
+    }
+
     // --- play queue chunk queries (seeded shuffle + natural order pagination) ---
 
     @Test

@@ -1573,6 +1573,13 @@ type Show {
     "Trailer video key; with trailerSite YouTube the url is https://www.youtube.com/watch?v=<key>."
     trailerKey: String
     trailerSite: String
+    """
+    Comparable shows from the same library, best match first. Scored on the metadata TMDB
+    enrichment already stores: shared keywords, genres and cast members, plus a smaller bonus for
+    an overlapping network, origin country or a nearby release year. Empty for a show that has no
+    TMDB enrichment yet, rather than arbitrary neighbours.
+    """
+    related(limit: Int): [Show!]!
 }
 
 type RecentlyWatched {
