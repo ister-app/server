@@ -3,6 +3,7 @@ package app.ister.api.controller;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.MediaType;
+import app.ister.core.enums.TrackHistoryScope;
 import app.ister.core.service.LibraryAccessService;
 import app.ister.core.service.PlaybackHistoryService;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Controller;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -38,6 +40,25 @@ public class PlaybackHistoryController {
             return List.of();
         }
         return playbackHistoryService.history(authentication, mediaType, mediaId);
+    }
+
+    /**
+     * The plays of the tracks of one container. An album is gated on its own library; an artist can
+     * span libraries, so the caller's whitelist is handed to the query instead. Either way an
+     * inaccessible container is indistinguishable from an empty history.
+     */
+    @PreAuthorize("hasRole('user')")
+    @QueryMapping
+    public List<WatchStatusEntity> trackPlaybackHistory(@Argument TrackHistoryScope scope, @Argument UUID id,
+                                                        @Argument Integer limit, Authentication authentication) {
+        Optional<Set<UUID>> allowed = libraryAccessService.allowedLibraryIds(authentication);
+        if (scope == TrackHistoryScope.ALBUM) {
+            Optional<LibraryEntity> library = playbackHistoryService.libraryOfAlbum(id);
+            if (library.isEmpty() || !libraryAccessService.canAccess(library.get(), authentication)) {
+                return List.of();
+            }
+        }
+        return playbackHistoryService.trackHistory(authentication, scope, id, limit, allowed);
     }
 
     @PreAuthorize("hasRole('user')")

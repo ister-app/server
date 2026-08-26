@@ -1,8 +1,10 @@
 package app.ister.api.controller;
 
 import app.ister.core.entity.LibraryEntity;
+import app.ister.core.entity.TrackEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.MediaType;
+import app.ister.core.enums.TrackHistoryScope;
 import app.ister.core.service.LibraryAccessService;
 import app.ister.core.service.PlaybackHistoryService;
 import org.junit.jupiter.api.AfterEach;
@@ -19,6 +21,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -89,6 +92,70 @@ class PlaybackHistoryControllerGraphQlTest {
                 .path("playbackHistory[0].watched").entity(Boolean.class).isEqualTo(true)
                 .path("playbackHistory[0].createdAt").entity(String.class).isEqualTo("2026-08-20T19:00:00Z")
                 .path("playbackHistory[0].updatedAt").entity(String.class).isEqualTo("2026-08-20T21:05:00Z");
+    }
+
+    @Test
+    void albumTrackHistoryIsGatedOnTheAlbumsLibraryAndNamesThePlayedTrack() {
+        UUID albumId = UUID.randomUUID();
+        UUID rowId = UUID.randomUUID();
+        UUID trackId = UUID.randomUUID();
+        LibraryEntity library = LibraryEntity.builder().build();
+        when(playbackHistoryService.libraryOfAlbum(albumId)).thenReturn(Optional.of(library));
+        when(libraryAccessService.canAccess(eq(library), any())).thenReturn(true);
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
+        WatchStatusEntity row = watchStatus(rowId, Instant.parse("2026-08-20T19:00:00Z"), Instant.parse("2026-08-20T19:04:00Z"));
+        TrackEntity track = TrackEntity.builder().number(3).build();
+        track.setId(trackId);
+        row.setTrackEntity(track);
+        when(playbackHistoryService.trackHistory(any(), eq(TrackHistoryScope.ALBUM), eq(albumId), eq(null), any()))
+                .thenReturn(List.of(row));
+
+        graphQlTester.document("""
+                        query {
+                            trackPlaybackHistory(scope: ALBUM, id: "%s") {
+                                id updatedAt track { id number }
+                            }
+                        }
+                        """.formatted(albumId))
+                .execute()
+                .path("trackPlaybackHistory[0].id").entity(String.class).isEqualTo(rowId.toString())
+                .path("trackPlaybackHistory[0].updatedAt").entity(String.class).isEqualTo("2026-08-20T19:04:00Z")
+                .path("trackPlaybackHistory[0].track.id").entity(String.class).isEqualTo(trackId.toString())
+                .path("trackPlaybackHistory[0].track.number").entity(Integer.class).isEqualTo(3);
+    }
+
+    @Test
+    void anInaccessibleAlbumHasAnEmptyHistoryRatherThanAnError() {
+        UUID albumId = UUID.randomUUID();
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.of(Set.of(UUID.randomUUID())));
+        when(playbackHistoryService.libraryOfAlbum(albumId)).thenReturn(Optional.empty());
+
+        graphQlTester.document("""
+                        query {
+                            trackPlaybackHistory(scope: ALBUM, id: "%s") { id }
+                        }
+                        """.formatted(albumId))
+                .execute()
+                .path("trackPlaybackHistory").entityList(Object.class).hasSize(0);
+    }
+
+    @Test
+    void artistTrackHistoryHandsTheCallersLibrariesToTheQuery() {
+        UUID artistId = UUID.randomUUID();
+        UUID libraryId = UUID.randomUUID();
+        UUID rowId = UUID.randomUUID();
+        when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.of(Set.of(libraryId)));
+        when(playbackHistoryService.trackHistory(any(), eq(TrackHistoryScope.ARTIST), eq(artistId), eq(25),
+                eq(Optional.of(Set.of(libraryId)))))
+                .thenReturn(List.of(watchStatus(rowId, Instant.now(), Instant.now())));
+
+        graphQlTester.document("""
+                        query {
+                            trackPlaybackHistory(scope: ARTIST, id: "%s", limit: 25) { id }
+                        }
+                        """.formatted(artistId))
+                .execute()
+                .path("trackPlaybackHistory[0].id").entity(String.class).isEqualTo(rowId.toString());
     }
 
     @Test

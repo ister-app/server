@@ -36,6 +36,11 @@ public class WatchStatusController {
         return watchStatusEntity.getPodcastEpisodeEntity();
     }
 
+    @SchemaMapping(typeName = "WatchStatus", field = "track")
+    public app.ister.core.entity.TrackEntity track(WatchStatusEntity watchStatusEntity) {
+        return watchStatusEntity.getTrackEntity();
+    }
+
     @SchemaMapping(typeName = "WatchStatus", field = "createdAt")
     public String createdAt(WatchStatusEntity watchStatusEntity) {
         return watchStatusEntity.getDateCreated().toString();

@@ -38,6 +38,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
@@ -729,6 +731,66 @@ class PostgresRepositoryIntegrationTest {
         assertEquals(List.of(hiddenTrack.getId(), trackB.getId(), trackA.getId()),
                 trackRepository.findRecentlyAddedTrackIdsForPerson(artist.getId(), beforeNew, 10, 0),
                 "the frozen asOf does not");
+    }
+
+    /**
+     * The container playback histories: every play of an album's tracks, and of the tracks an
+     * artist is credited on (track artist, album artist or a featured credit), newest first and
+     * scoped to the caller's libraries.
+     */
+    @Test
+    void trackHistoryQueriesReturnEveryPlayOfAnAlbumAndOfAnArtist() {
+        UserEntity user = em.persist(UserEntity.builder().externalId("listener-hist").build());
+        UserEntity other = em.persist(UserEntity.builder().externalId("listener-other").build());
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music-hist").build());
+        LibraryEntity hidden = em.persist(LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music-hist-hidden").build());
+        PersonEntity artist = em.persist(PersonEntity.builder().name("Artist-hist").build());
+        PersonEntity guest = em.persist(PersonEntity.builder().name("Guest-hist").build());
+        AlbumEntity album = em.persist(AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Album").releaseYear(2020).build());
+        AlbumEntity hiddenAlbum = em.persist(AlbumEntity.builder().libraryEntity(hidden).personEntity(artist).name("Hidden").releaseYear(2020).build());
+        TrackEntity trackA = em.persist(TrackEntity.builder().albumEntity(album).personEntity(artist).number(1).discNumber(1).build());
+        TrackEntity trackB = em.persist(TrackEntity.builder().albumEntity(album).personEntity(artist).number(2).discNumber(1).build());
+        // Only a featured credit on this one: the artist history must still include it.
+        TrackEntity featured = em.persist(TrackEntity.builder().albumEntity(album).personEntity(guest).number(3).discNumber(1).build());
+        em.persist(TrackCreditEntity.builder().trackEntity(featured).personEntity(guest)
+                .creditType(TrackCreditType.PRIMARY).position(0).build());
+        em.persist(TrackCreditEntity.builder().trackEntity(featured).personEntity(artist)
+                .creditType(TrackCreditType.FEATURED).position(1).build());
+        TrackEntity hiddenTrack = em.persist(TrackEntity.builder().albumEntity(hiddenAlbum).personEntity(artist).number(1).discNumber(1).build());
+
+        WatchStatusEntity firstPlayOfA = em.persistAndFlush(trackPlay(user, trackA));
+        WatchStatusEntity secondPlayOfA = em.persistAndFlush(trackPlay(user, trackA));
+        WatchStatusEntity playOfB = em.persistAndFlush(trackPlay(user, trackB));
+        WatchStatusEntity playOfFeatured = em.persistAndFlush(trackPlay(user, featured));
+        WatchStatusEntity playInHiddenLibrary = em.persistAndFlush(trackPlay(user, hiddenTrack));
+        // Someone else's play of the same album never shows up.
+        em.persistAndFlush(trackPlay(other, trackA));
+        em.flush();
+
+        Pageable newestFirst = PageRequest.of(0, 10, Sort.by("dateUpdated").descending());
+        assertEquals(List.of(playOfFeatured.getId(), playOfB.getId(), secondPlayOfA.getId(), firstPlayOfA.getId()),
+                watchStatusRepository.findByUserEntityExternalIdAndTrackEntityAlbumEntityId(
+                                "listener-hist", album.getId(), newestFirst)
+                        .stream().map(WatchStatusEntity::getId).toList(),
+                "one row per play of the album's tracks, newest first");
+        assertEquals(2, watchStatusRepository.findByUserEntityExternalIdAndTrackEntityAlbumEntityId(
+                "listener-hist", album.getId(), PageRequest.of(0, 2, Sort.by("dateUpdated").descending())).size(),
+                "the page size limits the history");
+
+        assertEquals(List.of(playInHiddenLibrary.getId(), playOfFeatured.getId(), playOfB.getId(),
+                        secondPlayOfA.getId(), firstPlayOfA.getId()),
+                watchStatusRepository.findTrackHistoryForPerson(artist.getId(), "listener-hist", 10)
+                        .stream().map(WatchStatusEntity::getId).toList(),
+                "the artist history spans albums and includes the featured credit");
+        assertEquals(List.of(playOfFeatured.getId(), playOfB.getId(), secondPlayOfA.getId(), firstPlayOfA.getId()),
+                watchStatusRepository.findTrackHistoryForPersonInLibraries(
+                                artist.getId(), "listener-hist", List.of(library.getId()), 10)
+                        .stream().map(WatchStatusEntity::getId).toList(),
+                "a library filter drops the play in the library the caller may not see");
+        assertEquals(2, watchStatusRepository.findTrackHistoryForPerson(artist.getId(), "listener-hist", 2).size(),
+                "limit is applied");
+        assertTrue(watchStatusRepository.findTrackHistoryForPerson(artist.getId(), "nobody", 10).isEmpty(),
+                "another user's history is empty");
     }
 
     // --- library-wide browse (tracks/episodes) ---

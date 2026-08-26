@@ -9,6 +9,8 @@ import app.ister.core.entity.TrackEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.MediaType;
+import app.ister.core.enums.TrackHistoryScope;
+import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.EpisodeRepository;
@@ -18,6 +20,7 @@ import app.ister.core.repository.TrackRepository;
 import app.ister.core.repository.WatchStatusRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -28,6 +31,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -41,10 +45,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PlaybackHistoryService {
     private static final Sort NEWEST_FIRST = Sort.by("dateUpdated").descending();
+    private static final int DEFAULT_HISTORY_LIMIT = 100;
+    private static final int MAX_HISTORY_LIMIT = 500;
 
     private final WatchStatusService watchStatusService;
     private final WatchStatusRepository watchStatusRepository;
     private final ContinueWatchingService continueWatchingService;
+    private final AlbumRepository albumRepository;
     private final MovieRepository movieRepository;
     private final EpisodeRepository episodeRepository;
     private final TrackRepository trackRepository;
@@ -69,6 +76,34 @@ public class PlaybackHistoryService {
                     .findByUserEntityExternalIdAndChapterEntity(externalId, chapter(mediaId), NEWEST_FIRST);
             case BOOK, COMIC -> bookHistory(externalId, book(mediaId));
         };
+    }
+
+    /**
+     * The user's play history of a whole container — every track on an album, or every track an
+     * artist is credited on — newest first, one row per play. {@code allowedLibraryIds} is the
+     * caller's library whitelist ({@code Optional.empty()} = unrestricted): an artist can span
+     * several libraries, so the filter has to run inside the query rather than on the container.
+     */
+    @Transactional(readOnly = true)
+    public List<WatchStatusEntity> trackHistory(Authentication authentication, TrackHistoryScope scope, UUID id,
+                                                Integer limit, Optional<Set<UUID>> allowedLibraryIds) {
+        String externalId = authentication.getName();
+        int max = Math.clamp(limit == null ? DEFAULT_HISTORY_LIMIT : limit, 1, MAX_HISTORY_LIMIT);
+        return switch (scope) {
+            case ALBUM -> watchStatusRepository.findByUserEntityExternalIdAndTrackEntityAlbumEntityId(
+                    externalId, id, PageRequest.of(0, max, NEWEST_FIRST));
+            case ARTIST -> allowedLibraryIds
+                    .map(allowed -> allowed.isEmpty()
+                            ? List.<WatchStatusEntity>of()
+                            : watchStatusRepository.findTrackHistoryForPersonInLibraries(id, externalId, allowed, max))
+                    .orElseGet(() -> watchStatusRepository.findTrackHistoryForPerson(id, externalId, max));
+        };
+    }
+
+    /** The album's library, for the caller's access check; empty when the album does not exist. */
+    @Transactional(readOnly = true)
+    public Optional<app.ister.core.entity.LibraryEntity> libraryOfAlbum(UUID albumId) {
+        return albumRepository.findById(albumId).map(app.ister.core.entity.AlbumEntity::getLibraryEntity);
     }
 
     /** The book's reading row plus the listens of its chapters, merged newest first. */

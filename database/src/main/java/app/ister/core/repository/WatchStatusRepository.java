@@ -52,6 +52,38 @@ public interface WatchStatusRepository extends JpaRepository<WatchStatusEntity, 
     /** Listening history of a whole audiobook: the chapter rows of all the book's chapters. */
     List<WatchStatusEntity> findByUserEntityExternalIdAndChapterEntityBookEntity(String userEntityExternalId, BookEntity bookEntity, Sort sort);
 
+    /** Play history of a whole album: the rows of every track on it, newest first (Pageable). */
+    List<WatchStatusEntity> findByUserEntityExternalIdAndTrackEntityAlbumEntityId(String userEntityExternalId, UUID albumEntityId, org.springframework.data.domain.Pageable pageable);
+
+    /**
+     * Play history of every track an artist is credited on — as the track artist, the album artist
+     * or a track credit — newest first. Mirrors the WHERE clause of
+     * {@code TrackRepository.findTopPlayedTrackIdsForPerson} so the artist page's history and its
+     * ranked track lists agree on what "by this artist" means.
+     */
+    @Query(value = """
+            SELECT ws.* FROM watch_status_entity ws
+            JOIN track_entity t ON t.id = ws.track_entity_id
+            JOIN album_entity a ON t.album_entity_id = a.id
+            JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
+            WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId
+                   OR EXISTS (SELECT 1 FROM track_credit_entity tc WHERE tc.track_entity_id = t.id AND tc.person_entity_id = :personId))
+            ORDER BY ws.date_updated DESC, ws.id
+            LIMIT :limit""", nativeQuery = true)
+    List<WatchStatusEntity> findTrackHistoryForPerson(@Param("personId") UUID personId, @Param("externalId") String externalId, @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT ws.* FROM watch_status_entity ws
+            JOIN track_entity t ON t.id = ws.track_entity_id
+            JOIN album_entity a ON t.album_entity_id = a.id
+            JOIN user_entity u ON u.id = ws.user_entity_id AND u.external_id = :externalId
+            WHERE (t.person_entity_id = :personId OR a.person_entity_id = :personId
+                   OR EXISTS (SELECT 1 FROM track_credit_entity tc WHERE tc.track_entity_id = t.id AND tc.person_entity_id = :personId))
+              AND a.library_entity_id IN (:libraryIds)
+            ORDER BY ws.date_updated DESC, ws.id
+            LIMIT :limit""", nativeQuery = true)
+    List<WatchStatusEntity> findTrackHistoryForPersonInLibraries(@Param("personId") UUID personId, @Param("externalId") String externalId, @Param("libraryIds") java.util.Collection<UUID> libraryIds, @Param("limit") int limit);
+
     List<WatchStatusEntity> findByUserEntityExternalIdAndPodcastEpisodeEntityIn(String userEntityExternalId, java.util.Collection<app.ister.core.entity.PodcastEpisodeEntity> podcastEpisodeEntities, Sort sort);
 
     List<WatchStatusEntity> findByUserEntityExternalIdAndChapterEntityIn(String userEntityExternalId, java.util.Collection<ChapterEntity> chapterEntities, Sort sort);

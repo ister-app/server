@@ -7,6 +7,8 @@ import app.ister.core.entity.TrackEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
 import app.ister.core.enums.MediaType;
+import app.ister.core.enums.TrackHistoryScope;
+import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.EpisodeRepository;
@@ -21,6 +23,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 
@@ -28,6 +31,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -54,6 +59,8 @@ class PlaybackHistoryServiceTest {
     private WatchStatusRepository watchStatusRepository;
     @Mock
     private ContinueWatchingService continueWatchingService;
+    @Mock
+    private AlbumRepository albumRepository;
     @Mock
     private MovieRepository movieRepository;
     @Mock
@@ -118,6 +125,59 @@ class PlaybackHistoryServiceTest {
 
         assertThrows(NoSuchElementException.class,
                 () -> subject.history(authentication, MediaType.MOVIE, mediaId));
+    }
+
+    // --- trackHistory ---
+
+    @Test
+    void albumHistoryAsksForTheAlbumsTracksNewestFirst() {
+        List<WatchStatusEntity> rows = List.of(statusUpdatedAt(Instant.parse("2026-08-20T10:00:00Z")));
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        when(watchStatusRepository.findByUserEntityExternalIdAndTrackEntityAlbumEntityId(
+                eq("user-1"), eq(mediaId), pageable.capture())).thenReturn(rows);
+
+        assertEquals(rows, subject.trackHistory(authentication, TrackHistoryScope.ALBUM, mediaId, null, Optional.empty()));
+        assertEquals(100, pageable.getValue().getPageSize());
+        assertEquals(Sort.by("dateUpdated").descending(), pageable.getValue().getSort());
+    }
+
+    @Test
+    void aTooLargeLimitIsClamped() {
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        when(watchStatusRepository.findByUserEntityExternalIdAndTrackEntityAlbumEntityId(
+                eq("user-1"), eq(mediaId), pageable.capture())).thenReturn(List.of());
+
+        subject.trackHistory(authentication, TrackHistoryScope.ALBUM, mediaId, 10_000, Optional.empty());
+
+        assertEquals(500, pageable.getValue().getPageSize());
+    }
+
+    @Test
+    void anUnrestrictedCallerGetsTheArtistHistoryWithoutALibraryFilter() {
+        List<WatchStatusEntity> rows = List.of(statusUpdatedAt(Instant.parse("2026-08-20T10:00:00Z")));
+        when(watchStatusRepository.findTrackHistoryForPerson(mediaId, "user-1", 100)).thenReturn(rows);
+
+        assertEquals(rows, subject.trackHistory(authentication, TrackHistoryScope.ARTIST, mediaId, null, Optional.empty()));
+        verify(watchStatusRepository, never()).findTrackHistoryForPersonInLibraries(any(), any(), any(), anyInt());
+    }
+
+    @Test
+    void aRestrictedCallerGetsTheArtistHistoryOfTheirOwnLibrariesOnly() {
+        UUID libraryId = UUID.randomUUID();
+        List<WatchStatusEntity> rows = List.of(statusUpdatedAt(Instant.parse("2026-08-20T10:00:00Z")));
+        when(watchStatusRepository.findTrackHistoryForPersonInLibraries(
+                mediaId, "user-1", Set.of(libraryId), 100)).thenReturn(rows);
+
+        assertEquals(rows, subject.trackHistory(
+                authentication, TrackHistoryScope.ARTIST, mediaId, null, Optional.of(Set.of(libraryId))));
+    }
+
+    @Test
+    void aCallerWithoutAnyLibraryGetsAnEmptyArtistHistory() {
+        assertTrue(subject.trackHistory(
+                authentication, TrackHistoryScope.ARTIST, mediaId, null, Optional.of(Set.of())).isEmpty());
+        verify(watchStatusRepository, never()).findTrackHistoryForPerson(any(), any(), anyInt());
+        verify(watchStatusRepository, never()).findTrackHistoryForPersonInLibraries(any(), any(), any(), anyInt());
     }
 
     // --- markPlayed ---

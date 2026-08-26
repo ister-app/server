@@ -10,6 +10,12 @@ type Query {
     single updated entry. BOOK/COMIC also includes the listens of the book's chapters.
     """
     playbackHistory(mediaType: MediaType!, mediaId: ID!): [WatchStatus!]!
+    """
+    The calling user's plays of every track on an album, or of every track an artist is credited
+    on, newest first — one entry per play. Tracks in libraries the caller may not access are
+    omitted; an unknown or inaccessible container yields an empty list. limit defaults to 100.
+    """
+    trackPlaybackHistory(scope: TrackHistoryScope!, id: ID!, limit: Int): [WatchStatus!]!
     "One library by id; null when it does not exist or the caller may not access it."
     libraryById(id: ID!): Library
     episodeById(id: ID): Episode
@@ -778,6 +784,12 @@ enum RankKind {
     MOST_PLAYED
     HIGHEST_RATED
     RECENTLY_ADDED
+}
+
+"The container a track playback history is asked for."
+enum TrackHistoryScope {
+    ALBUM
+    ARTIST
 }
 
 "Page order of a comic/manga series: western comics read LTR, unflipped manga RTL."
@@ -1608,6 +1620,7 @@ type WatchStatus {
     chapter: Chapter
     book: Book
     podcastEpisode: PodcastEpisode
+    track: Track
     watched: Boolean!
     progressInMilliseconds: Int!
     "Epub reading position (epubcfi); only on book-level rows."
