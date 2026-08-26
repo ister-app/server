@@ -1,5 +1,37 @@
 # Changelog
 
+## server v3.0.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `3.0.0` |
+| `ghcr.io/ister-app/migrations` | `3.0.0` |
+
+### Breaking changes
+
+- feat(api)!: redesign the maintenance flows around scanLibraries/refreshMetadata/rebuildSearchIndex ([`e3bdadb`](https://github.com/ister-app/server/commit/e3bdadb))
+
+### Features
+
+- feat(api): expose extended TMDB metadata over GraphQL ([`d692003`](https://github.com/ister-app/server/commit/d692003))
+- feat(worker): fetch extended TMDB metadata (genres, ratings, trailers, extras) ([`cfb83b8`](https://github.com/ister-app/server/commit/cfb83b8))
+- feat(database): store extended TMDB metadata on movies, shows and episodes ([`4f5a645`](https://github.com/ister-app/server/commit/4f5a645))
+- feat(api): expose hideSubtitlesMatchingAudio over GraphQL ([`c51f19e`](https://github.com/ister-app/server/commit/c51f19e))
+- feat(database): store the hide-subtitles-matching-audio setting ([`ed94eda`](https://github.com/ister-app/server/commit/ed94eda))
+
+### Other
+
+- docs: describe the redesigned maintenance flows ([`1770042`](https://github.com/ister-app/server/commit/1770042))
+- docs: describe the extended TMDB metadata and its backfill ([`944a432`](https://github.com/ister-app/server/commit/944a432))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:3.0.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v2.20.0...v3.0.0
+
 ## server v2.20.0
 
 | Image | Tag |
