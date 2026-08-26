@@ -31,7 +31,7 @@ jobs:
 
       - uses: graalvm/setup-graalvm@5298d94fb55a4f185c602eeac5de1b553882abe2 # v1.6.4
         with:
-          version: '25.2.4' # GraalVM CE innovation release, jdk 25.0.4
+          version: '25.3.4.1' # GraalVM CE innovation release, jdk 25.0.4.1
           java-version: '25'
           distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
