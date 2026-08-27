@@ -1,5 +1,30 @@
 # Changelog
 
+## server v3.1.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `3.1.0` |
+| `ghcr.io/ister-app/migrations` | `3.1.0` |
+
+### Features
+
+- feat(api): expose the playback history of an album and an artist ([`6c704bc`](https://github.com/ister-app/server/commit/6c704bc))
+- feat(api): expose related shows scored on the stored show metadata ([`0484f44`](https://github.com/ister-app/server/commit/0484f44))
+
+### Other
+
+- chore(ci): bump GraalVM CE to 25.3.4.1 ([`4ced710`](https://github.com/ister-app/server/commit/4ced710))
+- perf(images): make image downloads cacheable with an ETag ([`a4fb962`](https://github.com/ister-app/server/commit/a4fb962))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:3.1.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v3.0.0...v3.1.0
+
 ## server v3.0.0
 
 | Image | Tag |
