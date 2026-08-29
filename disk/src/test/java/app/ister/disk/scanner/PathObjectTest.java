@@ -69,6 +69,39 @@ class PathObjectTest {
         assertEquals(FileType.IMAGE, subject.getFileType());
     }
 
+    // A forgotten closing paren after the year is tolerated on purpose: the
+    // trailing \)* in REGEX_SHOW is zero-or-more, so "Show (2002" still parses.
+    @Test
+    void showDirectoryWithMissingClosingParenTest() {
+        var subject = new PathObject("/disk/shows/Show (2002");
+        assertEquals(2002, subject.getYear());
+        assertEquals("Show", subject.getName());
+        assertEquals(0, subject.getSeason());
+        assertEquals(0, subject.getEpisode());
+        assertEquals(DirType.SHOW, subject.getDirType());
+        assertEquals(FileType.NONE, subject.getFileType());
+    }
+
+    @Test
+    void episodeInShowDirectoryWithMissingClosingParenTest() {
+        var subject = new PathObject("/disk/shows/Show (2002/Season 01/s01e01.mkv");
+        assertEquals(2002, subject.getYear());
+        assertEquals("Show", subject.getName());
+        assertEquals(1, subject.getSeason());
+        assertEquals(1, subject.getEpisode());
+        assertEquals(DirType.EPISODE, subject.getDirType());
+        assertEquals(FileType.MEDIA, subject.getFileType());
+    }
+
+    @Test
+    void imageInShowDirectoryWithMissingClosingParenTest() {
+        var subject = new PathObject("/disk/shows/Show (2002/cover.jpg");
+        assertEquals(2002, subject.getYear());
+        assertEquals("Show", subject.getName());
+        assertEquals(DirType.SHOW, subject.getDirType());
+        assertEquals(FileType.IMAGE, subject.getFileType());
+    }
+
     @Test
     void showTest() {
         var subject = new PathObject("/disk/shows/Show (2024)");
