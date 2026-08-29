@@ -151,6 +151,37 @@ class ImageScannerTest {
     }
 
     @Test
+    void analyzePosterNameIsNotDropped() {
+        ImageEntity result = (ImageEntity) subject.analyze(
+                DirectoryEntity.builder().nodeEntity(NodeEntity.builder().name("disk1").build()).build(),
+                Path.of("/disk/show/Show (2024)/poster.jpg"), false, 0).orElseThrow();
+        assertEquals(ImageType.COVER, result.getType());
+    }
+
+    @Test
+    void analyzeBackgroundWinsOverCoverInMixedNames() {
+        ImageEntity result = (ImageEntity) subject.analyze(
+                DirectoryEntity.builder().nodeEntity(NodeEntity.builder().name("disk1").build()).build(),
+                Path.of("/disk/show/Show (2024)/cover-thumb.jpg"), false, 0).orElseThrow();
+        assertEquals(ImageType.BACKGROUND, result.getType());
+    }
+
+    @Test
+    void analyzeMusicArtistJpgIsNotDropped() {
+        LibraryEntity musicLib = LibraryEntity.builder().libraryType(LibraryType.MUSIC).build();
+        DirectoryEntity musicDir = DirectoryEntity.builder()
+                .path("/music")
+                .libraryEntity(musicLib)
+                .nodeEntity(NodeEntity.builder().name("disk1").build())
+                .build();
+
+        ImageEntity result = (ImageEntity) subject.analyze(musicDir, Path.of("/music/The Beatles/artist.jpg"), false, 0).orElseThrow();
+
+        assertEquals(ImageType.COVER, result.getType());
+        verify(scannerHelperService).getOrCreatePerson(any(), eq("The Beatles"), anyInt());
+    }
+
+    @Test
     void analyzeMusicArtistImageLinksToArtist() {
         LibraryEntity musicLib = LibraryEntity.builder().libraryType(LibraryType.MUSIC).build();
         DirectoryEntity musicDir = DirectoryEntity.builder()

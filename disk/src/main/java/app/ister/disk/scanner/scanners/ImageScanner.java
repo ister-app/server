@@ -39,8 +39,11 @@ import java.util.Optional;
 @Transactional(propagation = Propagation.REQUIRES_NEW)
 @RequiredArgsConstructor
 public class ImageScanner implements Scanner {
+    // Must cover every name the path parsers accept (MusicPathObject/BookPathObject/
+    // ComicPathObject *_IMAGE_NAMES), or an accepted file is silently dropped as UNKNOWN.
+    // BACKGROUND is matched first, so e.g. "cover-thumb" becomes a BACKGROUND.
     private static final List<String> BACKGROUND_FILE_NAMES = List.of("background", "thumb");
-    private static final List<String> COVER_FILE_NAMES = List.of("cover");
+    private static final List<String> COVER_FILE_NAMES = List.of("cover", "folder", "poster", "artist");
     private static final List<String> AUDIO_EXTENSIONS = List.of("mp3", "flac", "aac", "opus", "ogg", "wav", "m4a", "wma");
     private final ScannerHelperService scannerHelperService;
     private final ImageRepository imageRepository;
