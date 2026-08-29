@@ -41,6 +41,11 @@ out/
 db-data/
 db-data-1/
 
+### Quick-start volumes (docker-compose.yml)
+media/
+cache-data/
+transcode-tmp/
+
 ### Typesense data
 typesense-data/
 

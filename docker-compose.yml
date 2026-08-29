@@ -5,7 +5,10 @@ services:
     image: postgres:18
     restart: always
     volumes:
-      - ./db-data/:/var/lib/postgresql/data/:Z
+      # postgres:18+ wants the mount one level up from the data directory, so the
+      # major-version subdirectory (18/docker) lands inside the volume and
+      # pg_upgrade can work across it. Mounting /var/lib/postgresql/data fails.
+      - ./db-data/:/var/lib/postgresql/:Z
     environment:
       POSTGRES_USER: ister
       POSTGRES_PASSWORD: ister
@@ -31,6 +34,26 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+  keycloak:
+    # Development identity provider with a pre-imported "Ister" realm
+    # (test user ister/ister with the admin role, public client "ister").
+    # For production, replace this with your own OIDC provider — see the
+    # "Users, sharing, and access" chapter in doc/admin.
+    #
+    # The realm issuer must look the same to the server container and to your
+    # browser. Both use http://keycloak:8060, so add this line to /etc/hosts
+    # on the machine you browse from:
+    #   127.0.0.1 keycloak
+    image: quay.io/keycloak/keycloak:26.4
+    restart: always
+    command: ["start-dev", "--import-realm", "--http-port=8060"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    volumes:
+      - ./keycloak/:/opt/keycloak/data/import/:Z
+    ports:
+      - "8060:8060"
   migrations:
     image: ghcr.io/ister-app/migrations:latest
     environment:
@@ -50,22 +73,32 @@ services:
       APP_ISTER_SERVER_URL: http://localhost:8080
       APP_ISTER_DISK_LIBRARIES_0_NAME: shows
       APP_ISTER_DISK_LIBRARIES_0_TYPE: SHOW
-#      APP_ISTER_DISK_DIRECTORIES_0_NAME: disk1
-#      APP_ISTER_DISK_DIRECTORIES_0_PATH: /disk1
-#      APP_ISTER_DISK_DIRECTORIES_0_LIBRARY: shows
+      APP_ISTER_DISK_DIRECTORIES_0_NAME: disk1
+      APP_ISTER_DISK_DIRECTORIES_0_PATH: /media/shows
+      APP_ISTER_DISK_DIRECTORIES_0_LIBRARY: shows
 #      APP_ISTER_DISK_DIRECTORIES_1_NAME: disk2
-#      APP_ISTER_DISK_DIRECTORIES_1_PATH: /disk2
+#      APP_ISTER_DISK_DIRECTORIES_1_PATH: /media/shows2
 #      APP_ISTER_DISK_DIRECTORIES_1_LIBRARY: shows
       SPRING_RABBITMQ_HOST: rabbitMQ
       SPRING_RABBITMQ_USERNAME: user
       SPRING_RABBITMQ_PASSWORD: password
-      OIDC_URL: https://localhost:8060/realms/Ister
+      OIDC_URL: http://keycloak:8060/realms/Ister
+      # API Read Access Token from https://www.themoviedb.org/settings/api.
+      # Leave empty to skip metadata fetching (scanning still works).
+      APP_ISTER_SERVER_TMDB_APIKEY: ""
       # Hardware acceleration — uncomment ONE block:
       # VAAPI (Intel/AMD):
 #      HLS_HWACCEL: vaapi
 #      HLS_HWACCEL_DEVICE: /dev/dri/renderD128
       # NVDEC (NVIDIA):
 #      HLS_HWACCEL: nvdec
+    volumes:
+      # Your media. The quick start scans ./media/shows/ as the "shows" library.
+      - ./media/:/media/:Z
+      # Image cache — persistent, or every artwork is re-fetched after a restart.
+      - ./cache-data/:/cache/:Z
+      # HLS transcode segments — safe to lose, but sized by what you stream.
+      - ./transcode-tmp/:/tmp/ister/:Z
     ports:
       - "8080:8080"
     depends_on:
@@ -73,6 +106,8 @@ services:
         condition: service_completed_successfully
       rabbitMQ:
         condition: service_healthy
+      keycloak:
+        condition: service_started
     # VAAPI device access (uncomment for Intel/AMD hardware decoding):
 #    devices:
 #      - /dev/dri/renderD128:/dev/dri/renderD128

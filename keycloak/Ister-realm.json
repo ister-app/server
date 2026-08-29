@@ -1,0 +1,67 @@
+{
+  "realm": "Ister",
+  "enabled": true,
+  "registrationAllowed": false,
+  "ssoSessionIdleTimeout": 1800,
+  "accessTokenLifespan": 300,
+  "roles": {
+    "realm": [
+      {
+        "name": "user",
+        "description": "Regular Ister user: may browse and play everything they have access to"
+      },
+      {
+        "name": "admin",
+        "description": "Ister administrator: scanning, metadata refresh, library access management"
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "ister",
+      "enabled": true,
+      "firstName": "Ister",
+      "lastName": "Admin",
+      "email": "ister@example.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ister",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["user", "admin"]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "ister",
+      "name": "Ister player",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["*"],
+      "webOrigins": ["*"],
+      "defaultClientScopes": ["basic", "profile", "email", "roles"],
+      "protocolMappers": [
+        {
+          "name": "realm roles as flat roles claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ]
+}
