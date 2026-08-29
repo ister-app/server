@@ -18,7 +18,10 @@ en de gebruikelijke verdachten wanneer iets er raar uitziet.
 | Pre-transcode | worker | elke 15 min | warmt HLS-uitvoer op voor wat gebruikers waarschijnlijk als volgende afspelen |
 | Continue-watching-rebuild | worker | 's nachts, 03:30 | herberekent de continue-watching-lijst van elke gebruiker vanaf nul; verwijdert items waarvan de media weg is |
 | Podcast-verversing | worker | elk uur | haalt elke geabonneerde feed op, zet downloads van nieuwe afleveringen in de queue |
-| Token-sweeps | core/transcoder | continu / 12 u | laten streamtokens en afspeelsessies verlopen; verversen node-tokens |
+| Transcode-cache-sweep | transcoder | elke 15 min | verwijdert afgeronde HLS-uitvoer ouder dan `cache-retention-hours` (2 u), met respect voor de `keep_until`-markering van elke sessie — dít is de sweep die tussen de dagelijkse runs door daadwerkelijk HLS-ruimte vrijmaakt |
+| Streamtoken-verloop | database | elk uur | verwijdert verlopen HLS-/afbeeldings-streamtokens |
+| Afspeelsessie-sweep | core | elke 15 s | laat verlopen client-afspeelsessies uit het live register verdwijnen |
+| Node-token-verversing | transcoder | elke 12 u | ververst de tokens waarmee nodes zich bij elkaar authenticeren |
 
 **Belangrijk:** de cache-opschoning wordt geleverd met
 **`app.ister.server.cache-cleanup.dry-run=true`** — standaard *logt* hij alleen wat hij zou
@@ -51,9 +54,24 @@ Dus: `pg_dump` op een schema, en doe geen moeite om de caches te back-uppen.
   Prometheus); een groeiende dead-letter-queue is het vroegste teken dat scannen of het ophalen
   van metadata faalt.
 - **Live activiteit** — de GraphQL-subscription `serverActivity` (zichtbaar op de
-  activiteitenpagina van de client) toont waar elke node op dit moment mee bezig is.
+  activiteitenpagina van de client) toont waar elke node op dit moment mee bezig is, **inclusief
+  de queue-dieptes** (`queueStats`) — voor een routinematige "loopt de achterstand leeg?"-check
+  heb je de RabbitMQ-UI niet nodig.
+- Poortbotsing om op te letten: de actuator luistert op **8081**, wat ook een populaire poort is
+  om een node op te publiceren (het meegeleverde multi-node-composebestand publiceert node 1 op
+  hostpoort 8081). Houd de managementpoort strikt intern — de endpoints zijn niet-geauthenticeerd
+  ([Configuratie](03-configuration.md)).
 
 ## Eenmalige upgrade-stappen
+
+**Crop-detectie en intro-/outro-detectie (`V37`/`V38`) vullen zich bij bij de eerste scan na de
+upgrade.** De eerste `scanLibraries`-run analyseert **elk bestaand videobestand** opnieuw
+(zwarte-balken-cropdetectie) en fingerprint **elke aflevering** (intro-/outro-detectie) — veruit
+het zwaarste onderdeel van de upgrade op een grote bibliotheek, en het concurreert met gewoon
+transcoderen om CPU. Ontsnappingsluiken om het uit te stellen:
+`app.ister.server.crop-detect-backfill=false` en
+`app.ister.server.segment-detect-backfill=false`; nieuwe bestanden worden hoe dan ook
+geanalyseerd.
 
 **Artiesten worden samengevoegd bij de eerste start na migratie `V43`.** Tot dan kon één artiest
 meerdere keren bestaan — "ABBA" naast "Abba", en "X feat. Y" als derde artiest die noch X noch Y
@@ -76,6 +94,11 @@ Speelduur/stemmen van afleveringen hebben zo'n marker niet — ververs bestaande
 `refreshMetadata(mode: FORCE, libraryId: …)` per showbibliotheek (of `refreshShow` per show). De
 zoekindex volgt automatisch (geen `rebuildSearchIndex` nodig — de `genre_<tag>`-velden bestaan al
 in het collectieschema).
+
+**Scan één keer opnieuw na de artwork-naamfix.** Lokale artwork-bestanden met `folder`, `poster`
+of `artist` in de naam werden vroeger stilletjes door de scanner genegeerd; ze worden nu
+geaccepteerd (zie [Naamconventies](08-naming-conventions.md)). Draai na de upgrade één keer
+`scanLibraries` om bestanden op te pikken die eerdere scans oversloegen.
 
 **Force-verversingen laten verweesde afbeeldingsbestanden achter.** De FORCE-flow en de per-item
 `refresh*`-mutations verwijderen afbeeldings-*rijen* en downloaden artwork onder nieuwe namen; de
@@ -100,8 +123,30 @@ een client voortgang via een ongebruikelijk pad heeft weggeschreven, kan hij ach
 nachtelijke rebuild (03:30) repareert dit; hij draait ook eenmalig bij het opstarten wanneer de
 tabel leeg is.
 
-**Zoeken geeft niets terug** — Typesense staat uit, is onbereikbaar, of is na het inschakelen
-nooit geherindexeerd. Zie [Zoeken](06-search-typesense.md).
+**Zoeken geeft een fout** ("Search is not configured on this server") — `TYPESENSE_ENABLED`
+staat op `false`. Staat zoeken wél aan maar is het *leeg*, dan is Typesense onbereikbaar of is er
+na het inschakelen nooit geherindexeerd. Zie [Zoeken](06-search-typesense.md).
+
+**Een node weigert te starten met "Directory X name is already used by an other node"** — twee
+nodes claimen dezelfde directorynaam. Het opstarten breekt bewust af; hernoem één kant (of
+repareer de gekopieerde configuratie) — zie [Multi-node](05-multi-node.md).
+
+**Lokaal artwork verschijnt niet** — de bestandsnaam van de afbeelding moet een van `cover`,
+`folder`, `poster`, `artist` (poster/cover) of `thumb`, `background` (backdrop) bevatten; al het
+andere wordt genegeerd. Zie [Naamconventies](08-naming-conventions.md).
+
+**Een handler blijft dezelfde bestanden herverwerken** — de klassieke interactie met RabbitMQ's
+`consumer_timeout`: een bericht waarvan het werk langer duurt dan de 30-minuten-consumer-timeout
+van de broker wordt opnieuw in de queue gezet en begint opnieuw, eindeloos. De standaardwaarden
+beschermen hiertegen (`prefetch=1`, sweeps in chunks — zie de commentaren in `core.properties` en
+`disk.properties`); heb je een chunkgrootte verhoogd of de broker-timeout verlaagd, zet dat dan
+terug.
+
+**Geen skip-intro-knop op sommige afleveringen** — intro-/outro-detectie vergelijkt afleveringen
+binnen een seizoen en stempelt per bestand een detectorversie-markering. Een seizoen verspreid
+over meerdere nodes paart alleen de afleveringen die lokaal op elke node staan, en een node met
+één losse aflevering detecteert niets. Zie
+[Scannen en analyse](../../architecture/nl/02-scanning-and-analysis.md).
 
 **Schijf loopt vol** — controleer of de cache-opschoning nog in dry-run staat (zie hierboven),
 en kijk naar de grootte van `CACHE_DIR`/`TMP_DIR` in verhouding tot podcastretentie en

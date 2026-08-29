@@ -5,9 +5,11 @@ description: Optioneel full-text zoeken met Typesense in Ister inschakelen en on
 # Zoeken (Typesense)
 
 Full-text zoeken door alle libraries is optioneel en draait op
-[Typesense](https://typesense.org/). Zonder werkt de server prima — de GraphQL-query `search`
-geeft dan gewoon niets terug. Mét krijgen clients snel, typefouttolerant, meertalig zoeken op
-titels, beschrijvingen en genres.
+[Typesense](https://typesense.org/). Zonder werkt de server prima — maar de GraphQL-query
+`search` faalt dan met een expliciete fout ("Search is not configured on this server"), hij
+geeft **geen** lege lijst terug. Mét krijgen clients snel, typefouttolerant, meertalig zoeken op
+titels, beschrijvingen en genres, gefilterd op de librarytoegang van de aanroeper
+([Gebruikers, delen en toegang](09-users-sharing-and-access.md)).
 
 ## Inschakelen
 
@@ -25,7 +27,9 @@ titels, beschrijvingen en genres.
 
 3. Herstart de server en draai dan eenmalig de GraphQL-mutation **`rebuildSearchIndex`** om de
    initiële index op te bouwen. Tot je dat doet is bestaande media niet doorzoekbaar — alleen
-   items die na het inschakelen worden aangeraakt zouden binnendruppelen.
+   items die na het inschakelen worden aangeraakt zouden binnendruppelen. (De collectie en alias
+   zelf worden bij het opstarten **leeg** aangemaakt, dus een lege-maar-aanwezige collectie in
+   Typesense is normaal vóór de eerste reindex.)
 
 De enabled-vlag wordt tijdens **runtime** gecontroleerd, niet in de image gebakken: dezelfde
 image bedient beide modi, en zoekevents worden simpelweg geconsumeerd en weggegooid zolang de
@@ -47,8 +51,9 @@ of als de index er ooit niet synchroon uitziet.
 
 ## Een taal toevoegen of verwijderen
 
-Zoekvelden worden per geconfigureerde taal gegenereerd (`title_en`, `description_nl`, …) en het
-collectieschema ligt **vast bij aanmaak**, dus een taalwijziging is een kleine procedure:
+Zoekvelden worden per geconfigureerde taal gegenereerd (`title_en`, `description_nl`, `genre_de`, …)
+— titelvelden wegen 5 in de ranking, beschrijvings- en genrevelden 1 — en het collectieschema ligt
+**vast bij aanmaak**, dus een taalwijziging is een kleine procedure:
 
 1. Werk `ISTER_LANGUAGES` bij (bijv. `en,nl,de`) en herstart de server(s).
 2. Haal metadata opnieuw op zodat de rijen van de nieuwe taal in PostgreSQL bestaan: draai de
@@ -62,9 +67,13 @@ er wordt niets uit PostgreSQL verwijderd.
 
 ## Probleemoplossing
 
-- **Zoeken geeft helemaal niets terug** — óf `TYPESENSE_ENABLED` staat nog op `false`, óf de
-  API-key is verkeerd, óf `rebuildSearchIndex` is na het inschakelen nooit gedraaid. Het serverlog
-  toont verbindingsfouten bij het opstarten en bij elke indexeerpoging.
+- **Zoeken geeft een fout** ("Search is not configured on this server") — `TYPESENSE_ENABLED`
+  staat nog op `false` op de node die de query beantwoordde.
+- **Zoeken staat aan maar geeft een lege lijst** — `rebuildSearchIndex` is na het inschakelen
+  nooit gedraaid (de bij het opstarten aangemaakte collectie is leeg), of de API-key/host is
+  verkeerd. Het serverlog toont verbindingsfouten bij het opstarten en bij elke indexeerpoging.
+- **Een reindex volgen in RabbitMQ** — de mutation heet `rebuildSearchIndex`, maar de queue die
+  hij voedt heet `app.ister.server.SearchReindexRequested`; zoek dus niet naar een "rebuild"-queue.
 - **Nieuwe taal niet doorzoekbaar** — je hebt stap 2 of 3 hierboven overgeslagen.
 - **De index overleeft serverherstarts**, maar leeft alleen in de datamap van Typesense; raak
   je dat volume kwijt, dan bouwt één `rebuildSearchIndex` alles opnieuw op uit PostgreSQL. Hij is

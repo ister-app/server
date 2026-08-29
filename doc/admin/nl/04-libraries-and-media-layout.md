@@ -31,12 +31,15 @@ app.ister.disk.directories[1].library=shows
 Directorynamen **moeten uniek zijn over het hele cluster** — ze benoemen de werkqueues per
 directory ([Multi-node](05-multi-node.md)). Schrijf paden **zonder slash aan het eind** en houd
 ze stabiel: het pad wordt letterlijk in de database opgeslagen en als stringprefix vergeleken,
-dus `/disk1` later veranderen in `/disk1/` telt als een padwijziging. Rijen worden bij elke
-start uit deze configuratie aangemaakt of bijgewerkt.
+dus `/disk1` later veranderen in `/disk1/` telt als een padwijziging. Bij het opstarten wordt deze
+configuratie asymmetrisch toegepast: het **pad** van een directory wordt in de database
+bijgewerkt, maar een library wordt alleen **aangemaakt** — `libraries[n].type` wijzigen na de
+eerste start doet stilletjes niets (verwijder de library en maak hem opnieuw aan). En claimt een
+andere node de directorynaam al, dan **breekt het opstarten af** ([Multi-node](05-multi-node.md)).
 
 ## Verwachte indeling per type
 
-Dit is de korte versie; [hoofdstuk 7](08-naming-conventions.md) is de volledige naamreferentie
+Dit is de korte versie; [hoofdstuk 8](08-naming-conventions.md) is de volledige naamreferentie
 (exacte patronen, geaccepteerde extensies, speciale bestanden en veelgemaakte fouten).
 
 **Series** — `Show Name (year)/Season NN/sNNeNN.mkv`:
@@ -73,16 +76,18 @@ nooit aan de bestandsnaam.
 `.epub`; losse patronen als `attackontitan_vol27.pdf`, `series_issue8.pdf` en `name#3.cbz`
 worden getolereerd.
 
-Herkende videocontainers: `mkv`, `mp4`; ondertitels: `.srt` naast de video (beeldondertitels in
-mkv worden geëxtraheerd en met OCR omgezet); lokale artwork: `jpg`/`png`; `.nfo`-bestanden
-worden gelezen voor metadata-hints.
+In SHOW- en MOVIE-libraries zijn de herkende videocontainers `mkv` en `mp4`; ondertitels: `.srt`
+naast de video (beeldondertitels in mkv worden geëxtraheerd en met OCR omgezet); lokale artwork:
+`jpg`/`png`; `.nfo`-bestanden worden gelezen voor metadata-hints. Andere librarytypes hebben hun
+eigen extensielijsten — zie de naamreferentie.
 
 ## Podcasts
 
 Een `PODCAST`-library heeft **helemaal geen directory** nodig — hij is feed-gebaseerd:
 
-- Abonneer vanuit de client (of via de GraphQL-mutation `subscribePodcast(feedUrl)`); het
-  zoeken in de client gebruikt de gratis iTunes Search API.
+- Abonneer vanuit de client (of via de GraphQL-mutation `subscribePodcast(feedUrl)` — alleen voor
+  admins, net als `unsubscribePodcast`); het zoeken in de client gebruikt de gratis iTunes Search
+  API.
 - Feeds verversen **elk uur**; de nieuwste afleveringen (standaard 3, `auto-download-count`)
   worden automatisch naar de cachemap gedownload, oudere op verzoek wanneer een gebruiker ze
   afspeelt.
@@ -98,8 +103,10 @@ De onderhouds-mutations (ook beschikbaar in de beheerschermen van de client):
 | `scanLibraries(libraryId?)` | Er zijn nieuwe bestanden toegevoegd — er is geen filesystem-watcher. Optioneel per bibliotheek. | Goedkoop; bekende bestanden worden overgeslagen. |
 | `refreshMetadata(MISSING, libraryId?)` | Backfill: haal metadata/afbeeldingen alleen op waar ze ontbreken (bv. na het toevoegen van een TMDB-key), bereken ontbrekende blur-hashes. | Goedkoop en idempotent; altijd veilig. |
 | `refreshMetadata(FORCE, libraryId)` | Eén bibliotheek opnieuw opbouwen: opgeslagen metadata, afbeeldingen en streaminfo wissen en alles opnieuw ophalen (bv. na een verkeerde match, of om nieuwe velden op oude items te vullen). | Zwaar: een externe fetch per item, ffprobe per bestand. |
-| `refreshMovie/Show/Episode/Person/Album/Track(id)` | Dezelfde wipe-en-herfetch voor één item (het ⋮-menu op de detailpagina). | Eén item (een show waaiert uit naar zijn afleveringen). |
+| `refreshMovie/Show/Episode/Person/Album/Track(id)` | Dezelfde wipe-en-herfetch voor één item (het ⋮-menu op de detailpagina). Er is **geen** per-item-verversing voor boeken, comics of podcasts. | Eén item (een show waaiert uit naar zijn afleveringen). |
 | `rebuildSearchIndex` | De Typesense-index opnieuw opbouwen in een verse collectie (na het inschakelen van zoeken of het wijzigen van talen). | Leest de hele database één keer; zoeken blijft beschikbaar. |
+| `refreshPodcasts` | Alle geabonneerde feeds nu ophalen in plaats van op de uurlijkse verversing te wachten. **Niet** admin-only. | Goedkoop (conditional GET per feed). |
+| `downloadPodcastEpisode(episodeId)` | Eén oudere aflevering op verzoek naar de cache halen. Niet admin-only. | Eén download. |
 
 Alle zijn asynchroon — ze zetten events in de queue en keren meteen terug; de voortgang is
 zichtbaar in het activiteitenscherm van de client. Een scan haalt **geen** metadata opnieuw op voor

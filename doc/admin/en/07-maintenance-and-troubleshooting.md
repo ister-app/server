@@ -17,7 +17,10 @@ should know about, what to back up, and the usual suspects when something looks 
 | Pre-transcode | worker | every 15 min | warms up HLS output for what users will likely play next |
 | Continue-watching rebuild | worker | nightly, 03:30 | recomputes each user's continue-watching list from scratch; prunes entries whose media is gone |
 | Podcast refresh | worker | hourly | fetches every subscribed feed, queues new episode downloads |
-| Token sweeps | core/transcoder | continuous / 12 h | expire stream tokens and playback sessions; refresh node tokens |
+| Transcode cache sweep | transcoder | every 15 min | deletes finished HLS output older than `cache-retention-hours` (2 h), honouring each session's `keep_until` marker — this is the sweep that actually frees HLS space between the daily runs |
+| Stream-token expiry | database | hourly | deletes expired HLS/image stream tokens |
+| Playback-session sweep | core | every 15 s | expires stale client playback sessions from the live registry |
+| Node-token refresh | transcoder | every 12 h | refreshes the tokens nodes use to authenticate to each other |
 
 **Important:** the cache cleanup ships with
 **`app.ister.server.cache-cleanup.dry-run=true`** — by default it only *logs* what it would
@@ -48,9 +51,21 @@ So: `pg_dump` on a schedule, and don't bother backing up the caches.
   headers. Watch its depth (RabbitMQ management UI on 15672, or Prometheus); a growing
   dead-letter queue is the earliest sign that scanning or metadata fetching is failing.
 - **Live activity** — the `serverActivity` GraphQL subscription (surfaced in the client's
-  activity page) shows what each node is busy with right now.
+  activity page) shows what each node is busy with right now, **including per-queue depths**
+  (`queueStats`) — for routine "is the backlog draining?" checks you don't need the RabbitMQ UI.
+- Port clash to watch for: the actuator listens on **8081**, which is also a popular port to
+  publish a node on (the bundled multi-node compose file publishes node 1 on host port 8081).
+  Keep the management port strictly internal — its endpoints are unauthenticated
+  ([Configuration](03-configuration.md)).
 
 ## One-off upgrade steps
+
+**Crop detection and intro/outro detection (`V37`/`V38`) backfill on the first scan after the
+upgrade.** The first `scanLibraries` run re-analyzes **every existing video file** (black-bar crop
+detection) and audio-fingerprints **every episode** (intro/outro detection) — by far the heaviest
+part of the upgrade on a large library, and it competes with normal transcoding for CPU. Escape
+hatches to defer it: `app.ister.server.crop-detect-backfill=false` and
+`app.ister.server.segment-detect-backfill=false`; new files are still analyzed either way.
 
 **Artists are merged on first start after the `V43` migration.** Until then an artist could exist
 several times over — "ABBA" next to "Abba", and "X feat. Y" as a third artist neither X nor Y could
@@ -73,6 +88,11 @@ re-enrich existing episodes with `refreshMetadata(mode: FORCE, libraryId: …)` 
 `refreshShow` per show). The search index follows automatically (no `rebuildSearchIndex` needed —
 the `genre_<tag>` fields already exist in the collection schema).
 
+**Rescan once after the artwork-naming fix.** Local artwork files named `folder`, `poster` or
+`artist` used to be silently dropped by the scanner; they are accepted now (see
+[Naming conventions](08-naming-conventions.md)). Run `scanLibraries` once after upgrading to pick
+up files that were skipped by earlier scans.
+
 **Force refreshes leave orphaned image files behind.** The FORCE flow and the per-item `refresh*`
 mutations delete image *rows* and re-download artwork under fresh names; the old cache files are
 reclaimed by the daily cache cleanup — which only logs until `CACHE_CLEANUP_DRY_RUN=false` (see
@@ -94,8 +114,28 @@ GPU setup (device mapping, `render` group) from the pipeline.
 wrote progress through an unusual path it can lag. The nightly rebuild (03:30) repairs it; it
 also runs once at startup when the table is empty.
 
-**Search returns nothing** — Typesense is disabled, unreachable, or was never reindexed after
+**Search returns an error** ("Search is not configured on this server") — `TYPESENSE_ENABLED`
+is `false`. If search is enabled but *empty*, it is unreachable or was never reindexed after
 enabling. See [Search](06-search-typesense.md).
+
+**A node refuses to start with "Directory X name is already used by an other node"** — two nodes
+claim the same directory name. Startup aborts on purpose; rename one side (or fix the copied
+config) — see [Multi-node](05-multi-node.md).
+
+**Local artwork does not appear** — the image filename must contain one of `cover`, `folder`,
+`poster`, `artist` (poster/cover) or `thumb`, `background` (backdrop); anything else is ignored.
+See [Naming conventions](08-naming-conventions.md).
+
+**A handler keeps re-processing the same files** — classic RabbitMQ `consumer_timeout`
+interaction: a message whose work outlives the broker's 30-minute consumer timeout is requeued
+and starts over, forever. The defaults guard against this (`prefetch=1`, chunked sweeps — see the
+comments in `core.properties` and `disk.properties`); if you raised a chunk size or lowered the
+broker timeout, put it back.
+
+**No skip-intro button on some episodes** — intro/outro detection compares episodes within a
+season and stamps a detector-version sentinel per file. A season spread over multiple nodes only
+pairs episodes local to each node, and a node holding a single stray episode detects nothing. See
+[Scanning and analysis](../../architecture/en/02-scanning-and-analysis.md).
 
 **Disk filling up** — check whether cache cleanup is still in dry-run (see above), and look at
 `CACHE_DIR`/`TMP_DIR` sizes versus podcast retention and pre-transcode activity.

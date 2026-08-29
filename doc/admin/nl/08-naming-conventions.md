@@ -5,7 +5,7 @@ description: Volledige naamgevingsreferentie voor Ister-libraries, met de exacte
 # Naamconventies per librarytype
 
 De scanner leidt alles af uit paden en bestandsnamen; de juiste namen zijn dus wat een library
-"gewoon laat werken". [Hoofdstuk 3](04-libraries-and-media-layout.md) geeft de korte versie; deze
+"gewoon laat werken". [Hoofdstuk 4](04-libraries-and-media-layout.md) geeft de korte versie; deze
 pagina is de volledige referentie van wat de parsers werkelijk accepteren, per librarytype.
 Bestanden en mappen die nergens op matchen worden **stilzwijgend genegeerd** — een titel die nooit
 verschijnt is bijna altijd een naamgevingsprobleem.
@@ -15,8 +15,13 @@ Regels die overal gelden:
 - Een jaartal-suffix is altijd precies **vier cijfers tussen haakjes**: `(2019)`. `[2019]`, `2019`
   en `(19)` worden niet herkend.
 - Extensies zijn hoofdletterongevoelig (`Cover.JPG` werkt).
-- Mappen waarvan de naam met een `.` begint worden volledig overgeslagen.
-- Zet geen punt in een mapnaam — een naam met een punt wordt voor een bestand aangezien.
+- Mappen waarvan de naam met een `.` **begint** worden volledig overgeslagen. Punten elders in een
+  naam zijn prima — "J.K. Rowling", "R.E.M." en "Dr. Stone" werken allemaal.
+- Het artwork-type wordt bepaald door substring-matching op de bestandsnaam (zonder extensie): een
+  naam met `background` of `thumb` erin wordt de **achtergrond**, een naam met `cover`, `folder`,
+  `poster` of `artist` de **poster/hoes** — en bevat een naam beide soorten tokens, dan wint de
+  achtergrond. Welke van deze namen op welk mapniveau worden geaccepteerd, verschilt per
+  librarytype; zie de secties hieronder.
 
 ## Series
 
@@ -32,6 +37,8 @@ The Wire (2002)/
     s01e12.mkv
     s01e12.en.srt
     s01e12-thumb.jpg
+  Season 04/
+    s04e06-e07.mkv                # dubbele aflevering: één bestand, twee afleveringen
 ```
 
 - De seriemap **moet** eindigen op `(jaar)`; een seizoensmap direct onder de library-root wordt
@@ -41,11 +48,21 @@ The Wire (2002)/
 - Afleveringsbestanden dragen een `sNNeNN`-token (elk 1–4 cijfers, hoofdletterongevoelig):
   `s01e12.mkv`, `S05E05.mp4`. Titel en jaar van de serie komen altijd uit de seriemap, niet uit de
   bestandsnaam.
+- Het **seizoensnummer in de bestandsnaam wint van de map**: `Season 02/s01e01.mkv` belandt in
+  seizoen 1.
+- **Multi-aflevering-bestanden**: `s04e06-e07.mkv` (ook geschreven als `s04e06e07` of
+  `s04e06-07`) maakt beide afleveringen aan, wijzend naar dat ene bestand, tot maximaal **drie**
+  afleveringen per bestand. Een onplausibele reeks (achterstevoren, of breder dan drie) wordt
+  gelogd en behandeld als alleen de eerste aflevering.
 - Videocontainers: `.mkv`, `.mp4`. Ondertitels: `.srt` naast de aflevering, gekoppeld op
   bestandsnaam-prefix; een taalcode tussen de laatste twee punten (`s01e01.en.srt`,
-  `s01e01.nld.srt`) bepaalt de ondertiteltaal.
+  `s01e01.nld.srt`) bepaalt de ondertiteltaal. In de container ingebedde beeldondertitels worden
+  ge-OCR'd; streams zonder taaltag vallen terug op
+  `app.ister.server.subtitle-ocr-default-language` (standaard `eng`).
 - NFO-bestanden: `tvshow.nfo` op serieniveau, `sNNeNN*.nfo` op afleveringsniveau.
-- Artwork: `.jpg`/`.png` met `cover` (poster) of `background`/`thumb` (achtergrond) in de naam.
+- Artwork: `.jpg`/`.png` met `cover`, `folder`, `poster` of `artist` (poster) dan wel
+  `background`/`thumb` (achtergrond) in de naam — substring-matching, achtergrond wint bij
+  gemengde namen.
 
 ## Films
 
@@ -56,14 +73,16 @@ The Wire (2002)/
 ```
 Heat (1995)/
   Heat (1995).mkv
-  Heat (1995).jpg
+  Heat (1995)-cover.jpg
 ```
 
 - De **bestandsnaam** moet eindigen op `(jaar)` vóór de extensie — dat onderscheidt een film van
   een los videobestand. Een omhullende map is optioneel; `Film (2024).mkv` direct in de
   library-root werkt ook.
-- Een suffix van letters/streepjes na het jaar mag en wordt gebruikt voor artwork:
-  `Heat (1995)-thumb.jpg` wordt de achtergrond.
+- Een suffix van letters/streepjes na het jaar mag en wordt gebruikt voor artwork, volgens de
+  typeregel hierboven: `Heat (1995)-cover.jpg` (of `-poster`/`-folder`) wordt de poster,
+  `Heat (1995)-thumb.jpg` (of `-background`) de achtergrond. Een kaal `Heat (1995).jpg` bevat
+  **geen** type-token en wordt genegeerd.
 - Dezelfde containers als series (`.mkv`, `.mp4`). `.nfo`-bestanden en ondertitels op filmniveau
   worden op dit moment niet opgepakt.
 
@@ -88,8 +107,13 @@ Grease_ Soundtrack (1991)/        # plat: geen artiestenmap
 - Een optioneel `(jaar)` op de artiestenmap is het geboortejaar van de artiest; op de albummap is
   het het releasejaar.
 - Tracknummers komen uit de voorloopcijfers van de bestandsnaam: `01 - Titel`, `01. Titel`,
-  `01-Titel` werken allemaal; `1-01 - Titel` wordt gelezen als disc 1, track 1. Zonder bruikbaar
-  nummer komt het tracknummer uit de audiotags.
+  `01-Titel` werken allemaal; `1-01 - Titel` wordt gelezen als disc 1, track 1. Zonder
+  voorloopcijfers worden de op ` - ` gescheiden segmenten afgezocht naar een nummer
+  (`Artiest - 20 - Titel` → track 20), en lukt ook dat niet, dan komt het tracknummer uit de
+  audiotags.
+- Albummapnamen worden genormaliseerd: een formaat-suffix aan het eind (` FLAC`, `(MP3)`,
+  `[FLAC]`, …) en een leidende `{Artiest} - `-prefix worden weggehaald, dus
+  `The Beatles - Abbey Road (1969) [FLAC]` en `Abbey Road (1969)` zijn hetzelfde album.
 - Een **plat album** direct onder de library-root (zonder artiestenmap) mag; de artiest komt dan
   uit de `album_artist`-tag in de bestanden.
 - Tags bepalen wie wat uitvoert: `album_artist` identificeert het album, `artist` de uitvoerder van
@@ -100,9 +124,10 @@ Grease_ Soundtrack (1991)/        # plat: geen artiestenmap
 - Artiestennamen worden vergeleken zonder te letten op hoofdletters en dubbele spaties, dus "ABBA"
   en "Abba" zijn één artiest.
 - Audioformaten: `mp3`, `flac`, `aac`, `opus`, `ogg`, `wav`, `m4a`, `wma`.
-- Speciale bestanden: `artist.nfo` en artiestafbeeldingen (`artist.jpg`, `folder.jpg`) op
-  artiestenniveau; `album.nfo` en hoezen (`cover.jpg`, `folder.png`) op albumniveau. Andere
-  `.nfo`-namen worden genegeerd.
+- Speciale bestanden: `artist.nfo` op artiestenniveau plus artiestafbeeldingen met `artist`,
+  `folder`, `background` of `thumb` in de naam; `album.nfo` op albumniveau plus hoezen met `cover`
+  of `folder` in de naam. Andere `.nfo`-namen worden genegeerd; het type volgt de
+  achtergrond-/posterregel hierboven.
 
 ## Boeken
 
@@ -132,8 +157,9 @@ Terry Pratchett/
   maar of hij echt voorleesaudio heeft (EPUB 3 media overlays) wordt uit de **inhoud** van de epub
   gedetecteerd, nooit uit de naam. Ook het ISBN wordt uit de epub zelf gelezen, niet uit de
   bestandsnaam.
-- Audioformaten: als muziek, plus `m4b`. Speciale bestanden: `artist.nfo` op auteursniveau;
-  `album.nfo` of `book.nfo` plus covers op boekniveau.
+- Audioformaten: als muziek, plus `m4b`. Speciale bestanden: `artist.nfo` op auteursniveau plus
+  auteursafbeeldingen met `artist`, `folder`, `background` of `thumb` in de naam; `album.nfo` of
+  `book.nfo` op boekniveau plus covers met `cover` of `folder` in de naam.
 
 ## Comics
 
@@ -159,15 +185,17 @@ Attack on Titan (2009)/
   `Saga #12`), of losse cijfers aan het eind (`fairytail 3`). Bestanden zonder nummer sorteren
   achteraan.
 - Formaten: `.cbz`, `.pdf`, `.epub`. Meerdere formaten van hetzelfde volume (zelfde basisnaam)
-  worden één volume. Een `ComicInfo.xml` wordt uit de **binnenkant** van het cbz-archief gelezen,
-  niet uit de map.
-- Serie-artwork: `.jpg`/`.jpeg`/`.png` met `cover`, `folder`, `poster` of `background` in de naam.
+  worden één volume, en een `-N` aan het eind wordt weggehaald als dedupe-suffix van een
+  her-download — `…part2.pdf` en `…part2-1.pdf` zijn hetzelfde volume. Een `ComicInfo.xml` wordt
+  uit de **binnenkant** van het cbz-archief gelezen, niet uit de map.
+- Serie-artwork: `.jpg`/`.jpeg`/`.png` met `cover`, `folder`, `poster` of `background` in de naam
+  (het type volgt de achtergrond-/posterregel hierboven).
 
 ## Podcasts
 
 Geen naamregels — een `PODCAST`-library heeft helemaal geen map op schijf. Afleveringen komen uit
 de RSS-feed en worden naar de cache gedownload; zie
-[hoofdstuk 3](04-libraries-and-media-layout.md#podcasts).
+[hoofdstuk 4](04-libraries-and-media-layout.md#podcasts).
 
 ## Als iets niet wordt opgepakt
 

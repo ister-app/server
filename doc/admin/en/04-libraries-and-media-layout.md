@@ -31,12 +31,15 @@ app.ister.disk.directories[1].library=shows
 Directory **names must be unique across the whole cluster** — they name the per-directory work
 queues ([Multi-node](05-multi-node.md)). Write paths **without a trailing slash** and keep them
 stable: the path is stored verbatim in the database and compared as a string prefix, so changing
-`/disk1` to `/disk1/` later counts as a path change. Rows are created/updated from this config at
-every startup.
+`/disk1` to `/disk1/` later counts as a path change. At startup this config is applied
+asymmetrically: a directory's **path** is updated in the database, but a library is only
+**created** — changing `libraries[n].type` after the first start silently does nothing (delete the
+library and re-create it instead). And if a directory name is already claimed by another node,
+startup **aborts** ([Multi-node](05-multi-node.md)).
 
 ## Expected layout per type
 
-This is the short version; [chapter 7](08-naming-conventions.md) is the full naming reference
+This is the short version; [chapter 8](08-naming-conventions.md) is the full naming reference
 (exact patterns, accepted extensions, special files, and common mistakes).
 
 **Shows** — `Show Name (year)/Season NN/sNNeNN.mkv`:
@@ -72,16 +75,17 @@ never from the filename.
 `.epub`; loose patterns like `attackontitan_vol27.pdf`, `series_issue8.pdf` and `name#3.cbz`
 are tolerated.
 
-Video containers recognised: `mkv`, `mp4`; subtitles: `.srt` next to the video (image subtitles
-inside mkv are extracted and OCR'd); local artwork: `jpg`/`png`; `.nfo` files are read for
-metadata hints.
+In SHOW and MOVIE libraries the recognised video containers are `mkv` and `mp4`; subtitles: `.srt`
+next to the video (image subtitles inside mkv are extracted and OCR'd); local artwork: `jpg`/`png`;
+`.nfo` files are read for metadata hints. Other library types accept their own extension lists —
+see the naming reference.
 
 ## Podcasts
 
 A `PODCAST` library needs **no directory at all** — it is feed-based:
 
-- Subscribe from the client (or the GraphQL `subscribePodcast(feedUrl)` mutation); the directory
-  search in the client uses the free iTunes Search API.
+- Subscribe from the client (or the GraphQL `subscribePodcast(feedUrl)` mutation — admin-only, as
+  is `unsubscribePodcast`); the directory search in the client uses the free iTunes Search API.
 - Feeds refresh **hourly**; the newest episodes (default 3, `auto-download-count`) are downloaded
   automatically into the cache directory, older ones on demand when a user plays them.
 - Downloads expire after 30 days (`podcast-retention-days`) unless someone is mid-episode.
@@ -95,8 +99,10 @@ The maintenance mutations (also exposed in the client's admin screens):
 | `scanLibraries(libraryId?)` | New files were added — there is no filesystem watcher. Optionally scoped to one library. | Cheap; known files are skipped. |
 | `refreshMetadata(MISSING, libraryId?)` | Backfill: fetch metadata/artwork only where missing (e.g. after adding a TMDB key), recompute missing blur-hashes. | Cheap and idempotent; safe anytime. |
 | `refreshMetadata(FORCE, libraryId)` | Rebuild one library: wipe stored metadata, artwork and stream info, then re-fetch everything (e.g. after a wrong match, or to pick up newly added fields on old items). | Heavy: an external fetch per item, ffprobe per file. |
-| `refreshMovie/Show/Episode/Person/Album/Track(id)` | The same wipe-and-refetch for a single item (the ⋮ menu on its detail page). | One item (a show fans out to its episodes). |
+| `refreshMovie/Show/Episode/Person/Album/Track(id)` | The same wipe-and-refetch for a single item (the ⋮ menu on its detail page). There is **no** per-item refresh for books, comics or podcasts. | One item (a show fans out to its episodes). |
 | `rebuildSearchIndex` | Rebuild the Typesense index into a fresh collection (after enabling search or changing languages). | Reads the whole database once; search stays available. |
+| `refreshPodcasts` | Re-fetch every subscribed feed now instead of waiting for the hourly refresh. **Not** admin-only. | Cheap (conditional GET per feed). |
+| `downloadPodcastEpisode(episodeId)` | Pull one older episode into the cache on demand. Not admin-only. | One download. |
 
 All are asynchronous — they queue events and return immediately; progress is visible in the
 client's activity view. A scan does **not** re-fetch metadata for existing items, and a MISSING

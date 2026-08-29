@@ -5,9 +5,11 @@ description: Enable and maintain optional Typesense full-text search in Ister, f
 # Search (Typesense)
 
 Full-text search across all libraries is optional and backed by
-[Typesense](https://typesense.org/). Without it the server runs fine — the GraphQL `search`
-query just returns nothing. With it, clients get fast, typo-tolerant, multilingual search over
-titles, descriptions and genres.
+[Typesense](https://typesense.org/). Without it the server runs fine — but the GraphQL `search`
+query then fails with an explicit error ("Search is not configured on this server"), it does
+**not** return an empty list. With it, clients get fast, typo-tolerant, multilingual search over
+titles, descriptions and genres, filtered by the caller's library access
+([Users, sharing, and access](09-users-sharing-and-access.md)).
 
 ## Enabling
 
@@ -25,7 +27,8 @@ titles, descriptions and genres.
 
 3. Restart the server, then run the **`rebuildSearchIndex`** GraphQL mutation once to build the
    initial index. Until you do, existing media is not searchable — only items touched after
-   enabling would trickle in.
+   enabling would trickle in. (The collection and alias themselves are created **empty** at
+   startup, so an empty-but-present collection in Typesense is normal before the first reindex.)
 
 The enabled flag is checked at **runtime**, not baked into the image: the same image serves both
 modes, and search events are simply consumed and discarded while the flag is off. That means you
@@ -45,8 +48,9 @@ existing database, after restoring a database backup, or if the index ever looks
 
 ## Adding or removing a language
 
-Search fields are generated per configured language (`title_en`, `description_nl`, …) and the
-collection schema is **fixed at creation time**, so a language change is a small procedure:
+Search fields are generated per configured language (`title_en`, `description_nl`, `genre_de`, …)
+— title fields weigh 5 in ranking, description and genre fields 1 — and the collection schema is
+**fixed at creation time**, so a language change is a small procedure:
 
 1. Update `ISTER_LANGUAGES` (e.g. `en,nl,de`) and restart the server(s).
 2. Re-fetch metadata so the new language's rows exist in PostgreSQL: run the `refreshMetadata`
@@ -59,9 +63,13 @@ PostgreSQL is deleted.
 
 ## Troubleshooting
 
-- **Search returns nothing at all** — either `TYPESENSE_ENABLED` is still `false`, the API key
-  is wrong, or `rebuildSearchIndex` was never run after enabling. The server log shows connection
-  errors on startup and on each indexing attempt.
+- **Search returns an error** ("Search is not configured on this server") — `TYPESENSE_ENABLED`
+  is still `false` on the node that answered the query.
+- **Search is enabled but returns an empty list** — `rebuildSearchIndex` was never run after
+  enabling (the startup-created collection is empty), or the API key/host is wrong. The server
+  log shows connection errors on startup and on each indexing attempt.
+- **Tracing a reindex in RabbitMQ** — the mutation is called `rebuildSearchIndex`, but the queue
+  it feeds is named `app.ister.server.SearchReindexRequested`; don't look for a "rebuild" queue.
 - **New language not searchable** — you skipped step 2 or 3 above.
 - **Index survives server restarts** but lives only in Typesense's data dir; if you lose that
   volume, one `rebuildSearchIndex` rebuilds everything from PostgreSQL. It is disposable — see

@@ -34,6 +34,13 @@ valideert de JWT's die deze uitgeeft.
 - **Comics** — CBZ, PDF en epub, georganiseerd per serie
 - **Podcasts** — geabonneerd via RSS-feed, elk uur ververst, afleveringen op verzoek gedownload
 
+Bovenop de media zelf krijgen gebruikers een persoonlijke laag: playlists (handmatig of smart,
+op filters gebaseerd), opgeslagen views met eigen filters, waarderingen en afspeelgeschiedenis
+per gebruiker, geregistreerde devices met afstandsbediening en playback-overdracht, meeluisteren
+met de sessie van een andere gebruiker, en automatische intro-/outro-detectie met een skipknop.
+Niets daarvan vergt inrichting door de beheerder; het model staat beschreven in
+[Persoonlijke bibliotheek en devices](../../architecture/nl/09-personal-library-and-devices.md).
+
 ## Deploymentvormen
 
 - **Docker Compose** — de repository levert `docker-compose.yml` mee als referentiestack
@@ -43,7 +50,9 @@ valideert de JWT's die deze uitgeeft.
 - **Kubernetes** — de [chart-repository](https://github.com/ister-app/chart) biedt een Helm-chart
   en draait er in CI een volledige end-to-end-suite tegenaan.
 - **Meerdere nodes** — meerdere servers kunnen samen één cluster vormen, elk met eigen schijven;
-  transcodewerk draait op de node die het bestand heeft. Zie [Multi-node](05-multi-node.md).
+  transcodewerk draait op de node die het bestand heeft. Een node kan ook **transcode-only** zijn:
+  zonder eigen media, encoderend voor de schijven van een andere node. Zie
+  [Multi-node](05-multi-node.md).
 
 Het productieartefact is een **GraalVM native image**: de gepubliceerde containerimage start in
 een fractie van een seconde en bevat geen JVM. Normaal gesproken pull je gewoon

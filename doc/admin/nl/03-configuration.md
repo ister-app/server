@@ -18,7 +18,7 @@ een single-node thuisopstelling.
 | Connectionpool | `DB_POOL_SIZE` | `20` | afspelen waaiert uit naar veel gelijktijdige queries |
 | Connectie-timeout (ms) | `DB_CONNECTION_TIMEOUT` | `10000` | hoe lang een thread op een poolverbinding wacht voordat het faalt |
 | RabbitMQ | `SPRING_RABBITMQ_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` | `localhost`, `5672`, `user`/`password` | poort valt terug op de RabbitMQ-standaard 5672 |
-| OIDC-issuer | `OIDC_URL` | — | Keycloak-compatibel; bijv. `https://keycloak.example.com/realms/Home` |
+| OIDC-issuer | `OIDC_URL` | `http://keycloak:8060/realms/Ister` | Keycloak-compatibel; de standaard matcht de meegeleverde dev-Keycloak. Productie: bijv. `https://keycloak.example.com/realms/Home` |
 
 ## Identiteit en paden
 
@@ -38,6 +38,7 @@ een single-node thuisopstelling.
 | `app.ister.server.TMDB.max-requests-per-second` | | `30` | blijft onder TMDB's limiet van ~40 rps |
 | `app.ister.worker.tmdb.certification-country` | | `US` | ISO 3166-1-land waarvan de keuring/leeftijdsclassificatie (bv. `16`, `PG-13`, `TV-MA`) bij films en shows wordt opgeslagen; valt terug op US en daarna op een willekeurig land dat er een heeft. |
 | `app.ister.languages` | `ISTER_LANGUAGES` | `en,nl` | kommagescheiden ISO-639-1-tags; de eerste = primair. Bepaalt in welke talen metadata wordt opgehaald **én** welke talen de zoekindex krijgt. Wijzigen vereist een re-scan plus `rebuildSearchIndex` — zie [Zoeken](06-search-typesense.md). |
+| `app.ister.worker.musicbrainz.min-request-interval-millis` | | `1100` | tussenruimte tussen MusicBrainz-aanroepen; blijft net boven hun 1-verzoek-per-seconde-beleid — alleen verlagen tegen je eigen mirror |
 
 ## Zoeken (Typesense)
 
@@ -55,6 +56,7 @@ Zie [Zoeken](06-search-typesense.md) voor de procedure om in te schakelen en te 
 | --- | --- | --- | --- |
 | FFmpeg-map | `FFMPEG_DIR` | `/usr/bin` | map met `ffmpeg`/`ffprobe` |
 | mkvextract / subtile-ocr | `MKVEXTRACT` / `SUBTILE_OCR` | `/usr/bin/...` | extractie en OCR van beeldondertitels |
+| `app.ister.server.subtitle-ocr-default-language` | | `eng` | OCR-taal die wordt aangenomen voor ingebedde beeldondertitels zonder taaltag; leeg schakelt OCR voor taggeloze streams uit |
 | `app.ister.transcoder.hls.hwaccel` | `HLS_HWACCEL` | `none` | `vaapi` (Intel/AMD) of `nvdec` (NVIDIA); het compose-bestand toont de benodigde device-mappings |
 | `app.ister.transcoder.hls.hwaccel-device` | `HLS_HWACCEL_DEVICE` | `/dev/dri/renderD128` | alleen VAAPI |
 | `app.ister.transcoder.hls.max-concurrent-files` | `HLS_MAX_CONCURRENT_FILES` | `2` | gelijktijdig getranscodeerde bestanden; pre-transcoding deelt dit budget |
@@ -102,7 +104,11 @@ doet. Zie de architectuurgids, [Transcoding](../../architecture/nl/04-transcodin
 | --- | --- | --- |
 | `CONTINUE_WATCHING_HISTORY_DAYS` | `150` | hoe ver de continue-watching-lijst terugkijkt; bepaalt ook wat pre-transcoding warm houdt |
 | `CONTINUE_WATCHING_REBUILD_CRON` | `0 30 3 * * *` | nachtelijke zelfherstel-rebuild |
-| `CONTINUE_WATCHING_REBUILD_ENABLED` | `true` | |
+| `CONTINUE_WATCHING_REBUILD_ENABLED` | `true` | `false` haalt de scheduler-bean volledig weg (`@ConditionalOnProperty`), en schakelt daarmee ook de eenmalige startup-backfill uit die een lege tabel vult |
+
+Gebruik hier bij voorkeur de korte env vars in plaats van de lange property-namen: de
+onderliggende properties zijn inconsistent gebonden (`…rebuild.enabled` met een punt, maar
+`…rebuild-cron` met een streepje) — de env vars verbergen dat.
 
 ## Cache-opschoning en podcasts
 
@@ -138,13 +144,18 @@ Aparte transcoder-nodes krijgen schijven toegewezen met `app.ister.transcoder.di
 ## Health, metrics en overige interne knoppen
 
 De Spring Actuator (`/actuator/health`, `/actuator/metrics`, `/actuator/prometheus`) draait op een
-eigen poort, zodat die buiten de publieke API blijft. Zie [Installatie](02-installation.md#health-metrics-logs).
+eigen poort, zodat die buiten de publieke API blijft. Die poortscheiding is de **enige**
+bescherming — de actuator-endpoints zelf zijn niet-geauthenticeerd — dus publiceer of proxy poort
+8081 nooit. Zie [Installatie](02-installation.md#health-metrics-logs).
 
 | Property | Standaard | Opmerkingen |
 | --- | --- | --- |
 | `management.server.port` | `8081` | poort voor de Actuator-endpoints |
 | `management.endpoints.web.exposure.include` | `health,metrics,prometheus` | welke Actuator-endpoints beschikbaar zijn |
 | `app.ister.server.blur-hash.chunk-size` | `500` | afbeeldingen per chunk tijdens de BlurHash-sweep (houdt een chunk onder de RabbitMQ-consumer-timeout) |
+| `app.ister.server.segment-detect.chunk-size` | `4` | afleveringen die per intro-/outro-detectiebericht worden gefingerprint; houd een chunk ruim onder de RabbitMQ-consumer-timeout |
+| `app.ister.server.crop-detect-backfill` | `true` | ontsnappingsluik: `false` slaat de eenmalige crop-detectie-heranalyse van elk bestaand bestand bij de eerste scan na de upgrade over — zie [Onderhoud](07-maintenance-and-troubleshooting.md#eenmalige-upgrade-stappen) |
+| `app.ister.server.segment-detect-backfill` | `true` | zelfde ontsnappingsluik voor het eenmalige intro-/outro-fingerprinten van elke bestaande aflevering |
 
 ## Lokale overrides (ontwikkeling)
 

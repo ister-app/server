@@ -34,6 +34,12 @@ validates the JWTs it issues.
 - **Comics** — CBZ, PDF and epub, organised per series
 - **Podcasts** — subscribed by RSS feed, refreshed hourly, episodes downloaded on demand
 
+On top of the media itself, users get a personal layer: playlists (hand-built or smart,
+filter-based), saved views with custom filters, per-user ratings and playback history, registered
+devices with remote control and playback handoff, listen-along with another user's session, and
+automatic intro/outro detection with a skip button. None of it needs operator setup; the model is
+described in [Personal library and devices](../../architecture/en/09-personal-library-and-devices.md).
+
 ## Deployment shapes
 
 - **Docker Compose** — the repository ships `docker-compose.yml` as a reference stack
@@ -43,7 +49,8 @@ validates the JWTs it issues.
 - **Kubernetes** — the [chart repository](https://github.com/ister-app/chart) provides a Helm
   chart and runs a full end-to-end suite against it in CI.
 - **Multiple nodes** — several servers can form one cluster, each owning its own disks; transcode
-  work runs on the node that holds the file. See [Multi-node](05-multi-node.md).
+  work runs on the node that holds the file. A node can also be **transcode-only**, owning no
+  media and encoding for another node's disks. See [Multi-node](05-multi-node.md).
 
 The production artifact is a **GraalVM native image**: the published container image starts in a
 fraction of a second and contains no JVM. You normally just pull `ghcr.io/ister-app/server`;

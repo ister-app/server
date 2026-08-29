@@ -17,7 +17,7 @@ dedicated short env var, listed below. Defaults are sensible for a single-node h
 | Connection pool | `DB_POOL_SIZE` | `20` | playback fans out to many concurrent queries |
 | Connection timeout (ms) | `DB_CONNECTION_TIMEOUT` | `10000` | how long a thread waits for a pooled connection before failing |
 | RabbitMQ | `SPRING_RABBITMQ_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` | `localhost`, `5672`, `user`/`password` | port defaults to the RabbitMQ default 5672 |
-| OIDC issuer | `OIDC_URL` | — | Keycloak-compatible; e.g. `https://keycloak.example.com/realms/Home` |
+| OIDC issuer | `OIDC_URL` | `http://keycloak:8060/realms/Ister` | Keycloak-compatible; the default matches the bundled dev Keycloak. Production: e.g. `https://keycloak.example.com/realms/Home` |
 
 ## Identity and paths
 
@@ -37,6 +37,7 @@ dedicated short env var, listed below. Defaults are sensible for a single-node h
 | `app.ister.server.TMDB.max-requests-per-second` | | `30` | stays under TMDB's ~40 rps limit |
 | `app.ister.worker.tmdb.certification-country` | | `US` | ISO 3166-1 country whose certification/content rating (e.g. `16`, `PG-13`, `TV-MA`) is stored on movies and shows; falls back to US, then any country that has one. |
 | `app.ister.languages` | `ISTER_LANGUAGES` | `en,nl` | comma-separated ISO-639-1 tags; first = primary. Drives which languages metadata is fetched in **and** which languages search indexes. Changing it requires a re-scan plus `rebuildSearchIndex` — see [Search](06-search-typesense.md). |
+| `app.ister.worker.musicbrainz.min-request-interval-millis` | | `1100` | spacing between MusicBrainz calls; stays just above their 1-request-per-second policy — lower it only against your own mirror |
 
 ## Search (Typesense)
 
@@ -54,6 +55,7 @@ See [Search](06-search-typesense.md) for the enable/reindex procedure.
 | --- | --- | --- | --- |
 | FFmpeg directory | `FFMPEG_DIR` | `/usr/bin` | directory holding `ffmpeg`/`ffprobe` |
 | mkvextract / subtile-ocr | `MKVEXTRACT` / `SUBTILE_OCR` | `/usr/bin/...` | image-subtitle extraction and OCR |
+| `app.ister.server.subtitle-ocr-default-language` | | `eng` | OCR language assumed for embedded image subtitles without a language tag; empty disables OCR for untagged streams |
 | `app.ister.transcoder.hls.hwaccel` | `HLS_HWACCEL` | `none` | `vaapi` (Intel/AMD) or `nvdec` (NVIDIA); the compose file shows the required device mappings |
 | `app.ister.transcoder.hls.hwaccel-device` | `HLS_HWACCEL_DEVICE` | `/dev/dri/renderD128` | VAAPI only |
 | `app.ister.transcoder.hls.max-concurrent-files` | `HLS_MAX_CONCURRENT_FILES` | `2` | files transcoded simultaneously; pre-transcoding shares this budget |
@@ -101,7 +103,11 @@ the architecture guide, [Transcoding](../../architecture/en/04-transcoding.md).
 | --- | --- | --- |
 | `CONTINUE_WATCHING_HISTORY_DAYS` | `150` | how far back the continue-watching list looks; also drives what pre-transcoding keeps warm |
 | `CONTINUE_WATCHING_REBUILD_CRON` | `0 30 3 * * *` | nightly self-heal rebuild |
-| `CONTINUE_WATCHING_REBUILD_ENABLED` | `true` | |
+| `CONTINUE_WATCHING_REBUILD_ENABLED` | `true` | `false` removes the scheduler bean entirely (`@ConditionalOnProperty`), which also disables the one-time startup backfill that fills an empty table |
+
+Prefer these short env vars over the long property names here: the underlying properties are
+bound inconsistently (`…rebuild.enabled` with a dot but `…rebuild-cron` with a dash), which the
+env vars hide.
 
 ## Cache cleanup and podcasts
 
@@ -137,13 +143,18 @@ transcoder nodes are assigned disks with `app.ister.transcoder.disks[n].name` �
 ## Health, metrics, and other internals
 
 The Spring Actuator (`/actuator/health`, `/actuator/metrics`, `/actuator/prometheus`) runs on its
-own port so it stays off the public API. See [Installation](02-installation.md#health-metrics-logs).
+own port so it stays off the public API. That port separation is the **only** protection — the
+actuator endpoints themselves are unauthenticated — so never publish or proxy port 8081. See
+[Installation](02-installation.md#health-metrics-logs).
 
 | Property | Default | Notes |
 | --- | --- | --- |
 | `management.server.port` | `8081` | port for the Actuator endpoints |
 | `management.endpoints.web.exposure.include` | `health,metrics,prometheus` | which Actuator endpoints are exposed |
 | `app.ister.server.blur-hash.chunk-size` | `500` | images processed per chunk during the BlurHash sweep (keeps a chunk under the RabbitMQ consumer timeout) |
+| `app.ister.server.segment-detect.chunk-size` | `4` | episodes fingerprinted per intro/outro-detection message; keep a chunk well under the RabbitMQ consumer timeout |
+| `app.ister.server.crop-detect-backfill` | `true` | escape hatch: `false` skips the one-time crop-detection re-analysis of every pre-existing file on the first scan after upgrading — see [Maintenance](07-maintenance-and-troubleshooting.md#one-off-upgrade-steps) |
+| `app.ister.server.segment-detect-backfill` | `true` | same escape hatch for the one-time intro/outro fingerprinting of every pre-existing episode |
 
 ## Local overrides (development)
 
