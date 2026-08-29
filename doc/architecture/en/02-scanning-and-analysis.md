@@ -82,6 +82,8 @@ file, and the converged crop rectangle is stored on the video's `MediaFileStream
 as part of the file analysis, not on every scan. Files analyzed before the feature existed are
 caught by a scanner-side backfill: `app.ister.server.crop-detect-backfill` (default `true`)
 re-sends `MEDIA_FILE_FOUND` on a rescan for video files whose streams have no crop values yet.
+The consumer of the rectangle is the **player**, via the GraphQL crop fields — the transcoder
+deliberately leaves the bars in place ([chapter 4](04-transcoding.md#crop-detection-and-transcoding)).
 
 ### Intro/outro detection
 

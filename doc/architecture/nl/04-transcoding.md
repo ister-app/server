@@ -108,10 +108,19 @@ de enkele aanwezigheid van segmenten) laat een latere pre-transcode de pass over
 ## Crop-detectie en transcoderen
 
 De bestandsanalyse detecteert ingebakken zwarte balken en slaat de crop-rechthoek op op de
-video-`MediaFileStreamEntity` ([hoofdstuk 2](02-scanning-and-analysis.md)). De transcoder past die
-**nog niet** toe: geen enkele FFmpeg-pass voegt een crop-filter toe, dus streams worden
-getranscodeerd mét de balken. De opgeslagen waarden worden vooralsnog alleen als stream-metadata
-aan clients ontsloten.
+video-`MediaFileStreamEntity` ([hoofdstuk 2](02-scanning-and-analysis.md)). De transcoder past
+die **bewust niet** toe: geen enkele FFmpeg-pass voegt een crop-filter toe, en streams worden
+getranscodeerd mét de balken. Croppen is het werk van de client — de player leest de rechthoek
+uit de GraphQL-cropvelden, schaalt hem naar de gedecodeerde afmetingen van wat hij afspeelt
+(direct play of elke HLS-variant, die verkleind kan zijn) en past hem toe als mpv `video-crop`.
+
+Die verdeling vermijdt drie serverside problemen tegelijk: de COPY-variant (`-c:v copy`) kan
+nooit gefilterd worden, dus een serverside crop zou ABR-wissels tussen COPY en een
+getranscodeerde variant in kadrering laten verspringen; een serverside crop zonder bijpassend
+client-contract zou dubbel worden toegepast; en de geadverteerde `RESOLUTION`-waarden in de
+masterplaylist zouden per variant herrekend moeten worden. De bekende beperking van het
+client-side ontwerp is de webplayer, die geen mpv heeft en de balken toont — de enige plek waar
+een serverside crop ooit iets zou toevoegen.
 
 ## Retentie
 

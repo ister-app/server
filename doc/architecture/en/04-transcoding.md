@@ -102,9 +102,18 @@ lets a later pre-transcode skip the pass.
 ## Crop detection and transcoding
 
 File analysis detects baked-in black bars and stores the crop rectangle on the video's
-`MediaFileStreamEntity` ([chapter 2](02-scanning-and-analysis.md)). The transcoder does **not**
-apply it yet: no FFmpeg pass adds a crop filter, so streams are transcoded with the bars intact.
-The stored values are currently only exposed as stream metadata for clients.
+`MediaFileStreamEntity` ([chapter 2](02-scanning-and-analysis.md)). The transcoder
+**deliberately does not** apply it: no FFmpeg pass adds a crop filter, and streams are
+transcoded with the bars intact. Cropping is the client's job — the player reads the rectangle
+from the GraphQL crop fields, scales it to the decoded dimensions of whatever it is playing
+(direct play or any HLS variant, which may be downscaled) and applies it as mpv `video-crop`.
+
+That split avoids three server-side problems at once: the COPY variant (`-c:v copy`) can never
+be filtered, so a server-side crop would make ABR switches between COPY and a transcoded
+variant jump in framing; a server-side crop without a matching client contract would be applied
+twice; and the advertised `RESOLUTION` values in the master playlist would have to be recomputed
+per variant. The known limitation of the client-side design is the web player, which has no mpv
+and shows the bars — the only place a server-side crop would ever add value.
 
 ## Retention
 

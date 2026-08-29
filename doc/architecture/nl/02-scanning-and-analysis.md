@@ -86,6 +86,8 @@ per sample en is dus niet gratis — het draait als onderdeel van de bestandsana
 scan. Bestanden die vóór deze feature zijn geanalyseerd worden opgevangen door een backfill aan
 de scannerkant: `app.ister.server.crop-detect-backfill` (standaard `true`) stuurt bij een rescan
 `MEDIA_FILE_FOUND` opnieuw voor videobestanden waarvan de streams nog geen crop-waarden hebben.
+De afnemer van de rechthoek is de **player**, via de GraphQL-cropvelden — de transcoder laat de
+balken bewust staan ([hoofdstuk 4](04-transcoding.md#crop-detectie-en-transcoderen)).
 
 ### Intro/outro-detectie
 
