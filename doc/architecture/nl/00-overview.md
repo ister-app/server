@@ -34,7 +34,8 @@ Zie het [modulediagram](../diagrams/modules.md) voor het plaatje.
 
 **Dependency-richting:** `server` → `{api, disk, worker, search, transcoder}` → `core` → `database`.
 `core` declareert `api project(':database')`, dus entities, repositories en enums komen
-**transitief** mee. Dat is de richting, en die haal je makkelijk door elkaar: `database` hangt van
+**transitief** mee (`disk`, `worker` en `search` declareren daarnaast een directe
+`database`-dependency). Dat is de richting, en die haal je makkelijk door elkaar: `database` hangt van
 niets interns af, en niets mag ooit maken dat het van `core` afhangt. `api` hangt daarnaast direct
 af van `search` en `transcoder`.
 
@@ -72,6 +73,8 @@ zie je dus niet in welke module een klasse zit.
 7. [API en auth](07-api-and-auth.md) — REST/GraphQL-oppervlak, subscriptions, OIDC en stream-tokens
 8. [Native image en testen](08-native-image-and-testing.md) — GraalVM-beperkingen,
    Flyway-discipline, testopzet, CI
+9. [Persoonlijke bibliotheek en devices](09-personal-library-and-devices.md) — de filter-DSL,
+   saved views en playlists, Discover-toplijsten, afspeelgeschiedenis, devices, listen-along
 
 ## Diagrammen
 

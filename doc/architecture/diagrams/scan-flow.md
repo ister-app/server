@@ -25,6 +25,9 @@ flowchart TD
 
     E --> J["HandleMediaFileFound\n📦 disk"]
     J -->|"ffprobe: streams + duration\nembedded subs → SRT\nscreenshot → background"| K["IMAGE_FOUND\n.{dirName}"]
+    J -->|"episode file: after commit,\nseason-scoped"| DS["DETECT_SEGMENTS\n.{dirName}"]
+    DS --> DSH["HandleDetectSegments\n📦 disk\nintro/outro detection\n(one chunk of episodes)"]
+    DSH -->|"episodes remaining →\nnext chunk"| DS
 
     F --> L["HandleAudioFileFound\n📦 disk"]
     L -->|"ffprobe: streams + duration\nID3 tags: title, artist, track no.\nembedded album cover\nclear HLS cache"| M["IMAGE_FOUND\n.{dirName}"]

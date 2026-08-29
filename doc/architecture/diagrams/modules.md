@@ -1,8 +1,10 @@
 # Module dependency flow
 
-`server` is the Spring Boot entry point and pulls in every feature module. Feature modules depend
-only on `core`, which re-exports `database` (entities, repositories, `EventType`) transitively via
-`api project(':database')`. `database` depends on nothing internal — nothing may reverse that
+`server` is the Spring Boot entry point and pulls in every feature module. Every feature module
+depends on `core`, which re-exports `database` (entities, repositories, `EventType`) transitively
+via `api project(':database')`; `disk`, `worker` and `search` additionally declare a direct
+`database` dependency (`api` and `transcoder` rely on the transitive export). Either way the
+direction is the same: `database` depends on nothing internal — nothing may reverse that
 direction. Note that `core` and `database` both contribute to the `app.ister.core.*` package
 (a split package).
 
@@ -21,5 +23,6 @@ flowchart TD
     api --> search
     api --> transcoder
     api & disk & worker & search & transcoder --> core
+    disk & worker & search -->|direct| database
     core -->|"api project(':database')\n(transitive)"| database
 ```

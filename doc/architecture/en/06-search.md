@@ -26,13 +26,18 @@ deletes) it in the collection behind the `media` alias.
 Emitters:
 
 - **Creation** comes for free: `ServerEventService.createXFoundEvent` emits an index event for every
-  searchable entity type (movie, show, episode, person, album, track) at creation time.
+  searchable entity type (`SearchEntityType`: movie, show, episode, person, album, track, book,
+  podcast — comic volumes index as BOOK) at creation time.
 - **Enrichment** handlers emit after their metadata saves: `MetadataSave` (TMDB), the worker
-  `HandlePersonFound`/`HandleAlbumFound` (MusicBrainz), `PersonLookupService` (TMDB cast),
-  `HandleNfoFileFound`, and `HandleAudioFileFound` (audio tags, including `action=DELETE` on track
-  dedup).
+  `HandlePersonFound`/`HandleAlbumFound`/`HandleBookFound` (MusicBrainz / Open Library), the disk
+  `HandlePersonFound`/`HandleAlbumFound`, `PersonLookupService` (TMDB cast), `HandleNfoFileFound`,
+  `HandleAudioFileFound` (audio tags, including `action=DELETE` on track dedup),
+  `HandleEpubFileFound`, `HandleComicFileFound`, `HandlePodcastRefreshRequested`, plus
+  `ScannerHelperService` (book creation from the folder structure) and `BookSeriesService` (series
+  assignment re-indexes the affected books).
 - **Deletes**: any code that deletes a searchable entity must call
-  `serverEventService.createSearchDeleteEvent(...)`. Safety nets exist — the upsert handler deletes
+  `serverEventService.createSearchDeleteEvent(...)` — `PodcastController` does on unsubscribe, for
+  instance. Safety nets exist — the upsert handler deletes
   the document when the entity no longer exists, and a reindex rebuilds everything — but the rule
   keeps the index correct between reindexes.
 

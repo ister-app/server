@@ -6,11 +6,11 @@ before the current one ends, in the client's reported stream settings).
 
 ```mermaid
 flowchart TD
-    TrigA([Periodic task]) -->|"per disk"| A
+    TrigA([Periodic task]) -->|"per configured directory"| A
     TrigB([Playback request]) -->|direct| B
     TrigC([updatePlayQueue progress]) -->|"end approaching →\nnext item(s), keepUntil=+24h"| B
 
-    A["PRE_TRANSCODE_RECENTLY_WATCHED\n.{diskName}"]
+    A["PRE_TRANSCODE_RECENTLY_WATCHED\n.{dirName}"]
     A --> PA["HandlePreTranscodeRecentlyWatched\n📦 disk"]
     PA -->|"continue-watching entries per user\n(+ the episode after that)\nkeepUntil=+30min (extended every run)"| B
     PA -->|"file without analyzed\nstreams → re-analysis"| MFF["MEDIA_FILE_FOUND\n.{dirName}"]

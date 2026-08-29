@@ -29,6 +29,7 @@ graph LR
         H13[HandleEpubFileFound]
         H14[HandleComicFileFound]
         H15[HandlePodcastEpisodeDownloadRequested]
+        H16[HandleDetectSegments]
     end
 
     subgraph worker module
@@ -57,6 +58,8 @@ graph LR
 
     T1 --> H1 --> H2
     H2 --> H3 --> H6
+    H3 -->|DETECT_SEGMENTS after commit| H16
+    H16 -->|next chunk| H16
     H2 --> H4 --> H6
     H2 --> H5
     H2 --> H6

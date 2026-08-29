@@ -7,7 +7,7 @@ it self-healing; and the scanner recomputes a show/book when a new episode/chapt
 ```mermaid
 flowchart TD
     HB([updatePlayQueue / updateReadingProgress]) -->|"synchronous, same transaction"| S
-    SC([ScannerHelperService\ngetOrCreateEpisode/Chapter]) -->|"show was finished →\nnew episode becomes the target"| S
+    SC([ScannerHelperService\ngetOrCreateEpisode/Chapter\n+ comic volume creation]) -->|"show/book/comic series was finished →\nnew episode/chapter/volume becomes the target"| S
 
     Cron([ContinueWatchingRebuildScheduler\n03:30 + backfill while table empty]) -->|per user| E
     E["CONTINUE_WATCHING_REBUILD_REQUESTED\n(userId)"]
@@ -15,7 +15,7 @@ flowchart TD
     H -->|"discard rows + recompute\nfrom watch_status_entity"| S
 
     S["ContinueWatchingService"]
-    S -->|"upsert ON CONFLICT\n(user, entry_type, group_id)"| T[("continue_watching\n1 row per user per\nshow/movie/book/podcast")]
+    S -->|"upsert ON CONFLICT\n(user, entry_type, group_id)"| T[("continue_watching\n1 row per user per\nshow/movie/book/comic series/podcast")]
     T --> Q([GraphQL recentlyWatched\n1 indexed read])
     T --> P([PreTranscodeService\n→ transcode flow])
 ```

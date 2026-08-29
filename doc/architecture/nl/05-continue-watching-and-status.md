@@ -12,13 +12,17 @@ registries.
 
 Zie het [continue-watching-flow-diagram](../diagrams/continue-watching-flow.md). De
 `continue_watching`-tabel (migratie V20) bevat één rij per user per container — show / film / boek
-/ podcastaflevering (`group_id`) — die wijst naar het item om mee te hervatten.
+/ comicserie / podcastaflevering (`group_id`) — die wijst naar het item om mee te hervatten. Bij
+comics is de container de serie en de target het volgende volume
+(`ContinueWatchingService.upsertComicVolume`; `recomputeForComicSeries` laat de serie terugkeren
+wanneer de scanner een volume toevoegt).
 `ContinueWatchingService` (database-module) is de eigenaar; de GraphQL-query `recentlyWatched` is
 één geïndexeerde read.
 
 - **Incrementeel, zelfde transactie.** `onWatchStatusChanged(watchStatus)` wordt aangeroepen
   *binnen de transactie* van elke watch-status-write (`PlayQueueService.updateWatchStatus`,
-  `BookController.updateReadingProgress`, `ReadingProgressController`), zodat cache en waarheid
+  `BookController.updateReadingProgress`, `ReadingProgressController`,
+  `PlaybackHistoryService.markPlayed`), zodat cache en waarheid
   samen committen — geen event ertussen. **Elk nieuw codepad dat een `WatchStatusEntity` schrijft
   moet dit aanroepen**, anders loopt de lijst achter tot de nachtelijke rebuild.
 - **Overdracht bij uitkijken.** Een onafgemaakt item hervat zichzelf; een uitgekeken item draagt
@@ -84,8 +88,15 @@ beantwoorden.
 
 `ServerStatusBroadcaster` verbindt de registries met de GraphQL-websocket-subscriptions:
 `serverActivity` en `nowPlaying` (`ServerStatusController`) en `playbackCommands(playQueueId)`
-(`PlaybackCommandController` — party-mode-afstandsbediening:
-PLAY/PAUSE/NEXT/SEEK/SKIP_TO_ITEM/QUEUE_CHANGED).
+(`PlaybackCommandController` — party-mode-afstandsbediening: PLAY / PAUSE / NEXT / PREVIOUS / SEEK /
+SKIP_TO_ITEM / QUEUE_CHANGED / STOP, plus STOP_FOLLOW en SET_REPEAT — zie `PlaybackCommandType` in
+`schema.graphqls`).
+
+Het `status/`-pakket is inmiddels breder dan deze registries: `DevicePresenceRegistry` +
+`DeviceCommandService` houden geregistreerde apparaten bij en routeren `deviceCommands` ernaartoe;
+`FollowerRegistry` + `FollowerStatusService` houden bij wie met een sessie meeluistert; en
+`TranscodeActivityRegistry` voedt live transcode-voortgang in `serverActivity`. De mechaniek van
+apparaten en meeluisteren staat in [hoofdstuk 9](09-personal-library-and-devices.md).
 
 Twee invarianten voordat je aan deze code komt:
 

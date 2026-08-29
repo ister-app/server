@@ -20,7 +20,12 @@ validates the multi-node configuration. See the [startup diagram](../diagrams/st
 
 See the [scan-flow diagram](../diagrams/scan-flow.md). `scanLibraries()` sends
 `NEW_DIRECTORIES_SCAN_REQUEST` per directory; the disk handler walks the filesystem and emits one
-`FILE_SCAN_REQUESTED` per file. `FileScanRequestedHandle` routes on extension (and library type):
+`FILE_SCAN_REQUESTED` per file. `FileScanRequestedHandle` routes on extension (and library type).
+The extension lists are exact and short (`PathObject`): images are `jpg`/`png`, video is
+`mkv`/`mp4`, subtitles are `srt` — a `.jpeg` or `.avi` is simply not picked up. Which scanners run
+at all depends on the library type: a COMIC library uses only `ComicScanner` + `ImageScanner`;
+MUSIC uses audio/image/nfo, BOOK adds `EpubScanner`; only movie/show libraries run the
+`SubtitleScanner` and `MediaFileScanner`.
 
 | File | Event | Handler work |
 | --- | --- | --- |
@@ -37,7 +42,9 @@ enrichment events and the search-index creation events.
 
 `getOrCreatePerson` looks a person up on the **normalized** name (`PersonNames.normalize`:
 lower-case, collapsed whitespace — mirrored by the generated `person_entity.name_normalized`
-column), so "ABBA" on one album and "Abba" on the next are one artist. The stored `name` keeps the
+column), so "ABBA" on one album and "Abba" on the next are one artist. The lookup is scoped **per
+library**, with a fallback to a library-less person (a TMDB actor, say) that is then attached to
+the library — not a single global lookup. The stored `name` keeps the
 spelling seen first, as the display value. `ArtistTagParser` splits a `feat.`/`ft.`/`featuring` tag
 into the primary artist and its guests; an ampersand is never split, because "Simon & Garfunkel"
 and "Mumford & Sons" are single acts.
@@ -65,6 +72,16 @@ parses as a range but has no link rows, creates the missing episodes and links, 
 
 Sidecar files (NFO, local images, external subtitles) attach to the first episode of the range,
 as before.
+
+### Crop detection
+
+Some rips carry baked-in black bars. `HandleMediaFileFound` runs a crop-detection step
+(`MediaFileFoundDetectCrop`): ffmpeg's `cropdetect` filter samples a handful of moments in the
+file, and the converged crop rectangle is stored on the video's `MediaFileStreamEntity`
+(`crop_*` columns, V37). This decodes a few dozen frames per sample, so it is not free — it runs
+as part of the file analysis, not on every scan. Files analyzed before the feature existed are
+caught by a scanner-side backfill: `app.ister.server.crop-detect-backfill` (default `true`)
+re-sends `MEDIA_FILE_FOUND` on a rescan for video files whose streams have no crop values yet.
 
 ### Intro/outro detection
 
@@ -193,6 +210,9 @@ Two subtleties:
 `CacheCleanupScheduler` (disk) and `TmpTranscodeCleanupScheduler` (transcoder) run a daily zombie
 sweep of the image cache and transcode tmp dirs, deleting files no database row references, and
 expire old podcast downloads. **`app.ister.server.cache-cleanup.dry-run` defaults to `true`** — the
-cleanup only logs until that flag is switched off.
+cleanup only logs until that flag is switched off. A third, much more frequent sweep exists next to
+these two: `HlsTranscodeService.cleanupOldFiles` runs every 15 minutes over the HLS cache dirs and
+honors each dir's `keep_until` deadline — see [chapter 4](04-transcoding.md) for how the two HLS
+sweeps divide the work.
 
 

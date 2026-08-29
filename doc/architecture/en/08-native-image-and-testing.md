@@ -12,7 +12,13 @@ that constrains how code is written:
 - **Never use `@ConditionalOnProperty` for a runtime-toggleable feature.** Bean conditions are
   evaluated and frozen at native-image *build* time; a conditional bean is baked out of the
   production image and no property can bring it back. Check the flag **inside** the bean instead —
-  the Typesense handlers are the reference example ([chapter 6](06-search.md)).
+  the Typesense handlers are the reference example ([chapter 6](06-search.md)). The prohibition is
+  about *runtime* toggles; a condition whose value is fixed at build time is technically fine but
+  easy to mistake for a runtime switch. Known exceptions to watch: `worker/.../PreTranscodeScheduler`
+  (`app.ister.worker.pretranscode.enabled`, `matchIfMissing = true`) and
+  `ContinueWatchingRebuildScheduler` (`app.ister.server.continue-watching.rebuild.enabled`) *do*
+  currently use `@ConditionalOnProperty` — those toggles only work when the property is already set
+  at image build time; setting it only at run time has no effect on the native image.
 - **Reflection and resource hints are hand-maintained** per module under
   `src/main/resources/META-INF/native-image/`. Nothing generates them; forgetting one surfaces only
   in the native image, not in JVM runs.
@@ -31,7 +37,8 @@ that constrains how code is written:
 
 Prod runs `hibernate.ddl-auto=validate`: an entity change without a matching Flyway migration fails
 startup. Migrations live in `database/src/main/resources/db/migration/V<n>__<name>.sql` (latest:
-`V28`), are **forward-only**, and are also shipped as a separate image (`Dockerfile.migrations`).
+see `ls database/src/main/resources/db/migration | sort -V | tail -1`), are **forward-only**, and
+are also shipped as a separate image (`Dockerfile.migrations`).
 Never edit a migration that has been applied anywhere.
 
 ## Testing

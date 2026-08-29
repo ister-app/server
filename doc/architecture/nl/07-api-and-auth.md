@@ -14,9 +14,12 @@ Controllers staan onder `api/.../controller/` (met een paar bestandsserverende c
 | Browsen | films, shows, seizoenen, afleveringen, personen, albums, tracks, chapters, boeken, series, podcasts + podcastafleveringen, credits |
 | Playback | play queue, watch status, mediabestanden, stream-tokens, playback-commands |
 | Voortgang | leesvoortgang (`ReadingProgressController`), recent bekeken, ratings per user (`RatingController`) |
-| Beheer | scanner (scan/analyze), libraries, directories, analyze-data, gebruikersinstellingen |
+| Playlists & ontdekken | playlists (`PlaylistController`), opgeslagen weergaven (`SavedViewController`), discover-rijen (`LibraryDiscoverController`) — zie [hoofdstuk 9](09-personal-library-and-devices.md) |
+| Apparaten, meeluisteren & historie | apparaten (`DeviceController`), meeluisteren (`PlayQueueFollowController`), afspeelhistorie (`PlaybackHistoryController`), sessies delen (`PlaybackSharingController`) — zie [hoofdstuk 9](09-personal-library-and-devices.md) en [hoofdstuk 5](05-continue-watching-and-status.md) |
+| Beheer | scanner (`ScannerController`, `scanLibraries`), metadata verversen (`MetadataRefreshController`, `refreshMetadata` + per-item `refresh*`), libraries, directories, gebruikersinstellingen, gebruikersbeheer (`UserAdminController`) |
+| Zoeken & overig | zoeken (`SearchController`), huidige gebruiker (`MeController`), serverklok (`TimeController`) |
 | Server | serverinfo, serverstatus, `.well-known` |
-| Bestanden serveren (disk-module) | epub-resources (`EpubResourceController`-gebied), strippagina's (`ComicResourceController`: `/comic/{mediaFileId}/manifest`, `/page/{index}`, `/file`), transcode-segment-upload/download (`FileController`) |
+| Bestanden serveren (disk-module) | epub-resources (`EpubResourceController`-gebied), strippagina's (`ComicResourceController`: `/comic/{mediaFileId}/manifest`, `/page/{index}`, `/file`), image-downloads + mediabestand-download + transcode-segment-upload (`FileController`, zie hieronder) |
 
 Fouten worden centraal gemapt in `api/.../error/` — `RestExceptionHandler` voor REST,
 `GraphQlExceptionResolver` voor GraphQL.
@@ -28,9 +31,10 @@ api-module; de base-URL is een property, zoals elk extern endpoint).
 
 ## GraphQL
 
-Het schema staat in `api/src/main/resources/graphql/schema.graphqls`; de GraphQL-IDE (GraphiQL) is
-in dev ingeschakeld. Naast queries en mutations zijn er drie websocket-subscriptions ([hoofdstuk
-5](05-continue-watching-and-status.md)):
+Het schema staat in `api/src/main/resources/graphql/schema.graphqls`; de GraphQL-IDE (GraphiQL)
+staat **onvoorwaardelijk** aan — `spring.graphql.graphiql.enabled=true` in `core.properties` en
+`/graphiql` is `permitAll` in `OIDCSecurityConfig` — niet alleen in dev. Naast queries en mutations
+zijn er vier websocket-subscriptions ([hoofdstuk 5](05-continue-watching-and-status.md)):
 
 - `serverActivity` — node-heartbeats, queuedieptes, bezige handlers, recente mislukkingen
   (replay-latest)
@@ -38,6 +42,14 @@ in dev ingeschakeld. Naast queries en mutations zijn er drie websocket-subscript
   eigenaar ([hoofdstuk 5](05-continue-watching-and-status.md#sessies-delen--privacy), replay-latest)
 - `playbackCommands(playQueueId)` — party-mode-afstandsbediening (best-effort, non-replaying);
   begrensd door de afstandsbedienings-scope van de eigenaar
+- `deviceCommands(deviceId)` — commando's gericht aan een van de eigen apparaten van de aanroeper;
+  zie [hoofdstuk 9](09-personal-library-and-devices.md)
+
+**Websocket-auth** (`GraphQlWebSocketAuthConfig`): een browser kan geen `Authorization`-header op
+een websocket-handshake zetten, dus de JWT reist mee in de `connection_init`-payload
+(`{"Authorization": "Bearer <jwt>"}`). De interceptor bewaart de resulterende `SecurityContext` op
+de websocket-sessie en propageert die naar elk subscribe-bericht, zodat `@PreAuthorize` op
+subscription-controllers ongewijzigd werkt.
 
 Voor afleveringen kent het schema naast `Episode.mediaFile` een lijst `Episode.mediaFileParts` van
 `MediaFilePart { mediaFile, startInMilliseconds, durationInMilliseconds }`: de tijd-slice van de
@@ -78,11 +90,13 @@ Drie kleine API-oppervlakken die de hoofdstukken hierboven slechts terloops rake
   queries zijn library-gescoped en pagineren en sorteren als de rest van het browse-oppervlak;
   `filter` gaat voor het artiest-argument. `TrackController` / `AlbumController`.
 - **Playback-instellingen** — `userSettings` / `updateUserSettings` bevatten per gebruiker
-  `preferredAudioLanguages`, `preferredSubtitleLanguages`, `directPlay`, `transcode` en
-  `maxVideoHeight`. Ze gelden voor elke client van die gebruiker **en sturen pre-transcoding**:
-  alleen de voorkeurstalen voor audio en videovarianten tot `maxVideoHeight` worden op de
-  achtergrond getranscodeerd ([hoofdstuk 4](04-transcoding.md)). Standaardwaarden vallen terug op de
-  geconfigureerde talen van de server. `UserSettingsController`.
+  `preferredAudioLanguages`, `preferredSubtitleLanguages`, `directPlay`, `transcode`,
+  `maxVideoHeight`, `autoSkipIntro` en `hideSubtitlesMatchingAudio` (V44). Ze gelden voor elke
+  client van die gebruiker, en twee ervan **sturen pre-transcoding**: alleen de voorkeurstalen voor
+  audio en videovarianten tot `maxVideoHeight` worden op de achtergrond getranscodeerd
+  ([hoofdstuk 4](04-transcoding.md) — `PassFilter` leest niets anders, dus `autoSkipIntro` en
+  `hideSubtitlesMatchingAudio` zijn puur client-side voorkeuren). Standaardwaarden vallen terug op
+  de geconfigureerde talen van de server. `UserSettingsController`.
 - **Attributie** — `attributions` geeft de externe providers terug die daadwerkelijk op deze server
   in gebruik zijn, voor het attributiescherm van de client: `source` (een `MetadataSource`: TMDB,
   MUSICBRAINZ, COVER_ART_ARCHIVE, WIKIMEDIA_COMMONS, WIKIPEDIA, WIKIDATA, OPEN_LIBRARY, PODCAST_FEED,
@@ -111,10 +125,33 @@ playlist-URI's die hij genereert, zodat de speler het nooit expliciet hoeft te h
 `StreamTokenService` ruimt verlopen tokens op via een schedule. In multi-node-opstellingen ververst
 `NodeTokenManager` de tokens tussen nodes.
 
+### Autorisatie per library op media-URL's
+
+Authenticatie alleen bepaalt niet wat een gebruiker mag ophalen: `MediaAccessEnforcementFilter`
+(core) dwingt per-library-zichtbaarheid af op de id-geadresseerde media-endpoints —
+`/hls/{mediaFileId}`, `/epub/{mediaFileId}`, `/comic/{mediaFileId}` en
+`/images/{imageId}/download`. Een geweigerde resource antwoordt **404**, niet te onderscheiden van
+een resource die niet bestaat. Node-naar-node-verkeer (`ROLE_node`) mag erdoor, net als resources
+zonder library (bijvoorbeeld persoonsportretten).
+
+## Image-downloads
+
+`FileController` (disk-module) serveert ook de artwork zelf: `GET /images/{id}/download` met een
+**ETag en conditional GET** (`If-None-Match` → 304). Het cachebeleid is bewust `private, max-age`
+met hervalidatie in plaats van `immutable`: een gescande library-afbeelding houdt haar id wanneer
+het bestand erachter in-place vervangen wordt, dus clients moeten goedkoop kunnen hervalideren —
+anders dan de comic- en epub-resources, die wél immutable zijn. Operationele noot: een reverse
+proxy vóór de server moet `If-None-Match`/`ETag` doorlaten, anders degradeert elk imageverzoek tot
+een volledige download. Dezelfde controller verzorgt `/mediaFile/{id}/download`
+(multi-node-bronreads) en `POST /transcode/upload/{id}/{fileName}` (segment-uploads,
+[hoofdstuk 4](04-transcoding.md)).
+
 ## Epub lezen
 
-De epub-lezer van de client laadt boeken lazy via `GET /epub/{mediaFileId}/resource/{entry}`, dat
-individuele zip-entries serveert met Range- en ETag-ondersteuning. Het accepteert dezelfde
+De epub-lezer van de client laadt boeken lazy via
+`GET /epub/{mediaFileId}/resource/{*entryPath}` (`EpubResourceController` — de
+`{*entryPath}`-wildcard vangt het zip-entry-pad inclusief slashes), dat individuele zip-entries
+serveert met Range- en ETag-ondersteuning. Het accepteert dezelfde
 stream-tokens, plus een **cookie-fallback**: subresources (CSS, afbeeldingen, fonts) worden door de
 browser-engine zelf geladen, die het token niet kan meesturen — de cookie die bij het eerste
 verzoek gezet wordt, dekt die af.

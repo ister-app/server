@@ -69,7 +69,8 @@ only the advertised duration is now the honest one.
 
 ## Concurrency
 
-`transcodeExecutor` is a fixed 4-thread pool, additionally bounded by the `concurrentFileSlots`
+`transcodeExecutor` is a fixed pool sized by `app.ister.transcoder.hls.max-concurrent-passes`
+(default 4), additionally bounded by the `concurrentFileSlots`
 semaphore (`max-concurrent-files`, default 2). A pass holds a thread for the entire file duration.
 Pre-transcoding competes for the same pool, so it is easy to starve interactive playback — which is
 why background work is throttled and preemptible (below).
@@ -98,12 +99,32 @@ script generated at startup, falling back to normal priority when `nice` is miss
 pass writes a `done_<segmentPrefix>` marker; only that marker (not the mere presence of segments)
 lets a later pre-transcode skip the pass.
 
+## Crop detection and transcoding
+
+File analysis detects baked-in black bars and stores the crop rectangle on the video's
+`MediaFileStreamEntity` ([chapter 2](02-scanning-and-analysis.md)). The transcoder does **not**
+apply it yet: no FFmpeg pass adds a crop filter, so streams are transcoded with the bars intact.
+The stored values are currently only exposed as stream metadata for clients.
+
 ## Retention
 
-The cleanup task removes a transcode cache dir only when it has been untouched for ≥2 hours **and**
-its `keep_until` deadline (the highest `keepUntilEpochMillis` ever received) has passed. Play-queue
-prefetch sends +24h; the periodic pre-transcode sends +30min and refreshes it every 15 minutes as
-long as the entry qualifies.
+Two separate sweeps clean the transcode cache, steered by different properties:
+
+- **`HlsTranscodeService.cleanupOldFiles`** runs every 15 minutes. It removes a cache dir only when
+  every file in it has been untouched for `app.ister.transcoder.hls.cache-retention-hours` (default
+  2) **and** the dir's `keep_until` deadline (the highest `keepUntilEpochMillis` ever received) has
+  passed. Play-queue prefetch sends now + `app.ister.server.prefetch.keep-hours` (default 24 h); the
+  periodic pre-transcode sends +30 min and refreshes it every 15 minutes as long as the entry
+  qualifies. One exemption: a dir holding **nothing but `.m3u8` playlists** is kept permanently —
+  those are the scan-time playlists for music, a few KB that make first play instant. The exemption
+  is deliberately that narrow: a dir with extracted subtitles or other leftovers but no `.ts` still
+  ages out.
+- **`TmpTranscodeCleanupScheduler`** runs daily (cron `app.ister.server.cache-cleanup.cron`) and
+  handles what the first sweep cannot see: **orphans** — dirs whose media file no longer exists in
+  the database — are removed unconditionally, and idle dirs with no active FFmpeg pass are removed
+  after `app.ister.server.cache-cleanup.min-age` (default 24 h). It ignores `keep_until`, and obeys
+  the shared `app.ister.server.cache-cleanup.dry-run` flag (default `true` — it only logs until
+  switched off).
 
 ## Multi-node
 

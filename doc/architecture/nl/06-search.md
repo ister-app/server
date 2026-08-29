@@ -26,13 +26,18 @@ verwijdert) in de collection achter de `media`-alias.
 Verzenders:
 
 - **Creatie** komt gratis mee: `ServerEventService.createXFoundEvent` stuurt bij creatie een
-  indexevent voor elk doorzoekbaar entiteitstype (movie, show, episode, person, album, track).
+  indexevent voor elk doorzoekbaar entiteitstype (`SearchEntityType`: movie, show, episode, person,
+  album, track, book, podcast — comicvolumes indexeren als BOOK).
 - **Verrijkings**-handlers sturen na hun metadata-saves: `MetadataSave` (TMDB), de
-  worker-`HandlePersonFound`/`HandleAlbumFound` (MusicBrainz), `PersonLookupService` (TMDB-cast),
-  `HandleNfoFileFound` en `HandleAudioFileFound` (audio-tags, inclusief `action=DELETE` bij
-  track-dedup).
+  worker-`HandlePersonFound`/`HandleAlbumFound`/`HandleBookFound` (MusicBrainz / Open Library), de
+  disk-`HandlePersonFound`/`HandleAlbumFound`, `PersonLookupService` (TMDB-cast),
+  `HandleNfoFileFound`, `HandleAudioFileFound` (audio-tags, inclusief `action=DELETE` bij
+  track-dedup), `HandleEpubFileFound`, `HandleComicFileFound`, `HandlePodcastRefreshRequested`,
+  plus `ScannerHelperService` (boekcreatie uit de mappenstructuur) en `BookSeriesService`
+  (reekstoewijzing herindexeert de betrokken boeken).
 - **Deletes**: elke code die een doorzoekbare entiteit verwijdert moet
-  `serverEventService.createSearchDeleteEvent(...)` aanroepen. Er zijn vangnetten — de
+  `serverEventService.createSearchDeleteEvent(...)` aanroepen — `PodcastController` doet dat
+  bijvoorbeeld bij het opzeggen van een abonnement. Er zijn vangnetten — de
   upsert-handler verwijdert het document als de entiteit niet meer bestaat, en een reindex bouwt
   alles opnieuw op — maar deze regel houdt de index correct tússen reindexen in.
 

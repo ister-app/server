@@ -72,7 +72,8 @@ laatste segment draagt het — alleen de geadverteerde duur is nu de eerlijke.
 
 ## Concurrency
 
-`transcodeExecutor` is een vaste pool van 4 threads, extra begrensd door de
+`transcodeExecutor` is een vaste pool ter grootte van
+`app.ister.transcoder.hls.max-concurrent-passes` (default 4), extra begrensd door de
 `concurrentFileSlots`-semafoor (`max-concurrent-files`, default 2). Een pass houdt een thread vast
 voor de volledige duur van het bestand. Pre-transcoding concurreert om dezelfde pool, dus het is
 makkelijk om interactieve playback uit te hongeren — vandaar dat achtergrondwerk gethrottled en
@@ -104,12 +105,33 @@ via een bij startup gegenereerd wrapper-script, met terugval op normale priorite
 ontbreekt. Een succesvolle pass schrijft een `done_<segmentPrefix>`-marker; alleen die marker (niet
 de enkele aanwezigheid van segmenten) laat een latere pre-transcode de pass overslaan.
 
+## Crop-detectie en transcoderen
+
+De bestandsanalyse detecteert ingebakken zwarte balken en slaat de crop-rechthoek op op de
+video-`MediaFileStreamEntity` ([hoofdstuk 2](02-scanning-and-analysis.md)). De transcoder past die
+**nog niet** toe: geen enkele FFmpeg-pass voegt een crop-filter toe, dus streams worden
+getranscodeerd mét de balken. De opgeslagen waarden worden vooralsnog alleen als stream-metadata
+aan clients ontsloten.
+
 ## Retentie
 
-De cleanup-taak verwijdert een transcode-cache-dir pas als die ≥2 uur onaangeraakt is **én** de
-`keep_until`-deadline (de hoogste ooit ontvangen `keepUntilEpochMillis`) verstreken is. De
-playqueue-prefetch stuurt +24 uur; de periodieke pre-transcode stuurt +30 min en ververst dat elke
-15 minuten zolang de entry in aanmerking komt.
+Twee losse sweeps schonen de transcode-cache op, gestuurd door verschillende properties:
+
+- **`HlsTranscodeService.cleanupOldFiles`** draait elke 15 minuten. Die verwijdert een cache-dir
+  pas als elk bestand erin `app.ister.transcoder.hls.cache-retention-hours` (default 2) onaangeraakt
+  is **én** de `keep_until`-deadline van de dir (de hoogste ooit ontvangen `keepUntilEpochMillis`)
+  verstreken is. De playqueue-prefetch stuurt nu + `app.ister.server.prefetch.keep-hours` (default
+  24 uur); de periodieke pre-transcode stuurt +30 min en ververst dat elke 15 minuten zolang de
+  entry in aanmerking komt. Eén uitzondering: een dir met **uitsluitend `.m3u8`-playlists** blijft
+  permanent staan — dat zijn de scan-time-playlists voor muziek, een paar KB die de eerste
+  afspeelactie instant maken. De uitzondering is bewust zo smal: een dir met geëxtraheerde
+  ondertitels of andere restanten maar zonder `.ts` veroudert alsnog.
+- **`TmpTranscodeCleanupScheduler`** draait dagelijks (cron `app.ister.server.cache-cleanup.cron`)
+  en pakt wat de eerste sweep niet kan zien: **wezen** — dirs waarvan het mediabestand niet meer in
+  de database bestaat — worden onvoorwaardelijk verwijderd, en stilliggende dirs zonder actieve
+  FFmpeg-pass na `app.ister.server.cache-cleanup.min-age` (default 24 uur). Deze sweep negeert
+  `keep_until` en gehoorzaamt de gedeelde vlag `app.ister.server.cache-cleanup.dry-run` (default
+  `true` — hij logt alleen totdat die omgezet wordt).
 
 ## Multi-node
 

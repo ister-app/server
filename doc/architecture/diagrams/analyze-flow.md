@@ -4,12 +4,14 @@
 
 Triggered by the GraphQL mutation `refreshMetadata(MISSING)` (`MetadataRefreshController`):
 metadata is fetched for everything that lacks it (movies/shows also when their TMDB enrichment
-columns were never filled). The controller kicks the BlurHash sweep per directory itself; the
-backfill event is **global**, so it runs exactly once cluster-wide.
+columns were never filled). The controller kicks the BlurHash sweep per directory itself — for an
+unscoped call over **every** directory including the cache directory; with a `libraryId` only over
+that library's `LIBRARY` directories. The backfill event is **global**, so it runs exactly once
+cluster-wide.
 
 ```mermaid
 flowchart TD
-    API([refreshMetadata MISSING]) -->|"per directory (incl. cache)"| C["UPDATE_IMAGES_REQUESTED\n.{dirName}"]
+    API([refreshMetadata MISSING]) -->|"per directory (incl. cache\nwhen unscoped)"| C["UPDATE_IMAGES_REQUESTED\n.{dirName}"]
     API -->|"one global event"| A
 
     A["METADATA_BACKFILL_REQUESTED"]
@@ -21,6 +23,8 @@ flowchart TD
     B -->|"artists/authors without metadata"| G["PERSON_FOUND"]
     B -->|"albums without an image"| H["ALBUM_FOUND"]
     B -->|"tracks without metadata"| I["AUDIO_FILE_FOUND\n.{dirName}"]
+    B -->|"books without metadata"| BK["BOOK_FOUND"]
+    B -->|"comic series without metadata"| CS["COMIC_SERIES_FOUND"]
 
     C --> C1["HandleUpdateImagesRequested\n📦 disk\nBlurHash for one chunk of images"]
     C1 -->|"chunk full: more work left\nafterId = last id"| C
@@ -48,7 +52,13 @@ flowchart TD
 
     I --> I1["HandleAudioFileFound\n📦 disk\n(same as the scan flow)"]
 
-    IMG1 & IMG2 & IMG3 & IMG4 --> FIN["HandleImageFound\n📦 disk\nsave row, no BlurHash"]
+    BK --> BK1["HandleBookFound\n📦 worker"]
+    BK1 -->|"Open Library / Wikidata\ncover when none exists"| IMG5["IMAGE_FOUND\n.{dirName}"]
+
+    CS --> CS1["HandleComicSeriesFound\n📦 worker"]
+    CS1 -->|"Wikipedia thumbnail\nwhen no local artwork"| IMG6["IMAGE_FOUND\n.{dirName}"]
+
+    IMG1 & IMG2 & IMG3 & IMG4 & IMG5 & IMG6 --> FIN["HandleImageFound\n📦 disk\nsave row, no BlurHash"]
     NFO1 & NFO2 --> FIN2["HandleNfoFileFound\n📦 disk\nparse XML + save"]
 ```
 

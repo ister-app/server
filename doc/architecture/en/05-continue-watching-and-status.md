@@ -11,12 +11,15 @@ continue-watching list is a precomputed table; live status is a fanout of in-mem
 
 See the [continue-watching-flow diagram](../diagrams/continue-watching-flow.md). The
 `continue_watching` table (migration V20) holds one row per user per container — show / movie / book
-/ podcast episode (`group_id`) — pointing at the item to resume with. `ContinueWatchingService`
+/ comic series / podcast episode (`group_id`) — pointing at the item to resume with. For comics the
+container is the series and the target the next volume (`ContinueWatchingService.upsertComicVolume`;
+`recomputeForComicSeries` revives the series when the scanner adds a volume). `ContinueWatchingService`
 (database module) owns it; the GraphQL `recentlyWatched` query is a single indexed read.
 
 - **Incremental, same transaction.** `onWatchStatusChanged(watchStatus)` is called *inside the
   transaction* of every watch-status write (`PlayQueueService.updateWatchStatus`,
-  `BookController.updateReadingProgress`, `ReadingProgressController`), so cache and truth commit
+  `BookController.updateReadingProgress`, `ReadingProgressController`,
+  `PlaybackHistoryService.markPlayed`), so cache and truth commit
   together — no event in between. **Any new code path that writes a `WatchStatusEntity` must call
   it**, or the list goes stale until the nightly rebuild.
 - **Handover on finish.** An unfinished item resumes itself; a finished one hands over to the next
@@ -78,8 +81,15 @@ so cluster state converges everywhere and any node can answer a subscription.
 
 `ServerStatusBroadcaster` bridges the registries to the GraphQL websocket subscriptions:
 `serverActivity` and `nowPlaying` (`ServerStatusController`) and `playbackCommands(playQueueId)`
-(`PlaybackCommandController` — party-mode remote control:
-PLAY/PAUSE/NEXT/SEEK/SKIP_TO_ITEM/QUEUE_CHANGED).
+(`PlaybackCommandController` — party-mode remote control: PLAY / PAUSE / NEXT / PREVIOUS / SEEK /
+SKIP_TO_ITEM / QUEUE_CHANGED / STOP, plus STOP_FOLLOW and SET_REPEAT — see `PlaybackCommandType` in
+`schema.graphqls`).
+
+The `status/` package has since grown beyond these registries: `DevicePresenceRegistry` +
+`DeviceCommandService` track registered devices and route `deviceCommands` to them;
+`FollowerRegistry` + `FollowerStatusService` track who is listening along with a session; and
+`TranscodeActivityRegistry` feeds live transcode progress into `serverActivity`. The device and
+listen-along mechanics are covered in [chapter 9](09-personal-library-and-devices.md).
 
 Two invariants before touching this code:
 

@@ -32,9 +32,10 @@ See the [module diagram](../diagrams/modules.md) for the picture.
 
 **Dependency flow:** `server` → `{api, disk, worker, search, transcoder}` → `core` → `database`.
 `core` declares `api project(':database')`, so entities, repositories and enums arrive
-**transitively**. That is the direction, and it is easy to get backwards: `database` depends on
-nothing internal, and nothing may ever make it depend on `core`. `api` additionally depends directly
-on `search` and `transcoder`.
+**transitively** (`disk`, `worker` and `search` also declare a direct `database` dependency).
+That is the direction, and it is easy to get backwards: `database` depends on nothing internal,
+and nothing may ever make it depend on `core`. `api` additionally depends directly on `search`
+and `transcoder`.
 
 **Split-package warning:** `core/` and `database/` both contribute to package `app.ister.core.*`.
 Entities, repositories and `EventType` live in `database/`; the
@@ -70,6 +71,8 @@ not tell you which module a class is in.
 7. [API and auth](07-api-and-auth.md) — REST/GraphQL surface, subscriptions, OIDC and stream tokens
 8. [Native image and testing](08-native-image-and-testing.md) — GraalVM constraints, Flyway
    discipline, test setup, CI
+9. [Personal library and devices](09-personal-library-and-devices.md) — the filter DSL, saved
+   views and playlists, Discover top-lists, playback history, devices, listen-along
 
 ## Diagrams
 

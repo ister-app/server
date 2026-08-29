@@ -14,9 +14,12 @@ areas:
 | Browse | movies, shows, seasons, episodes, persons, albums, tracks, chapters, books, series, podcasts + podcast episodes, credits |
 | Playback | play queue, watch status, media files, stream tokens, playback commands |
 | Progress | reading progress (`ReadingProgressController`), recently watched, per-user ratings (`RatingController`) |
-| Management | scanner (scan/analyze), libraries, directories, analyze-data, user settings |
+| Playlists & discovery | playlists (`PlaylistController`), saved views (`SavedViewController`), discover rows (`LibraryDiscoverController`) — see [chapter 9](09-personal-library-and-devices.md) |
+| Devices, follow & history | devices (`DeviceController`), listen-along (`PlayQueueFollowController`), playback history (`PlaybackHistoryController`), session sharing (`PlaybackSharingController`) — see [chapter 9](09-personal-library-and-devices.md) and [chapter 5](05-continue-watching-and-status.md) |
+| Management | scanner (`ScannerController`, `scanLibraries`), metadata refresh (`MetadataRefreshController`, `refreshMetadata` + per-item `refresh*`), libraries, directories, user settings, user admin (`UserAdminController`) |
+| Search & misc | search (`SearchController`), current user (`MeController`), server clock (`TimeController`) |
 | Server | server info, server status, `.well-known` |
-| File serving (disk module) | epub resources (`EpubResourceController` area), comic pages (`ComicResourceController`: `/comic/{mediaFileId}/manifest`, `/page/{index}`, `/file`), transcode segment upload/download (`FileController`) |
+| File serving (disk module) | epub resources (`EpubResourceController` area), comic pages (`ComicResourceController`: `/comic/{mediaFileId}/manifest`, `/page/{index}`, `/file`), image downloads + media-file download + transcode segment upload (`FileController`, see below) |
 
 Errors are mapped centrally in `api/.../error/` — `RestExceptionHandler` for REST,
 `GraphQlExceptionResolver` for GraphQL.
@@ -29,14 +32,23 @@ property like every external endpoint).
 ## GraphQL
 
 The schema lives at `api/src/main/resources/graphql/schema.graphqls`; the GraphQL IDE (GraphiQL) is
-enabled in dev. Besides queries and mutations there are three websocket subscriptions ([chapter
-5](05-continue-watching-and-status.md)):
+enabled **unconditionally** — `spring.graphql.graphiql.enabled=true` in `core.properties` and
+`/graphiql` is `permitAll` in `OIDCSecurityConfig` — not just in dev. Besides queries and mutations
+there are four websocket subscriptions ([chapter 5](05-continue-watching-and-status.md)):
 
 - `serverActivity` — node heartbeats, queue depths, busy handlers, recent failures (replay-latest)
 - `nowPlaying` — active playback sessions, filtered per viewer by the owner's sharing settings
   ([chapter 5](05-continue-watching-and-status.md#session-sharing--privacy), replay-latest)
 - `playbackCommands(playQueueId)` — party-mode remote control (best-effort, non-replaying); gated by
   the owner's remote-control sharing scope
+- `deviceCommands(deviceId)` — commands addressed to one of the caller's own devices; see
+  [chapter 9](09-personal-library-and-devices.md)
+
+**Websocket auth** (`GraphQlWebSocketAuthConfig`): a browser cannot set an `Authorization` header on
+a websocket handshake, so the JWT travels in the `connection_init` payload
+(`{"Authorization": "Bearer <jwt>"}`). The interceptor stores the resulting `SecurityContext` on the
+websocket session and propagates it to every subscribe message, so `@PreAuthorize` works unchanged
+on subscription controllers.
 
 For episodes the schema carries, next to `Episode.mediaFile`, an `Episode.mediaFileParts` list of
 `MediaFilePart { mediaFile, startInMilliseconds, durationInMilliseconds }`: the episode's time
@@ -73,11 +85,13 @@ Three small API surfaces that the chapters above only touch in passing:
   and sort like the rest of the browse surface; `filter` takes precedence over the artist argument.
   `TrackController` / `AlbumController`.
 - **Playback settings** — `userSettings` / `updateUserSettings` hold each user's
-  `preferredAudioLanguages`, `preferredSubtitleLanguages`, `directPlay`, `transcode` and
-  `maxVideoHeight`. They apply to every client of that user **and steer pre-transcoding**: only the
-  preferred audio languages and video variants up to `maxVideoHeight` are transcoded in the
-  background ([chapter 4](04-transcoding.md)). Defaults fall back to the server's configured
-  languages. `UserSettingsController`.
+  `preferredAudioLanguages`, `preferredSubtitleLanguages`, `directPlay`, `transcode`,
+  `maxVideoHeight`, `autoSkipIntro` and `hideSubtitlesMatchingAudio` (V44). They apply to every
+  client of that user, and two of them **steer pre-transcoding**: only the preferred audio
+  languages and video variants up to `maxVideoHeight` are transcoded in the background
+  ([chapter 4](04-transcoding.md) — `PassFilter` reads nothing else, so `autoSkipIntro` and
+  `hideSubtitlesMatchingAudio` are purely client-side preferences). Defaults fall back to the
+  server's configured languages. `UserSettingsController`.
 - **Attribution** — `attributions` returns the external providers actually in use on this server,
   for the client's attribution screen: `source` (a `MetadataSource`: TMDB, MUSICBRAINZ,
   COVER_ART_ARCHIVE, WIKIMEDIA_COMMONS, WIKIPEDIA, WIKIDATA, OPEN_LIBRARY, PODCAST_FEED, LOCAL_FILE),
@@ -103,10 +117,31 @@ segment requests may authenticate with a short-lived `?token=` query parameter
 generates, so the player never handles it explicitly. `StreamTokenService` sweeps expired tokens on
 a schedule. In multi-node setups, `NodeTokenManager` refreshes the inter-node tokens.
 
+### Per-library authorization on media URLs
+
+Authentication alone does not decide what a user may fetch: `MediaAccessEnforcementFilter` (core)
+enforces per-library visibility on the id-addressed media endpoints — `/hls/{mediaFileId}`,
+`/epub/{mediaFileId}`, `/comic/{mediaFileId}` and `/images/{imageId}/download`. A denied resource
+answers **404**, indistinguishable from a resource that does not exist. Node-to-node traffic
+(`ROLE_node`) passes through, as do resources without a library (person portraits, for example).
+
+## Image downloads
+
+`FileController` (disk module) also serves the artwork itself: `GET /images/{id}/download` with an
+**ETag and conditional GET** (`If-None-Match` → 304). The cache policy is deliberately
+`private, max-age` with revalidation rather than `immutable`: a scanned library image keeps its id
+when the file behind it is replaced in place, so clients must be able to revalidate cheaply —
+unlike the comic and epub resources, which are immutable. Operational note: a reverse proxy in
+front of the server must pass `If-None-Match`/`ETag` through, or every image request degrades to a
+full download. The same controller handles `/mediaFile/{id}/download` (multi-node source reads) and
+`POST /transcode/upload/{id}/{fileName}` (segment uploads, [chapter 4](04-transcoding.md)).
+
 ## Epub reading
 
-The client's epub reader loads books lazily through `GET /epub/{mediaFileId}/resource/{entry}`,
-which serves individual zip entries with Range and ETag support. It accepts the same stream tokens,
+The client's epub reader loads books lazily through
+`GET /epub/{mediaFileId}/resource/{*entryPath}` (`EpubResourceController` — the `{*entryPath}`
+wildcard captures the zip-entry path including slashes), which serves individual zip entries with
+Range and ETag support. It accepts the same stream tokens,
 plus a **cookie fallback**: subresources (CSS, images, fonts) are loaded by the browser engine
 itself, which cannot append the token — the cookie set on the first request covers those.
 
