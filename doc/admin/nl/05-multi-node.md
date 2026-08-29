@@ -76,5 +76,5 @@ bereiken), terwijl `APP_ISTER_CLUSTER_NAME` overal hetzelfde is.
 
 ## Verder lezen
 
-- [Zoeken](05-search-typesense.md) — één Typesense bedient het hele cluster
-- [Onderhoud](06-maintenance-and-troubleshooting.md) — caches en taken per node
+- [Zoeken](06-search-typesense.md) — één Typesense bedient het hele cluster
+- [Onderhoud](07-maintenance-and-troubleshooting.md) — caches en taken per node

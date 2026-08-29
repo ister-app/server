@@ -20,7 +20,7 @@ An Ister deployment is a small set of services:
 | PostgreSQL | yes | The single source of truth for all data |
 | RabbitMQ | yes | Message broker; all background work flows through it |
 | OIDC provider | yes | Authentication — any Keycloak-compatible OpenID Connect provider |
-| Typesense | optional | Full-text search across your libraries ([chapter 05](05-search-typesense.md)) |
+| Typesense | optional | Full-text search across your libraries ([chapter 06](06-search-typesense.md)) |
 
 Ister does not manage users itself: your OIDC provider (Keycloak, for example) does. The server
 validates the JWTs it issues.
@@ -37,23 +37,26 @@ validates the JWTs it issues.
 ## Deployment shapes
 
 - **Docker Compose** — the repository ships `docker-compose.yml` as a reference stack
-  (database, RabbitMQ, migrations, server). See [Installation](01-installation.md).
+  (database, RabbitMQ, a development Keycloak, migrations, server). The
+  [Quick start](01-quick-start.md) walks you through it; [Installation](02-installation.md)
+  covers keeping it.
 - **Kubernetes** — the [chart repository](https://github.com/ister-app/chart) provides a Helm
   chart and runs a full end-to-end suite against it in CI.
 - **Multiple nodes** — several servers can form one cluster, each owning its own disks; transcode
-  work runs on the node that holds the file. See [Multi-node](04-multi-node.md).
+  work runs on the node that holds the file. See [Multi-node](05-multi-node.md).
 
 The production artifact is a **GraalVM native image**: the published container image starts in a
 fraction of a second and contains no JVM. You normally just pull `ghcr.io/ister-app/server`;
-building it yourself is covered in [Installation](01-installation.md).
+building it yourself is covered in [Installation](02-installation.md).
 
 ## Chapter map
 
-1. [Installation](01-installation.md) — images, migrations, first start, health endpoints
-2. [Configuration](02-configuration.md) — the full settings reference
-3. [Libraries and media layout](03-libraries-and-media-layout.md) — how to organise files on disk
-4. [Multi-node](04-multi-node.md) — running a cluster
-5. [Search (Typesense)](05-search-typesense.md) — enabling and maintaining full-text search
-6. [Maintenance and troubleshooting](06-maintenance-and-troubleshooting.md) — scheduled jobs, backup, monitoring
-7. [Naming conventions](07-naming-conventions.md) — the exact directory and file naming rules per library type
-8. [Users, sharing, and access](08-users-sharing-and-access.md) — admins, per-library visibility, playback-session sharing
+1. [Quick start](01-quick-start.md) — a running, signed-in server with test media in about ten minutes
+2. [Installation](02-installation.md) — prerequisites, images, migrations, first start, health endpoints
+3. [Configuration](03-configuration.md) — the full settings reference
+4. [Libraries and media layout](04-libraries-and-media-layout.md) — how to organise files on disk
+5. [Multi-node](05-multi-node.md) — running a cluster
+6. [Search (Typesense)](06-search-typesense.md) — enabling and maintaining full-text search
+7. [Maintenance and troubleshooting](07-maintenance-and-troubleshooting.md) — scheduled jobs, backup, monitoring
+8. [Naming conventions](08-naming-conventions.md) — the exact directory and file naming rules per library type
+9. [Users, sharing, and access](09-users-sharing-and-access.md) — admins, per-library visibility, playback-session sharing

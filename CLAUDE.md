@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Documentation (`doc/`)
 
 Structured documentation lives under `doc/`, mirroring the player repo's setup: `doc/admin/{en,nl}/`
-(operator guide, 8 numbered chapters) and `doc/architecture/{en,nl}/` (developer docs, 9 numbered
+(operator guide, 10 numbered chapters) and `doc/architecture/{en,nl}/` (developer docs, 9 numbered
 chapters), plus `doc/architecture/diagrams/` (hand-authored mermaid, English only, shared by both
 locales). Root `EVENT_FLOWS.md` is only a pointer stub to it now.
 
@@ -19,7 +19,8 @@ Rules when touching `doc/`:
 - `ci/build-docs.sh --check` validates parity, relative links and mermaid fences (the `docs` job in
   `build.yml` runs it on every PR); without `--check` it packages `server-docs-<version>.zip`, which
   `release.yml` attaches to each GitHub release. The zip is gitignored.
-- Plain markdown, no front-matter, relative links only; chapters are `NN-name.md`.
+- Plain markdown, relative links only; chapters are `NN-name.md`. The only front-matter is a YAML
+  block with a one-line `description:` per chapter (SEO for the published site).
 - A behavior change in the server that is described in `doc/` should update the affected chapters
   in the same PR.
 

@@ -37,7 +37,7 @@ een single-node thuisopstelling.
 | `app.ister.server.TMDB.apikey` | `APP_ISTER_SERVER_TMDB_APIKEY` | niet gezet | TMDB **API read access token**. Zonder deze wordt het ophalen van film-/seriemetadata overgeslagen — je krijgt kale bestandsnamen. |
 | `app.ister.server.TMDB.max-requests-per-second` | | `30` | blijft onder TMDB's limiet van ~40 rps |
 | `app.ister.worker.tmdb.certification-country` | | `US` | ISO 3166-1-land waarvan de keuring/leeftijdsclassificatie (bv. `16`, `PG-13`, `TV-MA`) bij films en shows wordt opgeslagen; valt terug op US en daarna op een willekeurig land dat er een heeft. |
-| `app.ister.languages` | `ISTER_LANGUAGES` | `en,nl` | kommagescheiden ISO-639-1-tags; de eerste = primair. Bepaalt in welke talen metadata wordt opgehaald **én** welke talen de zoekindex krijgt. Wijzigen vereist een re-scan plus `rebuildSearchIndex` — zie [Zoeken](05-search-typesense.md). |
+| `app.ister.languages` | `ISTER_LANGUAGES` | `en,nl` | kommagescheiden ISO-639-1-tags; de eerste = primair. Bepaalt in welke talen metadata wordt opgehaald **én** welke talen de zoekindex krijgt. Wijzigen vereist een re-scan plus `rebuildSearchIndex` — zie [Zoeken](06-search-typesense.md). |
 
 ## Zoeken (Typesense)
 
@@ -47,7 +47,7 @@ een single-node thuisopstelling.
 | `TYPESENSE_HOST` / `TYPESENSE_PORT` / `TYPESENSE_PROTOCOL` | `localhost` / `8108` / `http` |
 | `TYPESENSE_API_KEY` / `TYPESENSE_COLLECTION` | leeg / `media` |
 
-Zie [Zoeken](05-search-typesense.md) voor de procedure om in te schakelen en te herindexeren.
+Zie [Zoeken](06-search-typesense.md) voor de procedure om in te schakelen en te herindexeren.
 
 ## Transcoding
 
@@ -109,7 +109,7 @@ doet. Zie de architectuurgids, [Transcoding](../../architecture/nl/04-transcodin
 | Instelling | Standaard | Opmerkingen |
 | --- | --- | --- |
 | `CACHE_CLEANUP_ENABLED` / `CACHE_CLEANUP_CRON` | `true` / `0 30 4 * * *` | dagelijkse zombie-sweep van cache- en tmp-mappen |
-| `CACHE_CLEANUP_DRY_RUN` | **`true`** | hij **logt** alleen totdat je dit op `false` zet — zie [Onderhoud](06-maintenance-and-troubleshooting.md) |
+| `CACHE_CLEANUP_DRY_RUN` | **`true`** | hij **logt** alleen totdat je dit op `false` zet — zie [Onderhoud](07-maintenance-and-troubleshooting.md) |
 | `CACHE_CLEANUP_MIN_AGE` | `24h` | verwijdert nooit bestanden jonger dan dit |
 | `app.ister.server.cache-cleanup.podcast-retention-days` | `30` | gedownloade podcastafleveringen verlopen hierna, tenzij iemand middenin een aflevering zit |
 | `app.ister.worker.podcast.auto-download-count` | `3` | nieuwste afleveringen die per feed automatisch worden gedownload |
@@ -131,14 +131,14 @@ lopen — de CI van de chart wijst ze allemaal naar één WireMock-pod:
 ## Libraries en directories
 
 `app.ister.disk.libraries[n].*` en `app.ister.disk.directories[n].*` bepalen wat er gescand
-wordt — volledig behandeld in [Libraries en media-indeling](03-libraries-and-media-layout.md).
+wordt — volledig behandeld in [Libraries en media-indeling](04-libraries-and-media-layout.md).
 Aparte transcoder-nodes krijgen schijven toegewezen met `app.ister.transcoder.disks[n].name` — zie
-[Multi-node](04-multi-node.md).
+[Multi-node](05-multi-node.md).
 
 ## Health, metrics en overige interne knoppen
 
 De Spring Actuator (`/actuator/health`, `/actuator/metrics`, `/actuator/prometheus`) draait op een
-eigen poort, zodat die buiten de publieke API blijft. Zie [Installatie](01-installation.md#health-metrics-logs).
+eigen poort, zodat die buiten de publieke API blijft. Zie [Installatie](02-installation.md#health-metrics-logs).
 
 | Property | Standaard | Opmerkingen |
 | --- | --- | --- |

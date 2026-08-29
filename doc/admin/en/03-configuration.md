@@ -36,7 +36,7 @@ dedicated short env var, listed below. Defaults are sensible for a single-node h
 | `app.ister.server.TMDB.apikey` | `APP_ISTER_SERVER_TMDB_APIKEY` | unset | TMDB **API read access token**. Without it, movie/show metadata fetching is skipped — you get bare filenames. |
 | `app.ister.server.TMDB.max-requests-per-second` | | `30` | stays under TMDB's ~40 rps limit |
 | `app.ister.worker.tmdb.certification-country` | | `US` | ISO 3166-1 country whose certification/content rating (e.g. `16`, `PG-13`, `TV-MA`) is stored on movies and shows; falls back to US, then any country that has one. |
-| `app.ister.languages` | `ISTER_LANGUAGES` | `en,nl` | comma-separated ISO-639-1 tags; first = primary. Drives which languages metadata is fetched in **and** which languages search indexes. Changing it requires a re-scan plus `rebuildSearchIndex` — see [Search](05-search-typesense.md). |
+| `app.ister.languages` | `ISTER_LANGUAGES` | `en,nl` | comma-separated ISO-639-1 tags; first = primary. Drives which languages metadata is fetched in **and** which languages search indexes. Changing it requires a re-scan plus `rebuildSearchIndex` — see [Search](06-search-typesense.md). |
 
 ## Search (Typesense)
 
@@ -46,7 +46,7 @@ dedicated short env var, listed below. Defaults are sensible for a single-node h
 | `TYPESENSE_HOST` / `TYPESENSE_PORT` / `TYPESENSE_PROTOCOL` | `localhost` / `8108` / `http` |
 | `TYPESENSE_API_KEY` / `TYPESENSE_COLLECTION` | empty / `media` |
 
-See [Search](05-search-typesense.md) for the enable/reindex procedure.
+See [Search](06-search-typesense.md) for the enable/reindex procedure.
 
 ## Transcoding
 
@@ -108,7 +108,7 @@ the architecture guide, [Transcoding](../../architecture/en/04-transcoding.md).
 | Setting | Default | Notes |
 | --- | --- | --- |
 | `CACHE_CLEANUP_ENABLED` / `CACHE_CLEANUP_CRON` | `true` / `0 30 4 * * *` | daily zombie sweep of cache and tmp dirs |
-| `CACHE_CLEANUP_DRY_RUN` | **`true`** | it only **logs** until you set this to `false` — see [Maintenance](06-maintenance-and-troubleshooting.md) |
+| `CACHE_CLEANUP_DRY_RUN` | **`true`** | it only **logs** until you set this to `false` — see [Maintenance](07-maintenance-and-troubleshooting.md) |
 | `CACHE_CLEANUP_MIN_AGE` | `24h` | never deletes files younger than this |
 | `app.ister.server.cache-cleanup.podcast-retention-days` | `30` | downloaded podcast episodes expire after this, unless someone is mid-episode |
 | `app.ister.worker.podcast.auto-download-count` | `3` | newest episodes auto-downloaded per feed |
@@ -130,14 +130,14 @@ chart's CI points them all at one WireMock pod:
 ## Libraries and directories
 
 `app.ister.disk.libraries[n].*` and `app.ister.disk.directories[n].*` define what gets scanned —
-covered in full in [Libraries and media layout](03-libraries-and-media-layout.md). Dedicated
+covered in full in [Libraries and media layout](04-libraries-and-media-layout.md). Dedicated
 transcoder nodes are assigned disks with `app.ister.transcoder.disks[n].name` — see
-[Multi-node](04-multi-node.md).
+[Multi-node](05-multi-node.md).
 
 ## Health, metrics, and other internals
 
 The Spring Actuator (`/actuator/health`, `/actuator/metrics`, `/actuator/prometheus`) runs on its
-own port so it stays off the public API. See [Installation](01-installation.md#health-metrics-logs).
+own port so it stays off the public API. See [Installation](02-installation.md#health-metrics-logs).
 
 | Property | Default | Notes |
 | --- | --- | --- |

@@ -4,8 +4,8 @@ This directory holds the documentation for the Ister media server.
 
 ## Contents
 
-- `admin/en/` — the administrator guide in English (8 chapters: installation, configuration,
-  libraries, multi-node, search, maintenance, naming conventions)
+- `admin/en/` — the administrator guide in English (10 chapters: quick start, installation,
+  configuration, libraries, multi-node, search, maintenance, naming conventions, users & access)
 - `admin/nl/` — de beheerdershandleiding in het Nederlands (same chapters, translated/adapted)
 - `architecture/en/` and `architecture/nl/` — developer-facing architecture documentation
   (modules, event system, scanning, media types & metadata, transcoding, continue watching,
@@ -18,8 +18,9 @@ This directory holds the documentation for the Ister media server.
 - Chapters are numbered (`00-…`, `01-…`) per track; `en/` and `nl/` always carry the same
   filenames. A chapter added or renamed in one locale must be added/renamed in the other —
   CI enforces this.
-- Plain Markdown, no front-matter, no site generator. Links between files are relative, so
-  everything renders on GitHub as-is.
+- Plain Markdown, no site generator. The only front-matter is a YAML block with a one-line
+  `description:` per chapter (used by the published site for SEO). Links between files are
+  relative, so everything renders on GitHub as-is.
 - The NL chapters are translations/adaptations, not word-for-word machine output; keep both
   in sync when the content changes.
 

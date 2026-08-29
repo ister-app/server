@@ -68,7 +68,7 @@ er wordt niets uit PostgreSQL verwijderd.
 - **Nieuwe taal niet doorzoekbaar** — je hebt stap 2 of 3 hierboven overgeslagen.
 - **De index overleeft serverherstarts**, maar leeft alleen in de datamap van Typesense; raak
   je dat volume kwijt, dan bouwt één `rebuildSearchIndex` alles opnieuw op uit PostgreSQL. Hij is
-  wegwerpbaar — zie [Onderhoud](06-maintenance-and-troubleshooting.md#back-up).
+  wegwerpbaar — zie [Onderhoud](07-maintenance-and-troubleshooting.md#back-up).
 
 Hoe het indexeren intern werkt staat beschreven in de
 [architectuurdocumentatie](../../architecture/nl/06-search.md).

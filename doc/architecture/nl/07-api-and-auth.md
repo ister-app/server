@@ -93,7 +93,7 @@ Drie kleine API-oppervlakken die de hoofdstukken hierboven slechts terloops rake
   `AttributionController`, gebaseerd op migratie V26.
 
 Admins, zichtbaarheid per library en het delen van playback-sessies zijn een eigen oppervlak — zie
-de beheergids, [Gebruikers, delen en toegang](../../admin/nl/08-users-sharing-and-access.md), en
+de beheergids, [Gebruikers, delen en toegang](../../admin/nl/09-users-sharing-and-access.md), en
 [hoofdstuk 5](05-continue-watching-and-status.md#sessies-delen--privacy) voor de interne werking van
 het delen.
 

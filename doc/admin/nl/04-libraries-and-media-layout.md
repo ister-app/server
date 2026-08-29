@@ -29,14 +29,14 @@ app.ister.disk.directories[1].library=shows
 ```
 
 Directorynamen **moeten uniek zijn over het hele cluster** — ze benoemen de werkqueues per
-directory ([Multi-node](04-multi-node.md)). Schrijf paden **zonder slash aan het eind** en houd
+directory ([Multi-node](05-multi-node.md)). Schrijf paden **zonder slash aan het eind** en houd
 ze stabiel: het pad wordt letterlijk in de database opgeslagen en als stringprefix vergeleken,
 dus `/disk1` later veranderen in `/disk1/` telt als een padwijziging. Rijen worden bij elke
 start uit deze configuratie aangemaakt of bijgewerkt.
 
 ## Verwachte indeling per type
 
-Dit is de korte versie; [hoofdstuk 7](07-naming-conventions.md) is de volledige naamreferentie
+Dit is de korte versie; [hoofdstuk 7](08-naming-conventions.md) is de volledige naamreferentie
 (exacte patronen, geaccepteerde extensies, speciale bestanden en veelgemaakte fouten).
 
 **Series** — `Show Name (year)/Season NN/sNNeNN.mkv`:
@@ -108,5 +108,5 @@ bestaande items, en een MISSING-verversing raakt items die al compleet zijn niet
 
 ## Verder lezen
 
-- [Multi-node](04-multi-node.md) — directories verspreid over meerdere servers
-- [Onderhoud](06-maintenance-and-troubleshooting.md) — wat er in de loop van de tijd met caches gebeurt
+- [Multi-node](05-multi-node.md) — directories verspreid over meerdere servers
+- [Onderhoud](07-maintenance-and-troubleshooting.md) — wat er in de loop van de tijd met caches gebeurt

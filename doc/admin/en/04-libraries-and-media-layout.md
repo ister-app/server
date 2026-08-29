@@ -29,14 +29,14 @@ app.ister.disk.directories[1].library=shows
 ```
 
 Directory **names must be unique across the whole cluster** — they name the per-directory work
-queues ([Multi-node](04-multi-node.md)). Write paths **without a trailing slash** and keep them
+queues ([Multi-node](05-multi-node.md)). Write paths **without a trailing slash** and keep them
 stable: the path is stored verbatim in the database and compared as a string prefix, so changing
 `/disk1` to `/disk1/` later counts as a path change. Rows are created/updated from this config at
 every startup.
 
 ## Expected layout per type
 
-This is the short version; [chapter 7](07-naming-conventions.md) is the full naming reference
+This is the short version; [chapter 7](08-naming-conventions.md) is the full naming reference
 (exact patterns, accepted extensions, special files, and common mistakes).
 
 **Shows** — `Show Name (year)/Season NN/sNNeNN.mkv`:
@@ -105,5 +105,5 @@ refresh does not touch items that are already complete. Details of the pipeline 
 
 ## Where to next
 
-- [Multi-node](04-multi-node.md) — directories spread over several servers
-- [Maintenance](06-maintenance-and-troubleshooting.md) — what happens to caches over time
+- [Multi-node](05-multi-node.md) — directories spread over several servers
+- [Maintenance](07-maintenance-and-troubleshooting.md) — what happens to caches over time

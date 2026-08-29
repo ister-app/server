@@ -95,14 +95,14 @@ wrote progress through an unusual path it can lag. The nightly rebuild (03:30) r
 also runs once at startup when the table is empty.
 
 **Search returns nothing** — Typesense is disabled, unreachable, or was never reindexed after
-enabling. See [Search](05-search-typesense.md).
+enabling. See [Search](06-search-typesense.md).
 
 **Disk filling up** — check whether cache cleanup is still in dry-run (see above), and look at
 `CACHE_DIR`/`TMP_DIR` sizes versus podcast retention and pre-transcode activity.
 
 **New files not appearing** — there is no filesystem watcher; run `scanLibraries`. If files are
 found but misclassified, compare their paths against
-[the expected layout](03-libraries-and-media-layout.md).
+[the expected layout](04-libraries-and-media-layout.md).
 
 For a deeper understanding of any of these subsystems, start at the
 [architecture overview](../../architecture/en/00-overview.md).

@@ -101,7 +101,7 @@ nachtelijke rebuild (03:30) repareert dit; hij draait ook eenmalig bij het opsta
 tabel leeg is.
 
 **Zoeken geeft niets terug** — Typesense staat uit, is onbereikbaar, of is na het inschakelen
-nooit geherindexeerd. Zie [Zoeken](05-search-typesense.md).
+nooit geherindexeerd. Zie [Zoeken](06-search-typesense.md).
 
 **Schijf loopt vol** — controleer of de cache-opschoning nog in dry-run staat (zie hierboven),
 en kijk naar de grootte van `CACHE_DIR`/`TMP_DIR` in verhouding tot podcastretentie en
@@ -109,7 +109,7 @@ pre-transcode-activiteit.
 
 **Nieuwe bestanden verschijnen niet** — er is geen filesystem-watcher; draai `scanLibraries`.
 Worden bestanden wel gevonden maar verkeerd geclassificeerd, vergelijk hun paden dan met
-[de verwachte indeling](03-libraries-and-media-layout.md).
+[de verwachte indeling](04-libraries-and-media-layout.md).
 
 Voor een dieper begrip van elk van deze subsystemen begin je bij het
 [architectuuroverzicht](../../architecture/nl/00-overview.md).

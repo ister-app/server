@@ -5,7 +5,7 @@ description: Full naming reference for Ister media libraries, with the exact dir
 # Naming conventions per library type
 
 The scanner derives everything from paths and filenames, so getting the names right is what makes
-a library "just work". [Chapter 3](03-libraries-and-media-layout.md) gives the short version; this
+a library "just work". [Chapter 3](04-libraries-and-media-layout.md) gives the short version; this
 page is the full reference of what the parsers actually accept, per library type. Files and
 directories that match no rule are **silently ignored** — a title that never shows up is almost
 always a naming problem.
@@ -160,7 +160,7 @@ Attack on Titan (2009)/
 ## Podcasts
 
 No naming rules — a `PODCAST` library has no directory on disk at all. Episodes are fetched from
-the RSS feed and downloaded into the cache; see [chapter 3](03-libraries-and-media-layout.md#podcasts).
+the RSS feed and downloaded into the cache; see [chapter 3](04-libraries-and-media-layout.md#podcasts).
 
 ## When something is not picked up
 

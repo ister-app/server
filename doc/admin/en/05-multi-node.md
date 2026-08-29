@@ -75,5 +75,5 @@ Points to copy from it: each node has its **own** `CACHE_DIR`, its own published
 
 ## Where to next
 
-- [Search](05-search-typesense.md) — one Typesense serves the whole cluster
-- [Maintenance](06-maintenance-and-troubleshooting.md) — per-node caches and jobs
+- [Search](06-search-typesense.md) — one Typesense serves the whole cluster
+- [Maintenance](07-maintenance-and-troubleshooting.md) — per-node caches and jobs

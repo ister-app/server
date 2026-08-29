@@ -65,7 +65,7 @@ PostgreSQL is deleted.
 - **New language not searchable** — you skipped step 2 or 3 above.
 - **Index survives server restarts** but lives only in Typesense's data dir; if you lose that
   volume, one `rebuildSearchIndex` rebuilds everything from PostgreSQL. It is disposable — see
-  [Maintenance](06-maintenance-and-troubleshooting.md#backup).
+  [Maintenance](07-maintenance-and-troubleshooting.md#backup).
 
 How indexing works internally is described in the
 [architecture documentation](../../architecture/en/06-search.md).

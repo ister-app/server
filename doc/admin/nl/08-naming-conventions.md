@@ -5,7 +5,7 @@ description: Volledige naamgevingsreferentie voor Ister-libraries, met de exacte
 # Naamconventies per librarytype
 
 De scanner leidt alles af uit paden en bestandsnamen; de juiste namen zijn dus wat een library
-"gewoon laat werken". [Hoofdstuk 3](03-libraries-and-media-layout.md) geeft de korte versie; deze
+"gewoon laat werken". [Hoofdstuk 3](04-libraries-and-media-layout.md) geeft de korte versie; deze
 pagina is de volledige referentie van wat de parsers werkelijk accepteren, per librarytype.
 Bestanden en mappen die nergens op matchen worden **stilzwijgend genegeerd** — een titel die nooit
 verschijnt is bijna altijd een naamgevingsprobleem.
@@ -167,7 +167,7 @@ Attack on Titan (2009)/
 
 Geen naamregels — een `PODCAST`-library heeft helemaal geen map op schijf. Afleveringen komen uit
 de RSS-feed en worden naar de cache gedownload; zie
-[hoofdstuk 3](03-libraries-and-media-layout.md#podcasts).
+[hoofdstuk 3](04-libraries-and-media-layout.md#podcasts).
 
 ## Als iets niet wordt opgepakt
 

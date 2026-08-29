@@ -87,7 +87,7 @@ Three small API surfaces that the chapters above only touch in passing:
   ([chapter 3](03-media-types-and-metadata.md)). `AttributionController`, backed by migration V26.
 
 Admins, per-library visibility, and playback-session sharing are their own surface — see the admin
-guide, [Users, sharing, and access](../../admin/en/08-users-sharing-and-access.md), and
+guide, [Users, sharing, and access](../../admin/en/09-users-sharing-and-access.md), and
 [chapter 5](05-continue-watching-and-status.md#session-sharing--privacy) for the sharing internals.
 
 ## Authentication
