@@ -6,21 +6,31 @@ import app.ister.core.service.MessageSender;
 import app.ister.worker.config.WorkerDiskConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+/**
+ * The enabled flag is checked at runtime (not via {@code @ConditionalOnProperty}) because bean
+ * conditions are frozen at GraalVM native-image build time.
+ */
 @Component
 @Slf4j
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "app.ister.worker.pretranscode.enabled", havingValue = "true", matchIfMissing = true)
 public class PreTranscodeScheduler {
 
     private final MessageSender messageSender;
     private final WorkerDiskConfig workerDiskConfig;
 
+    @Value("${app.ister.worker.pretranscode.enabled:true}")
+    private boolean enabled;
+
     @Scheduled(cron = "5 */15 * * * *")
     public void schedulePreTranscode() {
+        if (!enabled) {
+            log.debug("Pre-transcode scheduling is disabled, skipping");
+            return;
+        }
         workerDiskConfig.getDirectories().forEach(disk -> {
             log.debug("Sending PRE_TRANSCODE_RECENTLY_WATCHED for disk: {}", disk.getName());
             messageSender.sendPreTranscodeRecentlyWatched(

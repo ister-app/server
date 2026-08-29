@@ -8,9 +8,9 @@ import app.ister.core.repository.UserRepository;
 import app.ister.core.service.MessageSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -20,25 +20,38 @@ import org.springframework.stereotype.Component;
  *
  * <p>Like the other schedulers this runs on every node; a rebuild is idempotent, so a node queueing
  * a second one costs some work and changes nothing.
+ *
+ * <p>The enabled flag is checked at runtime (not via {@code @ConditionalOnProperty}) because bean
+ * conditions are frozen at GraalVM native-image build time. Disabling it skips both the nightly
+ * rebuild and the one-time startup backfill.
  */
 @Component
 @Slf4j
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "app.ister.server.continue-watching.rebuild.enabled", havingValue = "true", matchIfMissing = true)
 public class ContinueWatchingRebuildScheduler implements ApplicationRunner {
 
     private final UserRepository userRepository;
     private final ContinueWatchingRepository continueWatchingRepository;
     private final MessageSender messageSender;
 
+    @Value("${app.ister.server.continue-watching.rebuild.enabled:true}")
+    private boolean enabled;
+
     @Scheduled(cron = "${app.ister.server.continue-watching.rebuild-cron:0 30 3 * * *}")
     public void scheduleRebuilds() {
+        if (!enabled) {
+            log.debug("Continue watching rebuild is disabled, skipping");
+            return;
+        }
         queueRebuildForEveryUser("nightly rebuild");
     }
 
     /** Backfill: without it the list stays empty until every user has played something again. */
     @Override
     public void run(ApplicationArguments args) {
+        if (!enabled) {
+            return;
+        }
         if (continueWatchingRepository.count() == 0) {
             queueRebuildForEveryUser("backfill of the empty continue_watching table");
         }

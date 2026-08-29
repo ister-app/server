@@ -10,12 +10,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +40,7 @@ class PreTranscodeSchedulerTest {
 
     @Test
     void schedulePreTranscodeSendsMessageForEachDirectory() {
+        ReflectionTestUtils.setField(subject, "enabled", true);
         when(workerDiskConfig.getDirectories()).thenReturn(List.of(diskEntry("disk1"), diskEntry("disk2")));
 
         subject.schedulePreTranscode();
@@ -57,11 +60,21 @@ class PreTranscodeSchedulerTest {
 
     @Test
     void schedulePreTranscodeDoesNothingWhenNoDirectoriesConfigured() {
+        ReflectionTestUtils.setField(subject, "enabled", true);
         when(workerDiskConfig.getDirectories()).thenReturn(List.of());
 
         subject.schedulePreTranscode();
 
         verify(messageSender, times(0)).sendPreTranscodeRecentlyWatched(
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void schedulePreTranscodeDoesNothingWhenDisabled() {
+        ReflectionTestUtils.setField(subject, "enabled", false);
+
+        subject.schedulePreTranscode();
+
+        verifyNoInteractions(messageSender, workerDiskConfig);
     }
 }

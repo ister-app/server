@@ -15,12 +15,10 @@ en dat legt beperkingen op aan hoe je code schrijft:
   de vlag in plaats daarvan **binnen** de bean — de Typesense-handlers zijn het referentievoorbeeld
   ([hoofdstuk 6](06-search.md)). Het verbod gaat over *runtime*-toggles; een conditie waarvan de
   waarde op buildtijd vastligt kan technisch wel, maar is makkelijk aan te zien voor een
-  runtime-schakelaar. Bekende uitzonderingen om in de gaten te houden:
-  `worker/.../PreTranscodeScheduler` (`app.ister.worker.pretranscode.enabled`,
-  `matchIfMissing = true`) en `ContinueWatchingRebuildScheduler`
-  (`app.ister.server.continue-watching.rebuild.enabled`) gebruiken op dit moment wél
-  `@ConditionalOnProperty` — die toggles werken alleen als de property al bij het bouwen van het
-  image bekend is; hem pas op runtime zetten heeft op het native image geen effect.
+  runtime-schakelaar. De regel geldt zonder uitzonderingen: de twee schedulers die ooit
+  `@ConditionalOnProperty` gebruikten (`worker/.../PreTranscodeScheduler` en
+  `ContinueWatchingRebuildScheduler`) zijn omgezet naar runtime-gecheckte `@Value`-vlaggen met een
+  early return, zoals de cleanup-schedulers — hun `.enabled`-properties werken nu wél op runtime.
 - **Reflectie- en resource-hints worden met de hand bijgehouden**, per module onder
   `src/main/resources/META-INF/native-image/`. Niets genereert ze; er eentje vergeten merk je pas
   in het native image, niet in JVM-runs.

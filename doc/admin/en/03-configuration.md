@@ -90,6 +90,7 @@ the architecture guide, [Transcoding](../../architecture/en/04-transcoding.md).
 
 | Property | Default | Notes |
 | --- | --- | --- |
+| `app.ister.worker.pretranscode.enabled` | `true` | checked at runtime: `false` stops the 15-minute pre-transcode scheduling entirely |
 | `app.ister.server.pretranscode.keep-minutes` | `30` | how long a pre-transcoded file is kept warm before it may be swept |
 | `app.ister.server.prefetch.enabled` | `true` | prefetch the next item in a play queue during playback |
 | `app.ister.server.prefetch.video-threshold-seconds` | `120` | start prefetching the next video once this many seconds into the current one |
@@ -103,7 +104,7 @@ the architecture guide, [Transcoding](../../architecture/en/04-transcoding.md).
 | --- | --- | --- |
 | `CONTINUE_WATCHING_HISTORY_DAYS` | `150` | how far back the continue-watching list looks; also drives what pre-transcoding keeps warm |
 | `CONTINUE_WATCHING_REBUILD_CRON` | `0 30 3 * * *` | nightly self-heal rebuild |
-| `CONTINUE_WATCHING_REBUILD_ENABLED` | `true` | `false` removes the scheduler bean entirely (`@ConditionalOnProperty`), which also disables the one-time startup backfill that fills an empty table |
+| `CONTINUE_WATCHING_REBUILD_ENABLED` | `true` | checked at runtime: `false` skips both the nightly rebuild and the one-time startup backfill that fills an empty table |
 
 Prefer these short env vars over the long property names here: the underlying properties are
 bound inconsistently (`…rebuild.enabled` with a dot but `…rebuild-cron` with a dash), which the

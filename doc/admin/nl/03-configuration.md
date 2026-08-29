@@ -91,6 +91,7 @@ doet. Zie de architectuurgids, [Transcoding](../../architecture/nl/04-transcodin
 
 | Property | Standaard | Opmerkingen |
 | --- | --- | --- |
+| `app.ister.worker.pretranscode.enabled` | `true` | runtime gecheckt: `false` stopt de 15-minuten-pre-transcode-planning volledig |
 | `app.ister.server.pretranscode.keep-minutes` | `30` | hoe lang een voor-getranscodeerd bestand warm blijft voordat het geveegd mag worden |
 | `app.ister.server.prefetch.enabled` | `true` | prefetch het volgende item in een play queue tijdens afspelen |
 | `app.ister.server.prefetch.video-threshold-seconds` | `120` | begin de volgende video te prefetchen na zoveel seconden in de huidige |
@@ -104,7 +105,7 @@ doet. Zie de architectuurgids, [Transcoding](../../architecture/nl/04-transcodin
 | --- | --- | --- |
 | `CONTINUE_WATCHING_HISTORY_DAYS` | `150` | hoe ver de continue-watching-lijst terugkijkt; bepaalt ook wat pre-transcoding warm houdt |
 | `CONTINUE_WATCHING_REBUILD_CRON` | `0 30 3 * * *` | nachtelijke zelfherstel-rebuild |
-| `CONTINUE_WATCHING_REBUILD_ENABLED` | `true` | `false` haalt de scheduler-bean volledig weg (`@ConditionalOnProperty`), en schakelt daarmee ook de eenmalige startup-backfill uit die een lege tabel vult |
+| `CONTINUE_WATCHING_REBUILD_ENABLED` | `true` | runtime gecheckt: `false` slaat zowel de nachtelijke rebuild als de eenmalige startup-backfill over die een lege tabel vult |
 
 Gebruik hier bij voorkeur de korte env vars in plaats van de lange property-namen: de
 onderliggende properties zijn inconsistent gebonden (`…rebuild.enabled` met een punt, maar

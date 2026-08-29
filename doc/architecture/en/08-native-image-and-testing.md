@@ -14,11 +14,10 @@ that constrains how code is written:
   production image and no property can bring it back. Check the flag **inside** the bean instead —
   the Typesense handlers are the reference example ([chapter 6](06-search.md)). The prohibition is
   about *runtime* toggles; a condition whose value is fixed at build time is technically fine but
-  easy to mistake for a runtime switch. Known exceptions to watch: `worker/.../PreTranscodeScheduler`
-  (`app.ister.worker.pretranscode.enabled`, `matchIfMissing = true`) and
-  `ContinueWatchingRebuildScheduler` (`app.ister.server.continue-watching.rebuild.enabled`) *do*
-  currently use `@ConditionalOnProperty` — those toggles only work when the property is already set
-  at image build time; setting it only at run time has no effect on the native image.
+  easy to mistake for a runtime switch. The rule holds without exceptions: the two schedulers that
+  once used `@ConditionalOnProperty` (`worker/.../PreTranscodeScheduler` and
+  `ContinueWatchingRebuildScheduler`) have been converted to runtime-checked `@Value` flags with an
+  early return, like the cleanup schedulers — their `.enabled` properties now work at run time.
 - **Reflection and resource hints are hand-maintained** per module under
   `src/main/resources/META-INF/native-image/`. Nothing generates them; forgetting one surfaces only
   in the native image, not in JVM runs.
