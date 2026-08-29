@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Documentation (`doc/`)
 
 Structured documentation lives under `doc/`, mirroring the player repo's setup: `doc/admin/{en,nl}/`
-(operator guide, 10 numbered chapters) and `doc/architecture/{en,nl}/` (developer docs, 9 numbered
+(operator guide, 10 numbered chapters) and `doc/architecture/{en,nl}/` (developer docs, 10 numbered
 chapters), plus `doc/architecture/diagrams/` (hand-authored mermaid, English only, shared by both
 locales). Root `EVENT_FLOWS.md` is only a pointer stub to it now.
 
@@ -67,7 +67,8 @@ There is no separate formatter/linter: quality gating is SonarCloud (`org.sonarq
 as part of `check`. Integration tests are not a separate source set or task — they run under `test`
 and pull PostgreSQL via Testcontainers.
 
-Schema is Flyway, `database/src/main/resources/db/migration/V<n>__<name>.sql` (latest: `V28`).
+Schema is Flyway, `database/src/main/resources/db/migration/V<n>__<name>.sql` (latest: see
+`ls database/src/main/resources/db/migration | sort -V | tail -1`).
 Migrations are forward-only and also shipped as `Dockerfile.migrations`; never edit an applied one.
 
 ## Module Structure
@@ -100,7 +101,7 @@ All significant work is done asynchronously through RabbitMQ message queues. The
 2. `Handle<T>` implementation in `disk/`, `worker/`, or `transcoder/` receives message → processes → may send further events
 
 **Two enums, do not confuse them:**
-- `EventType` (in `database/.../enums/EventType.java`) is the logical message type. `Handle.handles()` returns an `EventType`, and `listener()` rejects a message whose `eventType` doesn't match. This is the source of truth for "what kinds of events exist" (31 values).
+- `EventType` (in `database/.../enums/EventType.java`) is the logical message type. `Handle.handles()` returns an `EventType`, and `listener()` rejects a message whose `eventType` doesn't match. This is the source of truth for "what kinds of events exist" (32 values).
 - `MessageQueue` (in `core/.../MessageQueue.java`) holds the queue **base names** (`app.ister.server.<event>`). `MessageSender` maps an event to its queue.
 
 **Event categories** (see `doc/architecture/diagrams/` and `doc/architecture/en/01-event-system.md` for the per-flow mermaid diagrams and the full handler reference — keep those as the canonical reference; any change to `doc/` must be applied to both the `en/` and `nl/` chapters, CI checks the parity):

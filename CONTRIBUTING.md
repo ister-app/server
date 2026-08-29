@@ -41,6 +41,14 @@ fix(transcoder): stop A/V drift on a forward seek
 chore(deps): bump spring-boot to 4.1.1
 ```
 
+## Documentation
+
+The docs under `doc/` are bilingual: `en/` and `nl/` must carry the same filenames, and any
+content change must land in both languages — the NL chapters are hand-written adaptations, not
+machine output. CI enforces the parity (`ci/build-docs.sh --check` runs on every PR, also
+validating relative links and mermaid fences). A behaviour change that is described in `doc/`
+updates the affected chapters in the same PR.
+
 ## Versions and releases
 
 Do not edit `version` in `build.gradle` by hand. `main` always carries a `-SNAPSHOT` version; the

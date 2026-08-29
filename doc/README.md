@@ -9,7 +9,7 @@ This directory holds the documentation for the Ister media server.
 - `admin/nl/` — de beheerdershandleiding in het Nederlands (same chapters, translated/adapted)
 - `architecture/en/` and `architecture/nl/` — developer-facing architecture documentation
   (modules, event system, scanning, media types & metadata, transcoding, continue watching,
-  search, API & auth, native image & testing)
+  search, API & auth, native image & testing, personal library & devices)
 - `architecture/diagrams/` — hand-authored mermaid diagrams (English only, shared by both
   locales, committed)
 

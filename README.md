@@ -1,9 +1,14 @@
 # Ister server
 
 Ister is a self-hosted media server (in the spirit of Plex/Jellyfin) built with Spring Boot and Java 25.
-It scans media libraries (movies, TV shows and music), fetches metadata from TMDB and MusicBrainz,
-and streams HLS-transcoded media to clients over REST and GraphQL. Multiple nodes can form a
-cluster: one node can transcode media that lives on another node's disks.
+It scans media libraries (movies, TV shows, music, books, comics and podcasts), fetches metadata
+from TMDB, MusicBrainz, Open Library, Wikidata/Wikipedia and podcast feeds, and streams
+HLS-transcoded media to clients over REST and GraphQL. Multiple nodes can form a cluster: one
+node can transcode media that lives on another node's disks.
+
+Want to try it? The [quick start](doc/admin/en/01-quick-start.md) gets a runnable stack —
+including a bundled development Keycloak — up in about ten minutes from the reference
+`docker-compose.yml`.
 
 Published documentation: administration at [ister.app/server](https://ister.app/server),
 architecture at [ister.app/development](https://ister.app/development).
@@ -20,9 +25,10 @@ Gradle multi-module project; all significant work flows through RabbitMQ events
 | `server` | Spring Boot entry point |
 | `core` | Shared infra: event contract (`Handle`), queue names, `MessageSender`, event DTOs |
 | `database` | JPA entities, repositories, Flyway migrations |
-| `api` | REST controllers + GraphQL schema/resolvers |
-| `disk` | Library scanning, file-type event handlers, startup tasks |
-| `worker` | Metadata fetching (TMDB, MusicBrainz), analysis jobs |
+| `api` | REST controllers + GraphQL schema/resolvers and websocket subscriptions |
+| `disk` | Library scanning, file-type event handlers, epub/comic/image serving, crop & intro/outro detection, startup tasks |
+| `worker` | Metadata fetching (TMDB, MusicBrainz, Open Library, Wikidata, podcast feeds), analysis jobs |
+| `search` | Optional Typesense full-text search: index handlers + query service |
 | `transcoder` | FFmpeg-based HLS transcoding (hardware acceleration optional) |
 
 Failed event handlers are retried with backoff; when retries are exhausted the message is
@@ -44,7 +50,10 @@ Then run the application:
 
 Local dev credentials live in `docker-compose-local.yml` (DB `ister`/`ister`,
 RabbitMQ `user`/`password`). Machine-specific overrides go in `*-local.properties`
-files (gitignored), e.g. `core/src/main/resources/core-local.properties`.
+files (gitignored), e.g. `core/src/main/resources/core-local.properties`. To run the whole
+stack from images instead — including an OIDC provider (a development Keycloak with a
+pre-imported realm, `keycloak/Ister-realm.json`) — use the reference `docker-compose.yml`;
+the [quick start](doc/admin/en/01-quick-start.md) walks through it.
 
 ## Configuration
 
@@ -63,6 +72,9 @@ Everything is env-overridable; the most important settings:
 | Node identity | `app.ister.server.name`, `app.ister.server.url`, `app.ister.cluster.name` | unique per node |
 | Libraries | `app.ister.disk.libraries[n].*`, `app.ister.disk.directories[n].*` | see `disk/src/main/resources/disk.properties` |
 | Transcoder | `app.ister.transcoder.hls.*` | hwaccel (`vaapi`/`nvdec`), concurrency, timeouts |
+| Analysis backfills | `app.ister.server.crop-detect-backfill`, `app.ister.server.segment-detect-backfill` | both default `true`: the first scan after an upgrade re-analyzes every pre-existing file (crop) and fingerprints every episode (intro/outro) — set `false` to defer on very large libraries |
+| Segment detection | `app.ister.server.segment-detect.chunk-size` (4), `app.ister.server.blur-hash.chunk-size` (500) | chunked processing, sized against the RabbitMQ consumer timeout |
+| Subtitle OCR | `app.ister.server.subtitle-ocr-default-language` | ISO-639-3, default `eng` |
 | Continue watching | `CONTINUE_WATCHING_HISTORY_DAYS`, `CONTINUE_WATCHING_REBUILD_CRON` | how far back the continue-watching list looks (default 150 days), and when the nightly rebuild of that list runs. It also drives what pre-transcoding keeps warm. |
 | External metadata endpoints | `spring.cloud.openfeign.client.config.tmdb.url`, `app.ister.worker.tmdb.image-base`, `app.ister.worker.musicbrainz.base` / `.coverart-release-base` / `.coverart-release-group-base` / `.commons-filepath-base`, `app.ister.worker.openlibrary.base` / `.covers-base` / `.author-photo-base`, `app.ister.worker.wikidata.entity-base` / `.api-base`, `app.ister.worker.wikipedia.summary-template`, `app.ister.api.podcast.itunes-base` | every external source the workers call; defaults are the real services. The chart's CI points them all at one WireMock pod (`chart/ci/mock-external.yaml`) so e2e runs offline and deterministically |
 
