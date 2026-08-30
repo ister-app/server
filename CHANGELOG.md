@@ -1,5 +1,40 @@
 # Changelog
 
+## server v3.2.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `3.2.0` |
+| `ghcr.io/ister-app/migrations` | `3.2.0` |
+
+### Features
+
+- feat(compose): bundle Keycloak and make the reference stack runnable ([`0fc8ee8`](https://github.com/ister-app/server/commit/0fc8ee8))
+
+### Fixes
+
+- fix(worker): make the pre-transcode and rebuild toggles runtime-checkable ([`95427e8`](https://github.com/ister-app/server/commit/95427e8))
+- fix(core): align the OIDC_URL fallbacks on the bundled Keycloak ([`0141234`](https://github.com/ister-app/server/commit/0141234))
+- fix(disk): accept folder, poster and artist artwork file names ([`e0e6895`](https://github.com/ister-app/server/commit/e0e6895))
+
+### Other
+
+- docs(architecture): record client-side crop as the deliberate design ([`7dcadf7`](https://github.com/ister-app/server/commit/7dcadf7))
+- test(disk): cover show directories with a missing closing paren ([`fb33226`](https://github.com/ister-app/server/commit/fb33226))
+- docs: refresh the root docs ([`9b284ca`](https://github.com/ister-app/server/commit/9b284ca))
+- docs(architecture): add the personal-library and devices chapter ([`7f52fa5`](https://github.com/ister-app/server/commit/7f52fa5))
+- docs(architecture): sync the chapters and diagrams with the code ([`11ad5a3`](https://github.com/ister-app/server/commit/11ad5a3))
+- docs(admin): correct the role model, queue names and artwork rules ([`693db05`](https://github.com/ister-app/server/commit/693db05))
+- docs(admin): add quick-start chapter and renumber the operator guide ([`44fe194`](https://github.com/ister-app/server/commit/44fe194))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:3.2.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v3.1.0...v3.2.0
+
 ## server v3.1.0
 
 | Image | Tag |
