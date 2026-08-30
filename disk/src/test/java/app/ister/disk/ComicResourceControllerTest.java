@@ -35,6 +35,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ComicResourceControllerTest {
@@ -44,6 +47,8 @@ class ComicResourceControllerTest {
 
     @Mock
     private MediaFileRepository mediaFileRepository;
+    @Mock
+    private PdfPageCache pdfPageCache;
 
     @TempDir
     Path tempDir;
@@ -54,7 +59,7 @@ class ComicResourceControllerTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        controller = new ComicResourceController(mediaFileRepository, new CbzParser());
+        controller = new ComicResourceController(mediaFileRepository, new CbzParser(), pdfPageCache);
 
         BufferedImage image = new BufferedImage(SOURCE_WIDTH, SOURCE_HEIGHT, BufferedImage.TYPE_INT_RGB);
         ByteArrayOutputStream png = new ByteArrayOutputStream();
@@ -127,6 +132,91 @@ class ComicResourceControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(MediaType.IMAGE_PNG, response.getHeaders().getContentType());
         assertArrayEquals(pagePng, body(response));
+    }
+
+    private Path pdfMediaFile(UUID id, Integer pageCount) throws IOException {
+        Path pdf = tempDir.resolve("Volume 2.pdf");
+        Files.write(pdf, "%PDF-1.4 fixture".getBytes(StandardCharsets.UTF_8));
+        MediaFileEntity mediaFile = mock(MediaFileEntity.class);
+        BookEntity book = mock(BookEntity.class);
+        lenient().when(mediaFile.getBookEntity()).thenReturn(book);
+        lenient().when(mediaFile.getPath()).thenReturn(pdf.toString());
+        lenient().when(mediaFile.getId()).thenReturn(id);
+        lenient().when(mediaFile.getPageCount()).thenReturn(pageCount);
+        lenient().when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+        return pdf;
+    }
+
+    @Test
+    void pdfPageServesTheCachedRenderAsJpeg() throws IOException {
+        UUID id = UUID.randomUUID();
+        Path pdf = pdfMediaFile(id, 3);
+        Path rendered = tempDir.resolve("rendered.jpg");
+        Files.write(rendered, new byte[]{1, 2, 3});
+        when(pdfPageCache.pageJpeg(id, pdf, 1, 1600)).thenReturn(Optional.of(rendered));
+
+        ResponseEntity<StreamingResponseBody> response = controller.page(id, 1, null, null);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(MediaType.IMAGE_JPEG, response.getHeaders().getContentType());
+        assertArrayEquals(new byte[]{1, 2, 3}, body(response));
+        assertTrue(response.getHeaders().getETag().contains("-p1-w1600"));
+        assertEquals("private, max-age=31536000, immutable", response.getHeaders().getCacheControl());
+    }
+
+    @Test
+    void pdfWidthSnapsToABucket() throws IOException {
+        UUID id = UUID.randomUUID();
+        Path pdf = pdfMediaFile(id, 3);
+        Path rendered = tempDir.resolve("rendered.jpg");
+        Files.write(rendered, new byte[]{1});
+        when(pdfPageCache.pageJpeg(id, pdf, 0, 480)).thenReturn(Optional.of(rendered));
+
+        ResponseEntity<StreamingResponseBody> response = controller.page(id, 0, 300, null);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertTrue(response.getHeaders().getETag().contains("-w480"));
+    }
+
+    @Test
+    void pdfEtagHonorsIfNoneMatchWithoutRendering() throws IOException {
+        UUID id = UUID.randomUUID();
+        Path pdf = pdfMediaFile(id, 3);
+        Path rendered = tempDir.resolve("rendered.jpg");
+        Files.write(rendered, new byte[]{1});
+        when(pdfPageCache.pageJpeg(id, pdf, 0, 1600)).thenReturn(Optional.of(rendered));
+        String etag = controller.page(id, 0, null, null).getHeaders().getETag();
+
+        ResponseEntity<StreamingResponseBody> cached = controller.page(id, 0, null, etag);
+
+        assertEquals(HttpStatus.NOT_MODIFIED, cached.getStatusCode());
+        verify(pdfPageCache, times(1)).pageJpeg(id, pdf, 0, 1600);
+    }
+
+    @Test
+    void pdfPageOutOfRangeIsNotFound() throws IOException {
+        UUID id = UUID.randomUUID();
+        pdfMediaFile(id, 3);
+
+        assertEquals(HttpStatus.NOT_FOUND, controller.page(id, 3, null, null).getStatusCode());
+        assertEquals(HttpStatus.NOT_FOUND, controller.page(id, -1, null, null).getStatusCode());
+    }
+
+    @Test
+    void pdfWithoutScannedPageCountIsNotFound() throws IOException {
+        UUID id = UUID.randomUUID();
+        pdfMediaFile(id, null);
+
+        assertEquals(HttpStatus.NOT_FOUND, controller.page(id, 0, null, null).getStatusCode());
+    }
+
+    @Test
+    void pdfFailedRenderIsAServerError() throws IOException {
+        UUID id = UUID.randomUUID();
+        Path pdf = pdfMediaFile(id, 3);
+        when(pdfPageCache.pageJpeg(id, pdf, 0, 1600)).thenReturn(Optional.empty());
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, controller.page(id, 0, null, null).getStatusCode());
     }
 
     private static byte[] body(ResponseEntity<StreamingResponseBody> response) throws IOException {

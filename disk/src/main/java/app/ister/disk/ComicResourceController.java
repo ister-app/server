@@ -41,9 +41,10 @@ import java.util.zip.ZipFile;
  * <ul>
  *   <li>{@code /comic/{id}/manifest} — what the volume is (format, page count) and, for cbz, the
  *       ordered page list; the client picks its reader from this.</li>
- *   <li>{@code /comic/{id}/page/{index}} — one cbz page image, ETag'd and immutable-cached.</li>
- *   <li>{@code /comic/{id}/file} — the whole file with HTTP Range support; pdf.js reads PDFs in
- *       ranged chunks, and it also serves as the epub/cbz download path.</li>
+ *   <li>{@code /comic/{id}/page/{index}} — one page image (a cbz entry, or a pdf page rasterized
+ *       server-side), ETag'd and immutable-cached.</li>
+ *   <li>{@code /comic/{id}/file} — the whole file with HTTP Range support; the epub/cbz download
+ *       path, and what pre-page-rendering clients used to read PDFs in ranged chunks.</li>
  * </ul>
  *
  * <p>Auth follows the epub reader: bearer token or a {@code ?token=} stream token
@@ -68,8 +69,13 @@ public class ComicResourceController {
             "gif", MediaType.IMAGE_GIF,
             "webp", MediaType.parseMediaType("image/webp"));
 
+    /** Render width for a pdf page requested without {@code ?width=} — the full-resolution
+     *  read/download size, matching what the old client-side pdfium renderer used. */
+    private static final int DEFAULT_PDF_WIDTH = 1600;
+
     private final MediaFileRepository mediaFileRepository;
     private final CbzParser cbzParser;
+    private final PdfPageCache pdfPageCache;
 
     /**
      * @param index the zero-based page index (cbz only)
@@ -108,11 +114,14 @@ public class ComicResourceController {
     }
 
     /**
-     * One cbz page image by index, in the natural-sorted reading order of the manifest.
+     * One page image by index: a cbz entry in the natural-sorted reading order of the manifest,
+     * or a pdf page rasterized server-side (cached under the tmp dir, see {@link PdfPageCache}).
      *
      * <p>With {@code ?width=} the image is downscaled server-side (for thumbnail strips); the
      * requested width is bucketed to {@link #WIDTH_BUCKETS} so the immutable cache stays bounded.
-     * Scaling is best-effort: when decoding or AWT is unavailable the original page is served.
+     * For cbz, scaling is best-effort: when decoding or AWT is unavailable the original page is
+     * served. A pdf page has no original bytes to fall back on, so a failed render is a 500 —
+     * a 404 would let clients cache "this page does not exist".
      */
     @GetMapping("/comic/{mediaFileId}/page/{index}")
     public ResponseEntity<StreamingResponseBody> page(
@@ -121,11 +130,18 @@ public class ComicResourceController {
             @RequestParam(required = false) Integer width,
             @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) throws IOException {
         Optional<MediaFileEntity> mediaFile = comicMediaFile(mediaFileId);
-        if (mediaFile.isEmpty() || !"cbz".equals(extensionOf(mediaFile.get().getPath()))) {
+        if (mediaFile.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
+        String extension = extensionOf(mediaFile.get().getPath());
         Path path = Path.of(mediaFile.get().getPath());
         if (!Files.exists(path)) {
+            return ResponseEntity.notFound().build();
+        }
+        if ("pdf".equals(extension)) {
+            return pdfPage(mediaFile.get(), path, index, width, ifNoneMatch);
+        }
+        if (!"cbz".equals(extension)) {
             return ResponseEntity.notFound().build();
         }
         List<String> pages = cbzParser.pages(path);
@@ -172,6 +188,37 @@ public class ComicResourceController {
                     .contentLength(bytes.length)
                     .body(output -> output.write(bytes));
         }
+    }
+
+    /**
+     * One rasterized pdf page. The page count comes from the scan (the entity), so a request
+     * never opens the document just to bounds-check; the ETag derives from the source file's
+     * identity (size + mtime) since there is no zip CRC to key on.
+     */
+    private ResponseEntity<StreamingResponseBody> pdfPage(
+            MediaFileEntity entity, Path path, int index, Integer width, String ifNoneMatch) throws IOException {
+        Integer pageCount = entity.getPageCount();
+        if (pageCount == null || index < 0 || index >= pageCount) {
+            return ResponseEntity.notFound().build();
+        }
+        Integer bucket = bucketWidth(width);
+        int renderWidth = bucket != null ? bucket : DEFAULT_PDF_WIDTH;
+        String etag = "\"pdf-%d-%d-p%d-w%d\"".formatted(
+                Files.size(path), Files.getLastModifiedTime(path).toMillis(), index, renderWidth);
+        if (etag.equals(ifNoneMatch)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
+        }
+        Optional<Path> rendered = pdfPageCache.pageJpeg(entity.getId(), path, index, renderWidth);
+        if (rendered.isEmpty()) {
+            return ResponseEntity.internalServerError().build();
+        }
+        Path cacheFile = rendered.get();
+        return ResponseEntity.ok()
+                .eTag(etag)
+                .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_IMMUTABLE)
+                .contentType(MediaType.IMAGE_JPEG)
+                .contentLength(Files.size(cacheFile))
+                .body(output -> Files.copy(cacheFile, output));
     }
 
     /** Allowed downscale widths; a requested width snaps to the smallest bucket that covers it. */

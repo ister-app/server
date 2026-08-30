@@ -24,13 +24,17 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import javax.imageio.ImageIO;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -41,7 +45,9 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -134,7 +140,7 @@ class ComicLibraryScanIntegrationTest {
     }
 
     @Test
-    void scanningAComicLibraryCreatesTheSeriesAndServesPagesAndRanges() {
+    void scanningAComicLibraryCreatesTheSeriesAndServesPagesAndRanges() throws IOException {
         DirectoryEntity directory = java.util.stream.StreamSupport
                 .stream(directoryRepository.findAll().spliterator(), false)
                 .filter(dir -> dir.getDirectoryType() == DirectoryType.LIBRARY)
@@ -210,6 +216,24 @@ class ComicLibraryScanIntegrationTest {
         assertEquals(206, chunk.getStatusCode().value());
         assertEquals(100, chunk.getBody().length);
         assertTrue(new String(chunk.getBody(), 0, 5, StandardCharsets.ISO_8859_1).startsWith("%PDF"));
+
+        // Rasterized pdf pages: full-size and a thumbnail-bucket width, out-of-range is a 404.
+        ResponseEntity<byte[]> pdfPage = rest.exchange(
+                "http://localhost:%d/comic/%s/page/0".formatted(port, pdf.getId()),
+                HttpMethod.GET, new HttpEntity<>(headers), byte[].class);
+        assertEquals(200, pdfPage.getStatusCode().value());
+        assertEquals(MediaType.IMAGE_JPEG, pdfPage.getHeaders().getContentType());
+        assertNotNull(ImageIO.read(new ByteArrayInputStream(pdfPage.getBody())), "decodable jpeg");
+
+        ResponseEntity<byte[]> pdfThumb = rest.exchange(
+                "http://localhost:%d/comic/%s/page/0?width=240".formatted(port, pdf.getId()),
+                HttpMethod.GET, new HttpEntity<>(headers), byte[].class);
+        assertEquals(200, pdfThumb.getStatusCode().value());
+        assertEquals(240, ImageIO.read(new ByteArrayInputStream(pdfThumb.getBody())).getWidth());
+
+        assertThrows(HttpClientErrorException.NotFound.class, () -> rest.exchange(
+                "http://localhost:%d/comic/%s/page/3".formatted(port, pdf.getId()),
+                HttpMethod.GET, new HttpEntity<>(headers), byte[].class));
     }
 
     private BookEntity volumeByName(String name) {

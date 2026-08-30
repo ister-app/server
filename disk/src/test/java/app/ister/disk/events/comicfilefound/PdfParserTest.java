@@ -5,6 +5,9 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -59,5 +62,24 @@ class PdfParserTest {
         Files.writeString(notAPdf, "not a pdf");
 
         assertTrue(parser.renderCoverJpeg(notAPdf).isEmpty());
+    }
+
+    @Test
+    void rendersAnyPageAtTheTargetWidth() throws IOException {
+        Path pdf = writePdf(3);
+
+        Optional<byte[]> page = parser.renderPageJpeg(pdf, 2, 480);
+
+        assertTrue(page.isPresent());
+        BufferedImage image = ImageIO.read(new ByteArrayInputStream(page.get()));
+        assertEquals(480, image.getWidth());
+    }
+
+    @Test
+    void renderOutOfRangeIsEmpty() throws IOException {
+        Path pdf = writePdf(2);
+
+        assertTrue(parser.renderPageJpeg(pdf, 2, 480).isEmpty());
+        assertTrue(parser.renderPageJpeg(pdf, -1, 480).isEmpty());
     }
 }
