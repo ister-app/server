@@ -1,5 +1,24 @@
 # Changelog
 
+## server v3.3.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `3.3.0` |
+| `ghcr.io/ister-app/migrations` | `3.3.0` |
+
+### Features
+
+- feat(comic): rasterize pdf pages server-side on /comic/{id}/page ([`d44e158`](https://github.com/ister-app/server/commit/d44e158))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:3.3.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v3.2.0...v3.3.0
+
 ## server v3.2.0
 
 | Image | Tag |
