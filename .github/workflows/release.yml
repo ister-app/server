@@ -145,9 +145,9 @@ jobs:
             || { echo "release version still carries -SNAPSHOT" >&2; exit 1; }
           git --no-pager diff build.gradle
 
-      - uses: graalvm/setup-graalvm@5298d94fb55a4f185c602eeac5de1b553882abe2 # v1.6.4
+      - uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1.6.6
         with:
-          version: '25.2.4' # GraalVM CE innovation release, jdk 25.0.4
+          version: '25.3.4.1' # GraalVM CE innovation release, jdk 25.0.4.1
           java-version: '25'
           distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
