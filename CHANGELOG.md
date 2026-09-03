@@ -1,5 +1,24 @@
 # Changelog
 
+## server v3.3.1
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `3.3.1` |
+| `ghcr.io/ister-app/migrations` | `3.3.1` |
+
+### Dependency updates
+
+- chore(deps): update dependencies and return to GraalVM CE 25.3.4.1 ([`aadb304`](https://github.com/ister-app/server/commit/aadb304))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:3.3.1
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v3.3.0...v3.3.1
+
 ## server v3.3.0
 
 | Image | Tag |
