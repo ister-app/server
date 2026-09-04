@@ -571,6 +571,56 @@ class PostgresRepositoryIntegrationTest {
         assertEquals(new HashSet<>(trackIds), new HashSet<>(paged));
     }
 
+    /**
+     * The source of a shuffled ARTIST play queue: everything the artist is on — their own albums,
+     * an album they only own, and a guest credit on someone else's track — in a stable seeded
+     * order, frozen at the queue's creation time.
+     */
+    @Test
+    void artistShuffleSpansOwnAndGuestTracksAndPagesDeterministically() {
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music-artist-shuffle").build());
+        PersonEntity artist = em.persist(PersonEntity.builder().name("Artist-shuffle").build());
+        PersonEntity other = em.persist(PersonEntity.builder().name("Other-shuffle").build());
+        AlbumEntity own = em.persist(AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Own").releaseYear(2020).build());
+        AlbumEntity someoneElses = em.persist(AlbumEntity.builder().libraryEntity(library).personEntity(other).name("Theirs").releaseYear(2021).build());
+        List<UUID> expected = new ArrayList<>(IntStream.range(0, 8)
+                .mapToObj(i -> em.persist(TrackEntity.builder().albumEntity(own).personEntity(artist).number(i + 1).discNumber(1).build()).getId())
+                .toList());
+        // On someone else's album with only a featured credit: still the artist's track.
+        TrackEntity featured = em.persist(TrackEntity.builder().albumEntity(someoneElses).personEntity(other).number(1).discNumber(1).build());
+        em.persist(TrackCreditEntity.builder().trackEntity(featured).personEntity(artist)
+                .creditType(TrackCreditType.FEATURED).position(1).build());
+        expected.add(featured.getId());
+        // A track of a different artist entirely never joins the shuffle.
+        em.persist(TrackEntity.builder().albumEntity(someoneElses).personEntity(other).number(2).discNumber(1).build());
+        em.flush();
+
+        String seed = "artist-seed";
+        UUID noExclusion = new UUID(0, 0);
+        Instant asOf = Instant.now().plusSeconds(60);
+
+        List<UUID> paged = new ArrayList<>();
+        paged.addAll(trackRepository.findShuffledTrackIdsForPerson(artist.getId(), asOf, seed, noExclusion, 4, 0));
+        paged.addAll(trackRepository.findShuffledTrackIdsForPerson(artist.getId(), asOf, seed, noExclusion, 4, 4));
+        paged.addAll(trackRepository.findShuffledTrackIdsForPerson(artist.getId(), asOf, seed, noExclusion, 4, 8));
+
+        assertEquals(trackRepository.findShuffledTrackIdsForPerson(artist.getId(), asOf, seed, noExclusion, 20, 0), paged,
+                "paging returns the same permutation as one big page");
+        assertEquals(new HashSet<>(expected), new HashSet<>(paged),
+                "own tracks and the guest credit, and nothing else");
+
+        UUID excluded = expected.getFirst();
+        assertFalse(trackRepository.findShuffledTrackIdsForPerson(artist.getId(), asOf, seed, excluded, 20, 0).contains(excluded),
+                "the pinned start item is left out of the shuffled remainder");
+        assertTrue(trackRepository.findShuffledTrackIdsForPerson(artist.getId(), Instant.now().minusSeconds(60), seed, noExclusion, 20, 0).isEmpty(),
+                "tracks added after the queue's creation time stay out");
+        assertEquals(paged,
+                trackRepository.findShuffledTrackIdsForPersonInLibraries(artist.getId(), List.of(library.getId()), asOf, seed, noExclusion, 20, 0),
+                "the allowed-library variant yields the same permutation");
+        assertTrue(trackRepository.findShuffledTrackIdsForPersonInLibraries(artist.getId(), List.of(UUID.randomUUID()), asOf, seed, noExclusion, 20, 0).isEmpty(),
+                "a library the caller may not see contributes nothing");
+    }
+
     @Test
     void episodesForShowOrderedFollowsSeasonAndEpisodeNumberAcrossPages() {
         LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.SHOW).name("Shows-ordered").build());

@@ -621,12 +621,31 @@ class PlayQueueServiceTest {
     }
 
     @Test
-    void createPlayQueueForArtistRejectsShuffle() {
+    void createPlayQueueForArtistRejectsARankKindTogetherWithShuffle() {
         mockUser();
         UUID personId = UUID.randomUUID();
 
         assertThrows(IllegalArgumentException.class,
                 () -> subject.createPlayQueue(PlayQueueSourceType.ARTIST, personId, null, true, RankKind.MOST_PLAYED, authentication));
+    }
+
+    @Test
+    void createPlayQueueForArtistShuffledPlaysTheWholeCatalogueFrozenAtCreation() {
+        user = UserEntity.builder().id(UUID.randomUUID()).externalId("listener").build();
+        mockUser();
+        mockSaveAssignsItemIds();
+        UUID personId = UUID.randomUUID();
+        List<UUID> trackIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+        when(libraryAccessService.allowedLibraryIdsForUser(user)).thenReturn(Optional.empty());
+        when(trackRepository.findShuffledTrackIdsForPerson(eq(personId), any(Instant.class), anyString(), eq(NIL_UUID), eq(50), eq(0)))
+                .thenReturn(trackIds);
+
+        PlayQueueEntity result = subject.createPlayQueue(PlayQueueSourceType.ARTIST, personId, null, true, null, authentication);
+
+        assertEquals(trackIds, result.getItems().stream().map(PlayQueueItemEntity::getTrackEntityId).toList());
+        assertNull(result.getRankKind(), "a shuffled artist queue plays no ranking");
+        assertNotNull(result.getShuffleSeed());
+        verify(trackRepository).findShuffledTrackIdsForPerson(personId, result.getDateCreated(), result.getShuffleSeed(), NIL_UUID, 50, 0);
     }
 
     @Test

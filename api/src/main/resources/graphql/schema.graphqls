@@ -839,7 +839,10 @@ enum PlayQueueSourceType {
     LIBRARY
     BOOK
     PODCAST
-    "A ranked track list of an artist (see rankKind), evaluated as of queue creation; grows lazily like other sources."
+    """
+    A ranked track list of an artist (see rankKind), or — with shuffle — every track the artist is
+    on, in a seeded random order. Evaluated as of queue creation; grows lazily like other sources.
+    """
     ARTIST
     """
     A custom filter: a saved view (sourceId) or an inline filter (filter + filterKind). The
@@ -919,9 +922,9 @@ input CreatePlayQueueInput {
     materialized. For a BOOK library's playlist a book id starts at that book's first chapter.
     """
     startId: ID
-    "Play the source in a stable random order; defaults to false, required for LIBRARY sources, rejected for ARTIST sources."
+    "Play the source in a stable random order; defaults to false, required for LIBRARY sources. An ARTIST source then plays the artist's whole catalogue instead of a ranking, so it takes no rankKind."
     shuffle: Boolean
-    "Which ranked track list of the artist to play; required for ARTIST sources, forbidden otherwise."
+    "Which ranked track list of the artist to play; required for unshuffled ARTIST sources, forbidden otherwise."
     rankKind: RankKind
     "Inline (ad-hoc) filter for FILTER sources without a saved view; requires filterKind."
     filter: MediaFilterInput

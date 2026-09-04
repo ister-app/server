@@ -209,7 +209,9 @@ public class PlayQueueService {
      * @param startId    the episode/track to start at (ignored for MOVIE, optional otherwise;
      *                   for a filter-backed source only without shuffle)
      * @param shuffle    play the source in a stable seeded random order; required for LIBRARY sources
-     * @param rankKind   which ranked track list an ARTIST source plays; required for ARTIST, forbidden otherwise
+     * @param rankKind   which ranked track list an ARTIST source plays; required for an unshuffled
+     *                   ARTIST source, forbidden with shuffle (which plays the artist's whole
+     *                   catalogue) and forbidden for every other source
      * @param filter     inline filter definition for an ad-hoc FILTER source (alternative to a
      *                   saved view id in sourceId)
      * @param filterKind which browse kind an inline filter targets; required with filter
@@ -288,8 +290,13 @@ public class PlayQueueService {
     }
 
     private static void validateCreateRequest(CreatePlayQueueRequest request) {
-        if (request.sourceType() == PlayQueueSourceType.ARTIST && request.rankKind() == null) {
+        if (request.sourceType() == PlayQueueSourceType.ARTIST && request.rankKind() == null && !request.shuffle()) {
             throw new IllegalArgumentException("Artist play queues require a rankKind");
+        }
+        // A shuffled artist queue plays the artist's whole catalogue in a seeded random order, so a
+        // ranking would only pick an order that is then thrown away.
+        if (request.sourceType() == PlayQueueSourceType.ARTIST && request.rankKind() != null && request.shuffle()) {
+            throw new IllegalArgumentException("Shuffled artist play queues take no rankKind; the shuffle is the order");
         }
         if (request.sourceType() != PlayQueueSourceType.ARTIST && request.rankKind() != null) {
             throw new IllegalArgumentException("rankKind only applies to artist play queues");
@@ -598,7 +605,8 @@ public class PlayQueueService {
                 case PLAYLIST -> SourceChunk.of(pinnedFilterOf(queue) != null
                         ? filterChunkIds(queue, CHUNK_SIZE, offset)
                         : playlistItemRepository.findMediaIdsForPlaylistShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset));
-                case MOVIE, BOOK, PODCAST, ARTIST -> SourceChunk.of(List.of());
+                case ARTIST -> SourceChunk.of(shuffledTrackIdsForArtist(queue, seed, excludeId, CHUNK_SIZE, offset));
+                case MOVIE, BOOK, PODCAST -> SourceChunk.of(List.of());
             };
         }
         return switch (queue.getSourceType()) {
@@ -724,6 +732,22 @@ public class PlayQueueService {
         };
     }
 
+    /**
+     * A page of an ARTIST queue's shuffled catalogue: every track the artist is on — their own
+     * albums as well as the ones they only guest on — in the seeded random order the queue was
+     * created with. Frozen at the queue's creation time like the RECENTLY_ADDED ranking, so a scan
+     * adding tracks mid-playback cannot shift later pages, and library access is enforced per page
+     * for the same reason as {@link #rankedTrackIdsForArtist}.
+     */
+    private List<UUID> shuffledTrackIdsForArtist(PlayQueueEntity queue, String seed, UUID excludeId, int limit, int offset) {
+        UUID personId = queue.getSourceId();
+        Instant asOf = queue.getDateCreated();
+        return libraryAccessService.allowedLibraryIdsForUser(queue.getUserEntity())
+                .map(ids -> ids.isEmpty() ? List.<UUID>of()
+                        : trackRepository.findShuffledTrackIdsForPersonInLibraries(personId, ids, asOf, seed, excludeId, limit, offset))
+                .orElseGet(() -> trackRepository.findShuffledTrackIdsForPerson(personId, asOf, seed, excludeId, limit, offset));
+    }
+
     private MediaType mediaTypeForSource(PlayQueueSourceType sourceType, UUID sourceId, boolean shuffle, PinnedFilter pinned) {
         return switch (sourceType) {
             case MOVIE -> MediaType.MOVIE;
@@ -767,12 +791,7 @@ public class PlayQueueService {
                 }
                 yield MediaType.PODCAST_EPISODE;
             }
-            case ARTIST -> {
-                if (shuffle) {
-                    throw new IllegalArgumentException("Artist play queues cannot be shuffled; the ranking is the order");
-                }
-                yield MediaType.TRACK;
-            }
+            case ARTIST -> MediaType.TRACK;
             case LIBRARY -> {
                 if (!shuffle) {
                     throw new IllegalArgumentException("Library play queues require shuffle");
