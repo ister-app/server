@@ -199,13 +199,22 @@ the sweep restarted endlessly without ever committing.
 Two subtleties:
 
 - The cursor is a **keyset on `id`** — not an offset and not "next row without a hash". An image
-  that can never be hashed (a CMYK JPEG that `ImageIO` cannot read) keeps `blur_hash NULL`; a naive
+  that can never be hashed (a corrupt file) keeps `blur_hash NULL`; a naive
   `LIMIT` query would re-select such rows every round and never terminate. PostgreSQL orders `uuid`
   unsigned while `java.util.UUID.compareTo` compares signed, so both the `ORDER BY` and the `id >`
   comparison must run **in the database**, never in Java.
 - The successor message is published only **after** the chunk's transaction commits
   (`BlurHashChunkProcessor`). The other order would let a failed commit leave a cursor pointing past
   work that was never saved.
+
+Images are decoded through `RasterImageDecoder`, not `ImageIO.read` directly. A steady trickle of
+JPEGs — TMDB serves plenty — carries an ICC profile whose component count disagrees with the actual
+number of raster bands, typically a Photoshop export tagged CMYK over three-band data. `ImageIO`
+builds its colour model from that profile and refuses the file outright, so those images used to
+keep a null hash for good. The decoder falls back to reading the raw raster, which bypasses colour
+management, and converts by hand: `readRaster` performs no conversion at all, so a plain JFIF JPEG
+arrives as YCbCr rather than RGB, and the Adobe APP14 marker decides whether four bands are CMYK or
+YCCK.
 
 ## Related scheduled jobs
 

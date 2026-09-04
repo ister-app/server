@@ -2,6 +2,7 @@ package app.ister.disk.events.updateimagesrequested;
 
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.repository.ImageRepository;
+import app.ister.disk.RasterImageDecoder;
 import io.trbl.blurhash.BlurHash;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,7 +10,6 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -67,7 +67,7 @@ public class BlurHashChunkProcessor {
 
     private void applyBlurHash(ImageEntity imageEntity) {
         try {
-            BufferedImage bi = ImageIO.read(new File(imageEntity.getPath()));
+            BufferedImage bi = RasterImageDecoder.read(new File(imageEntity.getPath()));
             String blurHash = BlurHash.encode(bi);
 
             BasicFileAttributes attrs = Files.readAttributes(
@@ -79,8 +79,9 @@ public class BlurHashChunkProcessor {
 
             log.debug("Updated blur-hash for {}", imageEntity.getPath());
         } catch (IOException | RuntimeException | LinkageError e) {
-            // Best-effort per image: a corrupt file, a CMYK JPEG that ImageIO cannot decode, or a
-            // native-image image-decoding issue (e.g. AWT/CMM LinkageError) must not fail the chunk.
+            // Best-effort per image: a corrupt file, or a native-image image-decoding issue (e.g.
+            // AWT/CMM LinkageError) must not fail the chunk. Colour-space oddities ImageIO refuses
+            // outright are handled a level down, by RasterImageDecoder's raster fallback.
             // The image keeps a null blur-hash; the cursor moves past it regardless.
             log.error("Unable to process imageEntity {}: {}", imageEntity.getPath(), e.getMessage());
         }

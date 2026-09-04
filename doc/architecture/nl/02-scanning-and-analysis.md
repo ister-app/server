@@ -212,7 +212,7 @@ teruggezet werd en de sweep eindeloos opnieuw begon zonder ooit te committen.
 Twee subtiliteiten:
 
 - De cursor is een **keyset op `id`** — geen offset en geen "eerstvolgende rij zonder hash". Een
-  afbeelding die nooit te hashen is (een CMYK-JPEG die `ImageIO` niet kan lezen) houdt
+  afbeelding die nooit te hashen is (een corrupt bestand) houdt
   `blur_hash NULL`; een naïeve `LIMIT`-query zou zulke rijen elke ronde opnieuw selecteren en nooit
   eindigen. PostgreSQL sorteert `uuid` unsigned terwijl `java.util.UUID.compareTo` signed
   vergelijkt, dus zowel de `ORDER BY` als de `id >`-vergelijking moeten **in de database** draaien,
@@ -220,6 +220,15 @@ Twee subtiliteiten:
 - Het opvolgerbericht wordt pas gepubliceerd **nadat** de transactie van de chunk gecommit is
   (`BlurHashChunkProcessor`). Andersom zou een mislukte commit een cursor achterlaten die voorbij
   nooit-opgeslagen werk wijst.
+
+Afbeeldingen worden gedecodeerd via `RasterImageDecoder`, niet rechtstreeks met `ImageIO.read`. Een
+gestage stroom JPEG's — TMDB levert er genoeg — draagt een ICC-profiel waarvan het aantal componenten
+niet klopt met het werkelijke aantal rasterbanden, meestal een Photoshop-export met een CMYK-profiel
+over drie-bands data. `ImageIO` bouwt zijn kleurmodel uit dat profiel en weigert het bestand
+vervolgens helemaal, waardoor die afbeeldingen voorgoed zonder hash bleven. De decoder valt terug op
+het ruwe raster, wat het kleurbeheer overslaat, en converteert met de hand: `readRaster` converteert
+namelijk niets, dus een gewone JFIF-JPEG komt binnen als YCbCr in plaats van RGB, en de Adobe
+APP14-marker bepaalt of vier banden CMYK of YCCK zijn.
 
 ## Verwante scheduled jobs
 
