@@ -28,6 +28,12 @@ delete. Run a deploy or two, check the log lines look sane, then set
 `CACHE_CLEANUP_DRY_RUN=false` to let it actually reclaim disk space. It never touches files
 younger than `CACHE_CLEANUP_MIN_AGE` (24h), and it never touches your media.
 
+The same daily run also prunes **downscaled artwork** (`TMP_DIR/image-thumbs/`, the smaller
+variants clients request for grid tiles). Those are cheap to rebuild — one decode on the next
+request — so they get their own, longer idle window: `IMAGE_THUMBNAIL_MAX_IDLE` (30 days). A
+thumbnail is dropped when nobody has looked at that artwork within the window, or when the image
+itself is gone from the database.
+
 ## Backup
 
 **PostgreSQL is the single source of truth** — it is the only thing you must back up (plus your

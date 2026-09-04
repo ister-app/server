@@ -146,6 +146,18 @@ een volledige download. Dezelfde controller verzorgt `/mediaFile/{id}/download`
 (multi-node-bronreads) en `POST /transcode/upload/{id}/{fileName}` (segment-uploads,
 [hoofdstuk 4](04-transcoding.md)).
 
+**Verkleinde artwork.** `?width=` vraagt om een kleinere variant, wat clients gebruiken voor
+grid-tegels en lijstminiaturen — een episode-still van 3840×2160 die 150 px breed geschilderd
+wordt kost 33 MB aan gedecodeerde pixels, en een scherm vol daarvan put het GPU-geheugen van een
+browser uit. De gevraagde breedte klimt naar één van `160, 240, 320, 480, 640, 960, 1280`;
+daarboven wordt het origineel geserveerd, omdat hercoderen daar weinig oplevert. Varianten worden
+bij het eerste verzoek gemaakt en op schijf gecachet onder `TMP_DIR/image-thumbs/` (zie
+[onderhoud](../../admin/nl/07-maintenance-and-troubleshooting.md)); transparantie blijft behouden
+als png, de rest wordt jpeg. Elke schaalfout — een bron die al smal genoeg is, een geanimeerde
+gif, geen AWT in de native image — valt terug op het originele bestand in plaats van een fout, en
+een onbekende `?width=` op een oudere server wordt simpelweg genegeerd. De ETag krijgt een
+`-w{breedte}`-achtervoegsel zodat elke variant zelfstandig hervalideert.
+
 ## Epub lezen
 
 De epub-lezer van de client laadt boeken lazy via

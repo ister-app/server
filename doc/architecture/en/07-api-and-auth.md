@@ -136,6 +136,17 @@ front of the server must pass `If-None-Match`/`ETag` through, or every image req
 full download. The same controller handles `/mediaFile/{id}/download` (multi-node source reads) and
 `POST /transcode/upload/{id}/{fileName}` (segment uploads, [chapter 4](04-transcoding.md)).
 
+**Downscaled artwork.** `?width=` asks for a smaller variant, which is what clients use for grid
+tiles and list thumbnails — a 3840×2160 episode still painted 150 px wide costs 33 MB of decoded
+pixels, and a screen full of them exhausts a browser's GPU memory. The requested width snaps up to
+one of `160, 240, 320, 480, 640, 960, 1280`; above that the original is served, since re-encoding
+saves little there. Variants are generated on first request and cached on disk under
+`TMP_DIR/image-thumbs/` (see [maintenance](../../admin/en/07-maintenance-and-troubleshooting.md));
+transparency is preserved as png, everything else becomes jpeg. Every failure to scale — an
+already-narrow source, an animated gif, no AWT in the native image — falls back to the original
+file rather than an error, and an unknown `?width=` on an older server is simply ignored. The ETag
+carries a `-w{width}` suffix so each variant revalidates on its own.
+
 ## Epub reading
 
 The client's epub reader loads books lazily through

@@ -29,6 +29,12 @@ verwijderen. Draai een deploy of twee, controleer of de logregels er verstandig 
 dan `CACHE_CLEANUP_DRY_RUN=false` om daadwerkelijk schijfruimte terug te winnen. Hij komt nooit
 aan bestanden jonger dan `CACHE_CLEANUP_MIN_AGE` (24u), en nooit aan je media.
 
+Dezelfde dagelijkse run ruimt ook **verkleinde artwork** op (`TMP_DIR/image-thumbs/`, de kleinere
+varianten die clients voor grid-tegels opvragen). Die zijn goedkoop opnieuw te maken — één decode
+bij het volgende verzoek — dus ze krijgen hun eigen, langere inactiviteitsvenster:
+`IMAGE_THUMBNAIL_MAX_IDLE` (30 dagen). Een miniatuur verdwijnt als niemand die artwork binnen dat
+venster heeft bekeken, of als de afbeelding zelf uit de database weg is.
+
 ## Back-up
 
 **PostgreSQL is de enige bron van waarheid** — het is het enige dat je moet back-uppen (plus je

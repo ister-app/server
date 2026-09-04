@@ -81,6 +81,21 @@ class TmpCleanupServiceTest {
         assertEquals(3, res.dirsKept());
     }
 
+    /**
+     * ImageThumbnailCache parks its derived artwork under {@code tmp-dir/image-thumbs/}, which is
+     * only safe because this sweep ignores directories that are not named after a media file.
+     * Named here so renaming that directory to something UUID-shaped fails loudly instead of
+     * quietly deleting every thumbnail on the node.
+     */
+    @Test
+    void leavesTheImageThumbnailCacheAlone() throws IOException {
+        Path thumbnails = dir("image-thumbs", NOW.minus(Duration.ofDays(90)));
+
+        service.clean(tmp, mediaFileExists, hasActivePass, clock, Duration.ofHours(24), false);
+
+        assertTrue(Files.exists(thumbnails));
+    }
+
     @Test
     void dryRunDeletesNothing() throws IOException {
         Path idle = dir(existingIdle.toString(), NOW.minus(Duration.ofDays(2)));
