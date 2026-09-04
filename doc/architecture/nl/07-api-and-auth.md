@@ -51,6 +51,17 @@ een websocket-handshake zetten, dus de JWT reist mee in de `connection_init`-pay
 de websocket-sessie en propageert die naar elk subscribe-bericht, zodat `@PreAuthorize` op
 subscription-controllers ongewijzigd werkt.
 
+**Websocket-origin** (`GraphQlWebSocketOriginConfig`): Spring GraphQL bewaakt de handshake altijd
+met een `OriginHandshakeInterceptor`, en diens standaardlijst is leeg — wat "alleen dezelfde
+origin" betekent. Achter een proxy die TLS termineert spreekt de app zelf gewoon HTTP, dus een
+browser op `https://<publieke host>` is niet dezelfde origin als het `http://…:8080`-verzoek dat de
+app ziet en de handshake krijgt een 403 — terwijl alle gewone HTTP-aanroepen blijven werken. We
+bouwen die interceptor daarom opnieuw op met de publieke host uit `app.ister.server.url` (beide
+schema's, elke poort), aangevuld met wat `app.ister.server.websocket.allowed-origins` toevoegt. Op
+forwarded headers leunen we niet: die helpen alleen als de proxy ze stuurt *én*
+`server.forward-headers-strategy` aanstaat. Een client die geen `Origin` stuurt (de Dart-client)
+had er nooit last van.
+
 Voor afleveringen kent het schema naast `Episode.mediaFile` een lijst `Episode.mediaFileParts` van
 `MediaFilePart { mediaFile, startInMilliseconds, durationInMilliseconds }`: de tijd-slice van de
 aflevering binnen elk bestand. Voor een gewoon bestand is dat `(0, bestandsduur)`; voor een

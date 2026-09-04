@@ -29,6 +29,7 @@ een single-node thuisopstelling.
 | `app.ister.cluster.name` | `APP_ISTER_CLUSTER_NAME` | de servernaam | dezelfde waarde op elke node van een cluster |
 | Cachemap | `CACHE_DIR` | `/cache/` | afbeeldingen, podcastdownloads |
 | Tijdelijke map | `TMP_DIR` | `/tmp/ister/` | HLS-transcode-uitvoer |
+| `app.ister.server.websocket.allowed-origins` | `APP_ISTER_SERVER_WEBSOCKET_ALLOWED_ORIGINS` | leeg | extra origins die de GraphQL-websocket-handshake accepteert. De publieke host uit `app.ister.server.url` is automatisch toegestaan (beide schema's, elke poort), dus dit is alleen nodig als de server onder een tweede naam wordt aangeboden. `*` staat elke origin toe. |
 
 ## Metadata en talen
 

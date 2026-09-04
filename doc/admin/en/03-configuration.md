@@ -28,6 +28,7 @@ dedicated short env var, listed below. Defaults are sensible for a single-node h
 | `app.ister.cluster.name` | `APP_ISTER_CLUSTER_NAME` | the server name | same value on every node of a cluster |
 | Cache directory | `CACHE_DIR` | `/cache/` | images, podcast downloads |
 | Temp directory | `TMP_DIR` | `/tmp/ister/` | HLS transcode output |
+| `app.ister.server.websocket.allowed-origins` | `APP_ISTER_SERVER_WEBSOCKET_ALLOWED_ORIGINS` | empty | extra origins allowed on the GraphQL websocket handshake. The public host from `app.ister.server.url` is allowed automatically (both schemes, any port), so you only need this when the server is served under a second name. `*` allows any origin. |
 
 ## Metadata and languages
 
