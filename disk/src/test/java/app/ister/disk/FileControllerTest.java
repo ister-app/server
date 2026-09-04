@@ -143,8 +143,8 @@ class FileControllerTest {
 
         String before = controller.downloadImage(id, null, null).getHeaders().getETag();
 
-        // A rescan reuses the row for (directory, path), so the id survives a replaced file —
-        // the ETag is what tells a client its copy is stale.
+        // A rescan reuses the row for a given directory and path, so the id survives a replaced
+        // file — the ETag is what tells a client its copy is stale.
         Files.writeString(imageFile, "different image data");
         Files.setLastModifiedTime(imageFile, FileTime.fromMillis(1_700_000_000_000L));
 

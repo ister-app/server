@@ -28,6 +28,8 @@ public class HlsPlaylistBuilder {
      */
     static final String GRID_TAG = "#EXT-X-ISTER-GRID:2";
     private static final String PREFIX_STREAM_SUB = "stream_sub_";
+    private static final String PREFIX_STREAM_AUDIO = "stream_audio_";
+    private static final String TAG_VERSION = "#EXT-X-VERSION:6\n";
     private static final String PREFIX_STREAM_VIDEO = "stream_video_";
 
     // Keep in sync with MediaFileFoundExtractSubtitles.IMAGE_SUBTITLE_CODECS
@@ -100,7 +102,7 @@ public class HlsPlaylistBuilder {
         VideoQuality[] videoQualities = VideoQuality.values();
         StringBuilder sb = new StringBuilder();
         sb.append("#EXTM3U\n");
-        sb.append("#EXT-X-VERSION:6\n");
+        sb.append(TAG_VERSION);
         sb.append("\n");
 
         appendAudioMediaEntries(sb, audioStreams, audioQualities, includeVideo);
@@ -200,15 +202,11 @@ public class HlsPlaylistBuilder {
             sb.append(String.format(
                     "#EXT-X-STREAM-INF:BANDWIDTH=%d,CODECS=\"mp4a.40.2\",AUDIO=\"audio-%s\"%n",
                     bandwidths[qi], emitAq.getLabel()));
-            sb.append(String.format("stream_audio_%d_%s%s%n", first.getStreamIndex(), emitAq.getLabel(), EXT_M3U8));
+            sb.append(String.format("%s%d_%s%s%n", PREFIX_STREAM_AUDIO, first.getStreamIndex(), emitAq.getLabel(), EXT_M3U8));
             if (isTranscoded) transcodedEmitted = true;
         }
     }
 
-    /**
-     * Builds stream playlist content. Filename determines the type:
-     * {@code stream_video_*}, {@code stream_audio_*}, or {@code stream_sub_*}.
-     */
     /**
      * Which stream a playlist filename belongs to. Kept next to the dispatch in
      * {@link #buildStreamPlaylist} on purpose: the two parse the same filenames,
@@ -222,8 +220,8 @@ public class HlsPlaylistBuilder {
                     ? StreamRole.videoCopy()
                     : StreamRole.videoEncode();
         }
-        if (streamFilename.startsWith("stream_audio_")) {
-            String part = streamFilename.replace("stream_audio_", "").replace(EXT_M3U8, "");
+        if (streamFilename.startsWith(PREFIX_STREAM_AUDIO)) {
+            String part = streamFilename.replace(PREFIX_STREAM_AUDIO, "").replace(EXT_M3U8, "");
             return StreamRole.audio(Integer.parseInt(part.substring(0, part.lastIndexOf('_'))));
         }
         if (streamFilename.startsWith(PREFIX_STREAM_SUB)) {
@@ -244,8 +242,8 @@ public class HlsPlaylistBuilder {
             return buildVodPlaylist(keyframes, totalDuration,
                     (start, dur, idx) -> String.format(Locale.ROOT, "seg_video_%s_%05d.ts", quality, idx));
         }
-        if (streamFilename.startsWith("stream_audio_")) {
-            String part = streamFilename.replace("stream_audio_", "").replace(EXT_M3U8, "");
+        if (streamFilename.startsWith(PREFIX_STREAM_AUDIO)) {
+            String part = streamFilename.replace(PREFIX_STREAM_AUDIO, "").replace(EXT_M3U8, "");
             int sep = part.lastIndexOf('_');
             int audioIdx = Integer.parseInt(part.substring(0, sep));
             String bitrate = part.substring(sep + 1);
@@ -291,7 +289,7 @@ public class HlsPlaylistBuilder {
 
         StringBuilder sb = new StringBuilder();
         sb.append("#EXTM3U\n");
-        sb.append("#EXT-X-VERSION:6\n");
+        sb.append(TAG_VERSION);
         sb.append(GRID_TAG).append("\n");
         sb.append("#EXT-X-TARGETDURATION:").append(targetDuration).append("\n");
         sb.append("#EXT-X-MEDIA-SEQUENCE:0\n");
@@ -309,7 +307,7 @@ public class HlsPlaylistBuilder {
     String buildSingleSegmentPlaylist(double totalDuration, String segmentFilename) {
         int targetDuration = (int) Math.ceil(totalDuration);
         return "#EXTM3U\n" +
-                "#EXT-X-VERSION:6\n" +
+                TAG_VERSION +
                 GRID_TAG + "\n" +
                 "#EXT-X-TARGETDURATION:" + targetDuration + "\n" +
                 "#EXT-X-MEDIA-SEQUENCE:0\n" +

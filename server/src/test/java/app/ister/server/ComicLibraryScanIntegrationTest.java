@@ -150,6 +150,20 @@ class ComicLibraryScanIntegrationTest {
                 .directoryEntityUUID(directory.getId())
                 .build(), directory.getName());
 
+        verifyScanCreatedTheSeriesAndVolumes();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth("test-token");
+        RestTemplate rest = new RestTemplate();
+        MediaFileEntity cbz = mediaFileRepository.findByBookEntityId(volumeByName("fairytail_vol12").getId()).getFirst();
+        MediaFileEntity pdf = mediaFileRepository.findByBookEntityId(volumeByName("fairytail_vol1").getId()).getFirst();
+
+        verifyCbzManifestAndPages(rest, headers, cbz);
+        verifyPdfRangeAndRasterizedPages(rest, headers, pdf);
+    }
+
+    /** Everything the scan itself must have produced, once the async handlers have caught up. */
+    private void verifyScanCreatedTheSeriesAndVolumes() {
         // The scan runs through RabbitMQ: FILE_SCAN_REQUESTED → ComicScanner → COMIC_FILE_FOUND.
         Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> {
             assertEquals(1, seriesRepository.findAll().size(), "one series directory → one series");
@@ -184,13 +198,10 @@ class ComicLibraryScanIntegrationTest {
             assertEquals("The Guild", vol12.getTitle(), "ComicInfo.xml title wins over the filename");
             assertEquals(12.0, vol12.getSeriesIndex());
         });
+    }
 
-        // Manifest + page serving for the cbz, natural page order (page2 before page10).
-        MediaFileEntity cbz = mediaFileRepository.findByBookEntityId(volumeByName("fairytail_vol12").getId()).getFirst();
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth("test-token");
-        RestTemplate rest = new RestTemplate();
-
+    /** Manifest + page serving for the cbz, natural page order (page2 before page10). */
+    private void verifyCbzManifestAndPages(RestTemplate rest, HttpHeaders headers, MediaFileEntity cbz) {
         ResponseEntity<String> manifest = rest.exchange(
                 "http://localhost:%d/comic/%s/manifest".formatted(port, cbz.getId()),
                 HttpMethod.GET, new HttpEntity<>(headers), String.class);
@@ -204,9 +215,14 @@ class ComicLibraryScanIntegrationTest {
                 HttpMethod.GET, new HttpEntity<>(headers), byte[].class);
         assertEquals(200, page.getStatusCode().value());
         assertEquals(List.of(PAGE_ONE.length), List.of(page.getBody().length));
+    }
 
-        // Ranged read of the pdf (pdf.js style).
-        MediaFileEntity pdf = mediaFileRepository.findByBookEntityId(volumeByName("fairytail_vol1").getId()).getFirst();
+    /**
+     * Ranged read of the pdf (pdf.js style), plus its rasterized pages: full-size and a
+     * thumbnail-bucket width, with an out-of-range page as a 404.
+     */
+    private void verifyPdfRangeAndRasterizedPages(RestTemplate rest, HttpHeaders headers, MediaFileEntity pdf)
+            throws IOException {
         HttpHeaders rangeHeaders = new HttpHeaders();
         rangeHeaders.setBearerAuth("test-token");
         rangeHeaders.set(HttpHeaders.RANGE, "bytes=0-99");
@@ -217,7 +233,6 @@ class ComicLibraryScanIntegrationTest {
         assertEquals(100, chunk.getBody().length);
         assertTrue(new String(chunk.getBody(), 0, 5, StandardCharsets.ISO_8859_1).startsWith("%PDF"));
 
-        // Rasterized pdf pages: full-size and a thumbnail-bucket width, out-of-range is a 404.
         ResponseEntity<byte[]> pdfPage = rest.exchange(
                 "http://localhost:%d/comic/%s/page/0".formatted(port, pdf.getId()),
                 HttpMethod.GET, new HttpEntity<>(headers), byte[].class);

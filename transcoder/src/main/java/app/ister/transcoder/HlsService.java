@@ -889,7 +889,7 @@ public class HlsService {
         Files.writeString(tmp, content);
         try {
             Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
+        } catch (IOException _) {
             Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
         }
     }

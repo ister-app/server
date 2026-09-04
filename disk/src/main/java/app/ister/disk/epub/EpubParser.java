@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -29,6 +30,8 @@ public class EpubParser {
     private static final String CONTAINER_ENTRY = "META-INF/container.xml";
     private static final String NS_CONTAINER = "urn:oasis:names:tc:opendocument:xmlns:container";
     private static final String NS_OPF = "http://www.idpf.org/2007/opf";
+    /** The manifest's {@code properties} attribute is a space-separated token list. */
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
     private static final String NS_DC = "http://purl.org/dc/elements/1.1/";
     private static final String SMIL_MEDIA_TYPE = "application/smil+xml";
     private static final String URN_ISBN_PREFIX = "urn:isbn:";
@@ -241,7 +244,7 @@ public class EpubParser {
         for (int i = 0; i < items.getLength(); i++) {
             Element item = (Element) items.item(i);
             String properties = item.getAttribute("properties");
-            if (properties != null && java.util.Arrays.asList(properties.split("\\s+")).contains("cover-image")) {
+            if (properties != null && java.util.Arrays.asList(WHITESPACE.split(properties)).contains("cover-image")) {
                 return resolve(opfDir, item.getAttribute("href"));
             }
         }

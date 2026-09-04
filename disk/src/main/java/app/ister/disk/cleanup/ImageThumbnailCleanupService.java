@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -52,7 +52,7 @@ public class ImageThumbnailCleanupService {
      *                     in the database — one query per sweep, not one per file
      */
     public CleanupResult clean(Path thumbnailRoot, Duration maxIdle,
-                               Function<Set<UUID>, Set<UUID>> liveImageIds, boolean dryRun)
+                               UnaryOperator<Set<UUID>> liveImageIds, boolean dryRun)
             throws IOException {
         if (!Files.isDirectory(thumbnailRoot)) {
             log.debug("Thumbnail cleanup: {} does not exist, skipping", thumbnailRoot);
@@ -120,7 +120,7 @@ public class ImageThumbnailCleanupService {
         }
         try {
             return Optional.of(UUID.fromString(name.substring(0, 36)));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return Optional.empty();
         }
     }

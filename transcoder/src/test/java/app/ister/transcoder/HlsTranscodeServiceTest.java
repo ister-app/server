@@ -1161,8 +1161,14 @@ class HlsTranscodeServiceTest {
     // ========== Playlist reconciliation ==========
 
     private Path writePlaylist(String name, int entries) throws IOException {
-        StringBuilder sb = new StringBuilder("#EXTM3U\n#EXT-X-VERSION:6\n#EXT-X-TARGETDURATION:2\n"
-                + "#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n\n");
+        StringBuilder sb = new StringBuilder("""
+                #EXTM3U
+                #EXT-X-VERSION:6
+                #EXT-X-TARGETDURATION:2
+                #EXT-X-MEDIA-SEQUENCE:0
+                #EXT-X-PLAYLIST-TYPE:VOD
+
+                """);
         for (int i = 0; i < entries; i++) {
             sb.append("#EXTINF:2.000000,\n")
                     .append(String.format("seg_video_copy_%05d.ts%n", i));

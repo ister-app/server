@@ -72,8 +72,9 @@ public record SegmentGrid(List<Double> starts, double end) {
                 : cutCandidates;
 
         // Nothing usable to trim against (both the probe and the duration are
-        // unknown): keep every boundary. Guessing here would drop real segments.
-        if (!(end > 0)) {
+        // unknown, so end is zero or NaN): keep every boundary. Guessing here
+        // would drop real segments.
+        if (Double.isNaN(end) || end <= 0) {
             return new SegmentGrid(List.copyOf(candidates), usableEnd(playlistEnd, totalDuration));
         }
 

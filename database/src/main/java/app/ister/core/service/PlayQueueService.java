@@ -595,9 +595,9 @@ public class PlayQueueService {
                         ? movieRepository.findMovieIdsForLibraryShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset)
                         : trackRepository.findTrackIdsForLibraryShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset));
                 case FILTER -> SourceChunk.of(filterChunkIds(queue, CHUNK_SIZE, offset));
-                case PLAYLIST -> pinnedFilterOf(queue) != null
-                        ? SourceChunk.of(filterChunkIds(queue, CHUNK_SIZE, offset))
-                        : SourceChunk.of(playlistItemRepository.findMediaIdsForPlaylistShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset));
+                case PLAYLIST -> SourceChunk.of(pinnedFilterOf(queue) != null
+                        ? filterChunkIds(queue, CHUNK_SIZE, offset)
+                        : playlistItemRepository.findMediaIdsForPlaylistShuffled(sourceId, seed, excludeId, CHUNK_SIZE, offset));
                 case MOVIE, BOOK, PODCAST, ARTIST -> SourceChunk.of(List.of());
             };
         }

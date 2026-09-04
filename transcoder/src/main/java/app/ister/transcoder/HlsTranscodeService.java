@@ -770,22 +770,18 @@ public class HlsTranscodeService {
         // does not mention is exactly the mismatch this grid exists to prevent.
         // Files without keyframes get a synthetic grid from SegmentGrid instead.
 
+        String segmentPrefix = String.format("seg_audio_%d_%s_", streamIdx, audioQuality.getLabel());
         executePassWithTimeout(ffmpegFor(background)
                 .addInput(UrlInput.fromUrl(inputPath))
                 .addOutput(output)
                 .setOverwriteOutput(true)
                 .setLogLevel(LogLevel.ERROR),
                 inputPath, "audio pass " + streamIdx + "/" + audioQuality.getLabel(),
-                cacheDir, String.format("seg_audio_%d_%s_", streamIdx, audioQuality.getLabel()));
-        reconcilePlaylist(cacheDir, String.format("seg_audio_%d_%s_", streamIdx, audioQuality.getLabel()));
-        writeDoneMarker(cacheDir, String.format("seg_audio_%d_%s_", streamIdx, audioQuality.getLabel()));
+                cacheDir, segmentPrefix);
+        reconcilePlaylist(cacheDir, segmentPrefix);
+        writeDoneMarker(cacheDir, segmentPrefix);
     }
 
-    /**
-     * Marks a pass as fully completed on disk. Presence of the marker (not the presence of
-     * segments) tells later pre-transcode runs to skip the pass: a preempted or crashed pass
-     * leaves segments behind but no marker, so it is correctly restarted.
-     */
     /**
      * Cuts a playlist back to what the finished pass actually wrote.
      * <p>
@@ -830,15 +826,15 @@ public class HlsTranscodeService {
         try (var files = Files.list(cacheDir)) {
             for (Path p : files.toList()) {
                 String name = p.getFileName().toString();
-                if (!name.startsWith(segmentPrefix) || !name.endsWith(".ts")) continue;
-                if (Files.size(p) == 0) continue;
-                try {
-                    int idx = Integer.parseInt(
-                            name.substring(segmentPrefix.length(), name.length() - ".ts".length()));
-                    present.add(idx);
-                    highest = Math.max(highest, idx);
-                } catch (NumberFormatException _) {
-                    // Not one of ours.
+                if (name.startsWith(segmentPrefix) && name.endsWith(".ts") && Files.size(p) > 0) {
+                    try {
+                        int idx = Integer.parseInt(
+                                name.substring(segmentPrefix.length(), name.length() - ".ts".length()));
+                        present.add(idx);
+                        highest = Math.max(highest, idx);
+                    } catch (NumberFormatException _) {
+                        // Not one of ours.
+                    }
                 }
             }
         }
@@ -854,17 +850,20 @@ public class HlsTranscodeService {
     private static String truncatePlaylist(List<String> lines, int keep) {
         StringBuilder sb = new StringBuilder();
         int kept = 0;
-        for (int i = 0; i < lines.size(); i++) {
+        int i = 0;
+        while (i < lines.size()) {
             String line = lines.get(i);
-            if (line.startsWith("#EXTINF:")) {
-                if (kept >= keep) break;
-                kept++;
-                sb.append(line).append("\n");
-                if (i + 1 < lines.size()) sb.append(lines.get(++i)).append("\n");
-                continue;
-            }
-            if (line.startsWith("#EXT-X-ENDLIST")) break;
+            boolean segment = line.startsWith("#EXTINF:");
+            if (line.startsWith("#EXT-X-ENDLIST") || (segment && kept >= keep)) break;
             sb.append(line).append("\n");
+            if (segment) {
+                kept++;
+                // The URI line belongs to the #EXTINF above it; the two are kept or dropped together.
+                if (i + 1 < lines.size()) sb.append(lines.get(i + 1)).append("\n");
+                i += 2;
+            } else {
+                i++;
+            }
         }
         return sb.append("#EXT-X-ENDLIST\n").toString();
     }
@@ -877,6 +876,11 @@ public class HlsTranscodeService {
         return "stream_" + middle + ".m3u8";
     }
 
+    /**
+     * Marks a pass as fully completed on disk. Presence of the marker (not the presence of
+     * segments) tells later pre-transcode runs to skip the pass: a preempted or crashed pass
+     * leaves segments behind but no marker, so it is correctly restarted.
+     */
     private void writeDoneMarker(Path cacheDir, String segmentPrefix) {
         try {
             Files.writeString(cacheDir.resolve(DONE_MARKER_PREFIX + segmentPrefix), "");

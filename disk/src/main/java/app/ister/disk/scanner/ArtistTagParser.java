@@ -15,12 +15,13 @@ import java.util.regex.Pattern;
  * Within the featured part the context is unambiguous, so "feat. A &amp; B" does yield two guests.
  */
 public final class ArtistTagParser {
-    // Leading whitespace and an opening bracket are one character class, and the separator
-    // quantifiers are possessive: both keep matching linear on a long tag instead of backtracking.
-    private static final Pattern FEATURING =
-            Pattern.compile("[\\s(\\[]*+\\b(?:featuring|feat|ft)\\b\\.?+\\s++", Pattern.CASE_INSENSITIVE);
+    // The separator quantifiers are possessive and every leading run is guarded by a lookbehind, so
+    // a long tag is scanned linearly: the engine cannot re-enter a whitespace run halfway and redo
+    // the same work at every offset in it.
+    private static final Pattern FEATURING = Pattern.compile(
+            "(?<![\\s(\\[])[\\s(\\[]*+\\b(?:featuring|feat|ft)\\b\\.?+\\s++", Pattern.CASE_INSENSITIVE);
     private static final Pattern GUEST_SEPARATOR =
-            Pattern.compile("\\s*+[,&/+]\\s*+|\\s++and\\s++", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("(?<!\\s)\\s*+(?:[,&/+]|\\band\\b)\\s*+", Pattern.CASE_INSENSITIVE);
     private static final Pattern TRAILING_BRACKET = Pattern.compile("[)\\]]\\s*$");
 
     private ArtistTagParser() {

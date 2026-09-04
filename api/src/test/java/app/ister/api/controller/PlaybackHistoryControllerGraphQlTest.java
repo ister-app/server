@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -80,7 +81,7 @@ class PlaybackHistoryControllerGraphQlTest {
                 .thenReturn(List.of(watchStatus(rowId,
                         Instant.parse("2026-08-20T19:00:00Z"), Instant.parse("2026-08-20T21:05:00Z"))));
 
-        graphQlTester.document("""
+        assertDoesNotThrow(() -> graphQlTester.document("""
                         query {
                             playbackHistory(mediaType: MOVIE, mediaId: "%s") {
                                 id watched progressInMilliseconds createdAt updatedAt
@@ -91,7 +92,7 @@ class PlaybackHistoryControllerGraphQlTest {
                 .path("playbackHistory[0].id").entity(String.class).isEqualTo(rowId.toString())
                 .path("playbackHistory[0].watched").entity(Boolean.class).isEqualTo(true)
                 .path("playbackHistory[0].createdAt").entity(String.class).isEqualTo("2026-08-20T19:00:00Z")
-                .path("playbackHistory[0].updatedAt").entity(String.class).isEqualTo("2026-08-20T21:05:00Z");
+                .path("playbackHistory[0].updatedAt").entity(String.class).isEqualTo("2026-08-20T21:05:00Z"));
     }
 
     @Test
@@ -110,7 +111,7 @@ class PlaybackHistoryControllerGraphQlTest {
         when(playbackHistoryService.trackHistory(any(), eq(TrackHistoryScope.ALBUM), eq(albumId), eq(null), any()))
                 .thenReturn(List.of(row));
 
-        graphQlTester.document("""
+        assertDoesNotThrow(() -> graphQlTester.document("""
                         query {
                             trackPlaybackHistory(scope: ALBUM, id: "%s") {
                                 id updatedAt track { id number }
@@ -121,7 +122,7 @@ class PlaybackHistoryControllerGraphQlTest {
                 .path("trackPlaybackHistory[0].id").entity(String.class).isEqualTo(rowId.toString())
                 .path("trackPlaybackHistory[0].updatedAt").entity(String.class).isEqualTo("2026-08-20T19:04:00Z")
                 .path("trackPlaybackHistory[0].track.id").entity(String.class).isEqualTo(trackId.toString())
-                .path("trackPlaybackHistory[0].track.number").entity(Integer.class).isEqualTo(3);
+                .path("trackPlaybackHistory[0].track.number").entity(Integer.class).isEqualTo(3));
     }
 
     @Test
@@ -130,13 +131,13 @@ class PlaybackHistoryControllerGraphQlTest {
         when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.of(Set.of(UUID.randomUUID())));
         when(playbackHistoryService.libraryOfAlbum(albumId)).thenReturn(Optional.empty());
 
-        graphQlTester.document("""
+        assertDoesNotThrow(() -> graphQlTester.document("""
                         query {
                             trackPlaybackHistory(scope: ALBUM, id: "%s") { id }
                         }
                         """.formatted(albumId))
                 .execute()
-                .path("trackPlaybackHistory").entityList(Object.class).hasSize(0);
+                .path("trackPlaybackHistory").entityList(Object.class).hasSize(0));
     }
 
     @Test
@@ -149,13 +150,13 @@ class PlaybackHistoryControllerGraphQlTest {
                 eq(Optional.of(Set.of(libraryId)))))
                 .thenReturn(List.of(watchStatus(rowId, Instant.now(), Instant.now())));
 
-        graphQlTester.document("""
+        assertDoesNotThrow(() -> graphQlTester.document("""
                         query {
                             trackPlaybackHistory(scope: ARTIST, id: "%s", limit: 25) { id }
                         }
                         """.formatted(artistId))
                 .execute()
-                .path("trackPlaybackHistory[0].id").entity(String.class).isEqualTo(rowId.toString());
+                .path("trackPlaybackHistory[0].id").entity(String.class).isEqualTo(rowId.toString()));
     }
 
     @Test
@@ -166,14 +167,14 @@ class PlaybackHistoryControllerGraphQlTest {
         when(playbackHistoryService.markPlayed(any(), eq(MediaType.TRACK), eq(mediaId)))
                 .thenReturn(watchStatus(rowId, Instant.now(), Instant.now()));
 
-        graphQlTester.document("""
+        assertDoesNotThrow(() -> graphQlTester.document("""
                         mutation {
                             markPlayed(mediaType: TRACK, mediaId: "%s") { id watched }
                         }
                         """.formatted(mediaId))
                 .execute()
                 .path("markPlayed.id").entity(String.class).isEqualTo(rowId.toString())
-                .path("markPlayed.watched").entity(Boolean.class).isEqualTo(true);
+                .path("markPlayed.watched").entity(Boolean.class).isEqualTo(true));
     }
 
     @Test
@@ -181,12 +182,12 @@ class PlaybackHistoryControllerGraphQlTest {
         UUID id = UUID.randomUUID();
         when(playbackHistoryService.deleteWatchStatus(any(), eq(id))).thenReturn(true);
 
-        graphQlTester.document("""
+        assertDoesNotThrow(() -> graphQlTester.document("""
                         mutation {
                             deleteWatchStatus(id: "%s")
                         }
                         """.formatted(id))
                 .execute()
-                .path("deleteWatchStatus").entity(Boolean.class).isEqualTo(true);
+                .path("deleteWatchStatus").entity(Boolean.class).isEqualTo(true));
     }
 }

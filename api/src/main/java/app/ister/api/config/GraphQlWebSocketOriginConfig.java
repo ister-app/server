@@ -68,7 +68,7 @@ public class GraphQlWebSocketOriginConfig {
         }
         try {
             return URI.create(serverUrl).getHost();
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException _) {
             return null;
         }
     }

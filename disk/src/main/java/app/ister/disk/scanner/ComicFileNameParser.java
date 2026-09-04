@@ -50,7 +50,7 @@ public final class ComicFileNameParser {
         }
         Matcher issue = ISSUE.matcher(identity);
         if (issue.find()) {
-            String digits = issue.group(1) != null ? issue.group(1) : issue.group(2);
+            String digits = issue.group(issue.group(1) != null ? 1 : 2);
             Double number = Double.valueOf(digits);
             String subtitle = subtitleAfter(identity, issue.end());
             return new ComicName(identity, number, subtitle != null ? subtitle : "Issue " + formatNumber(number));

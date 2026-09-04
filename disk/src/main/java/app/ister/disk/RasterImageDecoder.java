@@ -157,7 +157,7 @@ public final class RasterImageDecoder {
     }
 
     private static int clamp(int value) {
-        return Math.min(255, Math.max(0, value));
+        return Math.clamp(value, 0, 255);
     }
 
     /**

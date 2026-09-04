@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * Handles all subtitle operations: SRT parsing, WebVTT segment generation,
@@ -144,6 +145,9 @@ public class HlsSubtitleService {
      */
     static final long DEFAULT_CUE_DURATION_MS = 6_000;
 
+    /** An SRT cue number: a line holding nothing but digits. */
+    private static final Pattern CUE_NUMBER = Pattern.compile("\\d+");
+
     /** Parses an SRT file into a list of cues. Tolerates Windows line endings and missing cue numbers. */
     private List<SrtCue> parseSrt(String srtPath) throws IOException {
         List<SrtCue> cues = new ArrayList<>();
@@ -153,7 +157,7 @@ public class HlsSubtitleService {
         int i = 0;
         while (i < lines.length) {
             String line = lines[i].trim();
-            if (line.isEmpty() || line.matches("\\d+")) {
+            if (line.isEmpty() || CUE_NUMBER.matcher(line).matches()) {
                 i++;
                 continue;
             }

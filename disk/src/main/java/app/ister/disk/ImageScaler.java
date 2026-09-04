@@ -16,7 +16,9 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -50,6 +52,23 @@ public class ImageScaler {
 
     /** Scaled bytes plus the type they were encoded as — never the source's type. */
     public record ScaledImage(byte[] bytes, MediaType contentType) {
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof ScaledImage(byte[] otherBytes, MediaType otherType)
+                    && Arrays.equals(bytes, otherBytes) && Objects.equals(contentType, otherType);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Arrays.hashCode(bytes) + Objects.hashCode(contentType);
+        }
+
+        @Override
+        public String toString() {
+            // The bytes themselves are useless in a log line; their length is not.
+            return "ScaledImage[bytes=" + (bytes == null ? 0 : bytes.length) + " bytes, contentType="
+                    + contentType + "]";
+        }
     }
 
     /**
