@@ -59,7 +59,7 @@ class ComicResourceControllerTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        controller = new ComicResourceController(mediaFileRepository, new CbzParser(), pdfPageCache);
+        controller = new ComicResourceController(mediaFileRepository, new CbzParser(), pdfPageCache, new ImageScaler());
 
         BufferedImage image = new BufferedImage(SOURCE_WIDTH, SOURCE_HEIGHT, BufferedImage.TYPE_INT_RGB);
         ByteArrayOutputStream png = new ByteArrayOutputStream();

@@ -6,7 +6,6 @@ import app.ister.disk.events.comicfilefound.CbzParser;
 import app.ister.disk.http.ByteRanges;
 import app.ister.disk.http.ByteRanges.Range;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -18,11 +17,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
-import javax.imageio.ImageIO;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -50,7 +44,6 @@ import java.util.zip.ZipFile;
  * <p>Auth follows the epub reader: bearer token or a {@code ?token=} stream token
  * (StreamTokenAuthenticationFilter, {@code /comic/} user path).
  */
-@Slf4j
 @RestController
 @RequiredArgsConstructor
 public class ComicResourceController {
@@ -76,6 +69,7 @@ public class ComicResourceController {
     private final MediaFileRepository mediaFileRepository;
     private final CbzParser cbzParser;
     private final PdfPageCache pdfPageCache;
+    private final ImageScaler imageScaler;
 
     /**
      * @param index the zero-based page index (cbz only)
@@ -166,9 +160,14 @@ public class ComicResourceController {
                 return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
             }
             if (targetWidth != null) {
-                Optional<byte[]> scaled = scaleToJpeg(zipFile, entry, targetWidth);
+                Optional<ImageScaler.ScaledImage> scaled;
+                try (InputStream in = zipFile.getInputStream(entry)) {
+                    // Comic pages are opaque scans: flatten any stray alpha onto white and keep
+                    // the jpeg the reader has always been served.
+                    scaled = imageScaler.scale(in, targetWidth, ImageScaler.Alpha.FLATTEN, "comic page " + entryName);
+                }
                 if (scaled.isPresent()) {
-                    byte[] jpeg = scaled.get();
+                    byte[] jpeg = scaled.get().bytes();
                     return ResponseEntity.ok()
                             .eTag(etag)
                             .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_IMMUTABLE)
@@ -234,40 +233,6 @@ public class ComicResourceController {
             }
         }
         return WIDTH_BUCKETS[WIDTH_BUCKETS.length - 1];
-    }
-
-    /**
-     * The entry downscaled to {@code targetWidth} as jpeg bytes, or empty when the source is
-     * already narrower or scaling is unavailable (undecodable image, native image without AWT) —
-     * the caller then streams the original.
-     */
-    @SuppressWarnings("java:S1181") // a native image without AWT throws LinkageError, which must degrade, not propagate
-    private Optional<byte[]> scaleToJpeg(ZipFile zipFile, ZipEntry entry, int targetWidth) {
-        try (InputStream in = zipFile.getInputStream(entry)) {
-            BufferedImage source = ImageIO.read(in);
-            if (source == null || source.getWidth() <= targetWidth) {
-                return Optional.empty();
-            }
-            int targetHeight = Math.max(1, Math.round(source.getHeight() * (targetWidth / (float) source.getWidth())));
-            BufferedImage scaled = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
-            Graphics2D graphics = scaled.createGraphics();
-            try {
-                graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                graphics.drawImage(source, 0, 0, targetWidth, targetHeight, java.awt.Color.WHITE, null);
-            } finally {
-                graphics.dispose();
-            }
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            if (!ImageIO.write(scaled, "jpg", out)) {
-                return Optional.empty();
-            }
-            return Optional.of(out.toByteArray());
-        } catch (Throwable t) {
-            // Throwable on purpose: a native image without AWT throws LinkageError/
-            // ExceptionInInitializerError, and a broken page must degrade to the original bytes.
-            log.warn("Could not downscale comic page {}: {}", entry.getName(), t.toString());
-            return Optional.empty();
-        }
     }
 
     /** The whole volume file, with single-range support (pdf.js reads PDFs in ranged chunks). */
