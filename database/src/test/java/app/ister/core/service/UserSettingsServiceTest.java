@@ -56,7 +56,7 @@ class UserSettingsServiceTest {
         assertEquals(List.of("en", "nl"), settings.preferredAudioLanguages());
         assertEquals(List.of("en", "nl"), settings.preferredSubtitleLanguages());
         assertTrue(settings.directPlay());
-        assertTrue(settings.transcode());
+        assertFalse(settings.transcode(), "transcoded variants are opt-in");
         assertNull(settings.maxVideoHeight(), "no quality cap without saved settings");
         assertFalse(settings.autoSkipIntro(), "intros are not auto-skipped by default");
         assertFalse(settings.hideSubtitlesMatchingAudio(),

@@ -19,7 +19,8 @@ import java.util.UUID;
  * play — without that, a file with seven audio streams gets every one of them transcoded.
  *
  * <p>A user who never saved settings falls back to the app-wide languages
- * ({@code app.ister.languages}) with direct play and transcoding on and no quality cap.
+ * ({@code app.ister.languages}) with direct play on and transcoding off — play the file as it is
+ * rather than spending CPU on a re-encode nobody asked for — and no quality cap.
  */
 @Service
 @Slf4j
@@ -66,9 +67,9 @@ public class UserSettingsService {
                 .orElseGet(this::defaults);
     }
 
-    /** Settings for a user without a row: the app-wide languages, everything else unrestricted. */
+    /** Settings for a user without a row: the app-wide languages, direct play only, no quality cap. */
     public UserSettings defaults() {
-        return new UserSettings(defaultLanguages, defaultLanguages, true, true, null, false, false);
+        return new UserSettings(defaultLanguages, defaultLanguages, true, false, null, false, false);
     }
 
     // Sonar FP: Lombok @SuperBuilder declares builder() on the subclass itself
