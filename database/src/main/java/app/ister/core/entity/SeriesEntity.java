@@ -64,5 +64,6 @@ public class SeriesEntity extends BaseEntity {
 
     /** Series-level artwork (folder.jpg in the series directory, or a wiki thumbnail). */
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "seriesEntity")
+    @OrderBy("id ASC")
     private List<ImageEntity> imageEntities;
 }

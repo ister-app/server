@@ -29,6 +29,7 @@ public class MovieEntity extends BaseEntity {
     private List<MediaFileEntity> mediaFileEntities;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "movieEntity")
+    @OrderBy("id ASC")
     private List<ImageEntity> imagesEntities;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "movieEntity")

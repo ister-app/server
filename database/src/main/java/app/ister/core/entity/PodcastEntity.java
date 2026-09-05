@@ -53,6 +53,7 @@ public class PodcastEntity extends BaseEntity {
     private List<PodcastEpisodeEntity> episodeEntities;
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "podcastEntity")
+    @OrderBy("id ASC")
     private List<ImageEntity> imageEntities;
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "podcastEntity")

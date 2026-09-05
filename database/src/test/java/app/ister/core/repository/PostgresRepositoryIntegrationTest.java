@@ -54,6 +54,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.IntStream;
@@ -194,6 +195,47 @@ class PostgresRepositoryIntegrationTest {
         em.flush();
 
         assertTrue(imageRepository.findByDirectoryEntityIdAndBlurHashIsNullOrderById(null, Limit.of(500)).isEmpty());
+    }
+
+    /**
+     * Image lookups must return a parent's images in one fixed order whichever path fetches
+     * them: the player merges every GraphQL query into one normalized entity, and two orders
+     * of the same list made a tile swap its artwork for a frame.
+     */
+    @Test
+    void imagesOfAParentComeBackInIdOrderOnEveryLookupPath() {
+        LibraryEntity library = em.persist(LibraryEntity.builder().libraryType(LibraryType.SHOW).name("Ordered").build());
+        ShowEntity show = em.persist(ShowEntity.builder().libraryEntity(library).name("Ordered").releaseYear(2020).build());
+        ShowEntity other = em.persist(ShowEntity.builder().libraryEntity(library).name("Other").releaseYear(2021).build());
+        DirectoryEntity directory = persistDirectory("ordered-images");
+        // Random UUIDs: insertion order and id order disagree, as in production.
+        IntStream.range(0, 6).forEach(i -> persistShowImage(directory, show, "/cache/show-" + i + ".jpg"));
+        persistShowImage(directory, other, "/cache/other.jpg");
+        em.flush();
+        em.clear();
+
+        List<UUID> expected = imageRepository.findByShowEntityId(show.getId()).stream()
+                // Postgres orders uuids bytewise, i.e. as their text form; UUID.compareTo does not.
+                .map(ImageEntity::getId).sorted(Comparator.comparing(UUID::toString)).toList();
+        assertEquals(6, expected.size());
+        assertEquals(expected, ids(imageRepository.findByShowEntityId(show.getId())),
+                "single lookup must be sorted by id");
+        assertEquals(expected, ids(imageRepository.findByShowEntityIdIn(List.of(other.getId(), show.getId())).stream()
+                        .filter(i -> i.getShowEntityId().equals(show.getId())).toList()),
+                "batch lookup must be sorted by id within a parent");
+        assertEquals(expected, ids(showRepository.findById(show.getId()).orElseThrow().getImageEntities()),
+                "the lazy collection must agree with the repository lookups");
+    }
+
+    private static List<UUID> ids(List<ImageEntity> images) {
+        return images.stream().map(ImageEntity::getId).toList();
+    }
+
+    private void persistShowImage(DirectoryEntity directory, ShowEntity show, String path) {
+        ImageEntity image = ImageEntity.builder().type(ImageType.BACKGROUND).path(path).build();
+        image.setDirectoryEntity(directory);
+        image.setShowEntity(show);
+        em.persist(image);
     }
 
     private static List<ImageEntity> concat(List<ImageEntity> a, List<ImageEntity> b) {

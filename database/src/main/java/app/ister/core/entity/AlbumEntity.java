@@ -35,6 +35,7 @@ public class AlbumEntity extends BaseEntity {
     private List<TrackEntity> trackEntities;
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "albumEntity")
+    @OrderBy("id ASC")
     private List<ImageEntity> imageEntities;
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "albumEntity")

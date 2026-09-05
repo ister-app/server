@@ -46,6 +46,7 @@ public class PersonEntity extends BaseEntity {
     private List<AlbumEntity> albumEntities;
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "personEntity")
+    @OrderBy("id ASC")
     private List<ImageEntity> imageEntities;
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "personEntity")
