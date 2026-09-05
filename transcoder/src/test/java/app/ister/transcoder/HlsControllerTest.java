@@ -8,6 +8,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
 
 import java.io.IOException;
@@ -143,7 +144,9 @@ class HlsControllerTest {
         ResponseEntity<?> response = controller.getTsSegment(mediaFileId, "seg_video_720p_00000.ts");
 
         assertEquals("video/MP2T", response.getHeaders().getFirst("Content-Type"));
-        assertEquals(Files.size(segFile), response.getHeaders().getContentLength());
+        // The length is left to the message converter, which derives it from the resource — see
+        // HlsControllerRangeTest for what actually reaches the wire.
+        assertEquals(Files.size(segFile), ((Resource) response.getBody()).contentLength());
     }
 
     // ========== getTsSegment (audio) ==========
@@ -187,7 +190,7 @@ class HlsControllerTest {
         ResponseEntity<?> response = controller.getSrtSubtitle(mediaFileId, filename);
 
         assertEquals("application/x-subrip", response.getHeaders().getFirst("Content-Type"));
-        assertEquals(Files.size(srtFile), response.getHeaders().getContentLength());
+        assertEquals(Files.size(srtFile), ((Resource) response.getBody()).contentLength());
     }
 
     // ========== appendTokenToUris edge cases ==========

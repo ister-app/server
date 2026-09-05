@@ -3,7 +3,8 @@ package app.ister.transcoder;
 import app.ister.core.enums.SubtitleFormat;
 import app.ister.core.utils.SafeFilename;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.PathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,9 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.UUID;
@@ -61,8 +60,25 @@ public class HlsController {
                 .body(appendTokenToUris(content, token));
     }
 
+    /**
+     * Segments are returned as a {@link PathResource} rather than an
+     * {@code InputStreamResource} on purpose. Spring skips range handling for the latter
+     * (see {@code AbstractMessageConverterMethodProcessor#isResourceType}), so the response
+     * carried no {@code Accept-Ranges} header and answered every {@code Range} request with the
+     * whole body.
+     * <p>
+     * ffmpeg reads that as a non-seekable connection — it only clears {@code is_streamed} when it
+     * sees {@code Accept-Ranges: bytes}, a known length is not enough. Reconnecting after a
+     * network error mid-segment then restarts the segment at offset <em>0</em> instead of the
+     * current one ({@code http_read_stream}: {@code target = h->is_streamed ? 0 : s->off}) and
+     * feeds those bytes to the demuxer a second time. The picture jumps back a few seconds and
+     * replays while the audio rendition, on its own connection, runs on undisturbed.
+     * <p>
+     * With a real file resource Spring advertises {@code Accept-Ranges: bytes} and serves 206
+     * responses, so a reconnect resumes where it left off.
+     */
     @GetMapping("/hls/{mediaFileId}/{segmentFilename:.+\\.ts}")
-    public ResponseEntity<InputStreamResource> getTsSegment(
+    public ResponseEntity<Resource> getTsSegment(
             @PathVariable UUID mediaFileId,
             @PathVariable String segmentFilename) throws IOException {
         SafeFilename.require(segmentFilename);
@@ -72,12 +88,10 @@ public class HlsController {
         } else {
             filePath = hlsService.getAudioSegment(mediaFileId, segmentFilename);
         }
-        long size = Files.size(filePath);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, TS_CONTENT_TYPE)
                 .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_2H)
-                .contentLength(size)
-                .body(new InputStreamResource(new FileInputStream(filePath.toFile())));
+                .body(new PathResource(filePath));
     }
 
     @GetMapping("/hls/{mediaFileId}/{segmentFilename:.+\\.vtt}")
@@ -92,16 +106,14 @@ public class HlsController {
     }
 
     @GetMapping("/hls/{mediaFileId}/{filename:.+\\.srt}")
-    public ResponseEntity<InputStreamResource> getSrtSubtitle(
+    public ResponseEntity<Resource> getSrtSubtitle(
             @PathVariable UUID mediaFileId,
             @PathVariable String filename) throws IOException {
         Path filePath = hlsService.getSrtSubtitle(mediaFileId, SafeFilename.require(filename));
-        long size = Files.size(filePath);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, "application/x-subrip")
                 .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_2H)
-                .contentLength(size)
-                .body(new InputStreamResource(new FileInputStream(filePath.toFile())));
+                .body(new PathResource(filePath));
     }
 
     /**
