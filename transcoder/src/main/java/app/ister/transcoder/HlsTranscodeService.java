@@ -52,6 +52,17 @@ public class HlsTranscodeService {
     private static final String ARG_SEGMENT_TIMES = "-segment_times";
     private static final String ARG_SEGMENT_TIME_DELTA = "-segment_time_delta";
     private static final String ARG_SEGMENT_FORMAT_OPTIONS = "-segment_format_options";
+    /**
+     * Audio filter for every AAC re-encode. The encoder copies the source's timestamps onto its
+     * output packets, so a source with jittery audio timestamps (an AC-3 track whose frames sit
+     * 32 ms off for a few frames at a time is common) yields AAC packets whose PTS deltas jump
+     * around 21.3 ms. Native players run on a sample clock and never notice, but hls.js trusts
+     * every PTS: it injects silent frames on each "gap", the segment grows past its slot, and
+     * Firefox keeps the surplus — the audio then falls further behind the picture every segment.
+     * {@code aresample=async=1} derives the timestamps from the sample count instead and only
+     * pads/trims when the discrepancy reaches 0.1 s, so genuine gaps still keep the timeline.
+     */
+    static final String AUDIO_TIMESTAMP_FILTER = "aresample=async=1";
     private static final String AUDIO_SAMPLE_RATE = "48000";
     /** The codec the AAC transcode qualities re-encode to; a source already in this codec is copied instead. */
     private static final String AAC_CODEC = "aac";
@@ -751,6 +762,7 @@ public class HlsTranscodeService {
             // COPY has no bitrate of its own; its AAC fallback mirrors the 192k quality.
             String bitrate = audioQuality.getBitrate() != null ? audioQuality.getBitrate() : "192k";
             output.addArguments("-c:a", AAC_CODEC)
+                    .addArguments("-af", AUDIO_TIMESTAMP_FILTER)
                     .addArguments("-ar", AUDIO_SAMPLE_RATE)
                     .addArguments("-b:a", bitrate)
                     .addArguments("-ac", "2");
@@ -1055,12 +1067,14 @@ public class HlsTranscodeService {
             log.debug("Codec '{}' cannot be copied into MPEG-TS, transcoding to AAC", sourceCodecName);
             output.addArguments("-t", String.format(Locale.ROOT, "%.6f", duration))
                     .addArguments("-c:a", "aac")
+                    .addArguments("-af", AUDIO_TIMESTAMP_FILTER)
                     .addArguments("-ar", AUDIO_SAMPLE_RATE)
                     .addArguments("-b:a", "192k")
                     .addArguments("-ac", "2");
         } else {
             output.addArguments("-t", String.format(Locale.ROOT, "%.6f", duration))
                     .addArguments("-c:a", "aac")
+                    .addArguments("-af", AUDIO_TIMESTAMP_FILTER)
                     .addArguments("-ar", AUDIO_SAMPLE_RATE)
                     .addArguments("-b:a", quality.getBitrate())
                     .addArguments("-ac", "2");

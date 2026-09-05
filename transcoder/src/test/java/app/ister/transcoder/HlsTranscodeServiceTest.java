@@ -691,6 +691,9 @@ class HlsTranscodeServiceTest {
         List<String> args = outputArgsOf(ffmpegMock);
         assertContainsSequence(args, "-c:a", "aac");
         assertContainsSequence(args, "-b:a", "192k");
+        // Jittery source timestamps must not reach the AAC packets: hls.js would inject silent
+        // frames on every jump and the web player's audio would fall behind the picture.
+        assertContainsSequence(args, "-af", "aresample=async=1");
         // A file without keyframes (audio-only) gets a synthetic 10s grid, and the
         // pass cuts on exactly the boundaries the playlist advertises. A plain
         // -segment_time would slice it into pieces the playlist never mentions.
@@ -712,6 +715,8 @@ class HlsTranscodeServiceTest {
         verify(ffmpegMock).executeAsync();
         List<String> args = outputArgsOf(ffmpegMock);
         assertContainsSequence(args, "-c:a", "copy");
+        // A stream copy has no filter graph; -af would make FFmpeg reject the command.
+        assertDoesNotContain(args, "-af");
         // -force_key_frames is meaningless (and rejected) with -c:a copy
         assertDoesNotContain(args, "-force_key_frames");
     }
@@ -746,6 +751,7 @@ class HlsTranscodeServiceTest {
         List<String> args = outputArgsOf(ffmpegMock);
         assertContainsSequence(args, "-c:a", "aac");
         assertContainsSequence(args, "-b:a", "192k");
+        assertContainsSequence(args, "-af", "aresample=async=1");
     }
 
     @Test
@@ -832,6 +838,7 @@ class HlsTranscodeServiceTest {
         service.generateAudioSegment("/test/audio.mkv", tempDir.resolve("out.ts"), 0.0, 10.0, 0, AudioQuality.Q192K, "aac");
 
         verify(ffmpegMock).executeAsync();
+        assertContainsSequence(outputArgsOf(ffmpegMock), "-af", "aresample=async=1");
     }
 
     @Test
