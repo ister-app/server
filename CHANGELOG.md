@@ -1,5 +1,38 @@
 # Changelog
 
+## server v3.4.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `3.4.0` |
+| `ghcr.io/ister-app/migrations` | `3.4.0` |
+
+### Features
+
+- feat(playqueue): shuffle an artist's whole catalogue ([`2af35b7`](https://github.com/ister-app/server/commit/2af35b7))
+- feat(settings): default to direct play without transcoding ([`c8df539`](https://github.com/ister-app/server/commit/c8df539))
+- feat(disk): sweep idle image thumbnails from the tmp dir ([`508317a`](https://github.com/ister-app/server/commit/508317a))
+- feat(disk): serve downscaled artwork from /images/{id}/download?width= ([`495b721`](https://github.com/ister-app/server/commit/495b721))
+
+### Fixes
+
+- fix(disk): downscale artwork in steps instead of one point-sampling jump ([`6965c19`](https://github.com/ister-app/server/commit/6965c19))
+- fix(disk): decode JPEGs ImageIO refuses when blur-hashing ([`c73a7e9`](https://github.com/ister-app/server/commit/c73a7e9))
+- fix(api): accept the public host as origin on the graphql websocket handshake ([`f825807`](https://github.com/ister-app/server/commit/f825807))
+
+### Other
+
+- chore: clear the open SonarCloud issues ([`d556fcd`](https://github.com/ister-app/server/commit/d556fcd))
+- refactor(disk): extract image downscaling into a shared ImageScaler ([`a65fe99`](https://github.com/ister-app/server/commit/a65fe99))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:3.4.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v3.3.1...v3.4.0
+
 ## server v3.3.1
 
 | Image | Tag |
