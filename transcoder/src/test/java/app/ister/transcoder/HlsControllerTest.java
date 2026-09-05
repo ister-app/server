@@ -47,7 +47,7 @@ class HlsControllerTest {
 
         ResponseEntity<String> response = controller.getMasterPlaylist(mediaFileId, true, true, SubtitleFormat.WEBVTT, null);
 
-        assertEquals("application/x-mpegURL", response.getHeaders().getFirst("Content-Type"));
+        assertEquals("application/vnd.apple.mpegurl", response.getHeaders().getFirst("Content-Type"));
     }
 
     @Test
@@ -117,7 +117,7 @@ class HlsControllerTest {
 
         ResponseEntity<String> response = controller.getStreamPlaylist(mediaFileId, "stream_video_720p.m3u8", null);
 
-        assertEquals("application/x-mpegURL", response.getHeaders().getFirst("Content-Type"));
+        assertEquals("application/vnd.apple.mpegurl", response.getHeaders().getFirst("Content-Type"));
     }
 
     @Test

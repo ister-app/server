@@ -1385,6 +1385,31 @@ class HlsServiceTest {
         verify(messageSender, times(2)).sendTranscodeRequested(any(), any());
     }
 
+    @Test
+    void getMasterPlaylistRegeneratesMasterOfOldGeneration() throws IOException {
+        UUID id = UUID.randomUUID();
+        ReflectionTestUtils.setField(hlsService, "masterPlaylistTimeoutMs", 100L);
+        MediaFileStreamEntity videoStream = videoStream(0, 1920, 1080);
+        MediaFileStreamEntity audioStream = audioStream(1, "eng", "English");
+        MediaFileEntity mediaFile = mediaFileEntity("/test/video.mkv", videoStream, audioStream);
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(mediaFile));
+
+        // A complete-looking master written before the MASTER_TAG generation (still
+        // advertising SRT renditions) must not be served from cache.
+        Path cacheDir = tempDir.resolve(id.toString());
+        Files.createDirectories(cacheDir);
+        Path cacheFile = cacheDir.resolve("master_d1_t0_sSRT.m3u8");
+        Files.writeString(cacheFile, "#EXTM3U\n#EXT-X-VERSION:6\n\n"
+                + "#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID=\"subs\",URI=\"stream_sub_x_srt.m3u8\"\n"
+                + "#EXT-X-STREAM-INF:BANDWIDTH=1\nstream_video_copy.m3u8\n");
+
+        assertThrows(IOException.class,
+                () -> hlsService.getMasterPlaylist(id, true, false, SubtitleFormat.SRT));
+
+        assertFalse(Files.exists(cacheFile), "Old-generation master should be deleted");
+        verify(messageSender, times(2)).sendTranscodeRequested(any(), any());
+    }
+
     // ========== getVideoSegment sends TRANSCODE_PASS_REQUESTED ==========
 
     @Test

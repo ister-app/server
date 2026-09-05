@@ -22,7 +22,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class HlsController {
 
-    private static final String M3U8_CONTENT_TYPE = "application/x-mpegURL";
+    // RFC 8216 §4: the registered HLS type. ffmpeg's demuxer warns on anything
+    // else ("mime type is not rfc8216 compliant"); hls.js and AVPlayer accept both.
+    private static final String M3U8_CONTENT_TYPE = "application/vnd.apple.mpegurl";
     private static final String TS_CONTENT_TYPE = "video/MP2T";
     private static final String VTT_CONTENT_TYPE = "text/vtt;charset=utf-8";
     private static final String CACHE_CONTROL_2H = "public, max-age=7200";

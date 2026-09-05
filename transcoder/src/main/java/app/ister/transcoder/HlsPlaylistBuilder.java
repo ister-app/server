@@ -27,6 +27,13 @@ public class HlsPlaylistBuilder {
      * the next request instead of serving a segment nobody has forever.
      */
     static final String GRID_TAG = "#EXT-X-ISTER-GRID:2";
+    /**
+     * Same idea for the master playlist: a cached master written before a
+     * generation bump is regenerated on the next request. Bump it whenever the
+     * master's content changes for an unchanged request (generation 2 dropped
+     * the SRT subtitle renditions).
+     */
+    static final String MASTER_TAG = "#EXT-X-ISTER-MASTER:2";
     private static final String PREFIX_STREAM_SUB = "stream_sub_";
     private static final String PREFIX_STREAM_AUDIO = "stream_audio_";
     private static final String TAG_VERSION = "#EXT-X-VERSION:6\n";
@@ -103,12 +110,24 @@ public class HlsPlaylistBuilder {
         StringBuilder sb = new StringBuilder();
         sb.append("#EXTM3U\n");
         sb.append(TAG_VERSION);
+        sb.append(MASTER_TAG).append("\n");
         sb.append("\n");
 
+        // SRT is the format the native (mpv-based) players ask for, and those
+        // side-load the whole-file sub_{id}.srt themselves. Advertising the SRT
+        // renditions in the master was only ever noise for them: ffmpeg's HLS
+        // demuxer rejects .srt as a segment ("not in allowed_segment_extensions",
+        // one error pair per track), and when an ffmpeg version does accept them
+        // the in-manifest tracks win the language preference over the side-loaded
+        // ones and double every cue on seek. Web asks for WEBVTT and does use
+        // the renditions. The stream_sub_*_srt.m3u8 playlists stay served for
+        // players that still hold an old master.
+        List<MediaFileStreamEntity> advertisedSubtitles =
+                subtitleFormat == SubtitleFormat.SRT ? List.of() : subtitleStreams;
         appendAudioMediaEntries(sb, audioStreams, audioQualities, includeVideo);
-        appendSubtitleMediaEntries(sb, subtitleStreams, subtitleFormat);
+        appendSubtitleMediaEntries(sb, advertisedSubtitles, subtitleFormat);
         if (videoStream != null) {
-            appendVideoVariants(sb, videoQualities, audioQualities, includeVideo, srcWidth, srcHeight, subtitleStreams);
+            appendVideoVariants(sb, videoQualities, audioQualities, includeVideo, srcWidth, srcHeight, advertisedSubtitles);
         } else if (!audioStreams.isEmpty()) {
             appendAudioOnlyVariants(sb, audioStreams, audioQualities, includeVideo);
         }

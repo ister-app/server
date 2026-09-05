@@ -94,7 +94,21 @@ class HlsPlaylistBuilderTest {
 
         String result = builder.buildMasterPlaylist(mediaFile, true, false, SubtitleFormat.SRT);
 
-        assertTrue(result.contains("stream_sub_" + subId + "_srt.m3u8"));
+        // Native players side-load sub_{id}.srt themselves; ffmpeg rejects .srt
+        // as an HLS segment, so the renditions are not advertised.
+        assertFalse(result.contains("TYPE=SUBTITLES"));
+        assertFalse(result.contains("SUBTITLES=\"subs\""));
+        assertFalse(result.contains("_srt.m3u8"));
+        assertTrue(result.contains("#EXT-X-STREAM-INF"));
+    }
+
+    @Test
+    void buildMasterPlaylistCarriesMasterGenerationTag() {
+        MediaFileEntity mediaFile = mediaFile(videoStream(0, 1920, 1080), audioStream(1, "eng", null));
+
+        String result = builder.buildMasterPlaylist(mediaFile, true, false, SubtitleFormat.WEBVTT);
+
+        assertTrue(result.contains(HlsPlaylistBuilder.MASTER_TAG));
     }
 
     @Test

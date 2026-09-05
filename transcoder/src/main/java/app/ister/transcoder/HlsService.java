@@ -174,11 +174,11 @@ public class HlsService {
 
         if (Files.exists(cacheFile)) {
             String cached = Files.readString(cacheFile);
-            if (cached.contains(EXT_X_MEDIA) || cached.contains(EXT_X_STREAM_INF)) {
+            if (isCurrentMaster(cached)) {
                 Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(System.currentTimeMillis()));
                 return cached;
             }
-            log.warn("Stale master playlist cache for {} has no stream entries, deleting and regenerating", mediaFileId);
+            log.warn("Stale master playlist cache for {} (no stream entries or old generation), deleting and regenerating", mediaFileId);
             Files.delete(cacheFile);
         }
 
@@ -229,7 +229,7 @@ public class HlsService {
 
         // Duplicate TRANSCODE_REQUESTED events are common (poll-timeout re-sends,
         // scan-time pre-generation); keep that path DB-free.
-        if (Files.exists(cacheFile)) {
+        if (Files.exists(cacheFile) && isCurrentMaster(Files.readString(cacheFile))) {
             log.debug("Playlists already cached for {}, skipping generation", mediaFileId);
             return;
         }
@@ -1027,6 +1027,16 @@ public class HlsService {
 
     /** Single source of the master-playlist cache key: getMasterPlaylist polls for the
      * exact filename generateAllPlaylists writes, so the format must never drift. */
+    /**
+     * A cached master is only served when it has stream entries and carries the
+     * current {@link HlsPlaylistBuilder#MASTER_TAG}; anything older is regenerated,
+     * so a bump of that tag repairs every cache directory on its next request.
+     */
+    private static boolean isCurrentMaster(String cached) {
+        return (cached.contains(EXT_X_MEDIA) || cached.contains(EXT_X_STREAM_INF))
+                && cached.contains(HlsPlaylistBuilder.MASTER_TAG);
+    }
+
     private static String masterCacheFilename(boolean direct, boolean transcode, SubtitleFormat subtitleFormat) {
         return String.format(Locale.ROOT, "master_d%d_t%d_s%s" + EXT_M3U8,
                 direct ? 1 : 0, transcode ? 1 : 0, subtitleFormat.name());
