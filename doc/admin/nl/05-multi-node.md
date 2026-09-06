@@ -85,6 +85,10 @@ uit handen geven:
 app.ister.helper.offload-jobs=DETECT_SEGMENTS,SUBTITLES
 ```
 
+Een helper leest ook de clusterbrede worker-queues mee (metadata, podcast-refresh,
+zoekindex) zoals elke node, maar bewaart nooit zelf podcastdownloads: die geeft hij door aan
+de node die de libraries bedient, en hij plant zelf geen podcast-refreshes.
+
 Zijn queues voor die jobs worden nog steeds gedeclareerd en gevuld, maar alleen door helpers
 geconsumeerd. Draait er geen helper, dan wacht het werk gewoon op de queue (zichtbaar als
 queue-diepte op de clusterpagina) — er gaat niets verloren, en er draait niets tot er een helper

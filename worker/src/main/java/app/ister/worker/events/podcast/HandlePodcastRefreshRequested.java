@@ -1,14 +1,18 @@
 package app.ister.worker.events.podcast;
 
 import app.ister.core.Handle;
+import app.ister.core.config.OwnDirectoriesProperties;
+import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.PodcastEntity;
 import app.ister.core.entity.PodcastEpisodeEntity;
+import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.SearchEntityType;
 import app.ister.core.eventdata.PodcastEpisodeDownloadRequestedData;
 import app.ister.core.eventdata.PodcastRefreshRequestedData;
+import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MetadataRepository;
@@ -38,14 +42,18 @@ import static app.ister.core.MessageQueue.APP_ISTER_SERVER_PODCAST_REFRESH_REQUE
 /**
  * Fetches a podcast's RSS feed and syncs it into the database: channel metadata and cover on the
  * podcast, one {@link PodcastEpisodeEntity} per feed item (deduplicated on guid). The newest
- * {@code auto-download-count} episodes get a download request on THIS node's cache directory, so
- * the audio lands on the node that refreshed the feed.
+ * {@code auto-download-count} episodes get a download request on the cache directory of a node
+ * that serves libraries: this node when it owns directories, else (on a helper node, which has
+ * none and whose URL clients cannot reach) the node already holding this podcast's downloads,
+ * else any node owning a library directory.
  */
 @Slf4j
 @Service
 @Transactional
 public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshRequestedData> {
     private static final String FEED_URI_PREFIX = "feed://";
+    /** Advisory-lock namespace for {@link PodcastRepository#tryLockPodcast}; distinct from segment detection's. */
+    static final int PODCAST_REFRESH_LOCK_NAMESPACE = 0x50444352; // "PDCR"
 
     private final PodcastRepository podcastRepository;
     private final PodcastEpisodeRepository podcastEpisodeRepository;
@@ -56,6 +64,8 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
     private final ImageDownloadService imageDownloadService;
     private final ServerEventService serverEventService;
     private final MessageSender messageSender;
+    private final DirectoryRepository directoryRepository;
+    private final OwnDirectoriesProperties ownDirectories;
 
     @Value("${app.ister.server.name}")
     private String nodeName;
@@ -71,7 +81,9 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
                                          RssFeedParser rssFeedParser,
                                          ImageDownloadService imageDownloadService,
                                          ServerEventService serverEventService,
-                                         MessageSender messageSender) {
+                                         MessageSender messageSender,
+                                         DirectoryRepository directoryRepository,
+                                         OwnDirectoriesProperties ownDirectories) {
         this.podcastRepository = podcastRepository;
         this.podcastEpisodeRepository = podcastEpisodeRepository;
         this.metadataRepository = metadataRepository;
@@ -81,6 +93,8 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
         this.imageDownloadService = imageDownloadService;
         this.serverEventService = serverEventService;
         this.messageSender = messageSender;
+        this.directoryRepository = directoryRepository;
+        this.ownDirectories = ownDirectories;
     }
 
     @Override
@@ -96,6 +110,12 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
 
     @Override
     public void handle(PodcastRefreshRequestedData data) {
+        if (!podcastRepository.tryLockPodcast(PODCAST_REFRESH_LOCK_NAMESPACE, data.getPodcastId())) {
+            // Another node (every node runs the refresh scheduler) is syncing this feed right
+            // now; its result is what we would have produced, so drop this one.
+            log.debug("Podcast {} is already being refreshed, skipping this message", data.getPodcastId());
+            return;
+        }
         podcastRepository.findById(data.getPodcastId()).ifPresent(podcast -> {
             if (!podcast.isActive()) {
                 return;
@@ -211,7 +231,7 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
                         .eventType(EventType.PODCAST_EPISODE_DOWNLOAD_REQUESTED)
                         .podcastEpisodeId(episodeId)
                         .build(),
-                cacheDirectoryName()));
+                downloadCacheDirectoryName(podcast)));
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
@@ -224,9 +244,31 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
         }
     }
 
-    /** The cache directory of the node running this handler (see StartupTasks naming). */
-    private String cacheDirectoryName() {
-        return nodeName + "-cache-directory";
+    /**
+     * Where the audio should land. A node that serves libraries keeps it in its own cache
+     * directory (StartupTasks naming). A helper node owns no directories and its URL is not one
+     * clients use, so it hands the download to the node that already holds this podcast's
+     * episodes, else to any node owning a library directory.
+     */
+    private String downloadCacheDirectoryName(PodcastEntity podcast) {
+        if (!ownDirectories.names().isEmpty()) {
+            return nodeName + "-cache-directory";
+        }
+        return podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(podcast.getId(), 50, 0).stream()
+                .flatMap(episodeId -> mediaFileRepository.findByPodcastEpisodeEntityId(episodeId).stream())
+                .map(mediaFile -> mediaFile.getDirectoryEntity())
+                .filter(dir -> dir != null && dir.getDirectoryType() == DirectoryType.CACHE)
+                .map(DirectoryEntity::getName)
+                .findFirst()
+                .or(() -> directoryRepository.findByDirectoryType(DirectoryType.LIBRARY).stream()
+                        .flatMap(lib -> directoryRepository
+                                .findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, lib.getNodeEntity()).stream())
+                        .map(DirectoryEntity::getName)
+                        .findFirst())
+                .orElseGet(() -> {
+                    log.warn("No node with library directories found; podcast downloads land on helper node {}", nodeName);
+                    return nodeName + "-cache-directory";
+                });
     }
 
     private String toIso3(String languageTag) {

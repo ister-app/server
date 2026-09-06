@@ -24,6 +24,16 @@ public interface PodcastRepository extends JpaRepository<PodcastEntity, UUID> {
     List<PodcastEntity> findByActiveTrue();
 
     /**
+     * Transaction-scoped advisory lock on one podcast, so two refreshes of the same feed (every
+     * node runs the refresh scheduler, and a manual refresh may coincide) never sync side by side:
+     * their delete-then-insert of the channel metadata cannot see each other's rows and one of
+     * them dies on an optimistic-lock error. Released automatically at commit/rollback.
+     */
+    @Query(value = "SELECT pg_try_advisory_xact_lock(:namespace, hashtext(CAST(:podcastId AS text)))",
+            nativeQuery = true)
+    boolean tryLockPodcast(@Param("namespace") int namespace, @Param("podcastId") UUID podcastId);
+
+    /**
      * The calling user's most recently played podcasts of a library, newest first, aggregated over
      * the episodes' watch rows. An episode's watch row is created the moment playback starts, so
      * only rows marked watched or past two minutes count as a play. Inactive (unsubscribed)

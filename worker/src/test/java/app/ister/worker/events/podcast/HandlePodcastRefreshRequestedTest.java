@@ -1,5 +1,10 @@
 package app.ister.worker.events.podcast;
 
+import app.ister.core.repository.DirectoryRepository;
+import app.ister.core.enums.DirectoryType;
+import app.ister.core.entity.NodeEntity;
+import app.ister.core.entity.DirectoryEntity;
+import app.ister.core.config.OwnDirectoriesProperties;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.PodcastEntity;
 import app.ister.core.entity.PodcastEpisodeEntity;
@@ -37,6 +42,8 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -60,6 +67,10 @@ class HandlePodcastRefreshRequestedTest {
     private ServerEventService serverEventService;
     @Mock
     private MessageSender messageSender;
+    @Mock
+    private DirectoryRepository directoryRepository;
+    @Mock
+    private OwnDirectoriesProperties ownDirectories;
 
     @InjectMocks
     private HandlePodcastRefreshRequested subject;
@@ -79,6 +90,43 @@ class HandlePodcastRefreshRequestedTest {
                 .build();
         podcast.setId(UUID.randomUUID());
         lenient().when(podcastRepository.findById(podcast.getId())).thenReturn(Optional.of(podcast));
+        lenient().when(podcastRepository.tryLockPodcast(anyInt(), any())).thenReturn(true);
+        lenient().when(ownDirectories.names()).thenReturn(List.of("disk1"));
+    }
+
+    /** Every node schedules refreshes; a feed already being synced by another node is dropped. */
+    @Test
+    void skipsWhenAnotherNodeHoldsThePodcastLock() {
+        when(podcastRepository.tryLockPodcast(anyInt(), eq(podcast.getId()))).thenReturn(false);
+
+        subject.handle(event());
+
+        verifyNoInteractions(rssFeedParser);
+        verify(podcastRepository, never()).save(any());
+    }
+
+    /** A helper node owns no directories: its downloads go to the node that serves the libraries. */
+    @Test
+    void helperNodeHandsAutoDownloadsToANodeWithLibraries() {
+        when(ownDirectories.names()).thenReturn(List.of());
+        RssFeedParser.Feed feed = new RssFeedParser.Feed(false, "etag", "lm",
+                new RssFeedParser.Channel("T", null, null, null, null), List.of(item("g1")));
+        when(rssFeedParser.fetch(any(), any(), any())).thenReturn(Optional.of(feed));
+        when(podcastEpisodeRepository.findByPodcastEntityAndGuid(any(), any())).thenReturn(Optional.empty());
+        when(podcastEpisodeRepository.save(any())).thenAnswer(inv -> { PodcastEpisodeEntity e = inv.getArgument(0); e.setId(UUID.randomUUID()); return e; });
+        UUID episodeId = UUID.randomUUID();
+        when(podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(podcast.getId(), 2, 0)).thenReturn(List.of(episodeId));
+        when(podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(podcast.getId(), 50, 0)).thenReturn(List.of());
+        NodeEntity owner = NodeEntity.builder().name("prod").url("https://media/api").build();
+        when(directoryRepository.findByDirectoryType(DirectoryType.LIBRARY))
+                .thenReturn(List.of(DirectoryEntity.builder().name("tv").directoryType(DirectoryType.LIBRARY).nodeEntity(owner).build()));
+        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, owner))
+                .thenReturn(List.of(DirectoryEntity.builder().name("prod-cache-directory").directoryType(DirectoryType.CACHE).nodeEntity(owner).build()));
+
+        subject.handle(event());
+
+        verify(messageSender).sendPodcastEpisodeDownloadRequested(any(), eq("prod-cache-directory"));
+        verify(messageSender, never()).sendPodcastEpisodeDownloadRequested(any(), eq("node1-cache-directory"));
     }
 
     private PodcastRefreshRequestedData event() {

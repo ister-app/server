@@ -81,6 +81,10 @@ An owner that should not spend its own CPU on a job family at all can hand it of
 app.ister.helper.offload-jobs=DETECT_SEGMENTS,SUBTITLES
 ```
 
+A helper also consumes the cluster-wide worker queues (metadata, podcast refresh, search
+indexing) like any node, but never keeps podcast downloads itself: it hands those to the node
+that serves the libraries, and it does not schedule podcast refreshes.
+
 Its queues for those jobs are still declared and filled, but only consumed by helpers. If no
 helper is up, the work simply waits on the queue (visible as queue depth on the cluster page) —
 nothing is lost, and nothing runs until a helper appears. Transcoding for the node's own cache
