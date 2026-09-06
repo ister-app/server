@@ -1,5 +1,8 @@
 package app.ister.transcoder;
 
+import app.ister.core.node.MediaFileInputResolver;
+import app.ister.core.node.NodeTokenManager;
+import app.ister.core.node.RemoteNodeClient;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MediaFileStreamEntity;
@@ -93,9 +96,8 @@ class HlsServiceTest {
         lenient().when(amqpAdmin.getQueueProperties(anyString())).thenReturn(new java.util.Properties());
         hlsService = new HlsService(playlistBuilder, subtitleService, transcodeService,
                 mediaFileRepository, mediaFileStreamRepository, messageSender,
-                remoteNodeClient, nodeTokenManager, amqpAdmin, transactionManager);
+                remoteNodeClient, new MediaFileInputResolver(nodeTokenManager, LOCAL_NODE_NAME), amqpAdmin, transactionManager);
         ReflectionTestUtils.setField(hlsService, "tmpDir", tempDir.toString());
-        ReflectionTestUtils.setField(hlsService, "localNodeName", LOCAL_NODE_NAME);
         ReflectionTestUtils.setField(hlsService, "uploadDrainTimeoutMs", 5000L);
     }
 
@@ -649,6 +651,7 @@ class HlsServiceTest {
         ReflectionTestUtils.setField(subtitleStream, "id", subtitleId);
 
         when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
+        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
 
         Path result = hlsService.getSrtSubtitle(mediaFileId, "sub_" + subtitleId + ".srt");
 
@@ -678,6 +681,7 @@ class HlsServiceTest {
         ReflectionTestUtils.setField(subtitleStream, "id", subtitleId);
 
         when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
+        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
 
         String filename = "sub_" + subtitleId + ".srt";
         hlsService.getSrtSubtitle(mediaFileId, filename);
@@ -691,6 +695,39 @@ class HlsServiceTest {
 
     // ========== Subtitle segment caching ==========
 
+
+    /**
+     * An external subtitle's path is local to the owning node. A node transcoding someone
+     * else's file fetches the SRT once through the owner's download endpoint.
+     */
+    @Test
+    void getSrtSubtitleExternalOnRemoteNodeDownloadsTheSrtOnce() throws Exception {
+        UUID mediaFileId = UUID.randomUUID();
+        UUID subtitleId = UUID.randomUUID();
+        MediaFileStreamEntity subtitleStream = MediaFileStreamEntity.builder()
+                .codecType(StreamCodecType.EXTERNAL_SUBTITLE)
+                .codecName("srt")
+                .path("/remote/cache/sub.srt")
+                .width(0).height(0)
+                .build();
+        ReflectionTestUtils.setField(subtitleStream, "id", subtitleId);
+        when(mediaFileStreamRepository.findById(subtitleId)).thenReturn(Optional.of(subtitleStream));
+        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(remoteMediaFileEntity(mediaFileId)));
+        when(nodeTokenManager.getDownloadToken()).thenReturn("tok");
+        doAnswer(inv -> {
+            Files.writeString(inv.getArgument(1), "1\n00:00:01,000 --> 00:00:03,000\nHello\n\n");
+            return null;
+        }).when(remoteNodeClient).downloadToFile(anyString(), any(Path.class));
+
+        String filename = "sub_" + subtitleId + ".srt";
+        Path result = hlsService.getSrtSubtitle(mediaFileId, filename);
+        hlsService.getSrtSubtitle(mediaFileId, filename);
+
+        assertTrue(Files.readString(result).contains("Hello"));
+        verify(remoteNodeClient, times(1)).downloadToFile(
+                eq("http://remote:8080/mediaFileStream/" + subtitleId + "/download?token=tok"),
+                eq(tempDir.resolve(mediaFileId.toString()).resolve("ext_" + subtitleId + ".srt")));
+    }
     @Test
     void getSubtitleSegmentIsCached() throws IOException {
         UUID mediaFileId = UUID.randomUUID();

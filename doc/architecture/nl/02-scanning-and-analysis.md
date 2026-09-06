@@ -89,10 +89,30 @@ de scannerkant: `app.ister.server.crop-detect-backfill` (standaard `true`) stuur
 De afnemer van de rechthoek is de **player**, via de GraphQL-cropvelden — de transcoder laat de
 balken bewust staan ([hoofdstuk 4](04-transcoding.md#crop-detectie-en-transcoderen)).
 
+### Ondertitel-extractie
+
+Ingebedde ondertitelstreams worden SRT-bestanden in de cache-directory van de eigenaar, één
+`SUBTITLE_EXTRACT_REQUESTED`-event per stream, verstuurd nadat de analyse van het bestand gecommit
+is (`HandleSubtitleExtractRequested` → `SubtitleExtractionProcessor` → `SubtitleExtractor`).
+Tekstcodecs zijn een simpele ffmpeg-remux; bitmapcodecs (dvd/PGS) gaan via ffmpeg → mkvextract →
+`subtile-ocr` (tesseract), wat minuten per stream kan duren — vandaar een apart, niet-transactioneel
+event in plaats van een stap binnen `MEDIA_FILE_FOUND`, en één bericht per stream zodat elk ruim
+onder de consumer-timeout van RabbitMQ blijft. Het resultaat is een `EXTERNAL_SUBTITLE`-rij waarvan
+`path` de eigenaar-lokale SRT is; een stream waarvan de tools falen krijgt de vlag
+`extractionFailed`, zodat de scanner-backfill (`subtitleStreamsToReextract`) hem niet blijft
+herhalen. De familie is helper-geschikt: een helper-node leest de bron via de download-URL van de
+eigenaar, extraheert in zijn eigen tmp-map, uploadt de SRT met `POST /cache/upload/{fileName}` en
+registreert het pad van de eigenaar, zodat de rij niet te onderscheiden is van een lokale
+extractie. Omdat de extractie nu ná de analyse klaar is, toont een tussentijds gegenereerde
+master-playlist de SRT-rendition pas zodra de playlist-cache van dat bestand opnieuw wordt
+opgebouwd.
+
 ### Intro/outro-detectie
 
 Terugkerende intro's en aftitelingen worden gevonden door **audio over een seizoen te
-vergelijken**: de disk-module decodeert korte vensters (eerste 10 / laatste 4 minuten van de slice
+vergelijken**: de disk-module (op de eigenaar, of op een helper-node die de directory voor
+`DETECT_SEGMENTS` opsomt — de reader neemt een lokaal pad of de ranged download-URL van de
+eigenaar even goed) decodeert korte vensters (eerste 10 / laatste 4 minuten van de slice
 van elke aflevering) naar mono-PCM, fingerprint ze (`ChromaFingerprinter`, een chromaprint-achtige
 32-bits gradiënthash per 128 ms — ongevoelig voor volumeverschillen, zonder externe library), en
 `SegmentMatcher` zoekt de langste gedeelde run tussen een aflevering en maximaal vier

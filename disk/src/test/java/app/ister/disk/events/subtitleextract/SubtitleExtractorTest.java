@@ -1,4 +1,4 @@
-package app.ister.disk.events.mediafilefound;
+package app.ister.disk.events.subtitleextract;
 
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileEntity;
@@ -14,24 +14,25 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class MediaFileFoundExtractSubtitlesTest {
+class SubtitleExtractorTest {
 
     @TempDir
     Path cacheDir;
 
-    private MediaFileFoundExtractSubtitles subject;
+    private SubtitleExtractor subject;
     private MediaFileEntity mediaFile;
     private DirectoryEntity cacheDirEntity;
 
     @BeforeEach
     void setUp() {
-        subject = new MediaFileFoundExtractSubtitles();
+        subject = new SubtitleExtractor();
         subject.loadLangMap();
 
         mediaFile = MediaFileEntity.builder()
@@ -45,7 +46,7 @@ class MediaFileFoundExtractSubtitlesTest {
 
     @Test
     void extractSubtitlesReturnsEmptyListWhenNoStreams() {
-        List<MediaFileStreamEntity> result = subject.extractSubtitles(mediaFile, List.of(), cacheDirEntity, "/usr/bin");
+        List<MediaFileStreamEntity> result = extractAll(mediaFile, List.of(), cacheDirEntity, "/usr/bin");
         assertTrue(result.isEmpty());
     }
 
@@ -56,7 +57,7 @@ class MediaFileFoundExtractSubtitlesTest {
                 .streamIndex(0)
                 .build();
 
-        List<MediaFileStreamEntity> result = subject.extractSubtitles(
+        List<MediaFileStreamEntity> result = extractAll(
                 mediaFile, List.of(videoStream), cacheDirEntity, "/usr/bin");
 
         assertTrue(result.isEmpty());
@@ -76,7 +77,7 @@ class MediaFileFoundExtractSubtitlesTest {
         Path srtPath = cacheDir.resolve(srtFilename);
         Files.writeString(srtPath, "1\n00:00:01,000 --> 00:00:03,000\nHello\n\n");
 
-        List<MediaFileStreamEntity> result = subject.extractSubtitles(
+        List<MediaFileStreamEntity> result = extractAll(
                 mediaFile, List.of(stream), cacheDirEntity, "/usr/bin");
 
         assertEquals(1, result.size());
@@ -103,7 +104,7 @@ class MediaFileFoundExtractSubtitlesTest {
                 .language("eng")
                 .build();
 
-        List<MediaFileStreamEntity> result = subject.extractSubtitles(
+        List<MediaFileStreamEntity> result = extractAll(
                 mediaFile, List.of(stream), cacheDirEntity, "/nonexistent/ffmpeg/dir");
 
         assertTrue(result.isEmpty());
@@ -121,7 +122,7 @@ class MediaFileFoundExtractSubtitlesTest {
                     .language("eng")
                     .build();
 
-            subject.extractSubtitles(mediaFile, List.of(stream), cacheDirEntity, "/nonexistent/ffmpeg/dir");
+            extractAll(mediaFile, List.of(stream), cacheDirEntity, "/nonexistent/ffmpeg/dir");
 
             assertEquals(Boolean.TRUE, stream.getExtractionFailed(), "Expected failure marker for codec: " + codec);
         }
@@ -136,7 +137,7 @@ class MediaFileFoundExtractSubtitlesTest {
                 .language("eng")
                 .build();
 
-        subject.extractSubtitles(mediaFile, List.of(stream), cacheDirEntity, "/nonexistent/ffmpeg/dir");
+        extractAll(mediaFile, List.of(stream), cacheDirEntity, "/nonexistent/ffmpeg/dir");
 
         assertNull(stream.getExtractionFailed());
     }
@@ -151,7 +152,7 @@ class MediaFileFoundExtractSubtitlesTest {
                 .build();
         Files.writeString(cacheDir.resolve(mediaFile.getId() + "_0_eng.srt"), "srt");
 
-        List<MediaFileStreamEntity> result = subject.extractSubtitles(
+        List<MediaFileStreamEntity> result = extractAll(
                 mediaFile, List.of(stream), cacheDirEntity, "/nonexistent/ffmpeg/dir");
 
         assertEquals(1, result.size());
@@ -179,7 +180,7 @@ class MediaFileFoundExtractSubtitlesTest {
 
         Files.writeString(cacheDir.resolve(mediaFile.getId() + "_0_" + expectedLang + ".srt"), "srt");
 
-        List<MediaFileStreamEntity> result = subject.extractSubtitles(
+        List<MediaFileStreamEntity> result = extractAll(
                 mediaFile, List.of(stream), cacheDirEntity, "/usr/bin");
 
         assertEquals(1, result.size());
@@ -196,7 +197,7 @@ class MediaFileFoundExtractSubtitlesTest {
                     .language("eng")
                     .build();
 
-            List<MediaFileStreamEntity> result = subject.extractSubtitles(
+            List<MediaFileStreamEntity> result = extractAll(
                     mediaFile, List.of(stream), cacheDirEntity, "/nonexistent/ffmpeg/dir");
 
             assertTrue(result.isEmpty(), "Expected empty result for codec: " + codec);
@@ -213,7 +214,7 @@ class MediaFileFoundExtractSubtitlesTest {
                     .language("eng")
                     .build();
 
-            List<MediaFileStreamEntity> result = subject.extractSubtitles(
+            List<MediaFileStreamEntity> result = extractAll(
                     mediaFile, List.of(stream), cacheDirEntity, "/nonexistent/ffmpeg/dir");
 
             assertTrue(result.isEmpty(), "Expected empty result for codec: " + codec);
@@ -275,7 +276,7 @@ class MediaFileFoundExtractSubtitlesTest {
                 .language("fra")
                 .build();
 
-        List<MediaFileStreamEntity> result = subject.extractSubtitles(
+        List<MediaFileStreamEntity> result = extractAll(
                 mediaFile,
                 List.of(audioStream, cachedSub, unsupportedSub),
                 cacheDirEntity,
@@ -312,7 +313,7 @@ class MediaFileFoundExtractSubtitlesTest {
                 .build();
         Files.writeString(cacheDir.resolve(mediaFile.getId() + "_2_fra.srt"), "srt2");
 
-        List<MediaFileStreamEntity> result = subject.extractSubtitles(
+        List<MediaFileStreamEntity> result = extractAll(
                 mediaFile,
                 List.of(audioStream, sub1, sub2),
                 cacheDirEntity,
@@ -345,5 +346,22 @@ class MediaFileFoundExtractSubtitlesTest {
         assertFalse(nld.contains("--tessdata-dir"));
         assertFalse(both.contains("--tessdata-dir"));
         assertFalse(eng.contains("-c"));
+    }
+
+    /** The pre-split "all streams of one local file" shape, so the cases above read as before. */
+    private List<MediaFileStreamEntity> extractAll(MediaFileEntity file, List<MediaFileStreamEntity> streams,
+                                                   DirectoryEntity cacheDirectory, String ffmpegDir) {
+        List<MediaFileStreamEntity> result = new ArrayList<>();
+        int subIdx = 0;
+        for (MediaFileStreamEntity stream : streams) {
+            if (stream.getCodecType() != StreamCodecType.SUBTITLE) {
+                continue;
+            }
+            subject.extractOne(file.getPath(), file.getId(), streams, stream, subIdx, Path.of(cacheDirectory.getPath()), ffmpegDir)
+                    .map(extracted -> SubtitleExtractor.toEntity(file, stream, extracted, extracted.srtFile()))
+                    .ifPresent(result::add);
+            subIdx++;
+        }
+        return result;
     }
 }

@@ -85,10 +85,27 @@ re-sends `MEDIA_FILE_FOUND` on a rescan for video files whose streams have no cr
 The consumer of the rectangle is the **player**, via the GraphQL crop fields — the transcoder
 deliberately leaves the bars in place ([chapter 4](04-transcoding.md#crop-detection-and-transcoding)).
 
+### Subtitle extraction
+
+Embedded subtitle streams become SRT files in the owner's cache directory, one
+`SUBTITLE_EXTRACT_REQUESTED` event per stream fired after the file's analysis commits
+(`HandleSubtitleExtractRequested` → `SubtitleExtractionProcessor` → `SubtitleExtractor`). Text
+codecs are a plain ffmpeg remux; bitmap codecs (DVD/PGS) go through ffmpeg → mkvextract →
+`subtile-ocr` (tesseract), which can take minutes per stream — hence a separate, non-transactional
+event rather than a step inside `MEDIA_FILE_FOUND`, and one message per stream so each stays well
+under RabbitMQ's consumer timeout. The result is an `EXTERNAL_SUBTITLE` row whose `path` is the
+owner-local SRT; a stream whose tools fail is flagged `extractionFailed` so the scanner backfill
+(`subtitleStreamsToReextract`) stops re-firing it. The family is helper-capable: a helper node
+reads the source through the owner's download URL, extracts into its own tmp dir, uploads the SRT
+with `POST /cache/upload/{fileName}` and records the owner's path, so the row is indistinguishable
+from a local extraction. Because extraction now finishes after the analysis, a master playlist
+generated in between lists the SRT rendition only once that file's playlist cache is regenerated.
+
 ### Intro/outro detection
 
 Recurring intros and closing credits are found by **comparing audio across a season**: the disk
-module decodes short windows (first 10 / last 4 minutes of each episode's slice) to mono PCM,
+module (on the owner, or on a helper node listing the directory for `DETECT_SEGMENTS` — the
+reader takes a local path or the owner's ranged download URL alike) decodes short windows (first 10 / last 4 minutes of each episode's slice) to mono PCM,
 fingerprints them (`ChromaFingerprinter`, a chromaprint-style 32-bit gradient hash per 128 ms —
 loudness-invariant, no external library), and `SegmentMatcher` finds the longest shared run
 between an episode and up to four season neighbours. Because a lag between two episodes that

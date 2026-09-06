@@ -145,7 +145,8 @@ lopen — de CI van de chart wijst ze allemaal naar één WireMock-pod:
 
 `app.ister.disk.libraries[n].*` en `app.ister.disk.directories[n].*` bepalen wat er gescand
 wordt — volledig behandeld in [Libraries en media-indeling](04-libraries-and-media-layout.md).
-Aparte transcoder-nodes krijgen schijven toegewezen met `app.ister.transcoder.disks[n].name` — zie
+Helper-nodes krijgen schijven van andere nodes toegewezen met `app.ister.helper.disks[n].name`
+(+ `.jobs`), en een eigenaar geeft jobfamilies uit handen met `app.ister.helper.offload-jobs` — zie
 [Multi-node](05-multi-node.md).
 
 ## Health, metrics en overige interne knoppen

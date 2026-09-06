@@ -1,5 +1,7 @@
 package app.ister.transcoder;
 
+import app.ister.core.node.MediaFileInputResolver;
+import app.ister.core.node.RemoteNodeClient;
 import app.ister.core.config.LanguageMatcher;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MediaFileStreamEntity;
@@ -72,7 +74,7 @@ public class HlsService {
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final MessageSender messageSender;
     private final RemoteNodeClient remoteNodeClient;
-    private final NodeTokenManager nodeTokenManager;
+    private final MediaFileInputResolver inputResolver;
     private final AmqpAdmin amqpAdmin;
 
     /**
@@ -88,7 +90,7 @@ public class HlsService {
     public HlsService(HlsPlaylistBuilder playlistBuilder, HlsSubtitleService subtitleService,
                       HlsTranscodeService transcodeService, MediaFileRepository mediaFileRepository,
                       MediaFileStreamRepository mediaFileStreamRepository, MessageSender messageSender,
-                      RemoteNodeClient remoteNodeClient, NodeTokenManager nodeTokenManager,
+                      RemoteNodeClient remoteNodeClient, MediaFileInputResolver inputResolver,
                       AmqpAdmin amqpAdmin, PlatformTransactionManager transactionManager) {
         this.amqpAdmin = amqpAdmin;
         this.playlistBuilder = playlistBuilder;
@@ -98,7 +100,7 @@ public class HlsService {
         this.mediaFileStreamRepository = mediaFileStreamRepository;
         this.messageSender = messageSender;
         this.remoteNodeClient = remoteNodeClient;
-        this.nodeTokenManager = nodeTokenManager;
+        this.inputResolver = inputResolver;
         this.readOnlyTransaction = new TransactionTemplate(transactionManager);
         this.readOnlyTransaction.setReadOnly(true);
     }
@@ -112,9 +114,6 @@ public class HlsService {
     /** After the pass completes, keep retrying failed segment uploads for at most this long. */
     @Value("${app.ister.transcoder.hls.upload-drain-timeout-ms:300000}")
     private long uploadDrainTimeoutMs;
-
-    @Value("${app.ister.server.name}")
-    private String localNodeName;
 
     /** Per-subtitle locks to prevent duplicate segment generation for the same subtitle stream. */
     private final ConcurrentHashMap<String, Object> subtitleLocks = new ConcurrentHashMap<>();
@@ -669,16 +668,17 @@ public class HlsService {
         SubtitleContext ctx = readOnlyTransaction.execute(status -> {
             MediaFileStreamEntity subtitleStream = mediaFileStreamRepository.findById(subtitleId).orElseThrow();
             MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
-            return new SubtitleContext(subtitleStream, resolveInputPath(mediaFile));
+            return new SubtitleContext(subtitleStream, resolveInputPath(mediaFile), externalSrtUrl(subtitleStream, mediaFile));
         });
         MediaFileStreamEntity subtitleStream = ctx.subtitleStream();
         String mediaFilePath = ctx.mediaFilePath();
+        String externalSrtPath = externalSrtLocal(ctx, mediaFileId);
         String generationKey = mediaFileId + "_sub_" + subtitleId;
         Object lock = subtitleLocks.computeIfAbsent(generationKey, k -> new Object());
         synchronized (lock) {
             if (!Files.exists(cacheFile)
                     || !subtitleService.isGenerationCurrent(cacheDir(mediaFileId), subtitleId)) {
-                subtitleService.generateSubtitleSegments(subtitleStream, mediaFilePath, mediaFileId,
+                subtitleService.generateSubtitleSegments(subtitleStream, mediaFilePath, externalSrtPath, mediaFileId,
                         cacheDir(mediaFileId), transcodeService.gridFor(mediaFilePath, StreamRole.subtitle()));
             }
         }
@@ -696,15 +696,16 @@ public class HlsService {
         UUID subtitleId = UUID.fromString(filename.replace("sub_", "").replace(".srt", ""));
         SubtitleContext ctx = readOnlyTransaction.execute(status -> {
             MediaFileStreamEntity stream = mediaFileStreamRepository.findById(subtitleId).orElseThrow();
+            MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
             String mediaFilePath = stream.getCodecType() == StreamCodecType.EXTERNAL_SUBTITLE ? null
-                    : resolveInputPath(mediaFileRepository.findById(mediaFileId).orElseThrow());
-            return new SubtitleContext(stream, mediaFilePath);
+                    : resolveInputPath(mediaFile);
+            return new SubtitleContext(stream, mediaFilePath, externalSrtUrl(stream, mediaFile));
         });
         MediaFileStreamEntity stream = ctx.subtitleStream();
 
         String sourceSrtPath;
         if (stream.getCodecType() == StreamCodecType.EXTERNAL_SUBTITLE) {
-            sourceSrtPath = stream.getPath();
+            sourceSrtPath = externalSrtLocal(ctx, mediaFileId);
         } else {
             Files.createDirectories(cacheDir(mediaFileId));
             sourceSrtPath = subtitleService.extractEmbeddedSubtitleToSrt(stream, ctx.mediaFilePath(), cacheDir(mediaFileId));
@@ -904,16 +905,41 @@ public class HlsService {
     // ========== Remote node helpers ==========
 
     private boolean isRemote(MediaFileEntity mediaFile) {
-        return !localNodeName.equals(mediaFile.getDirectoryEntity().getNodeEntity().getName());
+        return inputResolver.isRemote(mediaFile);
     }
 
     private String resolveInputPath(MediaFileEntity mediaFile) {
-        if (!isRemote(mediaFile)) {
-            return mediaFile.getPath();
+        return inputResolver.resolve(mediaFile);
+    }
+
+    /** Inside the read transaction: the owner's download URL for a remote external subtitle, else null. */
+    private String externalSrtUrl(MediaFileStreamEntity stream, MediaFileEntity mediaFile) {
+        if (stream.getCodecType() != StreamCodecType.EXTERNAL_SUBTITLE || !isRemote(mediaFile)) {
+            return null;
         }
-        return mediaFile.getDirectoryEntity().getNodeEntity().getUrl()
-                + "/mediaFile/" + mediaFile.getId()
-                + "/download?token=" + nodeTokenManager.getDownloadToken();
+        return inputResolver.subtitleDownloadUrl(mediaFile, stream);
+    }
+
+    /**
+     * Where the SRT of an external subtitle stream can be read on this node. Its {@code path}
+     * is local to the owning node (cache directory or a sidecar next to the media), so when the
+     * file is remote it is fetched once into this file's transcode cache dir; the tmp cleanup
+     * removes it together with the segments.
+     */
+    private String externalSrtLocal(SubtitleContext ctx, UUID mediaFileId) throws IOException {
+        MediaFileStreamEntity stream = ctx.subtitleStream();
+        if (stream.getCodecType() != StreamCodecType.EXTERNAL_SUBTITLE) {
+            return null;
+        }
+        if (ctx.externalSrtUrl() == null) {
+            return stream.getPath();
+        }
+        Path local = cacheDir(mediaFileId).resolve("ext_" + stream.getId() + ".srt");
+        if (!Files.exists(local)) {
+            Files.createDirectories(local.getParent());
+            remoteNodeClient.downloadToFile(ctx.externalSrtUrl(), local);
+        }
+        return local.toString();
     }
 
     private void watchAndUpload(Path cacheDirPath, String prefix, String nodeUrl,
@@ -1083,6 +1109,10 @@ public class HlsService {
     private record PassRequestContext(String inputPath, String directoryName) {
     }
 
-    private record SubtitleContext(MediaFileStreamEntity subtitleStream, String mediaFilePath) {
+    /**
+     * @param externalSrtUrl tokenized download URL of an {@code EXTERNAL_SUBTITLE} stream when the
+     *                       media file lives on another node; null when local or not external.
+     */
+    private record SubtitleContext(MediaFileStreamEntity subtitleStream, String mediaFilePath, String externalSrtUrl) {
     }
 }

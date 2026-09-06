@@ -62,14 +62,16 @@ public class HlsSubtitleService {
 
     /**
      * Generates all WebVTT subtitle segment files for the given stream.
+     * {@code externalSrtPath} is the readable SRT of an {@code EXTERNAL_SUBTITLE} stream on this node.
      * Segments are written into {@code cacheDir} using the filename pattern
      * {@code seg_sub_{subtitleId}_{%05d}.vtt}.
      */
-    void generateSubtitleSegments(MediaFileStreamEntity stream, String mediaFilePath,
+    void generateSubtitleSegments(MediaFileStreamEntity stream, String mediaFilePath, String externalSrtPath,
                                    UUID mediaFileId, Path cacheDir, SegmentGrid grid) throws IOException {
         String srtPath;
         if (stream.getCodecType() == StreamCodecType.EXTERNAL_SUBTITLE) {
-            srtPath = stream.getPath();
+            // Resolved by the caller: the row's path is owner-local, a remote node fetched a copy.
+            srtPath = externalSrtPath;
         } else {
             srtPath = extractEmbeddedSubtitleToSrt(stream, mediaFilePath, cacheDir);
         }

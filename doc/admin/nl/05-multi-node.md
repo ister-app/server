@@ -1,5 +1,5 @@
 ---
-description: "Draai Ister als zelfgehoste mediaserver op meerdere nodes: gedeelde database en broker, werkrouting per directory en dedicated transcoder-nodes."
+description: "Draai Ister als zelfgehoste mediaserver op meerdere nodes: gedeelde database en broker, werkrouting per directory en helper-nodes voor transcoderen, intro-detectie en ondertitel-OCR."
 ---
 
 # Multi-node
@@ -46,25 +46,61 @@ kortlevende **node-tokens** die de nodes onderling automatisch uitgeven en verve
 uur ververst). Je configureert hiervoor niets, behalve correcte `app.ister.server.url`-waarden —
 maar die URL's moeten node-naar-node bereikbaar zijn, niet alleen vanuit je browser.
 
-## Dedicated transcoder-nodes
+## Helper-nodes
 
-Een node kan ook transcoderen voor de schijven van **een andere node** zonder zelf media te
-bezitten: geef hem geen directories en som in plaats daarvan de directorynamen op die hij moet
-bedienen:
+Elke node blijft verantwoordelijk voor zijn eigen directories. Daarbovenop kan een krachtige
+node andere nodes **helpen** met de CPU-zware jobfamilies — hij hoeft daarvoor zelf geen media
+te bezitten:
+
+| Job | Wat eronder valt |
+| --- | --- |
+| `TRANSCODE` | HLS-(pre)transcoding |
+| `DETECT_SEGMENTS` | intro-/outro-detectie (audio-fingerprinting) |
+| `SUBTITLES` | extractie van ingebedde ondertitels, inclusief OCR van dvd-/blu-ray-bitmapondertitels |
+
+Som de directorynamen op die de helper moet bedienen, en optioneel welke jobs:
 
 ```properties
-app.ister.transcoder.disks[0].name=server-1-disk1-tv
-app.ister.transcoder.disks[1].name=server-1-disk1-movies
+app.ister.helper.disks[0].name=server-1-disk1-tv
+app.ister.helper.disks[1].name=server-1-disk1-movies
+app.ister.helper.disks[1].jobs=DETECT_SEGMENTS,SUBTITLES
+# standaard jobset voor schijven zonder eigen "jobs" (standaard: alle drie)
+app.ister.helper.jobs=TRANSCODE,DETECT_SEGMENTS,SUBTITLES
 ```
 
-Is `app.ister.transcoder.disks` leeg, dan valt hij terug op de eigen directories van de node
-(het normale single-node-gedrag). Let op: de bronnode moet het bestand nog steeds aan de
-transcoder kunnen leveren — externe invoer wordt opgehaald via een download-URL met token.
+De helper consumeert dan **dezelfde queues** als de eigenaar voor die directories, en RabbitMQ
+verdeelt het werk bericht voor bericht tussen beide — de snelste node pakt vanzelf het meest. De
+helper leest het bronbestand over HTTP van de eigenaar (een download met token en
+byte-ranges, zodat seeken goedkoop blijft); intro-detectie schrijft alleen databaserijen, en een
+geëxtraheerde ondertitel wordt geüpload naar de cache-directory van de eigenaar, die hem serveert
+alsof hij hem zelf gemaakt had. Daarvoor is niets nodig behalve correcte
+`app.ister.server.url`-waarden, maar de helper heeft dezelfde tools nodig als elke node (ffmpeg,
+mkvextract, subtile-ocr) — gebruik dezelfde image.
 
-Let op de spelling van die `disks[n].name`-waarden: ze worden letterlijk als queuenamen gebruikt
-en worden **niet gevalideerd** tegen de directories van het cluster. Een typefout levert dus
-geruisloos een dode queue op die nooit werk ontvangt — het symptoom is dat transcodes voor die
-schijf gewoon op de eigenaarsnode blijven (of nergens draaien).
+Een eigenaar die zijn eigen CPU helemaal niet aan een jobfamilie wil besteden, kan die volledig
+uit handen geven:
+
+```properties
+# op de eigenaarsnode
+app.ister.helper.offload-jobs=DETECT_SEGMENTS,SUBTITLES
+```
+
+Zijn queues voor die jobs worden nog steeds gedeclareerd en gevuld, maar alleen door helpers
+geconsumeerd. Draait er geen helper, dan wacht het werk gewoon op de queue (zichtbaar als
+queue-diepte op de clusterpagina) — er gaat niets verloren, en er draait niets tot er een helper
+verschijnt. Transcoderen voor de eigen cache-directory van de node (podcastdownloads) wordt nooit
+uit handen gegeven.
+
+Let op de spelling van de `disks[n].name`-waarden: ze worden letterlijk als queuenamen gebruikt.
+Het opstarten zoekt elke naam op in de directories van het cluster en logt een **waarschuwing**
+voor een naam die hij niet kent (hij faalt niet: de eigenaarsnode kan simpelweg nog niet
+draaien). Een verkeerd gespelde naam laat de helper luisteren op een queue waar niemand naar
+publiceert.
+
+`app.ister.transcoder.disks[n].name` uit eerdere versies werkt nog (het wordt vertaald naar
+helper-schijven met alleen de `TRANSCODE`-job en vervangt, zoals voorheen, de eigen directories
+van de node voor het transcoderen) en logt een deprecatiewaarschuwing; verplaats het naar
+`app.ister.helper.disks`.
 
 ## Uitgewerkt voorbeeld
 
@@ -73,8 +109,9 @@ tegen één database en broker:
 
 - **server-1** — bezit zes directories (series, films en muziek over twee schijven)
 - **server-2** — een tweede volwaardige node met eigen schijven
-- **transcoder-1** — geen directories, alleen `app.ister.transcoder.disks[n]`-regels met de
-  schijven van server-1: hij doet het transcoderen van server-1
+- **helper-1** — geen directories, alleen `app.ister.helper.disks[n]`-regels met de schijven van
+  server-1: hij transcodeert voor server-1 en doet diens intro-detectie en ondertitel-OCR, die
+  server-1 volledig uit handen geeft (`APP_ISTER_HELPER_OFFLOAD_JOBS`)
 
 Alle drie de nodes hebben in het voorbeeld VAAPI-hardwareversnelling ingeschakeld — transcoderen
 kan op elk van hen belanden, dus hardwareversnelling is het configureren waard op elke node die

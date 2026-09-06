@@ -1,5 +1,6 @@
 package app.ister.disk;
 
+import app.ister.core.config.DirectoryQueueNames;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.NodeEntity;
@@ -38,6 +39,7 @@ class StartupTasksTest {
     @Mock private AppIsterServerConfig config;
     @Mock private DirectoryRepository directoryRepository;
     @Mock private LibraryRepository libraryRepository;
+    @Mock private DirectoryQueueNames directoryQueueNames;
     @Mock private ApplicationContext applicationContext;
     @Mock private ApplicationContext parentContext;
 
@@ -49,6 +51,7 @@ class StartupTasksTest {
         ReflectionTestUtils.setField(startupTasks, "cacheDir", "/tmp/ister-cache");
         lenient().when(config.getLibraries()).thenReturn(List.of());
         lenient().when(config.getDirectories()).thenReturn(List.of());
+        lenient().when(directoryQueueNames.allHelperDirectoryNames()).thenReturn(List.of());
     }
 
     private DirectoryEntity existingCacheDir(NodeEntity node) {
@@ -278,5 +281,21 @@ class StartupTasksTest {
         dir.setPath(path);
         dir.setLibrary(library);
         return dir;
+    }
+
+    // ========== Helper disks ==========
+
+    /** An unknown helper disk name is a warning, not a failure: the owner may simply not be up yet. */
+    @Test
+    void unknownHelperDiskDoesNotFailStartup() {
+        NodeEntity node = nodeWithId(UUID.randomUUID());
+        when(nodeService.updateOrCreateNodeEntityForThisNode()).thenReturn(node);
+        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node)).thenReturn(List.of(existingCacheDir(node)));
+        when(directoryQueueNames.allHelperDirectoryNames()).thenReturn(List.of("other-node-tv"));
+        when(directoryRepository.findByName("other-node-tv")).thenReturn(Optional.empty());
+
+        assertDoesNotThrow(() -> startupTasks.onApplicationEvent(rootEvent()));
+
+        verify(directoryRepository).findByName("other-node-tv");
     }
 }

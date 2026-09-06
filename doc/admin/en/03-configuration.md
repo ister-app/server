@@ -143,9 +143,9 @@ chart's CI points them all at one WireMock pod:
 ## Libraries and directories
 
 `app.ister.disk.libraries[n].*` and `app.ister.disk.directories[n].*` define what gets scanned —
-covered in full in [Libraries and media layout](04-libraries-and-media-layout.md). Dedicated
-transcoder nodes are assigned disks with `app.ister.transcoder.disks[n].name` — see
-[Multi-node](05-multi-node.md).
+covered in full in [Libraries and media layout](04-libraries-and-media-layout.md). Helper nodes
+are assigned other nodes' disks with `app.ister.helper.disks[n].name` (+ `.jobs`), and an owner
+hands job families off with `app.ister.helper.offload-jobs` — see [Multi-node](05-multi-node.md).
 
 ## Health, metrics, and other internals
 

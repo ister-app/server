@@ -153,9 +153,13 @@ met hervalidatie in plaats van `immutable`: een gescande library-afbeelding houd
 het bestand erachter in-place vervangen wordt, dus clients moeten goedkoop kunnen hervalideren —
 anders dan de comic- en epub-resources, die wél immutable zijn. Operationele noot: een reverse
 proxy vóór de server moet `If-None-Match`/`ETag` doorlaten, anders degradeert elk imageverzoek tot
-een volledige download. Dezelfde controller verzorgt `/mediaFile/{id}/download`
-(multi-node-bronreads) en `POST /transcode/upload/{id}/{fileName}` (segment-uploads,
-[hoofdstuk 4](04-transcoding.md)).
+een volledige download. Dezelfde controller verzorgt de node-naar-node-endpoints, uitsluitend
+geauthenticeerd met node-tokens: `GET /mediaFile/{id}/download` (multi-node-bronreads, met
+byte-ranges) en `GET /mediaFileStream/{id}/download` (een geëxtraheerde of sidecar-SRT voor een
+remote transcoder) op het download-token; `POST /transcode/upload/{id}/{fileName}`
+(segment-uploads, [hoofdstuk 4](04-transcoding.md)) en `POST /cache/upload/{fileName}` (de
+geëxtraheerde ondertitel van een helper-node, atomair in de cache-directory van deze node
+geschreven) op het upload-token.
 
 **Verkleinde artwork.** `?width=` vraagt om een kleinere variant, wat clients gebruiken voor
 grid-tegels en lijstminiaturen — een episode-still van 3840×2160 die 150 px breed geschilderd

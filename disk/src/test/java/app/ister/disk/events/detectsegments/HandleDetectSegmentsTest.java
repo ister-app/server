@@ -3,6 +3,7 @@ package app.ister.disk.events.detectsegments;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.node.MediaFileInputResolver;
 import app.ister.core.entity.MediaFileSegmentEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.SegmentType;
@@ -57,6 +58,7 @@ class HandleDetectSegmentsTest {
     @Mock private MediaFileEpisodeService mediaFileEpisodeService;
     @Mock private DirectoryRepository directoryRepository;
     @Mock private MessageSender messageSender;
+    @Mock private MediaFileInputResolver inputResolver;
 
     private HandleDetectSegments subject;
     private final List<EpisodeEntity> episodes = new java.util.ArrayList<>();
@@ -69,17 +71,19 @@ class HandleDetectSegmentsTest {
      */
     @BeforeEach
     void setUp() {
+        // Files here have no directory/node: resolve like a local file.
+        lenient().when(inputResolver.resolve(any())).thenAnswer(inv -> ((MediaFileEntity) inv.getArgument(0)).getPath());
         AudioPcmReader fakeReader = new AudioPcmReader() {
             @Override
-            public short[] readMonoPcm(Path mediaFilePath, String dirOfFFmpeg, long offsetMs, long durationMs) {
+            public short[] readMonoPcm(String input, String dirOfFFmpeg, long offsetMs, long durationMs) {
                 pcmRead = true;
-                int episode = Integer.parseInt(mediaFilePath.getFileName().toString().replace(".wav", ""));
+                int episode = Integer.parseInt(Path.of(input).getFileName().toString().replace(".wav", ""));
                 return window(episodeAudio(episode), offsetMs, durationMs);
             }
         };
         SegmentDetectionChunkProcessor processor = new SegmentDetectionChunkProcessor(episodeRepository,
                 mediaFileRepository, mediaFileSegmentRepository, mediaFileEpisodeService,
-                directoryRepository, fakeReader);
+                directoryRepository, fakeReader, inputResolver);
         ReflectionTestUtils.setField(processor, "dirOfFFmpeg", "/usr/bin");
         subject = new HandleDetectSegments(processor, messageSender);
         ReflectionTestUtils.setField(subject, "chunkSize", 10);
@@ -157,13 +161,13 @@ class HandleDetectSegmentsTest {
     void aFailedDecodeStillStampsTheVersionSoTheChainTerminates() {
         AudioPcmReader silentReader = new AudioPcmReader() {
             @Override
-            public short[] readMonoPcm(Path mediaFilePath, String dirOfFFmpeg, long offsetMs, long durationMs) {
+            public short[] readMonoPcm(String input, String dirOfFFmpeg, long offsetMs, long durationMs) {
                 return new short[0]; // What the reader returns when ffmpeg fails.
             }
         };
         SegmentDetectionChunkProcessor processor = new SegmentDetectionChunkProcessor(episodeRepository,
                 mediaFileRepository, mediaFileSegmentRepository, mediaFileEpisodeService,
-                directoryRepository, silentReader);
+                directoryRepository, silentReader, inputResolver);
         ReflectionTestUtils.setField(processor, "dirOfFFmpeg", "/usr/bin");
         subject = new HandleDetectSegments(processor, messageSender);
         ReflectionTestUtils.setField(subject, "chunkSize", 10);

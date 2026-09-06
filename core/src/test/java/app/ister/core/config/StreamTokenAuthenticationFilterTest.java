@@ -57,7 +57,9 @@ class StreamTokenAuthenticationFilterTest {
         "/api/hls/some-uuid/master.m3u8",
         "/api/images/some-image.jpg",
         "/api/mediaFile/some-uuid/download",
-        "/api/transcode/upload/some-uuid/seg.ts"
+        "/api/mediaFileStream/some-uuid/download",
+        "/api/transcode/upload/some-uuid/seg.ts",
+        "/api/cache/upload/some-file.srt"
     })
     void shouldNotFilterReturnsFalseForFilteredPaths(String uri) {
         when(request.getRequestURI()).thenReturn(uri);

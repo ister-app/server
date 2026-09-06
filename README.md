@@ -81,10 +81,13 @@ Everything is env-overridable; the most important settings:
 ## Multi-node
 
 Every node runs the same application with its own `app.ister.server.name` and the directories it
-owns. Transcode queues are directory-scoped (`app.ister.server.transcode_requested.<directory>`),
-so transcode work is picked up by the node that holds the source file; produced segments are
-pushed to the requesting node via `POST /transcode/upload/{id}/{fileName}`, authenticated with
-short-lived node tokens.
+owns. Heavy queues are directory-scoped (`app.ister.server.TranscodeRequested.<directory>`), so
+work is picked up by the node that holds the source file; produced segments are pushed to the
+requesting node via `POST /transcode/upload/{id}/{fileName}`, authenticated with short-lived node
+tokens. A powerful **helper node** can additionally serve other nodes' directories for
+transcoding, intro/outro detection and subtitle extraction/OCR (`app.ister.helper.disks[n].name`,
+`.jobs`), reading the source over HTTP; an owner can hand a job family off entirely with
+`app.ister.helper.offload-jobs`. See the [multi-node chapter](doc/admin/en/05-multi-node.md).
 
 ## Languages
 

@@ -1,7 +1,15 @@
 package app.ister.disk;
 
 import app.ister.core.entity.ImageEntity;
+import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.MediaFileStreamEntity;
+import app.ister.core.entity.NodeEntity;
+import app.ister.core.enums.DirectoryType;
+import app.ister.core.enums.StreamCodecType;
+import app.ister.core.repository.DirectoryRepository;
+import app.ister.core.repository.MediaFileStreamRepository;
+import app.ister.core.service.NodeService;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +19,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -24,6 +34,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -35,6 +46,9 @@ class FileControllerTest {
 
     @Mock private ImageRepository imageRepository;
     @Mock private MediaFileRepository mediaFileRepository;
+    @Mock private MediaFileStreamRepository mediaFileStreamRepository;
+    @Mock private NodeService nodeService;
+    @Mock private DirectoryRepository directoryRepository;
 
     @TempDir Path tempDir;
 
@@ -43,7 +57,8 @@ class FileControllerTest {
     @BeforeEach
     void setUp() {
         controller = new FileController(imageRepository, mediaFileRepository,
-                new ImageThumbnailCache(new ImageScaler(), tempDir.resolve("tmp").toString()));
+                new ImageThumbnailCache(new ImageScaler(), tempDir.resolve("tmp").toString()),
+                mediaFileStreamRepository, nodeService, directoryRepository);
         ReflectionTestUtils.setField(controller, "tmpDir", tempDir.toString());
     }
 
@@ -303,10 +318,76 @@ class FileControllerTest {
         when(entity.getPath()).thenReturn(mediaFile.toString());
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(entity));
 
-        InputStreamResource result = controller.downloadMediaFile(id);
+        ResponseEntity<Resource> result = controller.downloadMediaFile(id);
 
-        assertNotNull(result);
-        assertEquals(Files.size(mediaFile), result.contentLength());
+        assertEquals(200, result.getStatusCode().value());
+        // A file-backed resource is what makes Spring advertise Accept-Ranges and serve 206s.
+        assertInstanceOf(FileSystemResource.class, result.getBody());
+        assertEquals(Files.size(mediaFile), result.getBody().contentLength());
+    }
+
+    @Test
+    void downloadMediaFileReturns404WhenFileIsGone() {
+        UUID id = UUID.randomUUID();
+        MediaFileEntity entity = mock(MediaFileEntity.class);
+        when(entity.getPath()).thenReturn(tempDir.resolve("missing.mkv").toString());
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(entity));
+
+        assertEquals(404, controller.downloadMediaFile(id).getStatusCode().value());
+    }
+
+    // ========== downloadMediaFileStream ==========
+
+    @Test
+    void downloadMediaFileStreamServesExternalSubtitles() throws IOException {
+        UUID id = UUID.randomUUID();
+        Path srt = tempDir.resolve("sub.srt");
+        Files.writeString(srt, "1\n");
+        MediaFileStreamEntity stream = MediaFileStreamEntity.builder()
+                .codecType(StreamCodecType.EXTERNAL_SUBTITLE).path(srt.toString()).build();
+        when(mediaFileStreamRepository.findById(id)).thenReturn(Optional.of(stream));
+
+        ResponseEntity<Resource> result = controller.downloadMediaFileStream(id);
+
+        assertEquals(200, result.getStatusCode().value());
+        assertInstanceOf(FileSystemResource.class, result.getBody());
+    }
+
+    @Test
+    void downloadMediaFileStreamRejectsEmbeddedStreams() {
+        UUID id = UUID.randomUUID();
+        MediaFileStreamEntity stream = MediaFileStreamEntity.builder()
+                .codecType(StreamCodecType.SUBTITLE).path(null).build();
+        when(mediaFileStreamRepository.findById(id)).thenReturn(Optional.of(stream));
+
+        assertEquals(404, controller.downloadMediaFileStream(id).getStatusCode().value());
+    }
+
+    // ========== uploadCacheFile ==========
+
+    @Test
+    void uploadCacheFileLandsInTheCacheDirectory() throws IOException {
+        Path cacheDir = tempDir.resolve("cache");
+        NodeEntity node = NodeEntity.builder().name("n").url("http://n").build();
+        when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
+        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node))
+                .thenReturn(List.of(DirectoryEntity.builder().path(cacheDir.toString()).directoryType(DirectoryType.CACHE).build()));
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setContent("1\n00:00:01,000 --> 00:00:02,000\nHi\n".getBytes());
+
+        ResponseEntity<Void> response = controller.uploadCacheFile("abc_2_eng.srt", request);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertTrue(Files.exists(cacheDir.resolve("abc_2_eng.srt")));
+        try (var files = Files.list(cacheDir)) {
+            assertEquals(1, files.count(), "no temp file left behind");
+        }
+    }
+
+    @Test
+    void uploadCacheFileRejectsPathTraversal() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        assertThrows(IllegalArgumentException.class, () -> controller.uploadCacheFile("../evil.srt", request));
     }
 
     // ========== uploadTranscode ==========

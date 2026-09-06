@@ -26,7 +26,7 @@ graphs.
 ## Two enums, do not confuse them
 
 - **`EventType`** (`database/.../enums/EventType.java`) is the logical message type — the source of
-  truth for what kinds of events exist (32 values). `Handle.handles()` returns one.
+  truth for what kinds of events exist (33 values). `Handle.handles()` returns one.
 - **`MessageQueue`** (`core/.../MessageQueue.java`) holds the queue **base names**. `MessageSender`
   maps an event to its queue.
 
@@ -52,16 +52,26 @@ which is why every external call must sit behind a configurable base URL.
 | Scope | Events |
 | --- | --- |
 | **Node** `.{nodeName}` | `PERSON_FOUND`, `ALBUM_FOUND` — the node-scoped sends (`MessageSender`) that reach the **disk** handlers on the node holding the files (artist/album `.nfo` and folder-artwork re-parse); the maintenance flows dispatch them via `worker/.../FoundEventDispatcher`. The same events also have global sends for the worker's enrichment handlers (see below). |
-| **Directory** `.{dirName}` | `NEW_DIRECTORIES_SCAN_REQUEST`, `FILE_SCAN_REQUESTED`, `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `EPUB_FILE_FOUND`, `COMIC_FILE_FOUND`, `SUBTITLE_FILE_FOUND`, `IMAGE_FOUND`, `NFO_FILE_FOUND`, `UPDATE_IMAGES_REQUESTED`, `ANALYZE_DATA` (disk), `DETECT_SEGMENTS`, `PRE_TRANSCODE_RECENTLY_WATCHED`, `TRANSCODE_REQUESTED`, `TRANSCODE_PASS_REQUESTED` |
+| **Directory** `.{dirName}` | `NEW_DIRECTORIES_SCAN_REQUEST`, `FILE_SCAN_REQUESTED`, `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `EPUB_FILE_FOUND`, `COMIC_FILE_FOUND`, `SUBTITLE_FILE_FOUND`, `IMAGE_FOUND`, `NFO_FILE_FOUND`, `UPDATE_IMAGES_REQUESTED`, `ANALYZE_DATA` (disk), `DETECT_SEGMENTS`, `SUBTITLE_EXTRACT_REQUESTED`, `PRE_TRANSCODE_RECENTLY_WATCHED`, `TRANSCODE_REQUESTED`, `TRANSCODE_PASS_REQUESTED` |
 | **Global** | `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND` (worker), `ALBUM_FOUND` (worker), `TRACK_FOUND` (no consumer), `BOOK_FOUND`, `COMIC_SERIES_FOUND`, `CHAPTER_FOUND` (no consumer), `PODCAST_FOUND` (no consumer), `PODCAST_EPISODE_FOUND` (no consumer), `PODCAST_REFRESH_REQUESTED`, `CONTINUE_WATCHING_REBUILD_REQUESTED`, `ANALYZE_DATA` (worker), `METADATA_BACKFILL_REQUESTED`, `SEARCH_INDEX_REQUESTED`, `SEARCH_REINDEX_REQUESTED` |
-| **Cache directory** `.{nodeName}-cache-directory` | `PODCAST_EPISODE_DOWNLOAD_REQUESTED` exists **only** with this suffix (the download lands on that node's disk). Beyond that, nearly every directory-scoped queue also gets a cache-directory variant: `DiskQueueNamingConfig` adds one for each of its queues (`FILE_SCAN_REQUESTED`, `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `IMAGE_FOUND`, `SUBTITLE_FILE_FOUND`, `NFO_FILE_FOUND`, `EPUB_FILE_FOUND`, `COMIC_FILE_FOUND`, `UPDATE_IMAGES_REQUESTED`, `ANALYZE_DATA`, `DETECT_SEGMENTS`, `PRE_TRANSCODE_RECENTLY_WATCHED`, …), and `TranscoderQueueNamingConfig` does the same for the transcode queues — downloaded podcast episodes live in the cache directory and must flow through the same pipelines. |
+| **Cache directory** `.{nodeName}-cache-directory` | `PODCAST_EPISODE_DOWNLOAD_REQUESTED` exists **only** with this suffix (the download lands on that node's disk). Beyond that, nearly every directory-scoped queue also gets a cache-directory variant: `DiskQueueNamingConfig` adds one for each of its queues (`FILE_SCAN_REQUESTED`, `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `IMAGE_FOUND`, `SUBTITLE_FILE_FOUND`, `NFO_FILE_FOUND`, `EPUB_FILE_FOUND`, `COMIC_FILE_FOUND`, `UPDATE_IMAGES_REQUESTED`, `ANALYZE_DATA`, `DETECT_SEGMENTS`, `SUBTITLE_EXTRACT_REQUESTED`, `PRE_TRANSCODE_RECENTLY_WATCHED`, …), and `TranscoderQueueNamingConfig` does the same for the transcode queues — downloaded podcast episodes live in the cache directory and must flow through the same pipelines. |
 
 `PRE_TRANSCODE_RECENTLY_WATCHED` is suffixed with the **directory name**: `PreTranscodeScheduler`
 (worker) sends one event per configured directory (`WorkerDiskConfig`, reading
 `app.ister.disk.directories`), and the disk module listens on the matching queues
-(`DiskQueueNamingConfig.getPreTranscodeRecentlyWatchedQueues`). Only `TRANSCODE_REQUESTED` and
-`TRANSCODE_PASS_REQUESTED` can fall back to the `app.ister.transcoder.disks` names when disks are
-configured (`TranscoderQueueNamingConfig`).
+(`DiskQueueNamingConfig.getPreTranscodeRecentlyWatchedQueues`).
+
+**Helper-capable families.** All directory-scoped names come from one core component,
+`DirectoryQueueNames`: `queues(base)` is the node's own directories plus its cache directory
+(owner-only events, they need the file on local disk), and `queues(base, HelperJob)` is the same
+set minus the own directories when the owner lists the job in `app.ister.helper.offload-jobs`,
+plus every `app.ister.helper.disks[n]` entry configured for that job. Three families go through
+the second form — `TRANSCODE` (`TRANSCODE_REQUESTED`, `TRANSCODE_PASS_REQUESTED`),
+`DETECT_SEGMENTS` and `SUBTITLES` (`SUBTITLE_EXTRACT_REQUESTED`) — so a helper node consumes the
+owner's queues as a competing consumer and reads the source through `MediaFileInputResolver`
+(local path, or the owner's tokenized `/mediaFile/{id}/download`, which serves byte ranges). The
+cache-directory queue is always consumed by its owner, offloaded or not. The deprecated
+`app.ister.transcoder.disks` is mapped onto helper disks with the `TRANSCODE` job.
 
 ## Handler reference
 
@@ -69,8 +79,9 @@ configured (`TranscoderQueueNamingConfig`).
 | --- | --- | --- | --- |
 | `HandleNewDirectoriesScanRequested` | disk | `NEW_DIRECTORIES_SCAN_REQUEST` | `FILE_SCAN_REQUESTED` |
 | `FileScanRequestedHandle` | disk | `FILE_SCAN_REQUESTED` | `MEDIA_FILE_FOUND` / `AUDIO_FILE_FOUND` / `EPUB_FILE_FOUND` / `COMIC_FILE_FOUND` / `IMAGE_FOUND` / `NFO_FILE_FOUND` / `SUBTITLE_FILE_FOUND` |
-| `HandleMediaFileFound` | disk | `MEDIA_FILE_FOUND` | `IMAGE_FOUND`, `DETECT_SEGMENTS` (season-scoped, after commit) |
-| `HandleDetectSegments` | disk | `DETECT_SEGMENTS` | `DETECT_SEGMENTS` (intro/outro detection per season, processed in chunks — the handler re-queues itself for the next chunk) |
+| `HandleMediaFileFound` | disk | `MEDIA_FILE_FOUND` | `IMAGE_FOUND`, `DETECT_SEGMENTS` (season-scoped, after commit), `SUBTITLE_EXTRACT_REQUESTED` (one per embedded subtitle stream, after commit) |
+| `HandleDetectSegments` | disk | `DETECT_SEGMENTS` | `DETECT_SEGMENTS` (intro/outro detection per season, processed in chunks — the handler re-queues itself for the next chunk; helper-capable) |
+| `HandleSubtitleExtractRequested` | disk | `SUBTITLE_EXTRACT_REQUESTED` | — (extracts/OCRs one subtitle stream to an SRT in the owner's cache directory, uploading it when run on a helper; helper-capable) |
 | `HandleAudioFileFound` | disk | `AUDIO_FILE_FOUND` | `IMAGE_FOUND` (track- or chapter-bound, by library type) |
 | `HandleEpubFileFound` | disk | `EPUB_FILE_FOUND` | `IMAGE_FOUND` |
 | `HandleComicFileFound` | disk | `COMIC_FILE_FOUND` | `IMAGE_FOUND` (extracted cover) |

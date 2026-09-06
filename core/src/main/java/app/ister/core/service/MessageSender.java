@@ -60,9 +60,17 @@ public class MessageSender {
         send(APP_ISTER_SERVER_SUBTITLE_FILE_FOUND, directoryName, subtitleFileFoundData);
     }
 
-    /** Directory-scoped, like sendMediaFileFound: detection runs on the node owning the files. */
+    /** Directory-scoped, like sendMediaFileFound; a helper node (app.ister.helper.disks) may consume it too. */
     public void sendDetectSegments(DetectSegmentsData detectSegmentsData, String directoryName) {
         send(APP_ISTER_SERVER_DETECT_SEGMENTS, directoryName, detectSegmentsData);
+    }
+
+    /**
+     * Directory-scoped like sendDetectSegments; helper nodes may consume the directory's queue
+     * too (app.ister.helper.disks) and read the file over HTTP from the owner.
+     */
+    public void sendSubtitleExtractRequested(SubtitleExtractRequestedData data, String directoryName) {
+        send(APP_ISTER_SERVER_SUBTITLE_EXTRACT_REQUESTED, directoryName, data);
     }
 
     public void sendUpdateImagesRequested(UpdateImagesRequestedData updateImagesRequestedData, String directoryName) {

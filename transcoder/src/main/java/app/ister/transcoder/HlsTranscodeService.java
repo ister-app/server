@@ -1244,7 +1244,7 @@ public class HlsTranscodeService {
             }
             default -> {
                 String selectStreams = role.selectStreams();
-                if (selectStreams == null || !isLocalInput(filePath)) return Double.NaN;
+                if (selectStreams == null) return Double.NaN;
                 return streamEndCache.computeIfAbsent(filePath + "|" + selectStreams,
                         _ -> ffprobeService.getStreamEnd(filePath, selectStreams, totalDuration));
             }
@@ -1253,16 +1253,6 @@ public class HlsTranscodeService {
 
     private boolean candidatesAreSynthetic(String filePath) {
         return getCachedKeyframes(filePath).isEmpty();
-    }
-
-    /**
-     * Remote media files are read over {@code /mediaFile/{id}/download}, which
-     * serves no byte ranges — a seeking probe there would stream the whole file
-     * across the network instead. Their audio end stays unmeasured; the
-     * post-pass reconciliation is the safety net for those.
-     */
-    private static boolean isLocalInput(String filePath) {
-        return !filePath.startsWith("http://") && !filePath.startsWith("https://");
     }
 
     double getTotalDuration(String filePath) {

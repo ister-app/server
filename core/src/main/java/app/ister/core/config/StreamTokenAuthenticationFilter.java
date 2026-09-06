@@ -33,10 +33,10 @@ public class StreamTokenAuthenticationFilter extends OncePerRequestFilter {
     // configurable would only let a deployment break its own stream authentication.
     private static final List<String> USER_PATHS =
             List.of("/hls/", "/images/", "/epub/", "/comic/", "/reading-progress", "/book-progress");
-    @SuppressWarnings("java:S1075")
-    private static final String DOWNLOAD_PATH = "/mediaFile/";
-    @SuppressWarnings("java:S1075")
-    private static final String UPLOAD_PATH = "/transcode/upload/";
+    // Node-to-node: a helper node reads media files and extracted subtitles from the owner
+    // with a download token, and pushes HLS artefacts / cache files back with an upload token.
+    private static final List<String> DOWNLOAD_PATHS = List.of("/mediaFile/", "/mediaFileStream/");
+    private static final List<String> UPLOAD_PATHS = List.of("/transcode/upload/", "/cache/upload/");
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -67,9 +67,9 @@ public class StreamTokenAuthenticationFilter extends OncePerRequestFilter {
     private void authenticate(StreamTokenEntity entity, String path) {
         if (matchesAny(path, USER_PATHS) && entity.getUserEntity() != null) {
             setAuth(entity.getUserEntity().getExternalId(), "ROLE_user");
-        } else if (matches(path, DOWNLOAD_PATH) && entity.isDownload()) {
+        } else if (matchesAny(path, DOWNLOAD_PATHS) && entity.isDownload()) {
             setAuth("node", "ROLE_node");
-        } else if (matches(path, UPLOAD_PATH) && entity.isUpload()) {
+        } else if (matchesAny(path, UPLOAD_PATHS) && entity.isUpload()) {
             setAuth("node", "ROLE_node");
         }
     }
@@ -95,8 +95,8 @@ public class StreamTokenAuthenticationFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
         return !matchesAny(path, USER_PATHS)
-                && !matches(path, DOWNLOAD_PATH)
-                && !matches(path, UPLOAD_PATH);
+                && !matchesAny(path, DOWNLOAD_PATHS)
+                && !matchesAny(path, UPLOAD_PATHS);
     }
 
     /**

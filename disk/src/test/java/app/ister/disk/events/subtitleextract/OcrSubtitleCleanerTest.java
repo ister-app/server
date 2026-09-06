@@ -1,4 +1,4 @@
-package app.ister.disk.events.mediafilefound;
+package app.ister.disk.events.subtitleextract;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

@@ -1,5 +1,6 @@
 package app.ister.disk;
 
+import app.ister.core.config.DirectoryQueueNames;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.NodeEntity;
@@ -31,14 +32,18 @@ public class StartupTasks implements ApplicationListener<ContextRefreshedEvent> 
 
     private final LibraryRepository libraryRepository;
 
+    private final DirectoryQueueNames directoryQueueNames;
+
     @Value("${app.ister.server.cache-dir}")
     private String cacheDir;
 
-    public StartupTasks(NodeService nodeService, AppIsterServerConfig appIsterServerConfig, DirectoryRepository directoryRepository, LibraryRepository libraryRepository) {
+    public StartupTasks(NodeService nodeService, AppIsterServerConfig appIsterServerConfig, DirectoryRepository directoryRepository,
+                        LibraryRepository libraryRepository, DirectoryQueueNames directoryQueueNames) {
         this.nodeService = nodeService;
         this.appIsterServerConfig = appIsterServerConfig;
         this.directoryRepository = directoryRepository;
         this.libraryRepository = libraryRepository;
+        this.directoryQueueNames = directoryQueueNames;
     }
 
     /**
@@ -58,6 +63,23 @@ public class StartupTasks implements ApplicationListener<ContextRefreshedEvent> 
         appIsterServerConfig.getDirectories().forEach(directoryConfigClass -> handleDirectoriesFromConfig(directoryConfigClass, nodeEntity));
 
         createCacheDirectoryIfNotExistForThisNode(nodeEntity);
+        validateHelperDisks(nodeEntity);
+    }
+
+    /**
+     * Helper disk names are used verbatim as queue suffixes, so a typo silently produces a queue
+     * nobody publishes to. Warn rather than fail: in a compose/cluster start the helper may come
+     * up before the owning node has registered its directories.
+     */
+    private void validateHelperDisks(NodeEntity nodeEntity) {
+        for (String name : directoryQueueNames.allHelperDirectoryNames()) {
+            Optional<DirectoryEntity> directory = directoryRepository.findByName(name);
+            if (directory.isEmpty()) {
+                log.warn("Helper disk '{}' is not a known directory in the cluster (typo, or the owning node has not started yet)", name);
+            } else if (directory.get().getNodeEntity().getId().equals(nodeEntity.getId())) {
+                log.warn("Helper disk '{}' is owned by this node itself; listing it under app.ister.helper.disks has no effect", name);
+            }
+        }
     }
 
 

@@ -143,8 +143,12 @@ answers **404**, indistinguishable from a resource that does not exist. Node-to-
 when the file behind it is replaced in place, so clients must be able to revalidate cheaply —
 unlike the comic and epub resources, which are immutable. Operational note: a reverse proxy in
 front of the server must pass `If-None-Match`/`ETag` through, or every image request degrades to a
-full download. The same controller handles `/mediaFile/{id}/download` (multi-node source reads) and
-`POST /transcode/upload/{id}/{fileName}` (segment uploads, [chapter 4](04-transcoding.md)).
+full download. The same controller handles the node-to-node endpoints, authenticated with node
+tokens only: `GET /mediaFile/{id}/download` (multi-node source reads, with byte ranges) and
+`GET /mediaFileStream/{id}/download` (an extracted or sidecar SRT for a remote transcoder) on the
+download token; `POST /transcode/upload/{id}/{fileName}` (segment uploads,
+[chapter 4](04-transcoding.md)) and `POST /cache/upload/{fileName}` (a helper node's extracted
+subtitle, written atomically into this node's cache directory) on the upload token.
 
 **Downscaled artwork.** `?width=` asks for a smaller variant, which is what clients use for grid
 tiles and list thumbnails — a 3840×2160 episode still painted 150 px wide costs 33 MB of decoded

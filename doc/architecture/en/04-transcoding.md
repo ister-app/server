@@ -137,10 +137,15 @@ Two separate sweeps clean the transcode cache, steered by different properties:
 
 ## Multi-node
 
-Transcode queues are directory/disk-scoped (`TranscoderQueueNamingConfig` appends the directory or
-disk name), so a transcode always runs on the node that owns the source file. When another node
-requested it, a watcher thread uploads each stable segment to the requester via `POST
-/transcode/upload/{id}/{fileName}` (`FileController`). When the source itself is remote,
-`resolveInputPath` feeds FFmpeg a tokenized `…/download` URL instead of a local path.
+Transcode queues are directory-scoped (`TranscoderQueueNamingConfig` over `DirectoryQueueNames`,
+[chapter 1](01-event-system.md)), so a transcode runs on the node that owns the source file — or
+on a helper node that lists the directory under `app.ister.helper.disks` with the `TRANSCODE` job,
+which consumes the same queues. When the node that transcodes is not the one serving the playback,
+a watcher thread uploads each stable segment to the owner via `POST /transcode/upload/{id}/{fileName}`
+(`FileController`). When the source itself is remote, `MediaFileInputResolver` feeds FFmpeg the
+owner's tokenized `/mediaFile/{id}/download` URL instead of a local path; that endpoint serves byte
+ranges, so FFmpeg's seeks and the transcoder's stream-end probes stay cheap. An `EXTERNAL_SUBTITLE`
+stream's path is owner-local too (cache directory or a sidecar `.srt`), so a remote transcoder
+fetches it once through `/mediaFileStream/{id}/download` into the file's transcode cache dir.
 
 

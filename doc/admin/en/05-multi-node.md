@@ -1,5 +1,5 @@
 ---
-description: "Run Ister as a multi-node self-hosted media server cluster: shared database and broker, directory-scoped work routing and dedicated transcoder nodes."
+description: "Run Ister as a multi-node self-hosted media server cluster: shared database and broker, directory-scoped work routing and helper nodes for transcoding, intro detection and subtitle OCR."
 ---
 
 # Multi-node
@@ -45,24 +45,55 @@ segment to B via `POST /transcode/upload/{id}/{fileName}`, authenticated with sh
 12 hours). You configure nothing for this beyond correct `app.ister.server.url` values — but
 those URLs must be reachable node-to-node, not just from your browser.
 
-## Dedicated transcoder nodes
+## Helper nodes
 
-A node can also transcode for **another node's** disks without owning any media itself: give it
-no directories and instead list the directory names it should serve:
+Every node stays responsible for its own directories. On top of that, a powerful node can
+**help** other nodes with the CPU-heavy job families — it does not need to own any media itself:
+
+| Job | What it covers |
+| --- | --- |
+| `TRANSCODE` | HLS (pre)transcoding |
+| `DETECT_SEGMENTS` | intro/outro detection (audio fingerprinting) |
+| `SUBTITLES` | extraction of embedded subtitles, including OCR of DVD/Blu-ray bitmap subtitles |
+
+List the directory names the helper should serve, and optionally which jobs:
 
 ```properties
-app.ister.transcoder.disks[0].name=server-1-disk1-tv
-app.ister.transcoder.disks[1].name=server-1-disk1-movies
+app.ister.helper.disks[0].name=server-1-disk1-tv
+app.ister.helper.disks[1].name=server-1-disk1-movies
+app.ister.helper.disks[1].jobs=DETECT_SEGMENTS,SUBTITLES
+# default job set for disks without their own "jobs" (default: all three)
+app.ister.helper.jobs=TRANSCODE,DETECT_SEGMENTS,SUBTITLES
 ```
 
-If `app.ister.transcoder.disks` is empty, it falls back to the node's own directories (the
-normal single-node behaviour). Note: the source node must still be able to serve the file to the
-transcoder — remote input is fetched over a tokenized download URL.
+The helper then consumes the **same queues** as the owner for those directories, and RabbitMQ
+shares the work between them one message at a time — the faster node simply takes more. The
+helper reads the source file over HTTP from the owner (a tokenized download with byte ranges, so
+seeking stays cheap); intro detection writes only database rows, and an extracted subtitle is
+uploaded into the owner's cache directory, where the owner serves it as if it had made it itself.
+Nothing beyond correct `app.ister.server.url` values is needed for that, but the helper needs the
+same tools as any node (ffmpeg, mkvextract, subtile-ocr) — use the same image.
 
-Watch the spelling of those `disks[n].name` values: they are used verbatim as queue names and are
-**not validated** against the cluster's directories, so a typo silently creates a dead queue that
-never receives work — the symptom is transcodes for that disk simply staying on the owning node
-(or nowhere).
+An owner that should not spend its own CPU on a job family at all can hand it off entirely:
+
+```properties
+# on the owning node
+app.ister.helper.offload-jobs=DETECT_SEGMENTS,SUBTITLES
+```
+
+Its queues for those jobs are still declared and filled, but only consumed by helpers. If no
+helper is up, the work simply waits on the queue (visible as queue depth on the cluster page) —
+nothing is lost, and nothing runs until a helper appears. Transcoding for the node's own cache
+directory (podcast downloads) is never offloaded.
+
+Watch the spelling of the `disks[n].name` values: they are used verbatim as queue names. Startup
+looks each one up in the cluster's directories and logs a **warning** for a name it does not know
+(it does not fail: the owning node may simply not be up yet). A misspelled name leaves the helper
+listening on a queue nobody publishes to.
+
+`app.ister.transcoder.disks[n].name` from earlier versions is still honoured (it maps to helper
+disks with the `TRANSCODE` job only and, as before, replaces the node's own directories for
+transcoding) and logs a deprecation warning; move it to `app.ister.helper.disks`.
 
 ## Worked example
 
@@ -71,8 +102,9 @@ one database and broker:
 
 - **server-1** — owns six directories (shows, movies and music over two disks)
 - **server-2** — a second full node with its own disks
-- **transcoder-1** — no directories, only `app.ister.transcoder.disks[n]` entries naming
-  server-1's disks: it does server-1's transcoding
+- **helper-1** — no directories, only `app.ister.helper.disks[n]` entries naming server-1's
+  disks: it transcodes for server-1 and does its intro detection and subtitle OCR, which server-1
+  offloads entirely (`APP_ISTER_HELPER_OFFLOAD_JOBS`)
 
 All three nodes have VAAPI hardware acceleration enabled in the example — transcoding can land on
 any of them, so hardware acceleration is worth configuring on every node that transcodes.

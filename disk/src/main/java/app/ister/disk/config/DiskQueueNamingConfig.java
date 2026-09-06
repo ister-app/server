@@ -1,139 +1,90 @@
 package app.ister.disk.config;
 
+import app.ister.core.config.DirectoryQueueNames;
+import app.ister.core.config.HelperJob;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
-
-import java.util.stream.Stream;
 
 import static app.ister.core.MessageQueue.*;
 
+/**
+ * Queue names the disk-module listeners subscribe to, referenced from {@code @RabbitListener}
+ * SpEL expressions ({@code #{@diskQueueNamingConfig.getXxxQueues()}}). Plain events are
+ * consumed for the node's own directories only; the heavy job families go through
+ * {@link DirectoryQueueNames#queues(String, HelperJob)} so helper nodes can join in and
+ * owners can opt out.
+ */
 @Configuration
 @RequiredArgsConstructor
 public class DiskQueueNamingConfig {
 
-    private final AppIsterServerConfig config;
-
-    @Value("${app.ister.server.name}")
-    private String nodeName;
-
-    private String cacheDirName() {
-        return nodeName + "-cache-directory";
-    }
+    private final DirectoryQueueNames names;
 
     public String[] getFileScanRequestedQueues() {
-        return Stream.concat(
-                config.getDirectories().stream()
-                        .map(dir -> APP_ISTER_SERVER_FILE_SCAN_REQUESTED + "." + dir.getName()),
-                Stream.of(APP_ISTER_SERVER_FILE_SCAN_REQUESTED + "." + cacheDirName())
-        ).toArray(String[]::new);
+        return names.queues(APP_ISTER_SERVER_FILE_SCAN_REQUESTED);
     }
 
     public String[] getMediaFileFoundQueues() {
-        return Stream.concat(
-                config.getDirectories().stream()
-                        .map(dir -> APP_ISTER_SERVER_MEDIA_FILE_FOUND + "." + dir.getName()),
-                Stream.of(APP_ISTER_SERVER_MEDIA_FILE_FOUND + "." + cacheDirName())
-        ).toArray(String[]::new);
+        return names.queues(APP_ISTER_SERVER_MEDIA_FILE_FOUND);
     }
 
     public String[] getNewDirectoriesScanRequestedQueues() {
-        return Stream.concat(
-                config.getDirectories().stream()
-                        .map(dir -> APP_ISTER_SERVER_NEW_DIRECTORIES_SCAN_REQUESTED + "." + dir.getName()),
-                Stream.of(APP_ISTER_SERVER_NEW_DIRECTORIES_SCAN_REQUESTED + "." + cacheDirName())
-        ).toArray(String[]::new);
+        return names.queues(APP_ISTER_SERVER_NEW_DIRECTORIES_SCAN_REQUESTED);
     }
 
     public String[] getNfoFileFoundQueues() {
-        return Stream.concat(
-                config.getDirectories().stream()
-                        .map(dir -> APP_ISTER_SERVER_NFO_FILE_FOUND + "." + dir.getName()),
-                Stream.of(APP_ISTER_SERVER_NFO_FILE_FOUND + "." + cacheDirName())
-        ).toArray(String[]::new);
+        return names.queues(APP_ISTER_SERVER_NFO_FILE_FOUND);
     }
 
     public String[] getSubtitleFileFoundQueues() {
-        return Stream.concat(
-                config.getDirectories().stream()
-                        .map(dir -> APP_ISTER_SERVER_SUBTITLE_FILE_FOUND + "." + dir.getName()),
-                Stream.of(APP_ISTER_SERVER_SUBTITLE_FILE_FOUND + "." + cacheDirName())
-        ).toArray(String[]::new);
+        return names.queues(APP_ISTER_SERVER_SUBTITLE_FILE_FOUND);
     }
 
     public String[] getImageFoundQueues() {
-        return Stream.concat(
-                config.getDirectories().stream()
-                        .map(dir -> APP_ISTER_SERVER_IMAGE_FOUND + "." + dir.getName()),
-                Stream.of(APP_ISTER_SERVER_IMAGE_FOUND + "." + cacheDirName())
-        ).toArray(String[]::new);
+        return names.queues(APP_ISTER_SERVER_IMAGE_FOUND);
     }
 
     public String[] getUpdateImagesRequestedQueues() {
-        return Stream.concat(
-                config.getDirectories().stream()
-                        .map(dir -> APP_ISTER_SERVER_UPDATE_IMAGES_REQUESTED + "." + dir.getName()),
-                Stream.of(APP_ISTER_SERVER_UPDATE_IMAGES_REQUESTED + "." + cacheDirName())
-        ).toArray(String[]::new);
+        return names.queues(APP_ISTER_SERVER_UPDATE_IMAGES_REQUESTED);
     }
 
     public String[] getDetectSegmentsQueues() {
-        return Stream.concat(
-                config.getDirectories().stream()
-                        .map(dir -> APP_ISTER_SERVER_DETECT_SEGMENTS + "." + dir.getName()),
-                Stream.of(APP_ISTER_SERVER_DETECT_SEGMENTS + "." + cacheDirName())
-        ).toArray(String[]::new);
+        return names.queues(APP_ISTER_SERVER_DETECT_SEGMENTS, HelperJob.DETECT_SEGMENTS);
+    }
+
+    public String[] getSubtitleExtractRequestedQueues() {
+        return names.queues(APP_ISTER_SERVER_SUBTITLE_EXTRACT_REQUESTED, HelperJob.SUBTITLES);
     }
 
     public String[] getAnalyzeDataQueues() {
-        return Stream.concat(
-                config.getDirectories().stream()
-                        .map(dir -> APP_ISTER_SERVER_ANALYZE_DATA + "." + dir.getName()),
-                Stream.of(APP_ISTER_SERVER_ANALYZE_DATA + "." + cacheDirName())
-        ).toArray(String[]::new);
+        return names.queues(APP_ISTER_SERVER_ANALYZE_DATA);
     }
 
     public String[] getPreTranscodeRecentlyWatchedQueues() {
-        return Stream.concat(
-                config.getDirectories().stream()
-                        .map(dir -> APP_ISTER_SERVER_PRE_TRANSCODE_RECENTLY_WATCHED + "." + dir.getName()),
-                Stream.of(APP_ISTER_SERVER_PRE_TRANSCODE_RECENTLY_WATCHED + "." + cacheDirName())
-        ).toArray(String[]::new);
+        return names.queues(APP_ISTER_SERVER_PRE_TRANSCODE_RECENTLY_WATCHED);
     }
 
     public String[] getAudioFileFoundQueues() {
-        return Stream.concat(
-                config.getDirectories().stream()
-                        .map(dir -> APP_ISTER_SERVER_AUDIO_FILE_FOUND + "." + dir.getName()),
-                Stream.of(APP_ISTER_SERVER_AUDIO_FILE_FOUND + "." + cacheDirName())
-        ).toArray(String[]::new);
+        return names.queues(APP_ISTER_SERVER_AUDIO_FILE_FOUND);
     }
 
     public String[] getEpubFileFoundQueues() {
-        return Stream.concat(
-                config.getDirectories().stream()
-                        .map(dir -> APP_ISTER_SERVER_EPUB_FILE_FOUND + "." + dir.getName()),
-                Stream.of(APP_ISTER_SERVER_EPUB_FILE_FOUND + "." + cacheDirName())
-        ).toArray(String[]::new);
+        return names.queues(APP_ISTER_SERVER_EPUB_FILE_FOUND);
     }
 
     public String[] getComicFileFoundQueues() {
-        return Stream.concat(
-                config.getDirectories().stream()
-                        .map(dir -> APP_ISTER_SERVER_COMIC_FILE_FOUND + "." + dir.getName()),
-                Stream.of(APP_ISTER_SERVER_COMIC_FILE_FOUND + "." + cacheDirName())
-        ).toArray(String[]::new);
+        return names.queues(APP_ISTER_SERVER_COMIC_FILE_FOUND);
     }
 
     public String getPodcastEpisodeDownloadRequestedQueue() {
-        return APP_ISTER_SERVER_PODCAST_EPISODE_DOWNLOAD_REQUESTED + "." + cacheDirName();
+        return APP_ISTER_SERVER_PODCAST_EPISODE_DOWNLOAD_REQUESTED + "." + names.cacheDirName();
     }
 
     public String getPersonFoundQueue() {
-        return APP_ISTER_SERVER_PERSON_FOUND + "." + nodeName;
+        return APP_ISTER_SERVER_PERSON_FOUND + "." + names.nodeName();
     }
 
     public String getAlbumFoundQueue() {
-        return APP_ISTER_SERVER_ALBUM_FOUND + "." + nodeName;
+        return APP_ISTER_SERVER_ALBUM_FOUND + "." + names.nodeName();
     }
 }

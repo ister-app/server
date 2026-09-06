@@ -1,12 +1,20 @@
 package app.ister.disk;
 
+import app.ister.core.entity.DirectoryEntity;
+import app.ister.core.enums.DirectoryType;
+import app.ister.core.enums.StreamCodecType;
+import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
+import app.ister.core.repository.MediaFileStreamRepository;
+import app.ister.core.service.NodeService;
 import app.ister.core.utils.SafeFilename;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -50,6 +58,9 @@ public class FileController {
     private final ImageRepository imageRepository;
     private final MediaFileRepository mediaFileRepository;
     private final ImageThumbnailCache imageThumbnailCache;
+    private final MediaFileStreamRepository mediaFileStreamRepository;
+    private final NodeService nodeService;
+    private final DirectoryRepository directoryRepository;
 
     @Value("${app.ister.server.tmp-dir}")
     private String tmpDir;
@@ -132,15 +143,62 @@ public class FileController {
         return null;
     }
 
+    /**
+     * The raw media file for another node (download token). Returned as a {@link FileSystemResource},
+     * never an {@code InputStreamResource}: Spring only serves byte ranges for real file
+     * resources, and ffmpeg on the helper node relies on {@code Accept-Ranges: bytes} to seek —
+     * a helper fingerprinting the outro window, or probing the end of a stream, would otherwise
+     * pull the whole file over the network for every seek.
+     */
     @GetMapping("/mediaFile/{id}/download")
-    public InputStreamResource downloadMediaFile(@PathVariable UUID id) throws IOException {
+    public ResponseEntity<Resource> downloadMediaFile(@PathVariable UUID id) {
         var mediaFileEntity = mediaFileRepository.findById(id).orElseThrow();
-        return new InputStreamResource(new FileInputStream(mediaFileEntity.getPath())) {
-            @Override
-            public long contentLength() throws IOException {
-                return Files.size(Path.of(mediaFileEntity.getPath()));
-            }
-        };
+        return fileResource(Path.of(mediaFileEntity.getPath()));
+    }
+
+    /**
+     * An external subtitle file (extracted or sidecar {@code .srt}) for another node. Its path is
+     * local to this node — the cache directory, or next to the media — so a helper transcoding
+     * this file can only get at it here.
+     */
+    @GetMapping("/mediaFileStream/{id}/download")
+    public ResponseEntity<Resource> downloadMediaFileStream(@PathVariable UUID id) {
+        return mediaFileStreamRepository.findById(id)
+                .filter(stream -> stream.getCodecType() == StreamCodecType.EXTERNAL_SUBTITLE)
+                .map(stream -> fileResource(Path.of(stream.getPath())))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private static ResponseEntity<Resource> fileResource(Path path) {
+        if (!Files.isRegularFile(path)) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(new FileSystemResource(path));
+    }
+
+    /**
+     * A helper node pushes an artefact it produced for one of this node's files (an extracted
+     * subtitle) into this node's cache directory, where the database row points at it. Written
+     * to a temp name and moved atomically, so a reader never sees a half-written file.
+     */
+    @PostMapping("/cache/upload/{fileName}")
+    public ResponseEntity<Void> uploadCacheFile(@PathVariable String fileName, HttpServletRequest request) throws IOException {
+        String safeName = SafeFilename.require(fileName);
+        DirectoryEntity cacheDir = directoryRepository
+                .findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeService.getOrCreateNodeEntityForThisNode())
+                .stream().findFirst().orElseThrow();
+        Path target = Path.of(cacheDir.getPath(), safeName);
+        Files.createDirectories(target.getParent());
+        Path tmp = target.resolveSibling("." + safeName + ".upload-" + UUID.randomUUID());
+        try (InputStream in = request.getInputStream()) {
+            Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
+            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } finally {
+            Files.deleteIfExists(tmp);
+        }
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/transcode/upload/{id}/{fileName}")

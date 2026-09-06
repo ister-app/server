@@ -4,6 +4,7 @@ import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.PipeOutput;
 import com.github.kokorin.jaffree.ffmpeg.UrlInput;
+import app.ister.core.node.MediaFileInputResolver;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -26,15 +27,18 @@ public class AudioPcmReader {
     /**
      * The decoded window, or an empty array when decoding failed (no audio stream,
      * unreadable file) — the caller then skips the episode for this run.
+     *
+     * @param input a local path, or the owner's tokenized download URL when this node is
+     *              helping with another node's directory (ffmpeg seeks it with byte ranges)
      */
-    public short[] readMonoPcm(Path mediaFilePath, String dirOfFFmpeg, long offsetMs, long durationMs) {
+    public short[] readMonoPcm(String input, String dirOfFFmpeg, long offsetMs, long durationMs) {
         if (durationMs <= 0) {
             return new short[0];
         }
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try {
             FFmpeg.atPath(Path.of(dirOfFFmpeg))
-                    .addInput(UrlInput.fromPath(mediaFilePath)
+                    .addInput(UrlInput.fromUrl(input)
                             .addArguments("-ss", offsetMs + "ms"))
                     .addOutput(PipeOutput.pumpTo(out)
                             .setFormat("s16le")
@@ -45,7 +49,7 @@ public class AudioPcmReader {
                     .setLogLevel(LogLevel.ERROR)
                     .execute();
         } catch (Exception e) {
-            log.warn("PCM decode at {}ms failed for {}: {}", offsetMs, mediaFilePath, e.getMessage());
+            log.warn("PCM decode at {}ms failed for {}: {}", offsetMs, MediaFileInputResolver.stripToken(input), e.getMessage());
             return new short[0];
         }
         byte[] bytes = out.toByteArray();

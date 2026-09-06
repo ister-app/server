@@ -1,4 +1,4 @@
-package app.ister.transcoder;
+package app.ister.core.node;
 
 import app.ister.core.service.StreamTokenService;
 import jakarta.annotation.PostConstruct;

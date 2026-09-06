@@ -30,6 +30,7 @@ graph LR
         H14[HandleComicFileFound]
         H15[HandlePodcastEpisodeDownloadRequested]
         H16[HandleDetectSegments]
+        H17[HandleSubtitleExtractRequested]
     end
 
     subgraph worker module
@@ -60,6 +61,7 @@ graph LR
     H2 --> H3 --> H6
     H3 -->|DETECT_SEGMENTS after commit| H16
     H16 -->|next chunk| H16
+    H3 -->|SUBTITLE_EXTRACT_REQUESTED after commit, per stream| H17
     H2 --> H4 --> H6
     H2 --> H5
     H2 --> H6

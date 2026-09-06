@@ -144,8 +144,15 @@ Twee losse sweeps schonen de transcode-cache op, gestuurd door verschillende pro
 
 ## Multi-node
 
-Transcode-queues zijn directory-/disk-gescoped (`TranscoderQueueNamingConfig` plakt de directory-
-of disknaam erachter), dus een transcode draait altijd op de node die het bronbestand bezit. Als een
-andere node erom vroeg, uploadt een watcher-thread elk stabiel segment naar de aanvrager via `POST
+Transcode-queues zijn directory-gescoped (`TranscoderQueueNamingConfig` boven op
+`DirectoryQueueNames`, [hoofdstuk 1](01-event-system.md)), dus een transcode draait op de node die
+het bronbestand bezit — of op een helper-node die de directory onder `app.ister.helper.disks` met de
+`TRANSCODE`-job opsomt en dezelfde queues meeleest. Als de node die transcodeert niet de node is die
+het afspelen bedient, uploadt een watcher-thread elk stabiel segment naar de eigenaar via `POST
 /transcode/upload/{id}/{fileName}` (`FileController`). Is de bron zelf remote, dan voert
-`resolveInputPath` FFmpeg een getokeniseerde `…/download`-URL in plaats van een lokaal pad.
+`MediaFileInputResolver` FFmpeg de getokeniseerde `/mediaFile/{id}/download`-URL van de eigenaar in
+plaats van een lokaal pad; dat endpoint serveert byte-ranges, zodat FFmpeg's seeks en de
+stream-eind-probes van de transcoder goedkoop blijven. Ook het pad van een
+`EXTERNAL_SUBTITLE`-stream is eigenaar-lokaal (cache-directory of een sidecar-`.srt`), dus een
+remote transcoder haalt hem eenmalig op via `/mediaFileStream/{id}/download` naar de
+transcode-cachemap van het bestand.

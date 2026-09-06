@@ -1,9 +1,9 @@
-package app.ister.disk.events.mediafilefound;
+package app.ister.disk.events.subtitleextract;
 
-import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MediaFileStreamEntity;
 import app.ister.core.enums.StreamCodecType;
+import app.ister.core.node.MediaFileInputResolver;
 import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.UrlInput;
@@ -30,11 +30,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Component
 @Slf4j
-public class MediaFileFoundExtractSubtitles {
+public class SubtitleExtractor {
 
     private static final Set<String> TEXT_SUBTITLE_CODECS = Set.of(
             "subrip", "ass", "ssa", "mov_text", "webvtt", "text"
@@ -92,12 +93,12 @@ public class MediaFileFoundExtractSubtitles {
     private final OcrSubtitleCleaner cleaner;
 
     @Autowired
-    public MediaFileFoundExtractSubtitles(OcrSubtitleCleaner cleaner) {
+    public SubtitleExtractor(OcrSubtitleCleaner cleaner) {
         this.cleaner = cleaner;
     }
 
     /** For tests: the extractor without the cleanup pass. */
-    MediaFileFoundExtractSubtitles() {
+    SubtitleExtractor() {
         this.cleaner = null;
     }
 
@@ -137,29 +138,25 @@ public class MediaFileFoundExtractSubtitles {
         }
     }
 
-    public List<MediaFileStreamEntity> extractSubtitles(
-            MediaFileEntity mediaFile,
-            List<MediaFileStreamEntity> streams,
-            DirectoryEntity cacheDir,
-            String ffmpegDir) {
-        List<MediaFileStreamEntity> result = new ArrayList<>();
-        int subIdx = 0;
-        for (MediaFileStreamEntity stream : streams) {
-            if (stream.getCodecType() != StreamCodecType.SUBTITLE) {
-                continue;
-            }
-            extractOne(mediaFile, streams, stream, subIdx, cacheDir, ffmpegDir).ifPresent(result::add);
-            subIdx++;
-        }
-        return result;
+    /** One extracted subtitle: the SRT on disk and the language the stream row should carry. */
+    public record ExtractedSubtitle(Path srtFile, String language) {
     }
 
-    private Optional<MediaFileStreamEntity> extractOne(
-            MediaFileEntity mediaFile, List<MediaFileStreamEntity> streams, MediaFileStreamEntity stream,
-            int subIdx, DirectoryEntity cacheDir, String ffmpegDir) {
+    /**
+     * Extracts one embedded subtitle stream to {@code srtDir}.
+     *
+     * @param input    the media file: a local path, or the owning node's tokenized download URL
+     *                 when this node helps with another node's directory
+     * @param streams  all streams of the file (OCR language fallback looks at the audio tags)
+     * @param stream   the {@code SUBTITLE} stream to extract
+     * @param subIdx   the stream's index among the file's subtitle streams (ffmpeg's {@code 0:s:N})
+     * @return the SRT, or empty when the codec is unsupported or the extraction failed — in the
+     *         latter case {@code stream.extractionFailed} is set so the caller can persist it
+     */
+    public Optional<ExtractedSubtitle> extractOne(String input, UUID mediaFileId, List<MediaFileStreamEntity> streams,
+                                                  MediaFileStreamEntity stream, int subIdx, Path srtDir, String ffmpegDir) {
         String lang = normalizeLanguage(stream.getLanguage());
-        String srtFilename = mediaFile.getId() + "_" + stream.getStreamIndex() + "_" + lang + ".srt";
-        Path srtPath = Paths.get(cacheDir.getPath(), srtFilename);
+        Path srtPath = srtDir.resolve(srtFilename(mediaFileId, stream, lang));
 
         String codecName = stream.getCodecName() != null ? stream.getCodecName().toLowerCase() : "";
         boolean extracted = false;
@@ -170,10 +167,10 @@ public class MediaFileFoundExtractSubtitles {
             extracted = true;
         } else if (TEXT_SUBTITLE_CODECS.contains(codecName)) {
             attempted = true;
-            extracted = extractTextSubtitle(mediaFile.getPath(), subIdx, srtPath, ffmpegDir);
+            extracted = extractTextSubtitle(input, subIdx, srtPath, ffmpegDir);
         } else if (IMAGE_SUBTITLE_CODECS.contains(codecName)) {
             attempted = true;
-            String effectiveLang = ocrExtract(mediaFile, streams, stream, subIdx, srtPath, lang, ffmpegDir);
+            String effectiveLang = ocrExtract(input, streams, stream, subIdx, srtPath, lang, ffmpegDir);
             if (effectiveLang != null) {
                 extracted = true;
                 lang = effectiveLang;
@@ -184,34 +181,54 @@ public class MediaFileFoundExtractSubtitles {
 
         if (!extracted) {
             if (attempted) {
-                // Persisted marker so the scanner's re-extract backfill does not re-fire a
-                // full re-analysis for this stream on every scan; a re-analysis for any
-                // other reason rewrites the stream rows and retries the extraction.
+                // Persisted marker so the scanner's re-extract backfill does not re-fire the
+                // extraction for this stream on every scan; a re-analysis for any other reason
+                // rewrites the stream rows and retries the extraction.
                 stream.setExtractionFailed(true);
             }
             return Optional.empty();
         }
-        return Optional.of(MediaFileStreamEntity.builder()
+        return Optional.of(new ExtractedSubtitle(srtPath, lang));
+    }
+
+    /** The SRT file name; the same on every node, so an uploaded copy lands under the name the row records. */
+    public String srtFilename(UUID mediaFileId, MediaFileStreamEntity stream, String normalizedLang) {
+        return mediaFileId + "_" + stream.getStreamIndex() + "_" + normalizedLang + ".srt";
+    }
+
+    /** The {@code EXTERNAL_SUBTITLE} row for an extraction, pointing at {@code recordedPath} (owner-local). */
+    public static MediaFileStreamEntity toEntity(MediaFileEntity mediaFile, MediaFileStreamEntity source,
+                                                 ExtractedSubtitle extracted, Path recordedPath) {
+        return MediaFileStreamEntity.builder()
                 .mediaFileEntity(mediaFile)
-                .streamIndex(stream.getStreamIndex())
+                .streamIndex(source.getStreamIndex())
                 .codecName("subtitle srt")
                 .codecType(StreamCodecType.EXTERNAL_SUBTITLE)
-                .language(lang)
-                .title(stream.getTitle())
-                .path(srtPath.toString())
-                .build());
+                .language(extracted.language())
+                .title(source.getTitle())
+                .path(recordedPath.toString())
+                .build();
+    }
+
+    /** Does the file have any stream this extractor could turn into an SRT? */
+    public static boolean isExtractable(MediaFileStreamEntity stream) {
+        if (stream.getCodecType() != StreamCodecType.SUBTITLE || stream.getCodecName() == null) {
+            return false;
+        }
+        String codec = stream.getCodecName().toLowerCase();
+        return TEXT_SUBTITLE_CODECS.contains(codec) || IMAGE_SUBTITLE_CODECS.contains(codec);
     }
 
     /** OCRs an image subtitle; returns the language for the stream row, or null when not extracted. */
-    private String ocrExtract(MediaFileEntity mediaFile, List<MediaFileStreamEntity> streams,
+    private String ocrExtract(String input, List<MediaFileStreamEntity> streams,
                               MediaFileStreamEntity stream, int subIdx, Path srtPath, String lang, String ffmpegDir) {
         String ocrLang = resolveOcrLanguage(lang, streams);
         if (ocrLang == null) {
             log.warn("No usable OCR language for {} stream {} — set app.ister.server.subtitle-ocr-default-language to enable OCR for untagged subtitles",
-                    mediaFile.getPath(), stream.getStreamIndex());
+                    MediaFileInputResolver.stripToken(input), stream.getStreamIndex());
             return null;
         }
-        if (!extractImageSubtitle(mediaFile.getPath(), subIdx, srtPath, ocrLang, ffmpegDir)) {
+        if (!extractImageSubtitle(input, subIdx, srtPath, ocrLang, ffmpegDir)) {
             return null;
         }
         // An untagged stream keeps "und" in its filename, but the row gets the OCR

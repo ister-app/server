@@ -20,7 +20,7 @@ public class TranscoderQueueConfig {
     @Bean
     public Declarables transcoderQueueDeclarables() {
         return new Declarables(
-                namingConfig.effectiveNames().stream()
+                namingConfig.declaredNames().stream()
                         .flatMap(name -> Stream.of(
                                 new Queue(APP_ISTER_SERVER_TRANSCODE_REQUESTED + "." + name),
                                 new Queue(APP_ISTER_SERVER_TRANSCODE_PASS_REQUESTED + "." + name)

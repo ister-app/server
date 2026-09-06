@@ -91,7 +91,7 @@ class HlsSubtitleServiceTest {
         SegmentGrid grid = SegmentGrid.trim(List.of(0.0, 10.0), Double.NaN, 30.0);
 
         subject.generateSubtitleSegments(externalSubtitleStream(subtitleId, srtFile.toString()),
-                MEDIA_FILE_PATH, UUID.randomUUID(), cacheDir, grid);
+                MEDIA_FILE_PATH, srtFile.toString(), UUID.randomUUID(), cacheDir, grid);
 
         Path segment0 = cacheDir.resolve("seg_sub_" + subtitleId + "_00000.vtt");
         Path segment1 = cacheDir.resolve("seg_sub_" + subtitleId + "_00001.vtt");
@@ -109,7 +109,7 @@ class HlsSubtitleServiceTest {
         SegmentGrid grid = SegmentGrid.trim(List.of(0.0), Double.NaN, 10.0);
 
         subject.generateSubtitleSegments(externalSubtitleStream(subtitleId, srtFile.toString()),
-                MEDIA_FILE_PATH, UUID.randomUUID(), cacheDir, grid);
+                MEDIA_FILE_PATH, srtFile.toString(), UUID.randomUUID(), cacheDir, grid);
 
         String vtt = Files.readString(cacheDir.resolve("seg_sub_" + subtitleId + "_00000.vtt"));
         assertTrue(vtt.startsWith("WEBVTT"));
@@ -126,7 +126,7 @@ class HlsSubtitleServiceTest {
         SegmentGrid grid = SegmentGrid.trim(List.of(0.0, 10.0), Double.NaN, 30.0);
 
         subject.generateSubtitleSegments(externalSubtitleStream(subtitleId, srtFile.toString()),
-                MEDIA_FILE_PATH, UUID.randomUUID(), cacheDir, grid);
+                MEDIA_FILE_PATH, srtFile.toString(), UUID.randomUUID(), cacheDir, grid);
 
         String segment1 = Files.readString(cacheDir.resolve("seg_sub_" + subtitleId + "_00001.vtt"));
         assertEquals("WEBVTT\n", segment1);
@@ -145,7 +145,7 @@ class HlsSubtitleServiceTest {
         SegmentGrid grid = SegmentGrid.trim(List.of(0.0, 10.0), Double.NaN, 20.0);
 
         subject.generateSubtitleSegments(externalSubtitleStream(subtitleId, srtFile.toString()),
-                MEDIA_FILE_PATH, UUID.randomUUID(), cacheDir, grid);
+                MEDIA_FILE_PATH, srtFile.toString(), UUID.randomUUID(), cacheDir, grid);
 
         assertTrue(Files.readString(cacheDir.resolve("seg_sub_" + subtitleId + "_00000.vtt")).contains("Spanning"));
         assertFalse(Files.readString(cacheDir.resolve("seg_sub_" + subtitleId + "_00001.vtt")).contains("Spanning"));
@@ -161,7 +161,7 @@ class HlsSubtitleServiceTest {
         SegmentGrid grid = SegmentGrid.trim(List.of(0.0), Double.NaN, 10.0);
 
         subject.generateSubtitleSegments(externalSubtitleStream(subtitleId, srtFile.toString()),
-                MEDIA_FILE_PATH, UUID.randomUUID(), cacheDir, grid);
+                MEDIA_FILE_PATH, srtFile.toString(), UUID.randomUUID(), cacheDir, grid);
 
         String vtt = Files.readString(cacheDir.resolve("seg_sub_" + subtitleId + "_00000.vtt"));
         assertTrue(vtt.contains("First"));
@@ -177,7 +177,7 @@ class HlsSubtitleServiceTest {
         SegmentGrid grid = SegmentGrid.trim(List.of(0.0), Double.NaN, 10.0);
 
         subject.generateSubtitleSegments(externalSubtitleStream(subtitleId, srtFile.toString()),
-                MEDIA_FILE_PATH, UUID.randomUUID(), cacheDir, grid);
+                MEDIA_FILE_PATH, srtFile.toString(), UUID.randomUUID(), cacheDir, grid);
 
         String vtt = Files.readString(cacheDir.resolve("seg_sub_" + subtitleId + "_00000.vtt"));
         assertTrue(vtt.contains("Line one\nLine two"));
@@ -201,7 +201,7 @@ class HlsSubtitleServiceTest {
         SegmentGrid grid = SegmentGrid.trim(List.of(0.0), Double.NaN, 10.0);
 
         subject.generateSubtitleSegments(externalSubtitleStream(subtitleId, srtFile.toString()),
-                MEDIA_FILE_PATH, UUID.randomUUID(), cacheDir, grid);
+                MEDIA_FILE_PATH, srtFile.toString(), UUID.randomUUID(), cacheDir, grid);
 
         String vtt = Files.readString(cacheDir.resolve("seg_sub_" + subtitleId + "_00000.vtt"));
         assertFalse(vtt.contains("Bad cue"));
@@ -224,7 +224,7 @@ class HlsSubtitleServiceTest {
         SegmentGrid grid = SegmentGrid.trim(List.of(0.0), Double.NaN, 10.0);
 
         subject.generateSubtitleSegments(embeddedSubtitleStream(subtitleId, 2),
-                MEDIA_FILE_PATH, UUID.randomUUID(), cacheDir, grid);
+                MEDIA_FILE_PATH, null, UUID.randomUUID(), cacheDir, grid);
 
         verify(ffmpegMock).execute();
         String vtt = Files.readString(cacheDir.resolve("seg_sub_" + subtitleId + "_00000.vtt"));

@@ -39,7 +39,7 @@ public class HlsPlaylistBuilder {
     private static final String TAG_VERSION = "#EXT-X-VERSION:6\n";
     private static final String PREFIX_STREAM_VIDEO = "stream_video_";
 
-    // Keep in sync with MediaFileFoundExtractSubtitles.IMAGE_SUBTITLE_CODECS
+    // Keep in sync with SubtitleExtractor.IMAGE_SUBTITLE_CODECS
     // (disk module): what OCR rescues at scan time is exactly what this
     // builder may drop from the master playlist.
     private static final Set<String> IMAGE_SUBTITLE_CODECS =

@@ -26,7 +26,7 @@ nooit door entity-grafen af te lopen.
 ## Twee enums, haal ze niet door elkaar
 
 - **`EventType`** (`database/.../enums/EventType.java`) is het logische berichttype — de bron van
-  waarheid voor welke soorten events er bestaan (32 waarden). `Handle.handles()` geeft er één terug.
+  waarheid voor welke soorten events er bestaan (33 waarden). `Handle.handles()` geeft er één terug.
 - **`MessageQueue`** (`core/.../MessageQueue.java`) bevat de **basisnamen** van de queues.
   `MessageSender` mapt een event naar zijn queue.
 
@@ -53,16 +53,27 @@ base-URL zitten.
 | Scope | Events |
 | --- | --- |
 | **Node** `.{nodeName}` | `PERSON_FOUND`, `ALBUM_FOUND` — de node-gescopete sends (`MessageSender`) die de **disk**-handlers bereiken op de node met de bestanden (herparse van artiest-/album-`.nfo` en map-artwork); de onderhoudsflows dispatchen ze via `worker/.../FoundEventDispatcher`. Dezelfde events hebben óók globale sends voor de verrijkingshandlers van de worker (zie hieronder). |
-| **Directory** `.{dirName}` | `NEW_DIRECTORIES_SCAN_REQUEST`, `FILE_SCAN_REQUESTED`, `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `EPUB_FILE_FOUND`, `COMIC_FILE_FOUND`, `SUBTITLE_FILE_FOUND`, `IMAGE_FOUND`, `NFO_FILE_FOUND`, `UPDATE_IMAGES_REQUESTED`, `ANALYZE_DATA` (disk), `DETECT_SEGMENTS`, `PRE_TRANSCODE_RECENTLY_WATCHED`, `TRANSCODE_REQUESTED`, `TRANSCODE_PASS_REQUESTED` |
+| **Directory** `.{dirName}` | `NEW_DIRECTORIES_SCAN_REQUEST`, `FILE_SCAN_REQUESTED`, `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `EPUB_FILE_FOUND`, `COMIC_FILE_FOUND`, `SUBTITLE_FILE_FOUND`, `IMAGE_FOUND`, `NFO_FILE_FOUND`, `UPDATE_IMAGES_REQUESTED`, `ANALYZE_DATA` (disk), `DETECT_SEGMENTS`, `SUBTITLE_EXTRACT_REQUESTED`, `PRE_TRANSCODE_RECENTLY_WATCHED`, `TRANSCODE_REQUESTED`, `TRANSCODE_PASS_REQUESTED` |
 | **Globaal** | `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND` (worker), `ALBUM_FOUND` (worker), `TRACK_FOUND` (geen consumer), `BOOK_FOUND`, `COMIC_SERIES_FOUND`, `CHAPTER_FOUND` (geen consumer), `PODCAST_FOUND` (geen consumer), `PODCAST_EPISODE_FOUND` (geen consumer), `PODCAST_REFRESH_REQUESTED`, `CONTINUE_WATCHING_REBUILD_REQUESTED`, `ANALYZE_DATA` (worker), `METADATA_BACKFILL_REQUESTED`, `SEARCH_INDEX_REQUESTED`, `SEARCH_REINDEX_REQUESTED` |
-| **Cache-directory** `.{nodeName}-cache-directory` | `PODCAST_EPISODE_DOWNLOAD_REQUESTED` bestaat **alleen** met deze suffix (de download landt op de disk van die node). Daarnaast krijgt bijna elke directory-gescopete queue óók een cache-directory-variant: `DiskQueueNamingConfig` voegt er één toe voor elk van zijn queues (`FILE_SCAN_REQUESTED`, `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `IMAGE_FOUND`, `SUBTITLE_FILE_FOUND`, `NFO_FILE_FOUND`, `EPUB_FILE_FOUND`, `COMIC_FILE_FOUND`, `UPDATE_IMAGES_REQUESTED`, `ANALYZE_DATA`, `DETECT_SEGMENTS`, `PRE_TRANSCODE_RECENTLY_WATCHED`, …), en `TranscoderQueueNamingConfig` doet hetzelfde voor de transcode-queues — gedownloade podcastafleveringen staan in de cache-directory en moeten door dezelfde pipelines. |
+| **Cache-directory** `.{nodeName}-cache-directory` | `PODCAST_EPISODE_DOWNLOAD_REQUESTED` bestaat **alleen** met deze suffix (de download landt op de disk van die node). Daarnaast krijgt bijna elke directory-gescopete queue óók een cache-directory-variant: `DiskQueueNamingConfig` voegt er één toe voor elk van zijn queues (`FILE_SCAN_REQUESTED`, `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `IMAGE_FOUND`, `SUBTITLE_FILE_FOUND`, `NFO_FILE_FOUND`, `EPUB_FILE_FOUND`, `COMIC_FILE_FOUND`, `UPDATE_IMAGES_REQUESTED`, `ANALYZE_DATA`, `DETECT_SEGMENTS`, `SUBTITLE_EXTRACT_REQUESTED`, `PRE_TRANSCODE_RECENTLY_WATCHED`, …), en `TranscoderQueueNamingConfig` doet hetzelfde voor de transcode-queues — gedownloade podcastafleveringen staan in de cache-directory en moeten door dezelfde pipelines. |
 
 `PRE_TRANSCODE_RECENTLY_WATCHED` krijgt de **directorynaam** als suffix: `PreTranscodeScheduler`
 (worker) stuurt één event per geconfigureerde directory (`WorkerDiskConfig`, dat
 `app.ister.disk.directories` leest), en de disk-module beluistert de bijbehorende queues
-(`DiskQueueNamingConfig.getPreTranscodeRecentlyWatchedQueues`). Alleen `TRANSCODE_REQUESTED` en
-`TRANSCODE_PASS_REQUESTED` kunnen terugvallen op de `app.ister.transcoder.disks`-namen wanneer er
-disks geconfigureerd zijn (`TranscoderQueueNamingConfig`).
+(`DiskQueueNamingConfig.getPreTranscodeRecentlyWatchedQueues`).
+
+**Helper-geschikte families.** Alle directory-gescopete namen komen uit één core-component,
+`DirectoryQueueNames`: `queues(base)` is de set eigen directories plus de cache-directory van de
+node (eigenaar-only events, ze hebben het bestand op lokale schijf nodig), en
+`queues(base, HelperJob)` is dezelfde set mín de eigen directories wanneer de eigenaar de job in
+`app.ister.helper.offload-jobs` zet, plús elke `app.ister.helper.disks[n]`-regel die voor die job
+geconfigureerd is. Drie families lopen via de tweede vorm — `TRANSCODE` (`TRANSCODE_REQUESTED`,
+`TRANSCODE_PASS_REQUESTED`), `DETECT_SEGMENTS` en `SUBTITLES` (`SUBTITLE_EXTRACT_REQUESTED`) —
+zodat een helper-node de queues van de eigenaar als competing consumer meeleest en de bron via
+`MediaFileInputResolver` leest (lokaal pad, of de getokeniseerde `/mediaFile/{id}/download` van de
+eigenaar, die byte-ranges serveert). De cache-directory-queue wordt altijd door de eigenaar zelf
+geconsumeerd, ook bij offloaden. Het verouderde `app.ister.transcoder.disks` wordt vertaald naar
+helper-schijven met de `TRANSCODE`-job.
 
 ## Handler-referentie
 
@@ -70,8 +81,9 @@ disks geconfigureerd zijn (`TranscoderQueueNamingConfig`).
 | --- | --- | --- | --- |
 | `HandleNewDirectoriesScanRequested` | disk | `NEW_DIRECTORIES_SCAN_REQUEST` | `FILE_SCAN_REQUESTED` |
 | `FileScanRequestedHandle` | disk | `FILE_SCAN_REQUESTED` | `MEDIA_FILE_FOUND` / `AUDIO_FILE_FOUND` / `EPUB_FILE_FOUND` / `COMIC_FILE_FOUND` / `IMAGE_FOUND` / `NFO_FILE_FOUND` / `SUBTITLE_FILE_FOUND` |
-| `HandleMediaFileFound` | disk | `MEDIA_FILE_FOUND` | `IMAGE_FOUND`, `DETECT_SEGMENTS` (per seizoen, na commit) |
-| `HandleDetectSegments` | disk | `DETECT_SEGMENTS` | `DETECT_SEGMENTS` (intro-/outro-detectie per seizoen, in chunks verwerkt — de handler zet zichzelf opnieuw in de queue voor de volgende chunk) |
+| `HandleMediaFileFound` | disk | `MEDIA_FILE_FOUND` | `IMAGE_FOUND`, `DETECT_SEGMENTS` (per seizoen, na commit), `SUBTITLE_EXTRACT_REQUESTED` (één per ingebedde ondertitelstream, na commit) |
+| `HandleDetectSegments` | disk | `DETECT_SEGMENTS` | `DETECT_SEGMENTS` (intro-/outro-detectie per seizoen, in chunks verwerkt — de handler zet zichzelf opnieuw in de queue voor de volgende chunk; helper-geschikt) |
+| `HandleSubtitleExtractRequested` | disk | `SUBTITLE_EXTRACT_REQUESTED` | — (extraheert/OCR't één ondertitelstream naar een SRT in de cache-directory van de eigenaar, en uploadt hem wanneer het op een helper draait; helper-geschikt) |
 | `HandleAudioFileFound` | disk | `AUDIO_FILE_FOUND` | `IMAGE_FOUND` (track- óf chapter-gebonden, per library-type) |
 | `HandleEpubFileFound` | disk | `EPUB_FILE_FOUND` | `IMAGE_FOUND` |
 | `HandleComicFileFound` | disk | `COMIC_FILE_FOUND` | `IMAGE_FOUND` (geëxtraheerde cover) |

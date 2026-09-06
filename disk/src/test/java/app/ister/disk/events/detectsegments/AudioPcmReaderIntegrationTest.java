@@ -34,7 +34,7 @@ class AudioPcmReaderIntegrationTest {
         Path wav = tempDir.resolve("episode.wav");
         writeWav(wav, original);
 
-        short[] decoded = new AudioPcmReader().readMonoPcm(wav, FFMPEG_DIR, 0, 30_000);
+        short[] decoded = new AudioPcmReader().readMonoPcm(wav.toString(), FFMPEG_DIR, 0, 30_000);
 
         assertTrue(decoded.length > 25 * AudioPcmReader.SAMPLE_RATE, "decoded window too short: " + decoded.length);
         Optional<SegmentMatcher.Segment> run = SegmentMatcher.longestCommonRun(
@@ -57,7 +57,7 @@ class AudioPcmReaderIntegrationTest {
         Path wav = tempDir.resolve("twopart.wav");
         writeWav(wav, all);
 
-        short[] decodedTail = new AudioPcmReader().readMonoPcm(wav, FFMPEG_DIR, 20_000, 20_000);
+        short[] decodedTail = new AudioPcmReader().readMonoPcm(wav.toString(), FFMPEG_DIR, 20_000, 20_000);
 
         Optional<SegmentMatcher.Segment> matchesSecond = SegmentMatcher.longestCommonRun(
                 ChromaFingerprinter.fingerprint(second, AudioPcmReader.SAMPLE_RATE),

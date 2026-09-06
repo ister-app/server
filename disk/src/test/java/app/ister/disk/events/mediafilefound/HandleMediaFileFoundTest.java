@@ -3,8 +3,10 @@ package app.ister.disk.events.mediafilefound;
 import app.ister.core.entity.*;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
+import app.ister.core.enums.StreamCodecType;
 import app.ister.core.eventdata.ImageFoundData;
 import app.ister.core.eventdata.MediaFileFoundData;
+import app.ister.core.eventdata.SubtitleExtractRequestedData;
 import app.ister.core.repository.*;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.NodeService;
@@ -12,6 +14,7 @@ import com.github.kokorin.jaffree.process.JaffreeAbnormalExitException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -23,6 +26,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -53,8 +57,6 @@ class HandleMediaFileFoundTest {
     private MediaFileFoundCreateBackground mediaFileFoundCreateBackgroundMock;
     @Mock
     private MediaFileFoundGetDuration mediaFileFoundGetDurationMock;
-    @Mock
-    private MediaFileFoundExtractSubtitles mediaFileFoundExtractSubtitlesMock;
     @Mock
     private MediaFileEpisodeRepository mediaFileEpisodeRepositoryMock;
     @Mock
@@ -95,22 +97,48 @@ class HandleMediaFileFoundTest {
                 .build();
         MediaFileEntity mediaFileEntity = MediaFileEntity.builder().path(filePath).build();
         MediaFileStreamEntity mediaFileStreamEntity = MediaFileStreamEntity.builder().build();
-        NodeEntity nodeEntity = NodeEntity.builder().name("node1").build();
-        DirectoryEntity cacheDirectory = DirectoryEntity.builder()
-                .id(UUID.randomUUID()).path("/cache/").name("cache").build();
 
         when(directoryRepositoryMock.findById(directoryEntity.getId())).thenReturn(Optional.of(directoryEntity));
         when(episodeRepositoryMock.findById(episodeEntity.getId())).thenReturn(Optional.of(episodeEntity));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directoryEntity, filePath)).thenReturn(Optional.of(mediaFileEntity));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(mediaFileEntity, null)).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(mediaFileStreamEntity), false, 10L));
         when(imageRepositoryMock.existsByEpisodeEntityId(episodeEntity.getId())).thenReturn(true);
-        when(nodeServiceMock.getOrCreateNodeEntityForThisNode()).thenReturn(nodeEntity);
-        when(directoryRepositoryMock.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity)).thenReturn(List.of(cacheDirectory));
-        when(mediaFileFoundExtractSubtitlesMock.extractSubtitles(any(), any(), any(), any())).thenReturn(List.of());
 
         subject.handle(mediaFileFoundData);
 
         verify(mediaFileRepositoryMock).save(mediaFileEntity);
+    }
+
+    /** Subtitle extraction left the analysis: every extractable subtitle stream gets its own event. */
+    @Test
+    void publishesOneSubtitleExtractEventPerExtractableStream() {
+        DirectoryEntity directoryEntity = DirectoryEntity.builder().id(UUID.randomUUID()).name("disk1").build();
+        String filePath = "/home/path";
+        MediaFileFoundData mediaFileFoundData = MediaFileFoundData.builder()
+                .eventType(EventType.MEDIA_FILE_FOUND)
+                .directoryEntityUUID(directoryEntity.getId())
+                .path(filePath)
+                .build();
+        UUID mediaFileId = UUID.randomUUID();
+        MediaFileEntity mediaFileEntity = MediaFileEntity.builder().id(mediaFileId).path(filePath).build();
+        UUID subripId = UUID.randomUUID();
+        UUID pgsId = UUID.randomUUID();
+        List<MediaFileStreamEntity> streams = List.of(
+                MediaFileStreamEntity.builder().id(subripId).codecType(StreamCodecType.SUBTITLE).codecName("subrip").streamIndex(2).build(),
+                MediaFileStreamEntity.builder().id(pgsId).codecType(StreamCodecType.SUBTITLE).codecName("hdmv_pgs_subtitle").streamIndex(3).build(),
+                MediaFileStreamEntity.builder().id(UUID.randomUUID()).codecType(StreamCodecType.SUBTITLE).codecName("weird").streamIndex(4).build());
+
+        when(directoryRepositoryMock.findById(directoryEntity.getId())).thenReturn(Optional.of(directoryEntity));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directoryEntity, filePath)).thenReturn(Optional.of(mediaFileEntity));
+        when(mediaFileFoundCheckForStreamsMock.checkForStreams(mediaFileEntity, null)).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(streams, false, 10L));
+
+        subject.handle(mediaFileFoundData);
+
+        ArgumentCaptor<SubtitleExtractRequestedData> events = ArgumentCaptor.forClass(SubtitleExtractRequestedData.class);
+        verify(messageSenderMock, times(2)).sendSubtitleExtractRequested(events.capture(), eq("disk1"));
+        assertEquals(List.of(subripId, pgsId), events.getAllValues().stream().map(SubtitleExtractRequestedData::getSubtitleStreamEntityUUID).toList());
+        assertTrue(events.getAllValues().stream().allMatch(e -> mediaFileId.equals(e.getMediaFileEntityUUID())
+                && directoryEntity.getId().equals(e.getDirectoryEntityUUID())));
     }
 
     @Test
@@ -148,18 +176,12 @@ class HandleMediaFileFoundTest {
                 .path(filePath)
                 .build();
         MediaFileEntity mediaFileEntity = MediaFileEntity.builder().path(filePath).build();
-        NodeEntity nodeEntity = NodeEntity.builder().name("node1").build();
-        DirectoryEntity cacheDirectory = DirectoryEntity.builder()
-                .id(UUID.randomUUID()).path("/cache/").name("cache").build();
 
         when(directoryRepositoryMock.findById(directoryEntity.getId())).thenReturn(Optional.of(directoryEntity));
         when(movieRepositoryMock.findById(movieId)).thenReturn(Optional.of(movieEntity));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directoryEntity, filePath)).thenReturn(Optional.of(mediaFileEntity));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(eq(mediaFileEntity), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 5000L));
         when(imageRepositoryMock.existsByMovieEntityId(movieId)).thenReturn(true);
-        when(nodeServiceMock.getOrCreateNodeEntityForThisNode()).thenReturn(nodeEntity);
-        when(directoryRepositoryMock.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity)).thenReturn(List.of(cacheDirectory));
-        when(mediaFileFoundExtractSubtitlesMock.extractSubtitles(any(), any(), any(), any())).thenReturn(List.of());
 
         subject.handle(data);
 
@@ -279,17 +301,11 @@ class HandleMediaFileFoundTest {
                 .path(filePath)
                 .build();
         MediaFileEntity mediaFileEntity = MediaFileEntity.builder().path(filePath).build();
-        NodeEntity nodeEntity = NodeEntity.builder().name("node1").build();
-        DirectoryEntity cacheDirectory = DirectoryEntity.builder()
-                .id(UUID.randomUUID()).path("/cache/").name("cache").build();
 
         when(directoryRepositoryMock.findById(directoryEntity.getId())).thenReturn(Optional.of(directoryEntity));
         when(episodeRepositoryMock.findById(episodeEntity.getId())).thenReturn(Optional.of(episodeEntity));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directoryEntity, filePath)).thenReturn(Optional.of(mediaFileEntity));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(eq(mediaFileEntity), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 10L));
-        when(nodeServiceMock.getOrCreateNodeEntityForThisNode()).thenReturn(nodeEntity);
-        when(directoryRepositoryMock.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity)).thenReturn(List.of(cacheDirectory));
-        when(mediaFileFoundExtractSubtitlesMock.extractSubtitles(any(), any(), any(), any())).thenReturn(List.of());
         when(imageRepositoryMock.existsByEpisodeEntityId(episodeEntity.getId())).thenReturn(true);
 
         assertDoesNotThrow(() -> subject.listener(data));
@@ -329,7 +345,6 @@ class HandleMediaFileFoundTest {
         when(imageRepositoryMock.existsByEpisodeEntityId(any())).thenReturn(false);
         when(nodeServiceMock.getOrCreateNodeEntityForThisNode()).thenReturn(nodeEntity);
         when(directoryRepositoryMock.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity)).thenReturn(List.of(cacheDirectory));
-        when(mediaFileFoundExtractSubtitlesMock.extractSubtitles(any(), any(), any(), any())).thenReturn(List.of());
 
         subject.handle(data);
 

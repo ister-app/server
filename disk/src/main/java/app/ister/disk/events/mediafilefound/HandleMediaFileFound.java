@@ -8,6 +8,8 @@ import app.ister.core.enums.ImageType;
 import app.ister.core.eventdata.DetectSegmentsData;
 import app.ister.core.eventdata.ImageFoundData;
 import app.ister.core.eventdata.MediaFileFoundData;
+import app.ister.core.eventdata.SubtitleExtractRequestedData;
+import app.ister.disk.events.subtitleextract.SubtitleExtractor;
 import app.ister.core.repository.*;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.NodeService;
@@ -41,7 +43,6 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     private final MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams;
     private final MediaFileFoundCreateBackground mediaFileFoundCreateBackground;
     private final MediaFileFoundGetDuration mediaFileFoundGetDuration;
-    private final MediaFileFoundExtractSubtitles mediaFileFoundExtractSubtitles;
     private final MediaFileFoundEpisodeBoundaries mediaFileFoundEpisodeBoundaries;
     private final MediaFileFoundDetectCrop mediaFileFoundDetectCrop;
     private final MessageSender messageSender;
@@ -60,7 +61,6 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
                                 MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams,
                                 MediaFileFoundCreateBackground mediaFileFoundCreateBackground,
                                 MediaFileFoundGetDuration mediaFileFoundGetDuration,
-                                MediaFileFoundExtractSubtitles mediaFileFoundExtractSubtitles,
                                 MediaFileFoundEpisodeBoundaries mediaFileFoundEpisodeBoundaries,
                                 MediaFileFoundDetectCrop mediaFileFoundDetectCrop,
                                 MessageSender messageSender) {
@@ -75,7 +75,6 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
         this.mediaFileFoundCheckForStreams = mediaFileFoundCheckForStreams;
         this.mediaFileFoundCreateBackground = mediaFileFoundCreateBackground;
         this.mediaFileFoundGetDuration = mediaFileFoundGetDuration;
-        this.mediaFileFoundExtractSubtitles = mediaFileFoundExtractSubtitles;
         this.mediaFileFoundEpisodeBoundaries = mediaFileFoundEpisodeBoundaries;
         this.mediaFileFoundDetectCrop = mediaFileFoundDetectCrop;
         this.messageSender = messageSender;
@@ -190,14 +189,21 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             detectAndSetCrop(mediaFileEntity, streams, duration);
             mediaFileStreamRepository.saveAll(streams);
 
-            // Extract embedded subtitles to SRT files in the cache directory.
-            ActivityContext.step("subtitles");
-            NodeEntity cacheNode = nodeService.getOrCreateNodeEntityForThisNode();
-            DirectoryEntity cacheDisk = directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, cacheNode).stream().findFirst().orElseThrow();
-            mediaFileStreamRepository.saveAll(mediaFileFoundExtractSubtitles.extractSubtitles(mediaFileEntity, streams, cacheDisk, dirOfFFmpeg));
-            // Extraction marks failed attempts on the source subtitle rows, so save them once more:
-            // the marker then survives even if these entities ever stop being managed.
-            mediaFileStreamRepository.saveAll(streams);
+            // Embedded subtitles become SRTs in their own event, one per stream: extraction and
+            // OCR take minutes, must not hold this transaction, and a helper node may do them.
+            // After commit, or the handler would not find the rows.
+            streams.stream()
+                    .filter(SubtitleExtractor::isExtractable)
+                    .forEach(stream -> {
+                        SubtitleExtractRequestedData data = SubtitleExtractRequestedData.builder()
+                                .eventType(EventType.SUBTITLE_EXTRACT_REQUESTED)
+                                .mediaFileEntityUUID(mediaFileEntity.getId())
+                                .directoryEntityUUID(directoryEntity.getId())
+                                .subtitleStreamEntityUUID(stream.getId())
+                                .build();
+                        AfterCommitPublisher.publishAfterCommit(() ->
+                                messageSender.sendSubtitleExtractRequested(data, directoryEntity.getName()));
+                    });
         });
         return mediaFile;
     }
