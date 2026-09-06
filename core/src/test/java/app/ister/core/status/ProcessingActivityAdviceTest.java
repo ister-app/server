@@ -70,9 +70,16 @@ class ProcessingActivityAdviceTest {
         when(invocation.proceed()).thenAnswer(call -> {
             ActivityContext.subject("movie.mkv");
             ActivityContext.step("probe");
+            ActivityContext.context("movie", "id-1", "Die Hard (1988)");
+            ActivityContext.directory("disk1", "Movies");
             var item = registry.localSnapshot("node", Instant.now()).getProcessing().getFirst();
             assertEquals("movie.mkv", item.getSubject());
             assertEquals("probe", item.getStep());
+            assertEquals("movie", item.getContextType());
+            assertEquals("id-1", item.getContextId());
+            assertEquals("Die Hard (1988)", item.getContext());
+            assertEquals("disk1", item.getDirectory());
+            assertEquals("Movies", item.getLibrary());
             return null;
         });
 
