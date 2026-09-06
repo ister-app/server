@@ -92,8 +92,11 @@ public class SubtitleExtractionProcessor {
             return;
         }
         ActivityContext.subject(Path.of(job.mediaFile().getPath()).getFileName().toString());
+        // Per stream, not per file: the file's streams are extracted concurrently (listener
+        // concurrency) and each one cleans up after itself, so a shared directory would be
+        // deleted from under a sibling still running mkvextract or waiting to upload.
         Path srtDir = job.remote()
-                ? Path.of(tmpDir, "subtitles", mediaFileId.toString())
+                ? Path.of(tmpDir, "subtitles", mediaFileId.toString(), subtitleStreamId.toString())
                 : job.ownerCachePath();
         Optional<SubtitleExtractor.ExtractedSubtitle> extracted;
         try {

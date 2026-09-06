@@ -142,7 +142,24 @@ class SubtitleExtractionProcessorTest {
         ArgumentCaptor<MediaFileStreamEntity> saved = ArgumentCaptor.forClass(MediaFileStreamEntity.class);
         verify(mediaFileStreamRepository).save(saved.capture());
         assertEquals(ownerCache.resolve(mediaFileId + "_3_eng.srt").toString(), saved.getValue().getPath());
-        assertFalse(Files.exists(tempDir.resolve("tmp").resolve("subtitles").resolve(mediaFileId.toString())), "tmp cleaned up");
+        assertFalse(Files.exists(tempDir.resolve("tmp").resolve("subtitles").resolve(mediaFileId.toString()).resolve(streamId.toString())), "tmp cleaned up");
+    }
+
+    /** Sibling streams of one file run concurrently; finishing one must not wipe another's work dir. */
+    @Test
+    void remoteExtractionUsesAPerStreamTmpDirAndLeavesSiblingsAlone() throws IOException {
+        remote();
+        Path siblingDir = tempDir.resolve("tmp").resolve("subtitles").resolve(mediaFileId.toString()).resolve("other-stream");
+        Files.createDirectories(siblingDir);
+        Files.writeString(siblingDir.resolve("x.mks"), "in progress");
+        extractorProduces("x.srt");
+
+        subject.process(mediaFileId, streamId);
+
+        ArgumentCaptor<Path> uploaded = ArgumentCaptor.forClass(Path.class);
+        verify(remoteNodeClient).uploadToCache(eq("http://owner:8080"), uploaded.capture());
+        assertEquals(streamId.toString(), uploaded.getValue().getParent().getFileName().toString());
+        assertTrue(Files.exists(siblingDir.resolve("x.mks")), "sibling stream's work dir untouched");
     }
 
     @Test
