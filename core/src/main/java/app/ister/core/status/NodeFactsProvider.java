@@ -110,7 +110,7 @@ public class NodeFactsProvider {
     private static String resolveHostname() {
         try {
             return InetAddress.getLocalHost().getHostName();
-        } catch (UnknownHostException e) {
+        } catch (UnknownHostException _) {
             return null;
         }
     }

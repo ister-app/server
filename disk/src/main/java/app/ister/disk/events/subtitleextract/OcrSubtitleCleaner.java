@@ -48,7 +48,7 @@ public class OcrSubtitleCleaner {
             "nld", Set.of("is", "in", "ik", "iets", "ieder", "je", "jij", "jou", "jouw", "jullie", "ja")
     );
 
-    private static final Pattern TOKEN = Pattern.compile("[A-Za-z]+(?:['’][A-Za-z]+)*");
+    private static final Pattern TOKEN = Pattern.compile("[A-Za-z]++(?:['’][A-Za-z]++)*+");
     /** The preceding text ends a sentence: the next word may legitimately be capitalised. */
     private static final Pattern SENTENCE_END = Pattern.compile("[.?!\"“…:]\\s*$|[-–]\\s*$|^\\s*$");
     /** More confusable positions than this and the candidate set explodes; such tokens are left alone. */
@@ -78,37 +78,49 @@ public class OcrSubtitleCleaner {
             // standard single blank line.
             String src = Files.readString(srt, StandardCharsets.UTF_8).replace("\r\n", "\n").replace('\r', '\n');
             String[] blocks = src.strip().split("\n\s*\n");
-            List<String> cueTexts = new ArrayList<>();
-            for (String block : blocks) {
-                String[] lines = block.strip().split("\n", 3);
-                if (lines.length == 3 && lines[1].contains("-->")) {
-                    cueTexts.add(lines[2]);
-                }
-            }
-            Predicate<String> known = lexicon.map(l -> knownWords(l, lang, cueTexts)).orElse(null);
-            StringBuilder out = new StringBuilder();
-            int fixes = 0;
-            for (int i = 0; i < blocks.length; i++) {
-                String[] lines = blocks[i].strip().split("\n", 3);
-                if (lines.length == 3 && lines[1].contains("-->")) {
-                    String cleaned = clean(lines[2], lang, lexicon.orElse(null), known);
-                    if (!cleaned.equals(lines[2])) {
-                        fixes++;
-                    }
-                    out.append(lines[0]).append('\n').append(lines[1]).append('\n').append(cleaned);
-                } else {
-                    out.append(blocks[i]);
-                }
-                if (i < blocks.length - 1) {
-                    out.append("\n\n");
-                }
-            }
-            out.append('\n');
-            Files.writeString(srt, out.toString(), StandardCharsets.UTF_8);
-            log.debug("OCR cleanup touched {} cues in {}", fixes, srt);
+            Predicate<String> known = lexicon.map(l -> knownWords(l, cueTexts(blocks))).orElse(null);
+            String cleaned = rewrite(blocks, srt, lang, lexicon.orElse(null), known);
+            Files.writeString(srt, cleaned, StandardCharsets.UTF_8);
         } catch (IOException e) {
             log.warn("OCR cleanup of {} failed, keeping the raw OCR output: {}", srt, e.getMessage());
         }
+    }
+
+    /** The three parts of a cue block (index, timing, text), or empty when the block is not a cue. */
+    private static Optional<String[]> cueLines(String block) {
+        String[] lines = block.strip().split("\n", 3);
+        return lines.length == 3 && lines[1].contains("-->") ? Optional.of(lines) : Optional.empty();
+    }
+
+    private static List<String> cueTexts(String[] blocks) {
+        List<String> cueTexts = new ArrayList<>();
+        for (String block : blocks) {
+            cueLines(block).ifPresent(lines -> cueTexts.add(lines[2]));
+        }
+        return cueTexts;
+    }
+
+    private String rewrite(String[] blocks, Path srt, String lang, Lexicon lexicon, Predicate<String> known) {
+        StringBuilder out = new StringBuilder();
+        int fixes = 0;
+        for (int i = 0; i < blocks.length; i++) {
+            Optional<String[]> cue = cueLines(blocks[i]);
+            if (cue.isPresent()) {
+                String[] lines = cue.get();
+                String cleaned = clean(lines[2], lang, lexicon, known);
+                if (!cleaned.equals(lines[2])) {
+                    fixes++;
+                }
+                out.append(lines[0]).append('\n').append(lines[1]).append('\n').append(cleaned);
+            } else {
+                out.append(blocks[i]);
+            }
+            if (i < blocks.length - 1) {
+                out.append("\n\n");
+            }
+        }
+        log.debug("OCR cleanup touched {} cues in {}", fixes, srt);
+        return out.append('\n').toString();
     }
 
     /** Cleans one cue text with the rules only (no dictionary). Unknown languages are returned unchanged. */
@@ -118,7 +130,7 @@ public class OcrSubtitleCleaner {
 
     /** Cleans one cue text with the given dictionary (tests); {@link #cleanFile} batches the lookups per file instead. */
     String clean(String cueText, String lang, Lexicon lexicon) {
-        return clean(cueText, lang, lexicon, knownWords(lexicon, lang, List.of(cueText)));
+        return clean(cueText, lang, lexicon, knownWords(lexicon, List.of(cueText)));
     }
 
     private String clean(String cueText, String lang, Lexicon lexicon, Predicate<String> known) {
@@ -155,18 +167,28 @@ public class OcrSubtitleCleaner {
         if (token.length() < 2 || isAllCaps(token)) {
             return token;
         }
-        String lower = normalise(token);
         boolean continues = continuesSentence(before);
         if (known.test(normaliseApostrophe(token))) {
-            // Rule 2: a capital I/J that opens a known common word mid-sentence is the misread dot.
-            if (continues && isCapitalised(token) && "IJ".indexOf(token.charAt(0)) >= 0
-                    && known.test(lower) && !lexicon.isProperNoun(normaliseApostrophe(token))) {
-                return Character.toLowerCase(token.charAt(0)) + token.substring(1);
-            }
-            return token;
+            return lowerCaseMisreadCapital(token, lexicon, known, continues);
         }
-        // Rule 3: exactly one confusable-glyph respelling must be a word. The lower-cased token
-        // itself is a candidate too: a capital I inside a word ("DIt", "mIJ") is the same misread.
+        return respell(token, before, lexicon, known, continues);
+    }
+
+    /** Rule 2: a capital I/J that opens a known common word mid-sentence is the misread dot. */
+    private static String lowerCaseMisreadCapital(String token, Lexicon lexicon, Predicate<String> known, boolean continues) {
+        if (continues && isCapitalised(token) && "IJ".indexOf(token.charAt(0)) >= 0
+                && known.test(normalise(token)) && !lexicon.isProperNoun(normaliseApostrophe(token))) {
+            return Character.toLowerCase(token.charAt(0)) + token.substring(1);
+        }
+        return token;
+    }
+
+    /**
+     * Rule 3: exactly one confusable-glyph respelling must be a word. The lower-cased token
+     * itself is a candidate too: a capital I inside a word ("DIt", "mIJ") is the same misread.
+     */
+    private static String respell(String token, String before, Lexicon lexicon, Predicate<String> known, boolean continues) {
+        String lower = normalise(token);
         Set<String> candidates = new LinkedHashSet<>();
         if (token.indexOf('I', 1) > 0 && (known.test(lower) || known.test(capitalise(lower)))) {
             candidates.add(lower);
@@ -180,17 +202,20 @@ public class OcrSubtitleCleaner {
             return token;
         }
         String word = candidates.iterator().next();
-        boolean capital;
-        if (!known.test(word)) {
-            capital = true; // only the capitalised spelling exists: a name ("Elalne" → "Elaine")
-        } else if (Character.isUpperCase(token.charAt(0))) {
-            capital = !continues || lexicon.isProperNoun(capitalise(word));
-        } else {
-            // "lt's" after a full stop: the l was a capital I. Any other lower-case first letter was read right.
-            capital = token.charAt(0) == 'l' && !before.isBlank() && !continues;
-        }
-        String result = capital ? capitalise(word) : word;
+        String result = capitaliseRespelling(token, before, lexicon, known, continues, word) ? capitalise(word) : word;
         return token.indexOf('’') >= 0 ? result.replace('\'', '’') : result;
+    }
+
+    private static boolean capitaliseRespelling(String token, String before, Lexicon lexicon,
+                                                Predicate<String> known, boolean continues, String word) {
+        if (!known.test(word)) {
+            return true; // only the capitalised spelling exists: a name ("Elalne" → "Elaine")
+        }
+        if (Character.isUpperCase(token.charAt(0))) {
+            return !continues || lexicon.isProperNoun(capitalise(word));
+        }
+        // "lt's" after a full stop: the l was a capital I. Any other lower-case first letter was read right.
+        return token.charAt(0) == 'l' && !before.isBlank() && !continues;
     }
 
     /**
@@ -222,7 +247,7 @@ public class OcrSubtitleCleaner {
     }
 
     /** Every word the dictionary will be asked about for these cue texts, so hunspell runs once per file. */
-    private static Predicate<String> knownWords(Lexicon lexicon, String lang, List<String> cueTexts) {
+    private static Predicate<String> knownWords(Lexicon lexicon, List<String> cueTexts) {
         Set<String> lookups = new HashSet<>();
         for (String cueText : cueTexts) {
             Matcher m = TOKEN.matcher(cueText);

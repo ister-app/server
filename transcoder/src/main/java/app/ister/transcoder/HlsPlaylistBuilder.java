@@ -36,6 +36,7 @@ public class HlsPlaylistBuilder {
     static final String MASTER_TAG = "#EXT-X-ISTER-MASTER:2";
     private static final String PREFIX_STREAM_SUB = "stream_sub_";
     private static final String PREFIX_STREAM_AUDIO = "stream_audio_";
+    private static final String TAG_M3U = "#EXTM3U\n";
     private static final String TAG_VERSION = "#EXT-X-VERSION:6\n";
     private static final String PREFIX_STREAM_VIDEO = "stream_video_";
 
@@ -108,7 +109,7 @@ public class HlsPlaylistBuilder {
         AudioQuality[] audioQualities = AudioQuality.values();
         VideoQuality[] videoQualities = VideoQuality.values();
         StringBuilder sb = new StringBuilder();
-        sb.append("#EXTM3U\n");
+        sb.append(TAG_M3U);
         sb.append(TAG_VERSION);
         sb.append(MASTER_TAG).append("\n");
         sb.append("\n");
@@ -307,7 +308,7 @@ public class HlsPlaylistBuilder {
         int targetDuration = (int) Math.ceil(maxDuration);
 
         StringBuilder sb = new StringBuilder();
-        sb.append("#EXTM3U\n");
+        sb.append(TAG_M3U);
         sb.append(TAG_VERSION);
         sb.append(GRID_TAG).append("\n");
         sb.append("#EXT-X-TARGETDURATION:").append(targetDuration).append("\n");
@@ -325,7 +326,7 @@ public class HlsPlaylistBuilder {
 
     String buildSingleSegmentPlaylist(double totalDuration, String segmentFilename) {
         int targetDuration = (int) Math.ceil(totalDuration);
-        return "#EXTM3U\n" +
+        return TAG_M3U +
                 TAG_VERSION +
                 GRID_TAG + "\n" +
                 "#EXT-X-TARGETDURATION:" + targetDuration + "\n" +

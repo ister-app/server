@@ -15,14 +15,12 @@ import java.util.regex.Pattern;
  * Within the featured part the context is unambiguous, so "feat. A &amp; B" does yield two guests.
  */
 public final class ArtistTagParser {
-    // The separator quantifiers are possessive and every leading run is guarded by a lookbehind, so
-    // a long tag is scanned linearly: the engine cannot re-enter a whitespace run halfway and redo
-    // the same work at every offset in it.
-    private static final Pattern FEATURING = Pattern.compile(
-            "(?<![\\s(\\[])[\\s(\\[]*+\\b(?:featuring|feat|ft)\\b\\.?+\\s++", Pattern.CASE_INSENSITIVE);
+    // The patterns hold no repetition at all: the whitespace and bracket runs around a separator
+    // are trimmed in Java instead, so a long tag can never be rescanned at every offset in a run.
+    private static final Pattern FEATURING =
+            Pattern.compile("\\b(?:featuring|feat|ft)\\b\\.?", Pattern.CASE_INSENSITIVE);
     private static final Pattern GUEST_SEPARATOR =
-            Pattern.compile("(?<!\\s)\\s*+(?:[,&/+]|\\band\\b)\\s*+", Pattern.CASE_INSENSITIVE);
-    private static final Pattern TRAILING_BRACKET = Pattern.compile("[)\\]]\\s*$");
+            Pattern.compile("[,&/+]|\\band\\b", Pattern.CASE_INSENSITIVE);
 
     private ArtistTagParser() {
     }
@@ -35,18 +33,32 @@ public final class ArtistTagParser {
         if (tag == null || tag.isBlank()) return new Credits(null, List.of());
         String cleaned = tag.strip();
         Matcher matcher = FEATURING.matcher(cleaned);
-        if (!matcher.find() || matcher.start() == 0) {
-            // No guests, or a tag that starts with "feat." and so carries no primary artist at all.
+        if (!matcher.find()) return new Credits(cleaned, List.of());
+        String primary = stripSeparators(cleaned.substring(0, matcher.start()));
+        if (primary.isEmpty()) {
+            // A tag that is nothing but "feat. X" carries no primary artist at all.
             return new Credits(cleaned, List.of());
         }
-        String primary = cleaned.substring(0, matcher.start()).strip();
-        String guestPart = TRAILING_BRACKET.matcher(cleaned.substring(matcher.end()).strip()).replaceAll("").strip();
+        String guestPart = stripSeparators(cleaned.substring(matcher.end()));
         List<String> featured = new ArrayList<>();
         for (String guest : GUEST_SEPARATOR.split(guestPart)) {
             String name = guest.strip();
             if (!name.isEmpty() && !name.equalsIgnoreCase(primary)) featured.add(name);
         }
-        return new Credits(primary.isEmpty() ? cleaned : primary, List.copyOf(featured));
+        return new Credits(primary, List.copyOf(featured));
+    }
+
+    /** Strips the whitespace and brackets that surround a separator: "Robin Schulz (" → "Robin Schulz". */
+    private static String stripSeparators(String part) {
+        int start = 0;
+        int end = part.length();
+        while (start < end && isSeparator(part.charAt(start))) start++;
+        while (end > start && isSeparator(part.charAt(end - 1))) end--;
+        return part.substring(start, end);
+    }
+
+    private static boolean isSeparator(char c) {
+        return Character.isWhitespace(c) || c == '(' || c == '[' || c == ')' || c == ']';
     }
 
     /** The primary artist of a tag, or null when the tag is empty. */

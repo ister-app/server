@@ -725,8 +725,8 @@ class HlsServiceTest {
 
         assertTrue(Files.readString(result).contains("Hello"));
         verify(remoteNodeClient, times(1)).downloadToFile(
-                eq("http://remote:8080/mediaFileStream/" + subtitleId + "/download?token=tok"),
-                eq(tempDir.resolve(mediaFileId.toString()).resolve("ext_" + subtitleId + ".srt")));
+                "http://remote:8080/mediaFileStream/" + subtitleId + "/download?token=tok",
+                tempDir.resolve(mediaFileId.toString()).resolve("ext_" + subtitleId + ".srt"));
     }
     @Test
     void getSubtitleSegmentIsCached() throws IOException {
@@ -1436,9 +1436,14 @@ class HlsServiceTest {
         Path cacheDir = tempDir.resolve(id.toString());
         Files.createDirectories(cacheDir);
         Path cacheFile = cacheDir.resolve("master_d1_t0_sSRT.m3u8");
-        Files.writeString(cacheFile, "#EXTM3U\n#EXT-X-VERSION:6\n\n"
-                + "#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID=\"subs\",URI=\"stream_sub_x_srt.m3u8\"\n"
-                + "#EXT-X-STREAM-INF:BANDWIDTH=1\nstream_video_copy.m3u8\n");
+        Files.writeString(cacheFile, """
+                #EXTM3U
+                #EXT-X-VERSION:6
+
+                #EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",URI="stream_sub_x_srt.m3u8"
+                #EXT-X-STREAM-INF:BANDWIDTH=1
+                stream_video_copy.m3u8
+                """);
 
         assertThrows(IOException.class,
                 () -> hlsService.getMasterPlaylist(id, true, false, SubtitleFormat.SRT));

@@ -1,6 +1,7 @@
 package app.ister.disk.events.subtitleextract;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -48,6 +49,7 @@ public class HunspellLexicons {
 
     private final Map<String, Optional<Lexicon>> cache = new ConcurrentHashMap<>();
 
+    @Autowired
     public HunspellLexicons() {
     }
 
@@ -113,7 +115,7 @@ public class HunspellLexicons {
     private static Charset charsetOrUtf8(String name) {
         try {
             return Charset.forName(name);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return StandardCharsets.UTF_8;
         }
     }
@@ -160,7 +162,7 @@ public class HunspellLexicons {
             } catch (IOException e) {
                 log.warn("hunspell failed ({}); leaving this file's spelling as OCR produced it", e.getMessage());
                 return Set.of();
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 return Set.of();
             }

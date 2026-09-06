@@ -5,6 +5,7 @@ import app.ister.core.status.ActivitySubjects;
 import app.ister.core.Handle;
 import app.ister.core.config.OwnDirectoriesProperties;
 import app.ister.core.entity.DirectoryEntity;
+import app.ister.core.entity.FileFromPathEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.PodcastEntity;
 import app.ister.core.entity.PodcastEpisodeEntity;
@@ -259,7 +260,7 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
         }
         return podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(podcast.getId(), 50, 0).stream()
                 .flatMap(episodeId -> mediaFileRepository.findByPodcastEpisodeEntityId(episodeId).stream())
-                .map(mediaFile -> mediaFile.getDirectoryEntity())
+                .map(FileFromPathEntity::getDirectoryEntity)
                 .filter(dir -> dir != null && dir.getDirectoryType() == DirectoryType.CACHE)
                 .map(DirectoryEntity::getName)
                 .findFirst()

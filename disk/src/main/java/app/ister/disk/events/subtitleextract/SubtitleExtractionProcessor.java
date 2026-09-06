@@ -88,10 +88,11 @@ public class SubtitleExtractionProcessor {
     }
 
     public void process(UUID mediaFileId, UUID subtitleStreamId) {
-        ExtractionJob job = readOnlyTransaction.execute(_ -> loadJob(mediaFileId, subtitleStreamId));
-        if (job == null) {
+        Optional<ExtractionJob> loaded = readOnlyTransaction.execute(_ -> loadJob(mediaFileId, subtitleStreamId));
+        if (loaded.isEmpty()) {
             return;
         }
+        ExtractionJob job = loaded.orElseThrow();
         ActivityContext.report(job.subject());
         // Per stream, not per file: the file's streams are extracted concurrently (listener
         // concurrency) and each one cleans up after itself, so a shared directory would be
@@ -121,19 +122,19 @@ public class SubtitleExtractionProcessor {
         writeTransaction.executeWithoutResult(_ -> store(job, extracted.orElse(null), failed));
     }
 
-    private ExtractionJob loadJob(UUID mediaFileId, UUID subtitleStreamId) {
+    private Optional<ExtractionJob> loadJob(UUID mediaFileId, UUID subtitleStreamId) {
         MediaFileStreamEntity stream = mediaFileStreamRepository.findById(subtitleStreamId).orElse(null);
         if (stream == null || stream.getCodecType() != StreamCodecType.SUBTITLE) {
             log.debug("Subtitle stream {} is gone or not a subtitle, nothing to extract", subtitleStreamId);
-            return null;
+            return Optional.empty();
         }
         if (Boolean.TRUE.equals(stream.getExtractionFailed())) {
             log.debug("Subtitle stream {} already failed extraction, skipping", subtitleStreamId);
-            return null;
+            return Optional.empty();
         }
         MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElse(null);
         if (mediaFile == null) {
-            return null;
+            return Optional.empty();
         }
         List<MediaFileStreamEntity> streams = mediaFile.getMediaFileStreamEntity().stream()
                 .sorted(Comparator.comparingInt(MediaFileStreamEntity::getStreamIndex))
@@ -142,7 +143,7 @@ public class SubtitleExtractionProcessor {
                 && s.getStreamIndex() == stream.getStreamIndex());
         if (alreadyExtracted) {
             log.debug("Subtitle stream {} of {} already has an extracted SRT row", subtitleStreamId, mediaFileId);
-            return null;
+            return Optional.empty();
         }
         // ffmpeg addresses subtitle streams by their rank among the subtitle streams (0:s:N).
         int subIdx = (int) streams.stream()
@@ -152,9 +153,9 @@ public class SubtitleExtractionProcessor {
                 .findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, inputResolver.owner(mediaFile))
                 .stream().findFirst()
                 .orElseThrow(() -> new IllegalStateException("Owning node of " + mediaFileId + " has no cache directory"));
-        return new ExtractionJob(inputResolver.resolve(mediaFile), inputResolver.isRemote(mediaFile),
+        return Optional.of(new ExtractionJob(inputResolver.resolve(mediaFile), inputResolver.isRemote(mediaFile),
                 inputResolver.owner(mediaFile).getUrl(), Path.of(ownerCache.getPath()),
-                mediaFile, streams, stream, subIdx, ActivitySubjects.describe(mediaFile));
+                mediaFile, streams, stream, subIdx, ActivitySubjects.describe(mediaFile)));
     }
 
     private void store(ExtractionJob job, SubtitleExtractor.ExtractedSubtitle extracted, boolean failed) {

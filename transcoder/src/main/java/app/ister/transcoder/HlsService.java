@@ -1051,8 +1051,6 @@ public class HlsService {
         return Paths.get(tmpDir, mediaFileId.toString());
     }
 
-    /** Single source of the master-playlist cache key: getMasterPlaylist polls for the
-     * exact filename generateAllPlaylists writes, so the format must never drift. */
     /**
      * A cached master is only served when it has stream entries and carries the
      * current {@link HlsPlaylistBuilder#MASTER_TAG}; anything older is regenerated,
@@ -1063,6 +1061,10 @@ public class HlsService {
                 && cached.contains(HlsPlaylistBuilder.MASTER_TAG);
     }
 
+    /**
+     * Single source of the master-playlist cache key: getMasterPlaylist polls for the
+     * exact filename generateAllPlaylists writes, so the format must never drift.
+     */
     private static String masterCacheFilename(boolean direct, boolean transcode, SubtitleFormat subtitleFormat) {
         return String.format(Locale.ROOT, "master_d%d_t%d_s%s" + EXT_M3U8,
                 direct ? 1 : 0, transcode ? 1 : 0, subtitleFormat.name());

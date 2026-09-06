@@ -3,7 +3,7 @@ package app.ister.transcoder;
 import app.ister.core.enums.SubtitleFormat;
 import app.ister.core.utils.SafeFilename;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.PathResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -63,7 +63,7 @@ public class HlsController {
     }
 
     /**
-     * Segments are returned as a {@link PathResource} rather than an
+     * Segments are returned as a {@link FileSystemResource} rather than an
      * {@code InputStreamResource} on purpose. Spring skips range handling for the latter
      * (see {@code AbstractMessageConverterMethodProcessor#isResourceType}), so the response
      * carried no {@code Accept-Ranges} header and answered every {@code Range} request with the
@@ -93,7 +93,7 @@ public class HlsController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, TS_CONTENT_TYPE)
                 .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_2H)
-                .body(new PathResource(filePath));
+                .body(new FileSystemResource(filePath));
     }
 
     @GetMapping("/hls/{mediaFileId}/{segmentFilename:.+\\.vtt}")
@@ -115,7 +115,7 @@ public class HlsController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, "application/x-subrip")
                 .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_2H)
-                .body(new PathResource(filePath));
+                .body(new FileSystemResource(filePath));
     }
 
     /**
