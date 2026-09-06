@@ -19,10 +19,13 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -42,10 +45,44 @@ public class MediaFileFoundExtractSubtitles {
     );
 
     @Value("${app.ister.server.subtile-ocr:/usr/bin/subtile-ocr}")
-    private String subtileOcrPath;
+    private String subtileOcrPath = "/usr/bin/subtile-ocr";
 
     @Value("${app.ister.server.mkvextract:/usr/bin/mkvextract}")
     private String mkvextractPath;
+
+    /**
+     * Directory holding better tesseract models (tessdata_best) than the distro
+     * packages ship (tessdata_fast, several times less accurate on subtitle
+     * text). Only used for a language whose {@code <lang>.traineddata} is
+     * actually present there; other languages fall back to tesseract's default
+     * tessdata. Blank disables it.
+     */
+    @Value("${app.ister.server.subtitle-ocr-tessdata-dir:}")
+    private String ocrTessdataDir = "";
+
+    /** DPI subtile-ocr tags the subtitle bitmaps with; 300 suits tesseract's LSTM models, its own default is 150. */
+    @Value("${app.ister.server.subtitle-ocr-dpi:300}")
+    private int ocrDpi = 300;
+
+    /** Binarization threshold (0..1) subtile-ocr applies before OCR; only pixels above it count as text. */
+    @Value("${app.ister.server.subtitle-ocr-threshold:0.6}")
+    private double ocrThreshold = 0.6;
+
+    /** Blank border in pixels around each subtitle bitmap; tesseract misreads glyphs touching the image edge. */
+    @Value("${app.ister.server.subtitle-ocr-border:10}")
+    private int ocrBorder = 10;
+
+    /**
+     * Characters tesseract may never output. Subtitles contain none of these,
+     * yet they are its favourite misreads of an "I", "l" or a stray outline pixel.
+     * Blank disables the blacklist.
+     */
+    @Value("${app.ister.server.subtitle-ocr-char-blacklist:|\\/`_~}")
+    private String ocrCharBlacklist = "|\\/`_~";
+
+    /** Wall-clock limit for one mkvextract or subtile-ocr run. */
+    @Value("${app.ister.server.subtitle-ocr-timeout:10m}")
+    private Duration ocrTimeout = Duration.ofMinutes(10);
 
     /**
      * OCR fallback language (ISO 639-3) for image subtitles whose stream has
@@ -242,7 +279,7 @@ public class MediaFileFoundExtractSubtitles {
             }
 
             // Step 3: subtile-ocr → SRT
-            ProcessResult ocr = run(new ProcessBuilder(subtileOcrPath, "-l", lang, "-o", srtPath.toString(), idxPath.toString()));
+            ProcessResult ocr = run(new ProcessBuilder(ocrCommand(lang, idxPath, srtPath)));
             if (!ocr.finished()) {
                 log.warn("subtile-ocr timed out, skipping image subtitle 0:s:{}", subIdx);
                 return false;
@@ -268,6 +305,38 @@ public class MediaFileFoundExtractSubtitles {
     }
 
     /**
+     * The subtile-ocr command line for one VobSub track. The tessdata_best
+     * directory is only passed when it holds the requested language: subtile-ocr
+     * has no per-language fallback, so pointing it at a directory without the
+     * model fails the whole OCR instead of degrading to the distro model.
+     */
+    List<String> ocrCommand(String lang, Path idxPath, Path srtPath) {
+        List<String> cmd = new ArrayList<>(List.of(subtileOcrPath, "-l", lang,
+                "--dpi", String.valueOf(ocrDpi),
+                "--threshold", String.format(Locale.ROOT, "%.2f", ocrThreshold),
+                "--border", String.valueOf(ocrBorder)));
+        if (ocrTessdataDir != null && !ocrTessdataDir.isBlank()) {
+            // "eng+nld" style multi-language tags need every model in the directory.
+            boolean allPresent = Arrays.stream(lang.split("\\+"))
+                    .allMatch(l -> Files.isRegularFile(Paths.get(ocrTessdataDir, l + ".traineddata")));
+            if (allPresent) {
+                cmd.add("--tessdata-dir");
+                cmd.add(ocrTessdataDir);
+            } else {
+                log.debug("No {} model in {}, using tesseract's default tessdata", lang, ocrTessdataDir);
+            }
+        }
+        if (ocrCharBlacklist != null && !ocrCharBlacklist.isBlank()) {
+            cmd.add("-c");
+            cmd.add("tessedit_char_blacklist=" + ocrCharBlacklist);
+        }
+        cmd.add("-o");
+        cmd.add(srtPath.toString());
+        cmd.add(idxPath.toString());
+        return cmd;
+    }
+
+    /**
      * Runs the process with merged stdout/stderr, draining the output on a
      * background thread so a chatty tool can't dead-lock on a full pipe, and
      * keeping only the tail for the failure logs.
@@ -288,7 +357,7 @@ public class MediaFileFoundExtractSubtitles {
                 // The stream dies with the process; the tail so far is enough.
             }
         });
-        boolean finished = process.waitFor(10, TimeUnit.MINUTES);
+        boolean finished = process.waitFor(ocrTimeout.toMillis(), TimeUnit.MILLISECONDS);
         if (!finished) {
             process.destroyForcibly();
         }

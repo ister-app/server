@@ -58,6 +58,10 @@ Zie [Zoeken](06-search-typesense.md) voor de procedure om in te schakelen en te 
 | FFmpeg-map | `FFMPEG_DIR` | `/usr/bin` | map met `ffmpeg`/`ffprobe` |
 | mkvextract / subtile-ocr | `MKVEXTRACT` / `SUBTILE_OCR` | `/usr/bin/...` | extractie en OCR van beeldondertitels |
 | `app.ister.server.subtitle-ocr-default-language` | | `eng` | OCR-taal die wordt aangenomen voor ingebedde beeldondertitels zonder taaltag; leeg schakelt OCR voor taggeloze streams uit |
+| `app.ister.server.subtitle-ocr-tessdata-dir` | `SUBTITLE_OCR_TESSDATA_DIR` | image: `/usr/share/tesseract/tessdata-best` | map met `tessdata_best`-modellen; wordt per taal alleen gebruikt als `<taal>.traineddata` er staat, anders geldt het distro-model (`tessdata_fast`). De images bevatten `eng nld deu fra spa ita por`; voeg talen toe met `--build-arg TESSDATA_BEST_LANGS="…"` of mount een map |
+| `app.ister.server.subtitle-ocr-dpi` / `-threshold` / `-border` | `SUBTITLE_OCR_DPI` / `_THRESHOLD` / `_BORDER` | `300` / `0.6` / `10` | doorgegeven aan subtile-ocr; verhoog de threshold als randen in de letters lopen, verlaag hem als dunne halen wegvallen |
+| `app.ister.server.subtitle-ocr-char-blacklist` | `SUBTITLE_OCR_CHAR_BLACKLIST` | ``|\/`_~`` | tekens die tesseract nooit mag uitvoeren (zijn gebruikelijke mislezingen van `I`/`l`); leeg schakelt uit |
+| `app.ister.server.subtitle-ocr-timeout` | `SUBTITLE_OCR_TIMEOUT` | `10m` | limiet per mkvextract-/subtile-ocr-run; de best-modellen zijn drie tot vier keer trager dan fast |
 | `app.ister.transcoder.hls.hwaccel` | `HLS_HWACCEL` | `none` | `vaapi` (Intel/AMD) of `nvdec` (NVIDIA); het compose-bestand toont de benodigde device-mappings |
 | `app.ister.transcoder.hls.hwaccel-device` | `HLS_HWACCEL_DEVICE` | `/dev/dri/renderD128` | alleen VAAPI |
 | `app.ister.transcoder.hls.max-concurrent-files` | `HLS_MAX_CONCURRENT_FILES` | `2` | gelijktijdig getranscodeerde bestanden; pre-transcoding deelt dit budget |

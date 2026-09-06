@@ -57,6 +57,10 @@ See [Search](06-search-typesense.md) for the enable/reindex procedure.
 | FFmpeg directory | `FFMPEG_DIR` | `/usr/bin` | directory holding `ffmpeg`/`ffprobe` |
 | mkvextract / subtile-ocr | `MKVEXTRACT` / `SUBTILE_OCR` | `/usr/bin/...` | image-subtitle extraction and OCR |
 | `app.ister.server.subtitle-ocr-default-language` | | `eng` | OCR language assumed for embedded image subtitles without a language tag; empty disables OCR for untagged streams |
+| `app.ister.server.subtitle-ocr-tessdata-dir` | `SUBTITLE_OCR_TESSDATA_DIR` | image: `/usr/share/tesseract/tessdata-best` | directory with `tessdata_best` models; used for a language only when its `<lang>.traineddata` is there, otherwise the distro (`tessdata_fast`) model applies. The images ship `eng nld deu fra spa ita por`; add languages with `--build-arg TESSDATA_BEST_LANGS="…"` or mount a directory |
+| `app.ister.server.subtitle-ocr-dpi` / `-threshold` / `-border` | `SUBTITLE_OCR_DPI` / `_THRESHOLD` / `_BORDER` | `300` / `0.6` / `10` | passed to subtile-ocr; raise the threshold when outlines bleed into the glyphs, lower it when thin strokes disappear |
+| `app.ister.server.subtitle-ocr-char-blacklist` | `SUBTITLE_OCR_CHAR_BLACKLIST` | ``|\/`_~`` | characters tesseract may never output (its usual misreads of `I`/`l`); empty disables |
+| `app.ister.server.subtitle-ocr-timeout` | `SUBTITLE_OCR_TIMEOUT` | `10m` | limit per mkvextract / subtile-ocr run; the best models are three to four times slower than fast |
 | `app.ister.transcoder.hls.hwaccel` | `HLS_HWACCEL` | `none` | `vaapi` (Intel/AMD) or `nvdec` (NVIDIA); the compose file shows the required device mappings |
 | `app.ister.transcoder.hls.hwaccel-device` | `HLS_HWACCEL_DEVICE` | `/dev/dri/renderD128` | VAAPI only |
 | `app.ister.transcoder.hls.max-concurrent-files` | `HLS_MAX_CONCURRENT_FILES` | `2` | files transcoded simultaneously; pre-transcoding shares this budget |

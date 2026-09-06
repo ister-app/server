@@ -320,4 +320,30 @@ class MediaFileFoundExtractSubtitlesTest {
 
         assertEquals(2, result.size());
     }
+
+    @Test
+    void ocrCommandCarriesTuningOptionsAndBlacklist() {
+        List<String> cmd = subject.ocrCommand("eng", Path.of("/tmp/x.idx"), Path.of("/tmp/x.srt"));
+
+        assertEquals(List.of("/usr/bin/subtile-ocr", "-l", "eng", "--dpi", "300", "--threshold", "0.60", "--border", "10",
+                "-c", "tessedit_char_blacklist=|\\/`_~", "-o", "/tmp/x.srt", "/tmp/x.idx"), cmd);
+    }
+
+    @Test
+    void ocrCommandUsesTessdataDirOnlyWhenEveryModelIsPresent() throws IOException {
+        Path tessdata = Files.createDirectory(cacheDir.resolve("best"));
+        Files.writeString(tessdata.resolve("eng.traineddata"), "x");
+        org.springframework.test.util.ReflectionTestUtils.setField(subject, "ocrTessdataDir", tessdata.toString());
+        org.springframework.test.util.ReflectionTestUtils.setField(subject, "ocrCharBlacklist", "");
+
+        List<String> eng = subject.ocrCommand("eng", Path.of("/tmp/x.idx"), Path.of("/tmp/x.srt"));
+        List<String> nld = subject.ocrCommand("nld", Path.of("/tmp/x.idx"), Path.of("/tmp/x.srt"));
+        List<String> both = subject.ocrCommand("eng+nld", Path.of("/tmp/x.idx"), Path.of("/tmp/x.srt"));
+
+        assertTrue(eng.contains("--tessdata-dir"));
+        assertEquals(tessdata.toString(), eng.get(eng.indexOf("--tessdata-dir") + 1));
+        assertFalse(nld.contains("--tessdata-dir"));
+        assertFalse(both.contains("--tessdata-dir"));
+        assertFalse(eng.contains("-c"));
+    }
 }

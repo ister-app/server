@@ -148,6 +148,15 @@ RUN dnf install -y \
     tesseract-langpack-yid \
     tesseract-langpack-yor \
     && dnf clean all
+# Better tesseract models than the distro's tessdata_fast packages (which the server keeps as
+# fallback for every other language). Override at build time: --build-arg TESSDATA_BEST_LANGS="eng nld deu".
+ARG TESSDATA_BEST_LANGS="eng nld deu fra spa ita por"
+RUN mkdir -p /usr/share/tesseract/tessdata-best \
+    && for lang in $TESSDATA_BEST_LANGS; do \
+         curl -fsSL -o /usr/share/tesseract/tessdata-best/$lang.traineddata \
+           https://github.com/tesseract-ocr/tessdata_best/raw/main/$lang.traineddata || exit 1; \
+       done
+ENV SUBTITLE_OCR_TESSDATA_DIR=/usr/share/tesseract/tessdata-best
 COPY --from=subtile-ocr-builder /root/.cargo/bin/subtile-ocr /usr/bin/subtile-ocr
 COPY ./server/build/native/nativeCompile /home/app
 ENTRYPOINT ["/home/app/server"]
