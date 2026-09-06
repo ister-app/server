@@ -1,5 +1,27 @@
 # Changelog
 
+## server v3.4.1
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `3.4.1` |
+| `ghcr.io/ister-app/migrations` | `3.4.1` |
+
+### Fixes
+
+- fix(hls): stop advertising SRT renditions and serve playlists as vnd.apple.mpegurl ([`4926b5f`](https://github.com/ister-app/server/commit/4926b5f))
+- fix(hls): smooth AAC timestamps so hls.js stops drifting on jittery sources ([`4cc7e4a`](https://github.com/ister-app/server/commit/4cc7e4a))
+- fix(api): return a parent's images in a fixed order on every lookup path ([`3be4b85`](https://github.com/ister-app/server/commit/3be4b85))
+- fix(hls): serve segments as a range-capable resource ([`b39c001`](https://github.com/ister-app/server/commit/b39c001))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:3.4.1
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v3.4.0...v3.4.1
+
 ## server v3.4.0
 
 | Image | Tag |
