@@ -61,6 +61,7 @@ See [Search](06-search-typesense.md) for the enable/reindex procedure.
 | `app.ister.server.subtitle-ocr-dpi` / `-threshold` / `-border` | `SUBTITLE_OCR_DPI` / `_THRESHOLD` / `_BORDER` | `300` / `0.6` / `10` | passed to subtile-ocr; raise the threshold when outlines bleed into the glyphs, lower it when thin strokes disappear |
 | `app.ister.server.subtitle-ocr-char-blacklist` | `SUBTITLE_OCR_CHAR_BLACKLIST` | ``|\/`_~`` | characters tesseract may never output (its usual misreads of `I`/`l`); empty disables |
 | `app.ister.server.subtitle-ocr-timeout` | `SUBTITLE_OCR_TIMEOUT` | `10m` | limit per mkvextract / subtile-ocr run; the best models are three to four times slower than fast |
+| `app.ister.server.subtitle-ocr-cleanup` | `SUBTITLE_OCR_CLEANUP` | `true` | post-OCR repair of the systematic misreads of DVD fonts (a mid-sentence "Is", "golng", "nlet"); rules exist for English and Dutch, other languages are left untouched |
 | `app.ister.transcoder.hls.hwaccel` | `HLS_HWACCEL` | `none` | `vaapi` (Intel/AMD) or `nvdec` (NVIDIA); the compose file shows the required device mappings |
 | `app.ister.transcoder.hls.hwaccel-device` | `HLS_HWACCEL_DEVICE` | `/dev/dri/renderD128` | VAAPI only |
 | `app.ister.transcoder.hls.max-concurrent-files` | `HLS_MAX_CONCURRENT_FILES` | `2` | files transcoded simultaneously; pre-transcoding shares this budget |

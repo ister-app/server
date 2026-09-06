@@ -62,6 +62,7 @@ Zie [Zoeken](06-search-typesense.md) voor de procedure om in te schakelen en te 
 | `app.ister.server.subtitle-ocr-dpi` / `-threshold` / `-border` | `SUBTITLE_OCR_DPI` / `_THRESHOLD` / `_BORDER` | `300` / `0.6` / `10` | doorgegeven aan subtile-ocr; verhoog de threshold als randen in de letters lopen, verlaag hem als dunne halen wegvallen |
 | `app.ister.server.subtitle-ocr-char-blacklist` | `SUBTITLE_OCR_CHAR_BLACKLIST` | ``|\/`_~`` | tekens die tesseract nooit mag uitvoeren (zijn gebruikelijke mislezingen van `I`/`l`); leeg schakelt uit |
 | `app.ister.server.subtitle-ocr-timeout` | `SUBTITLE_OCR_TIMEOUT` | `10m` | limiet per mkvextract-/subtile-ocr-run; de best-modellen zijn drie tot vier keer trager dan fast |
+| `app.ister.server.subtitle-ocr-cleanup` | `SUBTITLE_OCR_CLEANUP` | `true` | nabewerking van de systematische OCR-fouten van dvd-lettertypen (een "Is" midden in de zin, "golng", "nlet"); regels bestaan voor Engels en Nederlands, andere talen blijven onaangeroerd |
 | `app.ister.transcoder.hls.hwaccel` | `HLS_HWACCEL` | `none` | `vaapi` (Intel/AMD) of `nvdec` (NVIDIA); het compose-bestand toont de benodigde device-mappings |
 | `app.ister.transcoder.hls.hwaccel-device` | `HLS_HWACCEL_DEVICE` | `/dev/dri/renderD128` | alleen VAAPI |
 | `app.ister.transcoder.hls.max-concurrent-files` | `HLS_MAX_CONCURRENT_FILES` | `2` | gelijktijdig getranscodeerde bestanden; pre-transcoding deelt dit budget |

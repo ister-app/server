@@ -10,6 +10,7 @@ import com.github.kokorin.jaffree.ffmpeg.UrlInput;
 import com.github.kokorin.jaffree.ffmpeg.UrlOutput;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -83,6 +84,22 @@ public class MediaFileFoundExtractSubtitles {
     /** Wall-clock limit for one mkvextract or subtile-ocr run. */
     @Value("${app.ister.server.subtitle-ocr-timeout:10m}")
     private Duration ocrTimeout = Duration.ofMinutes(10);
+
+    /** Post-OCR repair of the systematic i/l/j misreads, see {@link OcrSubtitleCleaner}. */
+    @Value("${app.ister.server.subtitle-ocr-cleanup:true}")
+    private boolean ocrCleanup = true;
+
+    private final OcrSubtitleCleaner cleaner;
+
+    @Autowired
+    public MediaFileFoundExtractSubtitles(OcrSubtitleCleaner cleaner) {
+        this.cleaner = cleaner;
+    }
+
+    /** For tests: the extractor without the cleanup pass. */
+    MediaFileFoundExtractSubtitles() {
+        this.cleaner = null;
+    }
 
     /**
      * OCR fallback language (ISO 639-3) for image subtitles whose stream has
@@ -290,6 +307,9 @@ public class MediaFileFoundExtractSubtitles {
                 return false;
             }
 
+            if (ocrCleanup && cleaner != null) {
+                cleaner.cleanFile(srtPath, lang);
+            }
             log.info("OCR-extracted image subtitle 0:s:{} (lang {}) to {}", subIdx, lang, srtPath);
             return true;
         } catch (InterruptedException e) {
