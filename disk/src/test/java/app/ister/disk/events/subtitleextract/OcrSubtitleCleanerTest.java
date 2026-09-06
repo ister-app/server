@@ -93,4 +93,30 @@ class OcrSubtitleCleanerTest {
                 that's always a pleasure, isn't it?
                 """, Files.readString(srt));
     }
+
+    @Test
+    void cleanFileHandlesSubtileOcrDoubleBlankLinesAndCrlf(@TempDir Path dir) throws IOException {
+        // subtile-ocr writes an extra blank line between cues; every cue after the first must still be cleaned.
+        Path srt = dir.resolve("x.srt");
+        Files.writeString(srt, "1\r\n00:00:02,280 --> 00:00:04,369\r\nDo you know what this Is all about?\r\n\r\n\r\n"
+                + "2\r\n00:00:06,000 --> 00:00:06,860\r\nTo be out. This Is out.\r\n\r\n\r\n"
+                + "3\r\n00:00:07,160 --> 00:00:10,630\r\nOut Is one of the single most\r\nenjoyable things.\r\n\r\n\r\n");
+
+        cleaner.cleanFile(srt, "eng");
+
+        assertEquals("""
+                1
+                00:00:02,280 --> 00:00:04,369
+                Do you know what this is all about?
+
+                2
+                00:00:06,000 --> 00:00:06,860
+                To be out. This is out.
+
+                3
+                00:00:07,160 --> 00:00:10,630
+                Out is one of the single most
+                enjoyable things.
+                """, Files.readString(srt));
+    }
 }

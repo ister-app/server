@@ -78,12 +78,15 @@ public class OcrSubtitleCleaner {
             return;
         }
         try {
-            String src = Files.readString(srt, StandardCharsets.UTF_8);
-            String[] blocks = src.split("\n\n");
+            // subtile-ocr separates cues with a double blank line and other writers use CRLF:
+            // any run of blank lines is a cue boundary, and the file is rewritten with the
+            // standard single blank line.
+            String src = Files.readString(srt, StandardCharsets.UTF_8).replace("\r\n", "\n").replace('\r', '\n');
+            String[] blocks = src.strip().split("\n\s*\n");
             StringBuilder out = new StringBuilder();
             int fixes = 0;
             for (int i = 0; i < blocks.length; i++) {
-                String[] lines = blocks[i].split("\n", 3);
+                String[] lines = blocks[i].strip().split("\n", 3);
                 if (lines.length == 3 && lines[1].contains("-->")) {
                     String cleaned = clean(lines[2], lang);
                     if (!cleaned.equals(lines[2])) {
@@ -97,6 +100,7 @@ public class OcrSubtitleCleaner {
                     out.append("\n\n");
                 }
             }
+            out.append('\n');
             Files.writeString(srt, out.toString(), StandardCharsets.UTF_8);
             log.debug("OCR cleanup touched {} cues in {}", fixes, srt);
         } catch (IOException e) {
