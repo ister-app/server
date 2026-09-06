@@ -1,10 +1,10 @@
 package app.ister.transcoder;
 
+import app.ister.core.node.MediaFileInputResolver;
 import app.ister.core.entity.MediaFileStreamEntity;
 import app.ister.core.enums.StreamCodecType;
 import app.ister.core.utils.Jaffree;
 import com.github.kokorin.jaffree.LogLevel;
-import com.github.kokorin.jaffree.ffmpeg.UrlInput;
 import com.github.kokorin.jaffree.ffmpeg.UrlOutput;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -100,7 +100,7 @@ public class HlsSubtitleService {
         Files.createDirectories(srtFile.getParent());
         log.debug("Extracting embedded subtitle to SRT: streamIndex={}", stream.getStreamIndex());
         jaffree.getFFMPEG()
-                .addInput(UrlInput.fromUrl(mediaFilePath))
+                .addInput(MediaFileInputResolver.ffmpegInput(mediaFilePath))
                 .addOutput(UrlOutput.toPath(srtFile)
                         .addArguments("-map", "0:" + stream.getStreamIndex())
                         .addArguments("-c:s", "srt"))

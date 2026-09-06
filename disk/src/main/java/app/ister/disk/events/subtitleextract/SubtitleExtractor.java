@@ -6,7 +6,6 @@ import app.ister.core.enums.StreamCodecType;
 import app.ister.core.node.MediaFileInputResolver;
 import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
-import com.github.kokorin.jaffree.ffmpeg.UrlInput;
 import com.github.kokorin.jaffree.ffmpeg.UrlOutput;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -265,7 +264,7 @@ public class SubtitleExtractor {
     private boolean extractTextSubtitle(String inputPath, int subIdx, Path srtPath, String ffmpegDir) {
         try {
             FFmpeg.atPath(Paths.get(ffmpegDir))
-                    .addInput(UrlInput.fromUrl(inputPath))
+                    .addInput(MediaFileInputResolver.ffmpegInput(inputPath))
                     .addArguments("-map", "0:s:" + subIdx)
                     .addArguments("-c:s", "srt")
                     .addOutput(UrlOutput.toPath(srtPath))
@@ -291,7 +290,7 @@ public class SubtitleExtractor {
 
             // Step 1: ffmpeg → dvdsub MKS
             FFmpeg.atPath(Paths.get(ffmpegDir))
-                    .addInput(UrlInput.fromUrl(inputPath))
+                    .addInput(MediaFileInputResolver.ffmpegInput(inputPath))
                     .addArguments("-map", "0:s:" + subIdx)
                     .addArguments("-c:s", "dvdsub")
                     .addArguments("-f", "matroska")

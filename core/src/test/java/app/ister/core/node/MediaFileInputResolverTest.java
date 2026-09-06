@@ -61,4 +61,13 @@ class MediaFileInputResolverTest {
         assertThat(MediaFileInputResolver.isUrl("https://x/y")).isTrue();
         assertThat(MediaFileInputResolver.isUrl("/tv/a.mkv")).isFalse();
     }
+
+    /** A gateway closing the response early must make ffmpeg resume, not end the file quietly. */
+    @Test
+    void urlInputsCarryReconnectOptionsLocalPathsDoNot() {
+        assertThat(String.join(" ", MediaFileInputResolver.ffmpegInput("https://owner/mediaFile/x/download?token=t").buildArguments()))
+                .contains("-reconnect 1").contains("-reconnect_on_network_error 1").contains("-reconnect_streamed 1");
+        assertThat(String.join(" ", MediaFileInputResolver.ffmpegInput("/tv/a.mkv").buildArguments()))
+                .doesNotContain("-reconnect");
+    }
 }

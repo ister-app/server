@@ -3,6 +3,7 @@ package app.ister.core.node;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MediaFileStreamEntity;
 import app.ister.core.entity.NodeEntity;
+import com.github.kokorin.jaffree.ffmpeg.UrlInput;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -63,6 +64,23 @@ public class MediaFileInputResolver {
     public static String stripToken(String input) {
         int idx = input.indexOf("?token=");
         return idx < 0 ? input : input.substring(0, idx);
+    }
+
+    /**
+     * An ffmpeg input for a local path or a remote download URL. For URLs ffmpeg's http client
+     * gets its reconnect options: a proxy or gateway that closes the response early otherwise
+     * makes ffmpeg treat the truncated stream as a clean end of file, and a helper node would
+     * store, say, half a subtitle without any error. With these it resumes with a Range request.
+     */
+    public static UrlInput ffmpegInput(String input) {
+        UrlInput urlInput = UrlInput.fromUrl(input);
+        if (isUrl(input)) {
+            urlInput.addArguments("-reconnect", "1")
+                    .addArguments("-reconnect_on_network_error", "1")
+                    .addArguments("-reconnect_streamed", "1")
+                    .addArguments("-reconnect_delay_max", "30");
+        }
+        return urlInput;
     }
 
     public static boolean isUrl(String input) {

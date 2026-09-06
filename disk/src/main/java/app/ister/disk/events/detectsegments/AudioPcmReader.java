@@ -3,7 +3,6 @@ package app.ister.disk.events.detectsegments;
 import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.PipeOutput;
-import com.github.kokorin.jaffree.ffmpeg.UrlInput;
 import app.ister.core.node.MediaFileInputResolver;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -38,7 +37,7 @@ public class AudioPcmReader {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try {
             FFmpeg.atPath(Path.of(dirOfFFmpeg))
-                    .addInput(UrlInput.fromUrl(input)
+                    .addInput(MediaFileInputResolver.ffmpegInput(input)
                             .addArguments("-ss", offsetMs + "ms"))
                     .addOutput(PipeOutput.pumpTo(out)
                             .setFormat("s16le")

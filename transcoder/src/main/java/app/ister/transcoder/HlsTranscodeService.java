@@ -1,5 +1,6 @@
 package app.ister.transcoder;
 
+import app.ister.core.node.MediaFileInputResolver;
 import app.ister.core.utils.Jaffree;
 import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.ffmpeg.UrlInput;
@@ -341,7 +342,7 @@ public class HlsTranscodeService {
 
     private UrlInput buildInput(String path) {
         String[] args = HardwareAccel.fromString(hwaccelProperty).inputArgs(hwaccelDevice);
-        UrlInput input = UrlInput.fromUrl(path);
+        UrlInput input = MediaFileInputResolver.ffmpegInput(path);
         for (int i = 0; i + 1 < args.length; i += 2) {
             input.addArguments(args[i], args[i + 1]);
         }
@@ -784,7 +785,7 @@ public class HlsTranscodeService {
 
         String segmentPrefix = String.format("seg_audio_%d_%s_", streamIdx, audioQuality.getLabel());
         executePassWithTimeout(ffmpegFor(background)
-                .addInput(UrlInput.fromUrl(inputPath))
+                .addInput(MediaFileInputResolver.ffmpegInput(inputPath))
                 .addOutput(output)
                 .setOverwriteOutput(true)
                 .setLogLevel(LogLevel.ERROR),
@@ -1082,7 +1083,7 @@ public class HlsTranscodeService {
 
         log.debug("Generating audio segment: start={} duration={} idx={} quality={} -> {}", start, duration, audioIdx, quality.getLabel(), outputPath);
         executeWithTimeout(jaffree.getFFMPEG()
-                .addInput(UrlInput.fromUrl(inputPath).addArguments("-ss", String.format(Locale.ROOT, "%.6f", start)))
+                .addInput(MediaFileInputResolver.ffmpegInput(inputPath).addArguments("-ss", String.format(Locale.ROOT, "%.6f", start)))
                 .addOutput(output)
                 .setOverwriteOutput(true)
                 .setLogLevel(LogLevel.ERROR),
