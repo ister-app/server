@@ -1,5 +1,7 @@
 package app.ister.disk.events.imagefound;
 
+import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.ImageFoundData;
@@ -38,6 +40,7 @@ public class HandleImageFound implements Handle<ImageFoundData> {
 
     @Override
     public void handle(app.ister.core.eventdata.ImageFoundData messageData) {
+        ActivityContext.subject(ActivitySubjects.fileName(messageData.getPath()));
         try {
             BasicFileAttributes basicFileAttributes = Files.readAttributes(Path.of(messageData.getPath()), BasicFileAttributes.class);
 

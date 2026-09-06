@@ -1,5 +1,6 @@
 package app.ister.worker.events.albumfound;
 
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.status.ActivityContext;
 import app.ister.core.Handle;
 import app.ister.core.entity.MetadataEntity;
@@ -54,7 +55,7 @@ public class HandleAlbumFound implements Handle<AlbumFoundData> {
         albumRepository.findById(data.getAlbumId()).ifPresent(album -> {
             String artistName = album.getPersonEntity().getName();
             String albumName = album.getName();
-            ActivityContext.subject(artistName + " – " + albumName);
+            ActivityContext.report(ActivitySubjects.describe(album, ActivitySubjects.empty()).withTitle(albumName));
 
             if (imageRepository.findByAlbumEntityId(album.getId()).isEmpty()) {
                 musicBrainzService.getCoverArtUrl(artistName, albumName).ifPresentOrElse(

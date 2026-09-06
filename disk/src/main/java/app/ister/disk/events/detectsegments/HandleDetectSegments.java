@@ -15,8 +15,9 @@ import org.springframework.stereotype.Service;
  *
  * <p>Fingerprinting a whole season in one go can outlast RabbitMQ's consumer timeout (default
  * 30 minutes), which closes the channel and requeues the message forever. So each message detects
- * at most {@code app.ister.server.segment-detect.chunk-size} episodes and, when pending episodes
- * remain, publishes a successor message for the same season. Not annotated {@code @Transactional}:
+ * at most {@code app.ister.server.segment-detect.chunk-size} episodes and publishes a successor
+ * message for the same season while pending episodes remain — plus one final sweep, because an
+ * episode analyzed while the chain held the season lock had its own event dropped. Not annotated {@code @Transactional}:
  * the successor must only be published after the chunk's transaction has committed, see
  * {@link SegmentDetectionChunkProcessor}.
  */
@@ -47,7 +48,7 @@ public class HandleDetectSegments implements Handle<DetectSegmentsData> {
     public void handle(DetectSegmentsData data) {
         SegmentDetectionChunkProcessor.Chunk chunk =
                 chunkProcessor.process(data.getSeasonEntityUUID(), data.getDirectoryEntityUUID(), chunkSize);
-        if (chunk.remaining() == 0) {
+        if (chunk.remaining() == 0 && chunk.processed() == 0) {
             return;
         }
         if (chunk.directoryName() == null) {
@@ -55,6 +56,8 @@ public class HandleDetectSegments implements Handle<DetectSegmentsData> {
                     data.getDirectoryEntityUUID(), data.getSeasonEntityUUID());
             return;
         }
+        // remaining == 0 here is the final sweep: an episode whose analysis finished while this
+        // chain held the season lock had its own DETECT_SEGMENTS dropped, so look once more.
         log.debug("Segment detection chunk of {} done for season {}, {} episode(s) remaining",
                 chunk.processed(), data.getSeasonEntityUUID(), chunk.remaining());
         messageSender.sendDetectSegments(DetectSegmentsData.builder()

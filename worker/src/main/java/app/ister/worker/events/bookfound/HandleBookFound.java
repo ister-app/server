@@ -1,6 +1,7 @@
 package app.ister.worker.events.bookfound;
 
 import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.Handle;
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.MediaFileEntity;
@@ -82,7 +83,7 @@ public class HandleBookFound implements Handle<BookFoundData> {
     }
 
     private void enrich(BookEntity book) {
-        ActivityContext.subject(book.getName());
+        ActivityContext.report(ActivitySubjects.describe(book, ActivitySubjects.empty()).withTitle(book.getName()));
         if (book.getPersonEntity() == null) {
             // A comic volume: Open Library is a book database and BOOK_FOUND should never
             // fire for comics; the series-level Wikipedia enrichment covers them.

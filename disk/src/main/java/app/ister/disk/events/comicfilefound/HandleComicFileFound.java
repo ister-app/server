@@ -1,5 +1,7 @@
 package app.ister.disk.events.comicfilefound;
 
+import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.Handle;
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.DirectoryEntity;
@@ -84,6 +86,8 @@ public class HandleComicFileFound implements Handle<ComicFileFoundData> {
             log.warn("ComicFileFound: media file or volume not found for path={} — skipping", messageData.getPath());
             return;
         }
+        ActivityContext.report(ActivitySubjects.describe(volume.get(), ActivitySubjects.describe(directoryEntity))
+                .withTitle(ActivitySubjects.fileName(messageData.getPath())));
 
         Path path = Path.of(messageData.getPath());
         String lower = messageData.getPath().toLowerCase();

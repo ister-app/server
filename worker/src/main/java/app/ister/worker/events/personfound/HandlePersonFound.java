@@ -1,5 +1,7 @@
 package app.ister.worker.events.personfound;
 
+import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.Handle;
 import app.ister.core.config.LanguageProperties;
 import app.ister.core.entity.MetadataEntity;
@@ -64,6 +66,8 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
     @Override
     public void handle(PersonFoundData data) {
         personRepository.findById(data.getPersonId()).ifPresent(person -> {
+            ActivityContext.subject(person.getName());
+            ActivityContext.context(ActivitySubjects.PERSON, person.getId().toString(), person.getName());
             boolean hasMetadata = !metadataRepository.findByPersonEntityId(person.getId()).isEmpty();
             boolean hasImage = !imageRepository.findByPersonEntityId(person.getId()).isEmpty();
             boolean needsBirthYear = person.getBirthYear() == null;

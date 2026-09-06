@@ -1,5 +1,7 @@
 package app.ister.disk.events.pretranscode;
 
+import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.Handle;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.SubtitleFormat;
@@ -55,6 +57,8 @@ public class HandlePreTranscodeRecentlyWatched implements Handle<PreTranscodeRec
     @Override
     public void handle(PreTranscodeRecentlyWatchedData data) {
         String diskName = data.getDiskName();
+        ActivityContext.subject(diskName);
+        ActivityContext.directory(diskName, null);
         log.info("Handling PRE_TRANSCODE_RECENTLY_WATCHED for disk: {}", diskName);
 
         PreTranscodeService.PreTranscodeCollection collection = preTranscodeService.collectMediaFilesToPreTranscode(diskName);

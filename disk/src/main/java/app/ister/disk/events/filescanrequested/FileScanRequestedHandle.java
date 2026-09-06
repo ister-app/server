@@ -1,5 +1,7 @@
 package app.ister.disk.events.filescanrequested;
 
+import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.FileScanRequestedData;
@@ -54,6 +56,7 @@ public class FileScanRequestedHandle implements Handle<FileScanRequestedData> {
     @Override
     public void handle(app.ister.core.eventdata.FileScanRequestedData messageData) {
         DirectoryEntity directoryEntity = directoryRepository.findById(messageData.getDirectoryEntityUUID()).orElseThrow();
+        ActivityContext.report(ActivitySubjects.describeDirectoryJob(directoryEntity));
         LibraryType libraryType = directoryEntity.getLibraryEntity() != null
                 ? directoryEntity.getLibraryEntity().getLibraryType() : null;
         boolean isMusic = libraryType == LibraryType.MUSIC;

@@ -4,13 +4,13 @@ import app.ister.core.eventdata.TranscodeActivityStatusData;
 import app.ister.core.eventdata.TranscodeActivityStatusData.TranscodePass;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.service.MessageSender;
+import app.ister.core.status.ActivitySubjects;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -41,10 +41,10 @@ public class TranscodeActivityPublisher {
     private final MediaFileRepository mediaFileRepository;
     private final TransactionTemplate readOnlyTransaction;
 
-    /** mediaFileId (string) -> display title; LRU so a long prefetch queue can't grow it unbounded. */
-    private final Map<String, String> titleCache = new LinkedHashMap<>(16, 0.75f, true) {
+    /** mediaFileId (string) -> description; LRU so a long prefetch queue can't grow it unbounded. */
+    private final Map<String, ActivitySubjects.Subject> titleCache = new LinkedHashMap<>(16, 0.75f, true) {
         @Override
-        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+        protected boolean removeEldestEntry(Map.Entry<String, ActivitySubjects.Subject> eldest) {
             return size() > TITLE_CACHE_MAX;
         }
     };
@@ -67,9 +67,16 @@ public class TranscodeActivityPublisher {
     @Scheduled(fixedDelay = 2000)
     public void publishIfChanged() {
         List<TranscodePass> passes = transcodeService.runningPassesSnapshot().stream()
-                .map(pass -> new TranscodePass(pass.mediaFileId(), titleFor(pass.mediaFileId()),
-                        qualityOf(pass.generationKey(), pass.mediaFileId()), pass.background(),
-                        Instant.ofEpochMilli(pass.startedAtMillis())))
+                .map(pass -> {
+                    ActivitySubjects.Subject subject = subjectFor(pass.mediaFileId());
+                    return new TranscodePass(pass.mediaFileId(),
+                            subject == null ? null : subject.title(),
+                            qualityOf(pass.generationKey(), pass.mediaFileId()), pass.background(),
+                            Instant.ofEpochMilli(pass.startedAtMillis()),
+                            subject == null ? null : subject.context(),
+                            subject == null ? null : subject.contextType(),
+                            subject == null ? null : subject.contextId());
+                })
                 .toList();
         long nowMillis = System.currentTimeMillis();
         boolean unchanged = passes.equals(lastPasses);
@@ -91,24 +98,24 @@ public class TranscodeActivityPublisher {
                 : generationKey;
     }
 
-    private String titleFor(String mediaFileId) {
+    private ActivitySubjects.Subject subjectFor(String mediaFileId) {
         synchronized (titleCache) {
-            String cached = titleCache.get(mediaFileId);
+            ActivitySubjects.Subject cached = titleCache.get(mediaFileId);
             if (cached != null) {
                 return cached;
             }
         }
-        String title = lookupTitle(mediaFileId).orElse(null);
-        if (title != null) {
+        ActivitySubjects.Subject subject = lookupSubject(mediaFileId).orElse(null);
+        if (subject != null) {
             synchronized (titleCache) {
-                titleCache.put(mediaFileId, title);
+                titleCache.put(mediaFileId, subject);
             }
         }
-        return title;
+        return subject;
     }
 
-    /** Basename of the media file's path; empty for non-UUID pass keys or a missing row. */
-    private Optional<String> lookupTitle(String mediaFileId) {
+    /** File name plus show/movie/album context; empty for non-UUID pass keys or a missing row. */
+    private Optional<ActivitySubjects.Subject> lookupSubject(String mediaFileId) {
         UUID id;
         try {
             id = UUID.fromString(mediaFileId);
@@ -116,8 +123,6 @@ public class TranscodeActivityPublisher {
             return Optional.empty(); // Not a UUID-keyed pass; leave the title empty.
         }
         return Optional.ofNullable(readOnlyTransaction.execute(status ->
-                mediaFileRepository.findById(id)
-                        .map(file -> Path.of(file.getPath()).getFileName().toString())
-                        .orElse(null)));
+                mediaFileRepository.findById(id).map(ActivitySubjects::describe).orElse(null)));
     }
 }

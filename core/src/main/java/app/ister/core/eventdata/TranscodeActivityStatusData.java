@@ -35,5 +35,14 @@ public class TranscodeActivityStatusData {
         private String quality;
         private boolean background;
         private Instant startedAt;
+        /** Title of the show / movie / album the file belongs to; null when unknown. */
+        private String context;
+        /** Machine token for the kind of {@link #context} (see ActivitySubjects). */
+        private String contextType;
+        private String contextId;
+
+        public TranscodePass(String mediaFileId, String title, String quality, boolean background, Instant startedAt) {
+            this(mediaFileId, title, quality, background, startedAt, null, null, null);
+        }
     }
 }

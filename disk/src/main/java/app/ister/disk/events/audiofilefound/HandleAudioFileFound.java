@@ -1,5 +1,7 @@
 package app.ister.disk.events.audiofilefound;
 
+import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.entity.AlbumEntity;
 import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.DirectoryEntity;
@@ -140,6 +142,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
             return;
         }
         mediaFile.ifPresent(entity -> {
+            ActivityContext.report(ActivitySubjects.describe(entity));
             UUID entityId = entity.getId();
             UUID directoryId = directoryEntity.getId();
             // native bulk DELETE; clearAutomatically=true evicts all session entities afterwards

@@ -53,6 +53,16 @@ public class ProcessingActivityAdvice implements MethodInterceptor {
             public void step(String step) {
                 registry.updateStep(token, step);
             }
+
+            @Override
+            public void context(String type, String id, String title) {
+                registry.updateContext(token, type, id, title);
+            }
+
+            @Override
+            public void directory(String directory, String library) {
+                registry.updateDirectory(token, directory, library);
+            }
         });
         boolean failed = true;
         try {

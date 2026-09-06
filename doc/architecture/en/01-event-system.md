@@ -80,7 +80,7 @@ cache-directory queue is always consumed by its owner, offloaded or not. The dep
 | `HandleNewDirectoriesScanRequested` | disk | `NEW_DIRECTORIES_SCAN_REQUEST` | `FILE_SCAN_REQUESTED` |
 | `FileScanRequestedHandle` | disk | `FILE_SCAN_REQUESTED` | `MEDIA_FILE_FOUND` / `AUDIO_FILE_FOUND` / `EPUB_FILE_FOUND` / `COMIC_FILE_FOUND` / `IMAGE_FOUND` / `NFO_FILE_FOUND` / `SUBTITLE_FILE_FOUND` |
 | `HandleMediaFileFound` | disk | `MEDIA_FILE_FOUND` | `IMAGE_FOUND`, `DETECT_SEGMENTS` (season-scoped, after commit), `SUBTITLE_EXTRACT_REQUESTED` (one per embedded subtitle stream, after commit) |
-| `HandleDetectSegments` | disk | `DETECT_SEGMENTS` | `DETECT_SEGMENTS` (intro/outro detection per season, processed in chunks — the handler re-queues itself for the next chunk; helper-capable) |
+| `HandleDetectSegments` | disk | `DETECT_SEGMENTS` | `DETECT_SEGMENTS` (intro/outro detection per season, processed in chunks — the handler re-queues itself for the next chunk and once more as a final sweep, because an episode analyzed while the season was locked had its own event dropped; helper-capable) |
 | `HandleSubtitleExtractRequested` | disk | `SUBTITLE_EXTRACT_REQUESTED` | — (extracts/OCRs one subtitle stream to an SRT in the owner's cache directory, uploading it when run on a helper; helper-capable) |
 | `HandleAudioFileFound` | disk | `AUDIO_FILE_FOUND` | `IMAGE_FOUND` (track- or chapter-bound, by library type) |
 | `HandleEpubFileFound` | disk | `EPUB_FILE_FOUND` | `IMAGE_FOUND` |

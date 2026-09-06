@@ -32,6 +32,11 @@ public class NodeActivityRegistry {
         final Instant startedAt;
         volatile String subject;
         volatile String step;
+        volatile String context;
+        volatile String contextType;
+        volatile String contextId;
+        volatile String directory;
+        volatile String library;
 
         InFlightWork(String queue, String eventType, Instant startedAt) {
             this.queue = queue;
@@ -40,7 +45,8 @@ public class NodeActivityRegistry {
         }
 
         ProcessingItem toItem() {
-            return new ProcessingItem(queue, eventType, startedAt, subject, step);
+            return new ProcessingItem(queue, eventType, startedAt, subject, step,
+                    context, contextType, contextId, directory, library);
         }
     }
 
@@ -69,6 +75,23 @@ public class NodeActivityRegistry {
         InFlightWork work = inFlight.get(token);
         if (work != null) {
             work.step = step;
+        }
+    }
+
+    public void updateContext(long token, String type, String id, String title) {
+        InFlightWork work = inFlight.get(token);
+        if (work != null) {
+            work.contextType = type;
+            work.contextId = id;
+            work.context = title;
+        }
+    }
+
+    public void updateDirectory(long token, String directory, String library) {
+        InFlightWork work = inFlight.get(token);
+        if (work != null) {
+            work.directory = directory;
+            work.library = library;
         }
     }
 

@@ -1,5 +1,7 @@
 package app.ister.disk.events.subtitlefilefound;
 
+import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileStreamEntity;
 import app.ister.core.enums.EventType;
@@ -45,6 +47,7 @@ public class HandleSubtitleFileFound implements Handle<SubtitleFileFoundData> {
     @Override
     public void handle(app.ister.core.eventdata.SubtitleFileFoundData subtitleFileFoundData) {
         var directoryEntity = directoryRepository.findById(subtitleFileFoundData.getDirectoryEntityUUID()).orElseThrow();
+        ActivityContext.report(ActivitySubjects.describe(directoryEntity).withTitle(ActivitySubjects.fileName(subtitleFileFoundData.getPath())));
         analyze(directoryEntity, subtitleFileFoundData.getPath());
     }
 

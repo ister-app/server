@@ -495,6 +495,8 @@ type ServerActivityEvent {
     failure: EventFailure
     "The node's currently running FFmpeg transcode passes (TRANSCODE_ACTIVITY); replaces the node's previous list."
     transcodes: [TranscodePass!]
+    "What the node reports about itself (NODE_ACTIVITY): host, uptime, directories with disk space, helper set-up. Null from nodes older than 3.5."
+    nodeInfo: NodeInfo
 }
 
 type ProcessingItem {
@@ -505,6 +507,50 @@ type ProcessingItem {
     subject: String
     "Machine token for the current sub-step (e.g. \"probe\", \"crop\"); clients map it to a label and must tolerate unknown tokens."
     step: String
+    "Title of the entity the work belongs to (the show, movie, album, book, podcast or library); groups the steps of one item on the activity screen."
+    context: String
+    "Machine token for the kind of `context`: \"show\", \"movie\", \"album\", \"book\", \"podcast\", \"person\" or \"library\"; clients must tolerate unknown tokens."
+    contextType: String
+    "Id of the context entity; with `contextType` the grouping key."
+    contextId: ID
+    "Name of the directory (disk) the work runs on."
+    directory: String
+    "Name of the library the work belongs to."
+    library: String
+}
+
+"Slow-changing facts a node publishes about itself with every activity snapshot (at least once a minute)."
+type NodeInfo {
+    hostname: String
+    "When the node process started."
+    startedAt: String
+    javaVersion: String
+    availableProcessors: Int
+    "JVM heap limit in bytes."
+    maxMemoryBytes: Float
+    "Directories this node owns, library and cache alike."
+    directories: [NodeDirectory!]!
+    "Directories of other nodes this node helps with, and for which job families."
+    helperDisks: [HelperDisk!]!
+    "Job families this node hands off to helper nodes for its own directories."
+    offloadJobs: [String!]!
+}
+
+"One directory (disk) of a node with its file-system space; the byte counts are Float because Int is 32-bit."
+type NodeDirectory {
+    name: String!
+    path: String!
+    "LIBRARY or CACHE."
+    type: String
+    library: String
+    "Null when the path is not mounted on the node."
+    totalBytes: Float
+    freeBytes: Float
+}
+
+type HelperDisk {
+    name: String!
+    jobs: [String!]!
 }
 
 "One running FFmpeg transcode pass on a node."
@@ -518,6 +564,10 @@ type TranscodePass {
     "True for pre-transcode/prefetch work running at background priority."
     background: Boolean!
     startedAt: String!
+    "Title of the show / movie / album the file belongs to, matching ProcessingItem.context."
+    context: String
+    contextType: String
+    contextId: ID
 }
 
 type QueueStat {

@@ -1,6 +1,7 @@
 package app.ister.worker.events.showfound;
 
 import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.config.LanguageProperties;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
@@ -56,7 +57,7 @@ public class HandleShowFound implements Handle<app.ister.core.eventdata.ShowFoun
         }
         try {
             var showEntity = showRepository.findById(showFoundData.getShowId()).orElseThrow();
-            ActivityContext.subject(showEntity.getName());
+            ActivityContext.report(ActivitySubjects.describe(showEntity, ActivitySubjects.empty()).withTitle(showEntity.getName()));
             Integer tmdbSeriesId = null;
             for (String language : languageProperties.tags()) {
                 Optional<TMDBResult> tmdbResult = showMetadata.getMetadata(showEntity.getName(), showEntity.getReleaseYear(), language);

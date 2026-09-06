@@ -1,5 +1,7 @@
 package app.ister.disk.events.personfound;
 
+import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.Handle;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
@@ -47,6 +49,8 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
     @Override
     public void handle(PersonFoundData data) {
         personRepository.findById(data.getPersonId()).ifPresent(artist -> {
+            ActivityContext.subject(artist.getName());
+            ActivityContext.context(ActivitySubjects.PERSON, artist.getId().toString(), artist.getName());
             metadataRepository.deleteAll(metadataRepository.findByPersonEntityId(artist.getId()));
             // Keep the search index in line with the removed metadata; the NFO re-parse below re-enriches it.
             serverEventService.createSearchIndexEvent(SearchEntityType.PERSON, artist.getId());

@@ -73,6 +73,9 @@ class HandleDetectSegmentsTest {
     void setUp() {
         // Files here have no directory/node: resolve like a local file.
         lenient().when(inputResolver.resolve(any())).thenAnswer(inv -> ((MediaFileEntity) inv.getArgument(0)).getPath());
+        // Every chunk that did work routes a successor (or the final sweep) by directory name.
+        lenient().when(directoryRepository.findById(DIRECTORY_ID))
+                .thenReturn(Optional.of(DirectoryEntity.builder().name("disk1").build()));
         AudioPcmReader fakeReader = new AudioPcmReader() {
             @Override
             public short[] readMonoPcm(String input, String dirOfFFmpeg, long offsetMs, long durationMs) {
@@ -131,7 +134,9 @@ class HandleDetectSegmentsTest {
         files.forEach(f -> assertEquals(SegmentDetectionChunkProcessor.DETECTOR_VERSION, f.getSegmentDetectorVersion()));
         verify(mediaFileRepository, times(3)).save(any());
         // Everything fit in one chunk, so no successor message.
-        verify(messageSender, never()).sendDetectSegments(any(), anyString());
+        // The chain ends with one sweep: an episode analyzed while the season was locked
+        // had its own event dropped, and only a chunk started after it can see it.
+        verify(messageSender, times(1)).sendDetectSegments(any(), eq("disk1"));
     }
 
     @Test
@@ -175,7 +180,9 @@ class HandleDetectSegmentsTest {
         subject.handle(event());
 
         files.forEach(f -> assertEquals(SegmentDetectionChunkProcessor.DETECTOR_VERSION, f.getSegmentDetectorVersion()));
-        verify(messageSender, never()).sendDetectSegments(any(), anyString());
+        // The chain ends with one sweep: an episode analyzed while the season was locked
+        // had its own event dropped, and only a chunk started after it can see it.
+        verify(messageSender, times(1)).sendDetectSegments(any(), eq("disk1"));
     }
 
     @Test

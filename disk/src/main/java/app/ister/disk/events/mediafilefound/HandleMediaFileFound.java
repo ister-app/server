@@ -14,6 +14,7 @@ import app.ister.core.repository.*;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.NodeService;
 import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.utils.AfterCommitPublisher;
 import app.ister.core.Handle;
 import com.github.kokorin.jaffree.process.JaffreeAbnormalExitException;
@@ -111,11 +112,20 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
      */
     @Override
     public void handle(app.ister.core.eventdata.MediaFileFoundData mediaFileFoundData) {
-        ActivityContext.subject(Path.of(mediaFileFoundData.getPath()).getFileName().toString());
+        String fileName = ActivitySubjects.fileName(mediaFileFoundData.getPath());
+        ActivityContext.subject(fileName);
         DirectoryEntity directoryEntity = directoryRepository.findById(mediaFileFoundData.getDirectoryEntityUUID())
                 .orElseThrow(() -> new IllegalStateException("Directory not found: " + mediaFileFoundData.getDirectoryEntityUUID()));
         Optional<EpisodeEntity> episodeEntity = mediaFileFoundData.getEpisodeEntityUUID() != null ? episodeRepository.findById(mediaFileFoundData.getEpisodeEntityUUID()) : Optional.empty();
         Optional<MovieEntity> movieEntity = mediaFileFoundData.getMovieEntityUUID() != null ? movieRepository.findById(mediaFileFoundData.getMovieEntityUUID()) : Optional.empty();
+        ActivitySubjects.Subject subject = ActivitySubjects.describe(directoryEntity).withTitle(fileName);
+        if (episodeEntity.isPresent()) {
+            subject = ActivitySubjects.describe(episodeEntity.get(), subject)
+                    .withTitle(ActivitySubjects.episodeCode(episodeEntity.get()) + " · " + fileName);
+        } else if (movieEntity.isPresent()) {
+            subject = ActivitySubjects.describe(movieEntity.get(), subject);
+        }
+        ActivityContext.report(subject);
         var mediaFile = checkMediaFile(directoryEntity, mediaFileFoundData.getPath());
         mediaFile.ifPresent(mediaFileEntity -> {
             var parts = updateEpisodeBoundaries(mediaFileEntity);

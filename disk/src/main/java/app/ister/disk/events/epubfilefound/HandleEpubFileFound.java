@@ -1,5 +1,7 @@
 package app.ister.disk.events.epubfilefound;
 
+import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.Handle;
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.DirectoryEntity;
@@ -83,6 +85,8 @@ public class HandleEpubFileFound implements Handle<EpubFileFoundData> {
             log.warn("EpubFileFound: media file or book not found for path={} — skipping", messageData.getPath());
             return;
         }
+        ActivityContext.report(ActivitySubjects.describe(book.get(), ActivitySubjects.describe(directoryEntity))
+                .withTitle(ActivitySubjects.fileName(messageData.getPath())));
 
         Optional<EpubInfo> parsed = epubParser.parse(Path.of(messageData.getPath()));
         if (parsed.isEmpty()) {

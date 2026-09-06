@@ -1,5 +1,7 @@
 package app.ister.disk.events.updateimagesrequested;
 
+import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.Handle;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.UpdateImagesRequestedData;
@@ -41,6 +43,8 @@ public class HandleUpdateImagesRequested implements Handle<UpdateImagesRequested
 
     @Override
     public void handle(UpdateImagesRequestedData data) {
+        ActivityContext.subject(data.getDirectoryName());
+        ActivityContext.directory(data.getDirectoryName(), null);
         BlurHashChunkProcessor.Chunk chunk =
                 chunkProcessor.process(data.getDirectoryEntityId(), data.getAfterId(), chunkSize);
 

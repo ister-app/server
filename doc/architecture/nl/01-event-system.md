@@ -82,7 +82,7 @@ helper-schijven met de `TRANSCODE`-job.
 | `HandleNewDirectoriesScanRequested` | disk | `NEW_DIRECTORIES_SCAN_REQUEST` | `FILE_SCAN_REQUESTED` |
 | `FileScanRequestedHandle` | disk | `FILE_SCAN_REQUESTED` | `MEDIA_FILE_FOUND` / `AUDIO_FILE_FOUND` / `EPUB_FILE_FOUND` / `COMIC_FILE_FOUND` / `IMAGE_FOUND` / `NFO_FILE_FOUND` / `SUBTITLE_FILE_FOUND` |
 | `HandleMediaFileFound` | disk | `MEDIA_FILE_FOUND` | `IMAGE_FOUND`, `DETECT_SEGMENTS` (per seizoen, na commit), `SUBTITLE_EXTRACT_REQUESTED` (één per ingebedde ondertitelstream, na commit) |
-| `HandleDetectSegments` | disk | `DETECT_SEGMENTS` | `DETECT_SEGMENTS` (intro-/outro-detectie per seizoen, in chunks verwerkt — de handler zet zichzelf opnieuw in de queue voor de volgende chunk; helper-geschikt) |
+| `HandleDetectSegments` | disk | `DETECT_SEGMENTS` | `DETECT_SEGMENTS` (intro-/outro-detectie per seizoen, in chunks verwerkt — de handler zet zichzelf opnieuw in de queue voor de volgende chunk en nog één keer als slotronde, omdat een aflevering die tijdens het seizoensslot geanalyseerd werd haar eigen event kwijt was; helper-geschikt) |
 | `HandleSubtitleExtractRequested` | disk | `SUBTITLE_EXTRACT_REQUESTED` | — (extraheert/OCR't één ondertitelstream naar een SRT in de cache-directory van de eigenaar, en uploadt hem wanneer het op een helper draait; helper-geschikt) |
 | `HandleAudioFileFound` | disk | `AUDIO_FILE_FOUND` | `IMAGE_FOUND` (track- óf chapter-gebonden, per library-type) |
 | `HandleEpubFileFound` | disk | `EPUB_FILE_FOUND` | `IMAGE_FOUND` |

@@ -1,5 +1,7 @@
 package app.ister.disk.events.nfofilefound;
 
+import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.enums.EventType;
@@ -59,6 +61,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
     @Override
     public void handle(app.ister.core.eventdata.NfoFileFoundData nfoFileFoundData) {
         var directoryEntity = directoryRepository.findById(nfoFileFoundData.getDirectoryEntityUUID()).orElseThrow();
+        ActivityContext.report(ActivitySubjects.describe(directoryEntity).withTitle(ActivitySubjects.fileName(nfoFileFoundData.getPath())));
         analyze(directoryEntity, nfoFileFoundData.getPath());
     }
 

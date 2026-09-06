@@ -1,5 +1,7 @@
 package app.ister.worker.events.podcast;
 
+import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.Handle;
 import app.ister.core.config.OwnDirectoriesProperties;
 import app.ister.core.entity.DirectoryEntity;
@@ -117,6 +119,7 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
             return;
         }
         podcastRepository.findById(data.getPodcastId()).ifPresent(podcast -> {
+            ActivityContext.report(ActivitySubjects.describe(podcast, ActivitySubjects.empty()).withTitle(podcast.getTitle()));
             if (!podcast.isActive()) {
                 return;
             }

@@ -1,5 +1,7 @@
 package app.ister.disk.events.podcastepisodedownloadrequested;
 
+import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.Handle;
 import app.ister.core.EventHandlingException;
 import app.ister.core.entity.DirectoryEntity;
@@ -83,6 +85,9 @@ public class HandlePodcastEpisodeDownloadRequested implements Handle<PodcastEpis
             return;
         }
         PodcastEpisodeEntity episode = episodeOptional.get();
+        // The episode title lives in its metadata rows; the number (or the feed guid) is what is at hand.
+        ActivityContext.report(ActivitySubjects.describe(episode.getPodcastEntity(), ActivitySubjects.empty())
+                .withTitle(episode.getEpisodeNumber() != null ? "#" + episode.getEpisodeNumber() : episode.getGuid()));
         if (mediaFileRepository.existsByPodcastEpisodeEntityId(episode.getId())) {
             return; // already downloaded
         }

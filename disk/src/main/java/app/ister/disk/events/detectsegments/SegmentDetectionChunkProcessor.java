@@ -12,6 +12,7 @@ import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileSegmentRepository;
 import app.ister.core.service.MediaFileEpisodeService;
 import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -130,7 +131,8 @@ public class SegmentDetectionChunkProcessor {
     /**
      * One processed chunk. {@code remaining} counts the pending episodes left for a successor
      * message; {@code directoryName} routes that successor to the same directory queue (null when
-     * nothing remains).
+     * the directory is gone). A chunk that processed episodes always gets a successor, even with
+     * nothing remaining: a final sweep for episodes analyzed while the season was locked.
      */
     public record Chunk(int processed, int remaining, String directoryName) {
     }
@@ -159,8 +161,8 @@ public class SegmentDetectionChunkProcessor {
                 .findFirst()
                 .map(EpisodeEntity::getSeasonEntity)
                 .filter(season -> season.getShowEntity() != null)
-                .ifPresent(season -> ActivityContext.subject(
-                        season.getShowEntity().getName() + " S" + season.getNumber()));
+                .ifPresent(season -> ActivityContext.report(
+                        ActivitySubjects.describe(season, ActivitySubjects.empty())));
         List<EpisodeSlice> slices = localAnalyzedSlices(seasonEntityId, directoryEntityId);
         List<EpisodeSlice> pending = slices.stream()
                 .filter(s -> needsDetection(s.mediaFile()))
@@ -221,9 +223,12 @@ public class SegmentDetectionChunkProcessor {
         if (remaining == 0) {
             retryMissedIntros(slices, hopMs);
         }
-        String directoryName = remaining > 0
-                ? directoryRepository.findById(directoryEntityId).map(DirectoryEntity::getName).orElse(null)
-                : null;
+        // The directory name routes the successor. Also filled when nothing remains: the
+        // handler then runs one more sweep, because an episode analyzed while this chain held
+        // the season lock had its own event dropped (see the top of this method) and is only
+        // seen by a chunk that starts after it — this sweep, which finds nothing when the
+        // season is complete and ends the chain.
+        String directoryName = directoryRepository.findById(directoryEntityId).map(DirectoryEntity::getName).orElse(null);
         return new Chunk(workSet.size(), remaining, directoryName);
     }
 

@@ -12,6 +12,7 @@ import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -83,7 +84,7 @@ public class SubtitleExtractionProcessor {
      */
     record ExtractionJob(String input, boolean remote, String ownerUrl, Path ownerCachePath,
                          MediaFileEntity mediaFile, List<MediaFileStreamEntity> streams,
-                         MediaFileStreamEntity stream, int subIdx) {
+                         MediaFileStreamEntity stream, int subIdx, ActivitySubjects.Subject subject) {
     }
 
     public void process(UUID mediaFileId, UUID subtitleStreamId) {
@@ -91,7 +92,7 @@ public class SubtitleExtractionProcessor {
         if (job == null) {
             return;
         }
-        ActivityContext.subject(Path.of(job.mediaFile().getPath()).getFileName().toString());
+        ActivityContext.report(job.subject());
         // Per stream, not per file: the file's streams are extracted concurrently (listener
         // concurrency) and each one cleans up after itself, so a shared directory would be
         // deleted from under a sibling still running mkvextract or waiting to upload.
@@ -101,8 +102,10 @@ public class SubtitleExtractionProcessor {
         Optional<SubtitleExtractor.ExtractedSubtitle> extracted;
         try {
             Files.createDirectories(srtDir);
+            ActivityContext.step("subtitles");
             extracted = extractor.extractOne(job.input(), mediaFileId, job.streams(), job.stream(), job.subIdx(), srtDir, dirOfFFmpeg);
             if (job.remote() && extracted.isPresent()) {
+                ActivityContext.step("upload");
                 remoteNodeClient.uploadToCache(job.ownerUrl(), extracted.get().srtFile());
             }
         } catch (IOException e) {
@@ -151,7 +154,7 @@ public class SubtitleExtractionProcessor {
                 .orElseThrow(() -> new IllegalStateException("Owning node of " + mediaFileId + " has no cache directory"));
         return new ExtractionJob(inputResolver.resolve(mediaFile), inputResolver.isRemote(mediaFile),
                 inputResolver.owner(mediaFile).getUrl(), Path.of(ownerCache.getPath()),
-                mediaFile, streams, stream, subIdx);
+                mediaFile, streams, stream, subIdx, ActivitySubjects.describe(mediaFile));
     }
 
     private void store(ExtractionJob job, SubtitleExtractor.ExtractedSubtitle extracted, boolean failed) {

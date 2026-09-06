@@ -1,6 +1,7 @@
 package app.ister.worker.events.episodefound;
 
 import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.MessageQueue;
 import app.ister.core.config.LanguageProperties;
 import app.ister.core.enums.EventType;
@@ -55,8 +56,7 @@ public class HandleEpisodeFound implements Handle<EpisodeFoundData> {
         }
         try {
             var episodeEntity = episodeRepository.findById(episodeFoundData.getEpisodeId()).orElseThrow();
-            ActivityContext.subject(episodeEntity.getShowEntity().getName()
-                    + " S" + episodeEntity.getSeasonEntity().getNumber() + "E" + episodeEntity.getNumber());
+            ActivityContext.report(ActivitySubjects.describe(episodeEntity, ActivitySubjects.empty()));
             Integer tmdbSeriesId = null;
             for (String language : languageProperties.tags()) {
                 var showEntity = episodeEntity.getShowEntity();

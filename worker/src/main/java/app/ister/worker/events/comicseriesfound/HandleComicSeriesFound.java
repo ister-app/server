@@ -1,5 +1,7 @@
 package app.ister.worker.events.comicseriesfound;
 
+import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.Handle;
 import app.ister.core.config.LanguageProperties;
 import app.ister.core.entity.MetadataEntity;
@@ -57,6 +59,7 @@ public class HandleComicSeriesFound implements Handle<ComicSeriesFoundData> {
     @Override
     public void handle(ComicSeriesFoundData data) {
         seriesRepository.findById(data.getSeriesId()).ifPresent(series -> {
+            ActivityContext.subject(series.getName());
             boolean hasMetadata = !metadataRepository.findBySeriesEntityId(series.getId()).isEmpty();
             boolean hasImage = !imageRepository.findBySeriesEntityId(series.getId()).isEmpty();
             if (hasMetadata && hasImage) {

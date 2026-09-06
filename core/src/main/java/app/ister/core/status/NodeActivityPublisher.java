@@ -2,6 +2,7 @@ package app.ister.core.status;
 
 import app.ister.core.eventdata.NodeActivityStatusData;
 import app.ister.core.service.MessageSender;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -25,17 +26,26 @@ public class NodeActivityPublisher {
     private final NodeActivityRegistry registry;
     private final MessageSender messageSender;
     private final String nodeName;
+    private final NodeFactsProvider factsProvider;
 
     private List<NodeActivityStatusData.ProcessingItem> lastProcessing;
     private long lastProcessedCount = -1;
     private long lastFailedCount = -1;
     private long lastPublishedAtMillis;
 
+    @Autowired
     public NodeActivityPublisher(NodeActivityRegistry registry, MessageSender messageSender,
+                                 NodeFactsProvider factsProvider,
                                  @Value("${app.ister.server.name}") String nodeName) {
         this.registry = registry;
         this.messageSender = messageSender;
+        this.factsProvider = factsProvider;
         this.nodeName = nodeName;
+    }
+
+    /** Without node facts (tests). */
+    NodeActivityPublisher(NodeActivityRegistry registry, MessageSender messageSender, String nodeName) {
+        this(registry, messageSender, null, nodeName);
     }
 
     @Scheduled(fixedDelay = 2000)
@@ -47,6 +57,11 @@ public class NodeActivityPublisher {
                 && snapshot.getFailedCount() == lastFailedCount
                 && nowMillis - lastPublishedAtMillis < KEEPALIVE_MS) {
             return;
+        }
+        // Facts ride on every publication; they change slowly (disk space), and the 60s
+        // keepalive is the floor of their refresh rate.
+        if (factsProvider != null) {
+            snapshot.setFacts(factsProvider.facts());
         }
         messageSender.sendStatus(snapshot);
         lastProcessing = snapshot.getProcessing();
