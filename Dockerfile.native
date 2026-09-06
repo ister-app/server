@@ -22,6 +22,9 @@ RUN dnf install -y \
     libva-intel-driver \
     intel-media-driver \
     tesseract \
+    hunspell \
+    hunspell-en-US \
+    hunspell-nl \
     tesseract-equ \
     tesseract-osd \
     tesseract-langpack-afr \

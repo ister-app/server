@@ -20,6 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     tesseract-ocr \
     tesseract-ocr-all \
+    hunspell \
+    hunspell-en-us \
+    hunspell-nl \
     ffmpeg \
     libva-drm2 \
     mesa-va-drivers \
