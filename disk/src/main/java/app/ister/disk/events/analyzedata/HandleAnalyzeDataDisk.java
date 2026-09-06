@@ -1,5 +1,7 @@
 package app.ister.disk.events.analyzedata;
 
+import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.Handle;
 import app.ister.core.entity.*;
 import app.ister.core.enums.EventType;
@@ -61,6 +63,7 @@ public class HandleAnalyzeDataDisk implements Handle<AnalyzeData> {
     @Override
     public void handle(AnalyzeData data) {
         DirectoryEntity dir = directoryRepository.findById(data.getDirectoryId()).orElseThrow();
+        ActivityContext.report(ActivitySubjects.describeDirectoryJob(dir));
 
         List<MetadataEntity> metadataEntities;
         List<MediaFileEntity> localFiles;

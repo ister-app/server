@@ -1,5 +1,7 @@
 package app.ister.disk.events.newdirectoriesscanrequested;
 
+import app.ister.core.status.ActivityContext;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.NewDirectoriesScanRequestedData;
@@ -38,6 +40,7 @@ public class HandleNewDirectoriesScanRequested implements Handle<NewDirectoriesS
     public void handle(NewDirectoriesScanRequestedData messageData) {
         log.debug("handle HandleNewDirectoriesScanRequested: {}", messageData);
         DirectoryEntity directoryEntity = directoryRepository.findById(messageData.getDirectoryEntityUUID()).orElseThrow();
+        ActivityContext.report(ActivitySubjects.describeDirectoryJob(directoryEntity));
         try {
             libraryScanner.scanDirectory(directoryEntity);
         } catch (IOException e) {

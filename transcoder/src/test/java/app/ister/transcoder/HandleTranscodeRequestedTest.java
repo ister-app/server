@@ -27,6 +27,9 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class HandleTranscodeRequestedTest {
 
+    @Mock
+    private app.ister.core.repository.MediaFileRepository mediaFileRepository;
+
     @InjectMocks
     private HandleTranscodeRequested handler;
 
