@@ -43,8 +43,10 @@ class HunspellLexiconsTest {
         Optional<Lexicon> eng = lexicons.forLanguage("eng");
         assumeTrue(eng.isPresent(), "hunspell binary installed");
 
-        Set<String> unknown = eng.get().unknown(List.of("believe", "belleve", "Just", "Jerry", "jerry", "it's", "Elaine"));
-        assertEquals(Set.of("belleve", "jerry"), unknown);
+        // Only claims that hold for every dictionary version: Ubuntu's 2020 en_US knows a lower-case
+        // "jerry" (jerrycan), Fedora's 2026 one does not.
+        Set<String> unknown = eng.get().unknown(List.of("believe", "belleve", "Just", "Jerry", "it's", "Elaine"));
+        assertEquals(Set.of("belleve"), unknown);
         assertTrue(eng.get().isProperNoun("Jerry"));
         assertTrue(eng.get().isProperNoun("I'm"));
         assertFalse(eng.get().isProperNoun("Just"));
