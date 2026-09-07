@@ -1,5 +1,24 @@
 # Changelog
 
+## server v3.5.1
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `3.5.1` |
+| `ghcr.io/ister-app/migrations` | `3.5.1` |
+
+### Fixes
+
+- fix(transcoder): describe transcode work inside a session, not on a detached entity ([`1607011`](https://github.com/ister-app/server/commit/1607011))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:3.5.1
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v3.5.0...v3.5.1
+
 ## server v3.5.0
 
 | Image | Tag |
