@@ -1,13 +1,12 @@
 package app.ister.transcoder.events;
 
-import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.status.ActivityContext;
-import app.ister.core.status.ActivitySubjects;
 import app.ister.core.EventHandlingException;
 import app.ister.core.Handle;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.TranscodeRequestedData;
 import app.ister.transcoder.HlsService;
+import app.ister.transcoder.MediaFileSubjects;
 import app.ister.transcoder.PassFilter;
 import app.ister.transcoder.HlsTranscodeService;
 import app.ister.transcoder.config.TranscoderQueueNamingConfig;
@@ -26,7 +25,7 @@ public class HandleTranscodeRequested implements Handle<TranscodeRequestedData> 
     private final HlsService hlsService;
     private final HlsTranscodeService transcodeService;
     private final TranscoderQueueNamingConfig transcoderQueueNamingConfig;
-    private final MediaFileRepository mediaFileRepository;
+    private final MediaFileSubjects mediaFileSubjects;
 
     @Override
     public EventType handles() {
@@ -42,8 +41,7 @@ public class HandleTranscodeRequested implements Handle<TranscodeRequestedData> 
     @Override
     public void handle(TranscodeRequestedData data) {
         log.debug("Handling TRANSCODE_REQUESTED for mediaFileId={}", data.getMediaFileId());
-        mediaFileRepository.findById(data.getMediaFileId())
-                .ifPresent(file -> ActivityContext.report(ActivitySubjects.describe(file)));
+        mediaFileSubjects.describe(data.getMediaFileId()).ifPresent(ActivityContext::report);
         try {
             hlsService.generateAllPlaylists(data.getMediaFileId(), data.getDirect(), data.getTranscode(), data.getSubtitleFormat());
             if (data.getKeepUntilEpochMillis() != null) {

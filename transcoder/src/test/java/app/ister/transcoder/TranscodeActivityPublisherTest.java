@@ -1,8 +1,8 @@
 package app.ister.transcoder;
 
 import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.status.ActivitySubjects;
 import app.ister.core.eventdata.TranscodeActivityStatusData;
-import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.service.MessageSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,7 +10,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.PlatformTransactionManager;
 
 import java.util.List;
 import java.util.Optional;
@@ -34,10 +33,7 @@ class TranscodeActivityPublisherTest {
     private MessageSender messageSender;
 
     @Mock
-    private MediaFileRepository mediaFileRepository;
-
-    @Mock
-    private PlatformTransactionManager transactionManager;
+    private MediaFileSubjects mediaFileSubjects;
 
     private TranscodeActivityPublisher subject;
 
@@ -45,8 +41,7 @@ class TranscodeActivityPublisherTest {
 
     @BeforeEach
     void setUp() {
-        subject = new TranscodeActivityPublisher(transcodeService, messageSender, mediaFileRepository,
-                transactionManager, "node1");
+        subject = new TranscodeActivityPublisher(transcodeService, messageSender, mediaFileSubjects, "node1");
     }
 
     private HlsTranscodeService.RunningPassView pass(String quality) {
@@ -67,8 +62,8 @@ class TranscodeActivityPublisherTest {
     @Test
     void publishesRunningPassesWithTitleAndQuality() {
         when(transcodeService.runningPassesSnapshot()).thenReturn(List.of(pass("video_720p")));
-        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(
-                MediaFileEntity.builder().path("/media/movies/Big Movie (2020).mkv").build()));
+        when(mediaFileSubjects.describe(mediaFileId.toString())).thenReturn(Optional.of(
+                ActivitySubjects.describe(MediaFileEntity.builder().path("/media/movies/Big Movie (2020).mkv").build())));
 
         subject.publishIfChanged();
 
@@ -83,7 +78,7 @@ class TranscodeActivityPublisherTest {
     @Test
     void doesNotRepublishUnchangedPassesImmediately() {
         when(transcodeService.runningPassesSnapshot()).thenReturn(List.of(pass("video_720p")));
-        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.empty());
+        when(mediaFileSubjects.describe(mediaFileId.toString())).thenReturn(Optional.empty());
 
         subject.publishIfChanged();
         subject.publishIfChanged();
@@ -94,7 +89,7 @@ class TranscodeActivityPublisherTest {
     @Test
     void publishesOneFinalEmptyListWhenTheLastPassFinishes() {
         when(transcodeService.runningPassesSnapshot()).thenReturn(List.of(pass("video_720p")));
-        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.empty());
+        when(mediaFileSubjects.describe(mediaFileId.toString())).thenReturn(Optional.empty());
         subject.publishIfChanged();
 
         when(transcodeService.runningPassesSnapshot()).thenReturn(List.of());
@@ -109,7 +104,7 @@ class TranscodeActivityPublisherTest {
     @Test
     void aMissingMediaFileRowLeavesTheTitleNull() {
         when(transcodeService.runningPassesSnapshot()).thenReturn(List.of(pass("video_720p")));
-        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.empty());
+        when(mediaFileSubjects.describe(mediaFileId.toString())).thenReturn(Optional.empty());
 
         subject.publishIfChanged();
 

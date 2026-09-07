@@ -28,7 +28,7 @@ import static org.mockito.Mockito.*;
 class HandleTranscodeRequestedTest {
 
     @Mock
-    private app.ister.core.repository.MediaFileRepository mediaFileRepository;
+    private MediaFileSubjects mediaFileSubjects;
 
     @InjectMocks
     private HandleTranscodeRequested handler;

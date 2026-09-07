@@ -19,7 +19,7 @@ import static org.mockito.Mockito.verify;
 class HandleTranscodePassRequestedTest {
 
     @Mock
-    private app.ister.core.repository.MediaFileRepository mediaFileRepository;
+    private MediaFileSubjects mediaFileSubjects;
 
     @InjectMocks
     private HandleTranscodePassRequested subject;

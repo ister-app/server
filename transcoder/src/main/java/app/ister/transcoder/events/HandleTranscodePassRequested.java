@@ -1,12 +1,11 @@
 package app.ister.transcoder.events;
 
-import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.status.ActivityContext;
-import app.ister.core.status.ActivitySubjects;
 import app.ister.core.Handle;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.TranscodePassRequestedData;
 import app.ister.transcoder.HlsService;
+import app.ister.transcoder.MediaFileSubjects;
 import app.ister.transcoder.config.TranscoderQueueNamingConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +19,7 @@ public class HandleTranscodePassRequested implements Handle<TranscodePassRequest
 
     private final HlsService hlsService;
     private final TranscoderQueueNamingConfig transcoderQueueNamingConfig;
-    private final MediaFileRepository mediaFileRepository;
+    private final MediaFileSubjects mediaFileSubjects;
 
     @Override
     public EventType handles() {
@@ -36,10 +35,7 @@ public class HandleTranscodePassRequested implements Handle<TranscodePassRequest
     @Override
     public void handle(TranscodePassRequestedData data) {
         log.debug("Handling TRANSCODE_PASS_REQUESTED: passKey={}", data.getPassKey());
-        if (data.getMediaFileId() != null) {
-            mediaFileRepository.findById(data.getMediaFileId())
-                    .ifPresent(file -> ActivityContext.report(ActivitySubjects.describe(file)));
-        }
+        mediaFileSubjects.describe(data.getMediaFileId()).ifPresent(ActivityContext::report);
         hlsService.startPass(data);
     }
 }

@@ -2,21 +2,16 @@ package app.ister.transcoder;
 
 import app.ister.core.eventdata.TranscodeActivityStatusData;
 import app.ister.core.eventdata.TranscodeActivityStatusData.TranscodePass;
-import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.status.ActivitySubjects;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Publishes this node's running FFmpeg transcode passes on the status exchange.
@@ -38,8 +33,7 @@ public class TranscodeActivityPublisher {
     private final HlsTranscodeService transcodeService;
     private final MessageSender messageSender;
     private final String nodeName;
-    private final MediaFileRepository mediaFileRepository;
-    private final TransactionTemplate readOnlyTransaction;
+    private final MediaFileSubjects mediaFileSubjects;
 
     /** mediaFileId (string) -> description; LRU so a long prefetch queue can't grow it unbounded. */
     private final Map<String, ActivitySubjects.Subject> titleCache = new LinkedHashMap<>(16, 0.75f, true) {
@@ -53,14 +47,11 @@ public class TranscodeActivityPublisher {
     private long lastPublishedAtMillis;
 
     public TranscodeActivityPublisher(HlsTranscodeService transcodeService, MessageSender messageSender,
-                                      MediaFileRepository mediaFileRepository,
-                                      PlatformTransactionManager transactionManager,
+                                      MediaFileSubjects mediaFileSubjects,
                                       @Value("${app.ister.server.name}") String nodeName) {
         this.transcodeService = transcodeService;
         this.messageSender = messageSender;
-        this.mediaFileRepository = mediaFileRepository;
-        this.readOnlyTransaction = new TransactionTemplate(transactionManager);
-        this.readOnlyTransaction.setReadOnly(true);
+        this.mediaFileSubjects = mediaFileSubjects;
         this.nodeName = nodeName;
     }
 
@@ -105,24 +96,13 @@ public class TranscodeActivityPublisher {
                 return cached;
             }
         }
-        ActivitySubjects.Subject subject = lookupSubject(mediaFileId).orElse(null);
+        // File name plus show/movie/album context; empty for non-UUID pass keys or a missing row.
+        ActivitySubjects.Subject subject = mediaFileSubjects.describe(mediaFileId).orElse(null);
         if (subject != null) {
             synchronized (titleCache) {
                 titleCache.put(mediaFileId, subject);
             }
         }
         return subject;
-    }
-
-    /** File name plus show/movie/album context; empty for non-UUID pass keys or a missing row. */
-    private Optional<ActivitySubjects.Subject> lookupSubject(String mediaFileId) {
-        UUID id;
-        try {
-            id = UUID.fromString(mediaFileId);
-        } catch (IllegalArgumentException _) {
-            return Optional.empty(); // Not a UUID-keyed pass; leave the title empty.
-        }
-        return Optional.ofNullable(readOnlyTransaction.execute(status ->
-                mediaFileRepository.findById(id).map(ActivitySubjects::describe).orElse(null)));
     }
 }
