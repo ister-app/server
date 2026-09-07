@@ -1,5 +1,42 @@
 # Changelog
 
+## server v3.5.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `3.5.0` |
+| `ghcr.io/ister-app/migrations` | `3.5.0` |
+
+### Features
+
+- feat(disk): repair OCR subtitles with hunspell dictionaries ([`2e328d3`](https://github.com/ister-app/server/commit/2e328d3))
+- feat(core): helper nodes for transcoding, intro detection and subtitle extraction ([`6a3c121`](https://github.com/ister-app/server/commit/6a3c121))
+- feat(disk): repair systematic OCR misreads in extracted subtitles ([`e644c1b`](https://github.com/ister-app/server/commit/e644c1b))
+- feat(disk): ship tessdata_best models and make subtitle OCR tunable ([`1c86c10`](https://github.com/ister-app/server/commit/1c86c10))
+
+### Fixes
+
+- fix(status): name the media file behind transcode requests and the disk behind scans ([`085a8db`](https://github.com/ister-app/server/commit/085a8db))
+- fix(disk): sweep a season once more after its detection chain ([`3874026`](https://github.com/ister-app/server/commit/3874026))
+- fix(worker): serialize podcast refreshes and keep downloads off helper nodes ([`40c33ce`](https://github.com/ister-app/server/commit/40c33ce))
+- fix(core): make ffmpeg resume truncated HTTP reads from the owning node ([`55d9c46`](https://github.com/ister-app/server/commit/55d9c46))
+- fix(disk): clean every OCR cue, not just the first ([`c6a04d8`](https://github.com/ister-app/server/commit/c6a04d8))
+- fix(disk): give each subtitle extraction on a helper its own tmp dir ([`f4de573`](https://github.com/ister-app/server/commit/f4de573))
+
+### Other
+
+- refactor: clear the open SonarCloud issues ([`d5b22ad`](https://github.com/ister-app/server/commit/d5b22ad))
+- test(disk): stop asserting a dictionary-version-specific spelling ([`18a7dca`](https://github.com/ister-app/server/commit/18a7dca))
+- test(core): cover activity subjects, node facts and the context scope ([`4df244d`](https://github.com/ister-app/server/commit/4df244d))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:3.5.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v3.4.1...v3.5.0
+
 ## server v3.4.1
 
 | Image | Tag |
