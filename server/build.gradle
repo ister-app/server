@@ -50,9 +50,12 @@ graalvmNative {
     binaries {
         named("main") {
             mainClass.set("app.ister.server.IsterServerApplication")
-            javaLauncher = javaToolchains.launcherFor {
+            // .set() rather than Groovy assignment: since the native plugin 1.1.12 the
+            // javaLauncher property is exposed through a proxy that the Groovy `=` operator
+            // cannot coerce ("cannot be cast to LazyGroovySupport").
+            javaLauncher.set(javaToolchains.launcherFor {
                 languageVersion = JavaLanguageVersion.of(25)
-            }
+            })
             // PDFBox needs Windows-1252 (BaseParser), which the native image drops by default.
             buildArgs.add("-H:+AddAllCharsets")
         }
