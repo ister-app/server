@@ -1,5 +1,26 @@
 # Changelog
 
+## server v3.5.2
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `3.5.2` |
+| `ghcr.io/ister-app/migrations` | `3.5.2` |
+
+### Dependency updates
+
+- chore(deps): update feign-jackson to v13.15 and setup-java to v6.0.1 ([`34ea9f1`](https://github.com/ister-app/server/commit/34ea9f1))
+- chore(deps): update docker.io/flyway/flyway docker tag to v13.6.0 ([`db54443`](https://github.com/ister-app/server/commit/db54443))
+- chore(deps): update plugin org.graalvm.buildtools.native to v1.1.12 ([`6d9f664`](https://github.com/ister-app/server/commit/6d9f664))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:3.5.2
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v3.5.1...v3.5.2
+
 ## server v3.5.1
 
 | Image | Tag |
