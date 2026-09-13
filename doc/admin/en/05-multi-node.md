@@ -99,6 +99,16 @@ listening on a queue nobody publishes to.
 disks with the `TRANSCODE` job only and, as before, replaces the node's own directories for
 transcoding) and logs a deprecation warning; move it to `app.ister.helper.disks`.
 
+## S3 directories: attached nodes
+
+A directory in an S3 bucket ([Object storage](10-object-storage.md)) breaks the one-owner rule on
+purpose: it has no owning node, and every node that lists it — same name, same connection, same
+prefix — is *attached* to it and consumes its queues alongside the others. Scanning, analysis,
+transcoding and streaming of that directory are shared work, so adding a node is the way to add
+capacity; helper entries are not needed for it. With the shared cache and transcode stores enabled
+as well, the segment push described above is replaced by publishing to the bucket, which every
+node reads back from.
+
 ## Worked example
 
 `docker-compose-nodes-local.yml` in the repository runs a complete three-node cluster against

@@ -22,7 +22,16 @@ dependencies {
     // Jaffree Library
     implementation libs.jaffree
 
+    // S3 object storage (AWS SDK v2; the url-connection client keeps the footprint small and
+    // works with MinIO/Garage/Ceph through endpoint override + path-style access)
+    implementation platform(libs.awssdk.bom)
+    implementation libs.awssdk.s3
+    implementation libs.awssdk.url.connection.client
+
     // Testing Dependencies
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // S3ObjectStore against a real MinIO (skipped when no container runtime)
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-minio'
 }

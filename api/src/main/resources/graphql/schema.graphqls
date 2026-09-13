@@ -1087,10 +1087,23 @@ type MediaSegment {
 type Directory {
     id: ID!
     name: String!
-    node: Node!
+    "The owning node of a LOCAL directory; null for an S3 directory, which every attached node can serve."
+    node: Node
     library: Library!
+    "Absolute path for LOCAL, s3://bucket/prefix for S3."
     path: String!
     type: DirectoryType!
+    storageKind: StorageKind!
+    "Nodes that can serve this directory: the owner, or every node attached to an S3 directory."
+    attachedNodes: [Node!]!
+    s3Bucket: String
+    s3Prefix: String
+    s3Connection: String
+}
+
+enum StorageKind {
+    LOCAL
+    S3
 }
 
 type Library {

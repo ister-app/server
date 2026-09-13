@@ -47,7 +47,12 @@ een migratie die ergens al toegepast is.
 
 - Unit-tests zijn JUnit 5 + Mockito; Mockito draait als `-javaagent`, aangesloten in de
   root-`build.gradle`.
-- `jimfs` (in-memory filesystem) draagt de disk-/bestandspad-tests.
+- `jimfs` (in-memory filesystem) draagt de disk-/bestandspad-tests; `FakeObjectStore` (disk-tests) is
+  de in-memory stand-in voor een S3-bucket, en `CacheStoreMocks` stubt de cache-store-naad in handler-tests.
+- `S3ObjectStoreIntegrationTest` (core) en `S3LibraryScanIntegrationTest` (server) draaien tegen een
+  echte MinIO via Testcontainers — MinIO publiceert niet meer naar Docker Hub, dus de tests halen
+  `quay.io/minio/minio`. De AWS SDK v2 (`software.amazon.awssdk:s3` + `url-connection-client`)
+  levert zijn eigen native-image-reachability-metadata; er waren geen handmatige hints voor nodig.
 - **ffmpeg moet op `PATH` staan** — de transcoder-tests shellen ernaar uit, en CI installeert het
   vóór de build.
 - Integratietests zijn **geen** aparte source set of task. Ze draaien onder de normale `test`-task,

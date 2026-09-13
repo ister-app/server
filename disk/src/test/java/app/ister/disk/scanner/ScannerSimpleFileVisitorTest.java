@@ -95,10 +95,10 @@ class ScannerSimpleFileVisitorTest {
     void visitFile() {
         Path path = Path.of("/path");
 
-        when(mediaFileScanner.analyzable(path, false, 0)).thenReturn(false);
-        when(imageScanner.analyzable(path, false, 0)).thenReturn(false);
-        when(nfoScanner.analyzable(path, false, 0)).thenReturn(false);
-        when(subtitleScanner.analyzable(path, false, 0)).thenReturn(true);
+        when(mediaFileScanner.analyzable(path.toString(), false, 0)).thenReturn(false);
+        when(imageScanner.analyzable(path.toString(), false, 0)).thenReturn(false);
+        when(nfoScanner.analyzable(path.toString(), false, 0)).thenReturn(false);
+        when(subtitleScanner.analyzable(path.toString(), false, 0)).thenReturn(true);
 
         var subject = new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner, comicScanner));
 
@@ -111,10 +111,10 @@ class ScannerSimpleFileVisitorTest {
     void visitFileSkipsAlreadyScannedPath() {
         Path path = Path.of("/path");
 
-        when(mediaFileScanner.analyzable(path, false, 0)).thenReturn(false);
-        when(imageScanner.analyzable(path, false, 0)).thenReturn(true);
-        when(nfoScanner.analyzable(path, false, 0)).thenReturn(false);
-        when(subtitleScanner.analyzable(path, false, 0)).thenReturn(false);
+        when(mediaFileScanner.analyzable(path.toString(), false, 0)).thenReturn(false);
+        when(imageScanner.analyzable(path.toString(), false, 0)).thenReturn(true);
+        when(nfoScanner.analyzable(path.toString(), false, 0)).thenReturn(false);
+        when(subtitleScanner.analyzable(path.toString(), false, 0)).thenReturn(false);
         when(scannedCache.foundPath(path.toString())).thenReturn(true);
 
         var subject = visitor(directoryEntity);
@@ -130,10 +130,10 @@ class ScannerSimpleFileVisitorTest {
         // pass runs the backfills (multi-episode, subtitles, crop detection).
         Path path = Path.of("/path");
 
-        when(mediaFileScanner.analyzable(path, false, 0)).thenReturn(true);
-        when(imageScanner.analyzable(path, false, 0)).thenReturn(false);
-        when(nfoScanner.analyzable(path, false, 0)).thenReturn(false);
-        when(subtitleScanner.analyzable(path, false, 0)).thenReturn(false);
+        when(mediaFileScanner.analyzable(path.toString(), false, 0)).thenReturn(true);
+        when(imageScanner.analyzable(path.toString(), false, 0)).thenReturn(false);
+        when(nfoScanner.analyzable(path.toString(), false, 0)).thenReturn(false);
+        when(subtitleScanner.analyzable(path.toString(), false, 0)).thenReturn(false);
         when(scannedCache.foundMediaFilePath(path.toString())).thenReturn(false);
 
         var subject = visitor(directoryEntity);
@@ -150,9 +150,9 @@ class ScannerSimpleFileVisitorTest {
         Path path = fileSystem.getPath("/disk/music/Artist/Album (2024)/01 - Track.flac");
         DirectoryEntity musicDir = libraryDirectory(LibraryType.MUSIC, "/disk/music");
 
-        when(audioScanner.analyzable(path, false, musicDir)).thenReturn(true);
-        when(imageScanner.analyzable(path, false, 0, musicDir)).thenReturn(false);
-        when(nfoScanner.analyzable(path, false, 0, musicDir)).thenReturn(false);
+        when(audioScanner.analyzable(path.toString(), false, musicDir)).thenReturn(true);
+        when(imageScanner.analyzable(path.toString(), false, 0, musicDir)).thenReturn(false);
+        when(nfoScanner.analyzable(path.toString(), false, 0, musicDir)).thenReturn(false);
         when(scannedCache.foundMusicAudioPath(path.toString())).thenReturn(false);
 
         var subject = visitor(musicDir);
@@ -167,10 +167,10 @@ class ScannerSimpleFileVisitorTest {
         Path path = fileSystem.getPath("/disk/books/Author/Book.epub");
         DirectoryEntity bookDir = libraryDirectory(LibraryType.BOOK, "/disk/books");
 
-        when(epubScanner.analyzable(path, false, bookDir)).thenReturn(true);
-        when(audioScanner.analyzable(path, false, bookDir)).thenReturn(false);
-        when(imageScanner.analyzable(path, false, 0, bookDir)).thenReturn(false);
-        when(nfoScanner.analyzable(path, false, 0, bookDir)).thenReturn(false);
+        when(epubScanner.analyzable(path.toString(), false, bookDir)).thenReturn(true);
+        when(audioScanner.analyzable(path.toString(), false, bookDir)).thenReturn(false);
+        when(imageScanner.analyzable(path.toString(), false, 0, bookDir)).thenReturn(false);
+        when(nfoScanner.analyzable(path.toString(), false, 0, bookDir)).thenReturn(false);
         when(scannedCache.foundPath(path.toString())).thenReturn(false);
 
         var subject = visitor(bookDir);

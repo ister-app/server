@@ -197,7 +197,7 @@ public class SubtitleExtractor {
 
     /** The {@code EXTERNAL_SUBTITLE} row for an extraction, pointing at {@code recordedPath} (owner-local). */
     public static MediaFileStreamEntity toEntity(MediaFileEntity mediaFile, MediaFileStreamEntity source,
-                                                 ExtractedSubtitle extracted, Path recordedPath) {
+                                                 ExtractedSubtitle extracted, String recordedPath) {
         return MediaFileStreamEntity.builder()
                 .mediaFileEntity(mediaFile)
                 .streamIndex(source.getStreamIndex())
@@ -205,7 +205,7 @@ public class SubtitleExtractor {
                 .codecType(StreamCodecType.EXTERNAL_SUBTITLE)
                 .language(extracted.language())
                 .title(source.getTitle())
-                .path(recordedPath.toString())
+                .path(recordedPath)
                 .build();
     }
 

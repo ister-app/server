@@ -4,7 +4,6 @@ import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MediaFileStreamEntity;
-import app.ister.core.entity.NodeEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.StreamCodecType;
 import app.ister.core.repository.DirectoryRepository;
@@ -34,7 +33,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -44,6 +42,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class FileControllerTest {
 
+    @Mock private app.ister.core.storage.ObjectStoreRegistry objectStoreRegistry;
+    @Mock private app.ister.core.storage.CacheDirectoryResolver cacheDirectoryResolver;
     @Mock private ImageRepository imageRepository;
     @Mock private MediaFileRepository mediaFileRepository;
     @Mock private MediaFileStreamRepository mediaFileStreamRepository;
@@ -58,7 +58,7 @@ class FileControllerTest {
     void setUp() {
         controller = new FileController(imageRepository, mediaFileRepository,
                 new ImageThumbnailCache(new ImageScaler(), tempDir.resolve("tmp").toString()),
-                mediaFileStreamRepository, nodeService, directoryRepository);
+                mediaFileStreamRepository, nodeService, directoryRepository, objectStoreRegistry, cacheDirectoryResolver);
         ReflectionTestUtils.setField(controller, "tmpDir", tempDir.toString());
     }
 
@@ -318,7 +318,7 @@ class FileControllerTest {
         when(entity.getPath()).thenReturn(mediaFile.toString());
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(entity));
 
-        ResponseEntity<Resource> result = controller.downloadMediaFile(id);
+        ResponseEntity<Resource> result = controller.downloadMediaFile(id, null, null);
 
         assertEquals(200, result.getStatusCode().value());
         // A file-backed resource is what makes Spring advertise Accept-Ranges and serve 206s.
@@ -327,13 +327,13 @@ class FileControllerTest {
     }
 
     @Test
-    void downloadMediaFileReturns404WhenFileIsGone() {
+    void downloadMediaFileReturns404WhenFileIsGone() throws java.io.IOException {
         UUID id = UUID.randomUUID();
         MediaFileEntity entity = mock(MediaFileEntity.class);
         when(entity.getPath()).thenReturn(tempDir.resolve("missing.mkv").toString());
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(entity));
 
-        assertEquals(404, controller.downloadMediaFile(id).getStatusCode().value());
+        assertEquals(404, controller.downloadMediaFile(id, null, null).getStatusCode().value());
     }
 
     // ========== downloadMediaFileStream ==========
@@ -347,20 +347,20 @@ class FileControllerTest {
                 .codecType(StreamCodecType.EXTERNAL_SUBTITLE).path(srt.toString()).build();
         when(mediaFileStreamRepository.findById(id)).thenReturn(Optional.of(stream));
 
-        ResponseEntity<Resource> result = controller.downloadMediaFileStream(id);
+        ResponseEntity<Resource> result = controller.downloadMediaFileStream(id, null, null);
 
         assertEquals(200, result.getStatusCode().value());
         assertInstanceOf(FileSystemResource.class, result.getBody());
     }
 
     @Test
-    void downloadMediaFileStreamRejectsEmbeddedStreams() {
+    void downloadMediaFileStreamRejectsEmbeddedStreams() throws java.io.IOException {
         UUID id = UUID.randomUUID();
         MediaFileStreamEntity stream = MediaFileStreamEntity.builder()
                 .codecType(StreamCodecType.SUBTITLE).path(null).build();
         when(mediaFileStreamRepository.findById(id)).thenReturn(Optional.of(stream));
 
-        assertEquals(404, controller.downloadMediaFileStream(id).getStatusCode().value());
+        assertEquals(404, controller.downloadMediaFileStream(id, null, null).getStatusCode().value());
     }
 
     // ========== uploadCacheFile ==========
@@ -368,10 +368,8 @@ class FileControllerTest {
     @Test
     void uploadCacheFileLandsInTheCacheDirectory() throws IOException {
         Path cacheDir = tempDir.resolve("cache");
-        NodeEntity node = NodeEntity.builder().name("n").url("http://n").build();
-        when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
-        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node))
-                .thenReturn(List.of(DirectoryEntity.builder().path(cacheDir.toString()).directoryType(DirectoryType.CACHE).build()));
+        when(cacheDirectoryResolver.store()).thenReturn(new app.ister.core.storage.LocalCacheStore(
+                DirectoryEntity.builder().path(cacheDir.toString()).directoryType(DirectoryType.CACHE).build()));
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setContent("1\n00:00:01,000 --> 00:00:02,000\nHi\n".getBytes());
 
@@ -419,5 +417,115 @@ class FileControllerTest {
         controller.uploadTranscode(id, "chunk.ts", request);
 
         assertTrue(Files.isDirectory(expectedDir));
+    }
+
+    // ========== S3-backed files: ranged proxy ==========
+
+    private MediaFileEntity s3MediaFile(UUID id, app.ister.disk.storage.FakeObjectStore store, String key) {
+        app.ister.core.entity.DirectoryEntity dir = app.ister.core.entity.DirectoryEntity.builder()
+                .name("s3-dir").path("s3://" + store.bucket()).storageKind(app.ister.core.enums.StorageKind.S3)
+                .s3Connection("minio").s3Bucket(store.bucket()).build();
+        MediaFileEntity entity = MediaFileEntity.builder().path("s3://" + store.bucket() + "/" + key).directoryEntity(dir).build();
+        ReflectionTestUtils.setField(entity, "id", id);
+        when(mediaFileRepository.findById(id)).thenReturn(Optional.of(entity));
+        when(objectStoreRegistry.forEntity(entity)).thenReturn(store);
+        return entity;
+    }
+
+    private static String streamedBody(ResponseEntity<?> response) throws IOException {
+        try (var in = ((Resource) response.getBody()).getInputStream()) {
+            return new String(in.readAllBytes());
+        }
+    }
+
+    @Test
+    void s3MediaFileIsProxiedWholeWithAcceptRanges() throws IOException {
+        UUID id = UUID.randomUUID();
+        app.ister.disk.storage.FakeObjectStore store = new app.ister.disk.storage.FakeObjectStore("bucket").put("tv/a.mkv", "0123456789");
+        s3MediaFile(id, store, "tv/a.mkv");
+
+        ResponseEntity<?> response = controller.downloadMediaFile(id, null, null);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("bytes", response.getHeaders().getFirst(org.springframework.http.HttpHeaders.ACCEPT_RANGES));
+        assertEquals(10, response.getHeaders().getContentLength());
+        assertEquals("0123456789", streamedBody(response));
+    }
+
+    /** ffmpeg seeks with Range; the object is opened at that offset, never read from the start and skipped. */
+    @Test
+    void s3MediaFileServesASingleByteRangeAs206() throws IOException {
+        UUID id = UUID.randomUUID();
+        app.ister.disk.storage.FakeObjectStore store = new app.ister.disk.storage.FakeObjectStore("bucket").put("tv/a.mkv", "0123456789");
+        s3MediaFile(id, store, "tv/a.mkv");
+
+        ResponseEntity<?> response = controller.downloadMediaFile(id, "bytes=2-5", null);
+
+        assertEquals(206, response.getStatusCode().value());
+        assertEquals("bytes 2-5/10", response.getHeaders().getFirst(org.springframework.http.HttpHeaders.CONTENT_RANGE));
+        assertEquals(4, response.getHeaders().getContentLength());
+        assertEquals("2345", streamedBody(response));
+
+        ResponseEntity<?> open = controller.downloadMediaFile(id, "bytes=7-", null);
+        assertEquals("bytes 7-9/10", open.getHeaders().getFirst(org.springframework.http.HttpHeaders.CONTENT_RANGE));
+        assertEquals("789", streamedBody(open));
+    }
+
+    @Test
+    void s3MediaFileRangePastTheEndIs416AndMissingObjectIs404() throws IOException {
+        UUID id = UUID.randomUUID();
+        app.ister.disk.storage.FakeObjectStore store = new app.ister.disk.storage.FakeObjectStore("bucket").put("tv/a.mkv", "0123456789");
+        s3MediaFile(id, store, "tv/a.mkv");
+
+        ResponseEntity<?> response = controller.downloadMediaFile(id, "bytes=20-30", null);
+        assertEquals(416, response.getStatusCode().value());
+        assertEquals("bytes */10", response.getHeaders().getFirst(org.springframework.http.HttpHeaders.CONTENT_RANGE));
+
+        store.delete("tv/a.mkv");
+        assertEquals(404, controller.downloadMediaFile(id, null, null).getStatusCode().value());
+    }
+
+    @Test
+    void s3MediaFileHeadAnswersHeadersWithoutABody() throws IOException {
+        UUID id = UUID.randomUUID();
+        app.ister.disk.storage.FakeObjectStore store = new app.ister.disk.storage.FakeObjectStore("bucket").put("tv/a.mkv", "0123456789");
+        s3MediaFile(id, store, "tv/a.mkv");
+        jakarta.servlet.http.HttpServletRequest head = mock(jakarta.servlet.http.HttpServletRequest.class);
+        when(head.getMethod()).thenReturn("HEAD");
+
+        ResponseEntity<?> response = controller.downloadMediaFile(id, null, head);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(10, response.getHeaders().getContentLength());
+        assertNull(response.getBody());
+    }
+
+    @Test
+    void s3ImageIsServedWithAnEtagFromTheObjectAndScaledOnRequest() throws IOException {
+        UUID id = UUID.randomUUID();
+        Path source = writeImage("cover.jpg", 1000, 1500, false);
+        app.ister.disk.storage.FakeObjectStore store = new app.ister.disk.storage.FakeObjectStore("bucket")
+                .put("tv/cover.jpg", Files.readAllBytes(source));
+        app.ister.core.entity.DirectoryEntity dir = app.ister.core.entity.DirectoryEntity.builder()
+                .name("s3-dir").path("s3://bucket").storageKind(app.ister.core.enums.StorageKind.S3).s3Connection("minio").s3Bucket("bucket").build();
+        ImageEntity image = ImageEntity.builder().path("s3://bucket/tv/cover.jpg").directoryEntity(dir).build();
+        ReflectionTestUtils.setField(image, "id", id);
+        when(imageRepository.findById(id)).thenReturn(Optional.of(image));
+        when(objectStoreRegistry.forEntity(image)).thenReturn(store);
+
+        ResponseEntity<InputStreamResource> full = controller.downloadImage(id, null, null);
+        assertEquals(200, full.getStatusCode().value());
+        assertEquals(Files.size(source), full.getBody().contentLength());
+        String etag = full.getHeaders().getETag();
+        assertNotNull(etag);
+        full.getBody().getInputStream().close();
+
+        assertEquals(304, controller.downloadImage(id, null, etag).getStatusCode().value());
+
+        ResponseEntity<InputStreamResource> scaled = controller.downloadImage(id, 320, null);
+        assertEquals(200, scaled.getStatusCode().value());
+        assertNotEquals(etag, scaled.getHeaders().getETag());
+        assertTrue(scaled.getBody().contentLength() < Files.size(source));
+        scaled.getBody().getInputStream().close();
     }
 }

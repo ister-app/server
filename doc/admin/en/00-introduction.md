@@ -67,3 +67,4 @@ building it yourself is covered in [Installation](02-installation.md).
 7. [Maintenance and troubleshooting](07-maintenance-and-troubleshooting.md) — scheduled jobs, backup, monitoring
 8. [Naming conventions](08-naming-conventions.md) — the exact directory and file naming rules per library type
 9. [Users, sharing, and access](09-users-sharing-and-access.md) — admins, per-library visibility, playback-session sharing
+10. [Object storage (S3)](10-object-storage.md) — libraries in a bucket, attached to several nodes; the shared cache and transcode stores

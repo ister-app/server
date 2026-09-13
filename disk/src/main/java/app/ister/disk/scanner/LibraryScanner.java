@@ -5,6 +5,7 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.MessageSender;
+import app.ister.core.storage.ObjectStoreRegistry;
 import app.ister.disk.scanner.scanners.AudioScanner;
 import app.ister.disk.scanner.scanners.ComicScanner;
 import app.ister.disk.scanner.scanners.EpubScanner;
@@ -37,15 +38,32 @@ public class LibraryScanner {
     private final ImageRepository imageRepository;
     private final MediaFileRepository mediaFileRepository;
     private final OtherPathFileRepository otherPathFileRepository;
+    private final ObjectStoreRegistry objectStoreRegistry;
 
     public void scanDirectory(DirectoryEntity directoryEntity) throws IOException {
-        scanDirectory(Path.of(directoryEntity.getPath()), directoryEntity);
+        if (directoryEntity.isS3()) {
+            scanS3Directory(directoryEntity);
+        } else {
+            scanDirectory(Path.of(directoryEntity.getPath()), directoryEntity);
+        }
     }
 
     public void scanDirectory(Path path, DirectoryEntity directoryEntity) throws IOException {
         log.debug("Log: {}", path);
         ScannedCache scannedCache = new ScannedCache(directoryEntity, imageRepository, mediaFileRepository, otherPathFileRepository);
-        Files.walkFileTree(path, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner, comicScanner)));
+        Files.walkFileTree(path, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, scanners()));
         scannedCache.removeNotScannedFilesFromDatabase();
+    }
+
+    private void scanS3Directory(DirectoryEntity directoryEntity) {
+        log.debug("Scanning S3 directory {} ({})", directoryEntity.getName(), directoryEntity.getPath());
+        ScannedCache scannedCache = new ScannedCache(directoryEntity, imageRepository, mediaFileRepository, otherPathFileRepository);
+        new S3LibraryScanner(directoryEntity, objectStoreRegistry.forDirectory(directoryEntity),
+                new ScanEntryDispatcher(directoryEntity, scannedCache, messageSender, scanners())).scan();
+        scannedCache.removeNotScannedFilesFromDatabase();
+    }
+
+    private Scanners scanners() {
+        return new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner, comicScanner);
     }
 }

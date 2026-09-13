@@ -3,7 +3,7 @@ package app.ister.disk.events.mediafilefound;
 import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.NullOutput;
-import com.github.kokorin.jaffree.ffmpeg.UrlInput;
+import app.ister.core.node.MediaFileInputResolver;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -49,7 +49,7 @@ public class MediaFileFoundDetectCrop {
      * were found, or empty when detection failed (columns stay null so the
      * scanner's backfill retries on a later run).
      */
-    public Optional<CropRect> detectCrop(Path mediaFilePath, String dirOfFFmpeg,
+    public Optional<CropRect> detectCrop(String mediaFilePath, String dirOfFFmpeg,
                                          long durationMs, int width, int height) {
         if (durationMs <= 0 || width <= 0 || height <= 0) {
             return Optional.empty();
@@ -60,7 +60,7 @@ public class MediaFileFoundDetectCrop {
             try {
                 List<String> cropLines = new ArrayList<>();
                 FFmpeg.atPath(Path.of(dirOfFFmpeg))
-                        .addInput(UrlInput.fromPath(mediaFilePath)
+                        .addInput(MediaFileInputResolver.ffmpegInput(mediaFilePath)
                                 .addArguments("-ss", atMs + "ms"))
                         // NullOutput(false): the default adds -c copy, and
                         // ffmpeg refuses to combine streamcopy with a filter.

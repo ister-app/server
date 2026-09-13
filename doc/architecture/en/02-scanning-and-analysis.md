@@ -49,6 +49,28 @@ spelling seen first, as the display value. `ArtistTagParser` splits a `feat.`/`f
 into the primary artist and its guests; an ampersand is never split, because "Simon & Garfunkel"
 and "Mumford & Sons" are single acts.
 
+### Storage kinds and the S3 scan
+
+`DirectoryEntity.storageKind` is `LOCAL` (an absolute path on exactly one owning node) or `S3`
+(`s3://bucket/prefix`, no owner, N attached nodes in `directory_node`). Rows of an S3 directory
+store `s3://bucket/key` in the same `path` column, so the path parsers — pure string parsers that
+strip the root and split on `/` — and the `(directory, path)` uniqueness work unchanged. The two
+walkers share one per-file decision: `AnalyzerSimpleFileVisitor` (a `java.nio` adapter) and
+`S3LibraryScanner` (a delimiter-based recursive `ListObjectsV2`) both prune with `DirectoryPruner`
+and hand `ScanEntry`s to `ScanEntryDispatcher`, which asks the scanners and publishes
+`FILE_SCAN_REQUESTED` (its `path` is a string, with a tolerant setter for the `file:` URI older
+producers sent). `HandleNewDirectoriesScanRequested` takes a transaction-scoped advisory lock per
+directory, since an S3 directory's scan can be picked up by any attached node.
+
+Handlers never touch `java.nio` on a row's path directly. `core/.../storage` provides the seams:
+`ObjectStore` (one per `app.ister.s3.connections[n]`, held by `ObjectStoreRegistry`), `FileAccess`
+(stat/open/delete by directory + path), `LocalCopy` (an LRU-cached download for zip/PDF/OCR tools),
+`CacheStore` via `CacheDirectoryResolver` (every derived-file writer), and `TmpStoreProvider` (the
+shared transcode store, [chapter 4](04-transcoding.md)). `MediaFileInputResolver` decides what
+ffmpeg reads: a local path, another node's tokenized download URL, or — for an S3 file on an
+attached node — the node's own `/mediaFile/{id}/download` over loopback (`FileController` proxies
+the object with `Range`), or a presigned URL when `app.ister.s3.ffmpeg-direct` is on.
+
 ### Multi-episode files
 
 A filename may carry an episode **range** — `s04e06-e07.mkv`, `s04e06-08.mkv`, `s04e06e07.mkv` —

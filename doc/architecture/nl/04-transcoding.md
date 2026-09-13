@@ -156,3 +156,20 @@ stream-eind-probes van de transcoder goedkoop blijven. Ook het pad van een
 `EXTERNAL_SUBTITLE`-stream is eigenaar-lokaal (cache-directory of een sidecar-`.srt`), dus een
 remote transcoder haalt hem eenmalig op via `/mediaFileStream/{id}/download` naar de
 transcode-cachemap van het bestand.
+
+Een S3-directory heeft geen eigenaar: elke gekoppelde node mag de transcode-queues lezen, en de
+node waar de client mee praat is niet noodzakelijk de node die de pass draait.
+`TranscodeRequestedData` en `TranscodePassRequestedData` dragen daarom `requestingNodeUrl`; een
+transcoderende node pusht naar die node als het een andere is (`HlsService.uploadTarget`), wat de
+segment-push van helper naar eigenaar hergebruikt.
+
+Met `app.ister.server.tmp-s3-connection` gezet wordt het push-doel in plaats daarvan de
+cluster-gedeelde `TmpStore` (`S3TmpStore`, `tmp/{mediaFileId}/…`): de watcher publiceert stabiele
+segmenten, playlists en — als laatste, na de pass — de done-markering. De leeskant is een
+read-through: elke `HlsService`-lookup kijkt eerst in de lokale tmp-map en haalt daarna de
+ontbrekende playlist, markering of het segment uit de opslag daarnaartoe (`syncFromShared`), zodat
+de invarianten aan de encoderkant (groottestabiliteit, done-markeringen, `keep_until`, de lokale
+sweeps) onaangeroerd blijven en `HlsController` echte bestanden blijft serveren. Wachten op een
+elders geproduceerd segment pollt de opslag in plaats van de lokale pass (`waitForSegment`). De
+tmp-opschoning veegt ook de opslag, één node per run onder een advisory lock; heranalyse
+(`deleteHlsCache`) verwijdert de gepubliceerde map ook.

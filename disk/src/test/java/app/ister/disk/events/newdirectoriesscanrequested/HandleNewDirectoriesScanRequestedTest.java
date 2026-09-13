@@ -54,6 +54,7 @@ class HandleNewDirectoriesScanRequestedTest {
                 .build();
 
         when(directoryRepository.findById(uuid)).thenReturn(Optional.of(directoryEntity));
+        when(directoryRepository.tryLockDirectoryScan(org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.eq(uuid))).thenReturn(true);
 
         subject.handle(data);
 

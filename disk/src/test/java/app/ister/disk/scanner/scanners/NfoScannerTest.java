@@ -15,7 +15,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,18 +39,18 @@ class NfoScannerTest {
 
     @Test
     void analyzable() {
-        assertTrue(subject.analyzable(Path.of("/disk/shows/SHOW (2024)/tvshow.nfo"), true, 0));
-        assertFalse(subject.analyzable(Path.of("/disk/shows/SHOW (2024)/tvshowWithWrongName.nfo"), true, 0));
-        assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/Season 01/s01e01.nfo"), true, 0));
-        assertFalse(subject.analyzable(Path.of("/disk/shows/Show (2024)/Season 01/tvshow.nfo"), true, 0));
-        assertFalse(subject.analyzable(Path.of("/disk/shows/Show (2024)/Season 01/s01e01.nfo"), false, 0));
-        assertFalse(subject.analyzable(Path.of("/disk/shows/Show (2024)/Season 01/s01e01.mkv"), true, 0));
+        assertTrue(subject.analyzable("/disk/shows/SHOW (2024)/tvshow.nfo", true, 0));
+        assertFalse(subject.analyzable("/disk/shows/SHOW (2024)/tvshowWithWrongName.nfo", true, 0));
+        assertTrue(subject.analyzable("/disk/shows/Show (2024)/Season 01/s01e01.nfo", true, 0));
+        assertFalse(subject.analyzable("/disk/shows/Show (2024)/Season 01/tvshow.nfo", true, 0));
+        assertFalse(subject.analyzable("/disk/shows/Show (2024)/Season 01/s01e01.nfo", false, 0));
+        assertFalse(subject.analyzable("/disk/shows/Show (2024)/Season 01/s01e01.mkv", true, 0));
     }
 
     @Test
     void analyzeExistingFile() {
         DirectoryEntity directoryEntity = DirectoryEntity.builder().build();
-        Path path = Path.of("/path");
+        String path = "/path";
         OtherPathFileEntity otherPathFileEntity = OtherPathFileEntity.builder().build();
 
         when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString())).thenReturn(Optional.of(otherPathFileEntity));
@@ -62,7 +61,7 @@ class NfoScannerTest {
     @Test
     void analyzeNoneExistingFile() {
         DirectoryEntity directoryEntity = DirectoryEntity.builder().id(UUID.randomUUID()).name("disk1").nodeEntity(NodeEntity.builder().name("TestServer").build()).build();
-        Path path = Path.of("/path");
+        String path = "/path";
 
         when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString())).thenReturn(Optional.empty());
 

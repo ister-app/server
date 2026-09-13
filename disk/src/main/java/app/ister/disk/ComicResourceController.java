@@ -2,6 +2,7 @@ package app.ister.disk;
 
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.repository.MediaFileRepository;
+import app.ister.core.storage.LocalCopy;
 import app.ister.disk.events.comicfilefound.CbzParser;
 import app.ister.disk.http.ByteRanges;
 import app.ister.disk.http.ByteRanges.Range;
@@ -70,6 +71,7 @@ public class ComicResourceController {
     private final CbzParser cbzParser;
     private final PdfPageCache pdfPageCache;
     private final ImageScaler imageScaler;
+    private final LocalCopy localCopy;
 
     /**
      * @param index the zero-based page index (cbz only)
@@ -88,7 +90,7 @@ public class ComicResourceController {
             return ResponseEntity.notFound().build();
         }
         MediaFileEntity entity = mediaFile.get();
-        Path path = Path.of(entity.getPath());
+        Path path = localCopy.localPathOrNull(entity);
         String format = extensionOf(entity.getPath()).toUpperCase();
 
         List<PageInfo> pages = List.of();
@@ -128,8 +130,8 @@ public class ComicResourceController {
             return ResponseEntity.notFound().build();
         }
         String extension = extensionOf(mediaFile.get().getPath());
-        Path path = Path.of(mediaFile.get().getPath());
-        if (!Files.exists(path)) {
+        Path path = localCopy.localPathOrNull(mediaFile.get());
+        if (path == null || !Files.exists(path)) {
             return ResponseEntity.notFound().build();
         }
         if ("pdf".equals(extension)) {
@@ -244,8 +246,8 @@ public class ComicResourceController {
         if (mediaFile.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        Path path = Path.of(mediaFile.get().getPath());
-        if (!Files.exists(path)) {
+        Path path = localCopy.localPathOrNull(mediaFile.get());
+        if (path == null || !Files.exists(path)) {
             return ResponseEntity.notFound().build();
         }
         long size = Files.size(path);
@@ -284,7 +286,7 @@ public class ComicResourceController {
     }
 
     private List<PageInfo> cbzPages(Path path) throws IOException {
-        if (!Files.exists(path)) {
+        if (path == null || !Files.exists(path)) {
             return List.of();
         }
         List<String> names = cbzParser.pages(path);

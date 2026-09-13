@@ -33,15 +33,22 @@ public class DirectoryQueueNames {
     private final OwnDirectoriesProperties ownDirectories;
     private final HelperProperties helperProperties;
     private final TranscoderDisksConfig legacyTranscoderDisks;
+    private final SharedStorageProperties sharedStorage;
     private final String nodeName;
+    private final String clusterName;
+
     public DirectoryQueueNames(OwnDirectoriesProperties ownDirectories,
                                HelperProperties helperProperties,
                                TranscoderDisksConfig legacyTranscoderDisks,
-                               @Value("${app.ister.server.name}") String nodeName) {
+                               SharedStorageProperties sharedStorage,
+                               @Value("${app.ister.server.name}") String nodeName,
+                               @Value("${app.ister.cluster.name:${app.ister.server.name}}") String clusterName) {
         this.ownDirectories = ownDirectories;
         this.helperProperties = helperProperties;
         this.legacyTranscoderDisks = legacyTranscoderDisks;
+        this.sharedStorage = sharedStorage;
         this.nodeName = nodeName;
+        this.clusterName = clusterName;
     }
 
     @PostConstruct
@@ -73,6 +80,16 @@ public class DirectoryQueueNames {
      * cache-directory-scoped queue. Without it those events end up on a queue nobody consumes.
      */
     public String cacheDirName() {
+        if (sharedStorage != null && sharedStorage.isSharedCache()) {
+            // The cluster-shared S3 cache: one name for every node configured with it, so its
+            // queues (podcast downloads, cache-scoped image events) are competing-consumer.
+            return clusterName + "-s3-cache";
+        }
+        return nodeName + "-cache-directory";
+    }
+
+    /** This node's own cache directory name, shared cache or not (the legacy rows keep living there). */
+    public String localCacheDirName() {
         return nodeName + "-cache-directory";
     }
 

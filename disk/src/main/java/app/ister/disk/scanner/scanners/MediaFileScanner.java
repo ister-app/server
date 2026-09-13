@@ -23,7 +23,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -71,16 +70,16 @@ public class MediaFileScanner implements Scanner {
     private boolean segmentDetectBackfill;
 
     @Override
-    public boolean analyzable(Path path, boolean isRegularFile, long size) {
-        PathObject pathObject = new PathObject(path.toString());
+    public boolean analyzable(String path, boolean isRegularFile, long size) {
+        PathObject pathObject = new PathObject(path);
         return isRegularFile
                 && List.of(DirType.EPISODE, DirType.MOVIE).contains(pathObject.getDirType())
                 && pathObject.getFileType().equals(FileType.MEDIA);
     }
 
     @Override
-    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, boolean isRegularFile, long size) {
-        PathObject pathObject = new PathObject(path.toString());
+    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, String path, boolean isRegularFile, long size) {
+        PathObject pathObject = new PathObject(path);
         List<EpisodeEntity> episodeEntities = List.of();
         Optional<MovieEntity> movieEntity = Optional.empty();
         UUID movieId = null;
@@ -100,13 +99,13 @@ public class MediaFileScanner implements Scanner {
         UUID episodeId = episodeEntity.map(BaseEntity::getId).orElse(null);
         List<UUID> episodeIds = episodeEntities.stream().map(BaseEntity::getId).toList();
 
-        Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString());
+        Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, path);
         if (mediaFile.isEmpty()) {
             MediaFileEntity entity = MediaFileEntity.builder()
                     .directoryEntityId(directoryEntity.getId())
                     .episodeEntity(episodeEntity.orElse(null))
                     .movieEntity(movieEntity.orElse(null))
-                    .path(path.toString())
+                    .path(path)
                     .size(size).build();
             mediaFileRepository.save(entity);
             createEpisodeLinks(entity, episodeIds);
@@ -123,7 +122,7 @@ public class MediaFileScanner implements Scanner {
      * Each branch is idempotent, so firing at most one of them per pass converges over
      * a few rescans without flooding the analyzer.
      */
-    private void maybeBackfill(DirectoryEntity directoryEntity, Path path, MediaFileEntity mediaFile,
+    private void maybeBackfill(DirectoryEntity directoryEntity, String path, MediaFileEntity mediaFile,
                                Optional<EpisodeEntity> episodeEntity, UUID episodeId, List<UUID> episodeIds,
                                UUID movieId) {
         if (episodeIds.size() > 1
@@ -177,7 +176,7 @@ public class MediaFileScanner implements Scanner {
         }
     }
 
-    private void sendMediaFileFound(DirectoryEntity directoryEntity, Path path, UUID episodeId,
+    private void sendMediaFileFound(DirectoryEntity directoryEntity, String path, UUID episodeId,
                                     List<UUID> episodeIds, UUID movieId) {
         messageSender.sendMediaFileFound(MediaFileFoundData.builder()
                 .eventType(EventType.MEDIA_FILE_FOUND)
@@ -185,7 +184,7 @@ public class MediaFileScanner implements Scanner {
                 .episodeEntityUUID(episodeId)
                 .episodeEntityUUIDs(episodeIds)
                 .movieEntityUUID(movieId)
-                .path(path.toString()).build(), directoryEntity.getName());
+                .path(path).build(), directoryEntity.getName());
     }
 
     /**

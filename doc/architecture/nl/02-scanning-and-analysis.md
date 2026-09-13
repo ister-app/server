@@ -51,6 +51,30 @@ De opgeslagen `name` houdt de eerst geziene schrijfwijze als weergavenaam.
 op een ampersand wordt nooit gesplitst, want "Simon & Garfunkel" en "Mumford & Sons" zijn
 bandnamen.
 
+### Opslagsoorten en de S3-scan
+
+`DirectoryEntity.storageKind` is `LOCAL` (een absoluut pad op precies één eigenaar-node) of `S3`
+(`s3://bucket/prefix`, geen eigenaar, N gekoppelde nodes in `directory_node`). Rijen van een
+S3-directory bewaren `s3://bucket/key` in dezelfde `path`-kolom, zodat de padparsers — pure
+string-parsers die de root strippen en op `/` splitsen — en de uniciteit op `(directory, path)`
+ongewijzigd werken. De twee walkers delen één beslissing per bestand: `AnalyzerSimpleFileVisitor`
+(een `java.nio`-adapter) en `S3LibraryScanner` (een recursieve `ListObjectsV2` met delimiter)
+snoeien allebei met `DirectoryPruner` en geven `ScanEntry`s aan `ScanEntryDispatcher`, die de
+scanners bevraagt en `FILE_SCAN_REQUESTED` publiceert (zijn `path` is een string, met een
+tolerante setter voor de `file:`-URI die oudere producenten stuurden).
+`HandleNewDirectoriesScanRequested` neemt per directory een transactie-gescopete advisory lock,
+omdat de scan van een S3-directory door elke gekoppelde node opgepakt kan worden.
+
+Handlers raken `java.nio` nooit rechtstreeks aan op het pad van een rij. `core/.../storage` levert
+de naden: `ObjectStore` (één per `app.ister.s3.connections[n]`, beheerd door `ObjectStoreRegistry`),
+`FileAccess` (stat/open/delete op directory + pad), `LocalCopy` (een LRU-gecachte download voor
+zip-/PDF-/OCR-tools), `CacheStore` via `CacheDirectoryResolver` (elke schrijver van afgeleide
+bestanden) en `TmpStoreProvider` (de gedeelde transcode-opslag, [hoofdstuk 4](04-transcoding.md)).
+`MediaFileInputResolver` bepaalt wat ffmpeg leest: een lokaal pad, de getokeniseerde download-URL
+van een andere node, of — voor een S3-bestand op een gekoppelde node — het eigen
+`/mediaFile/{id}/download` van de node over loopback (`FileController` proxiet het object met
+`Range`), dan wel een presigned URL als `app.ister.s3.ffmpeg-direct` aanstaat.
+
 ### Multi-episode-bestanden
 
 Een bestandsnaam mag een aflevering-**range** dragen — `s04e06-e07.mkv`, `s04e06-08.mkv`,

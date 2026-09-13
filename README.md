@@ -69,6 +69,7 @@ Everything is env-overridable; the most important settings:
 | Typesense | `TYPESENSE_ENABLED`, `TYPESENSE_HOST`, `TYPESENSE_PORT`, `TYPESENSE_API_KEY` | optional full-text search (GraphQL `search` query); run the `rebuildSearchIndex` mutation once after enabling to build the initial index |
 | FFmpeg | `FFMPEG_DIR`, `MKVEXTRACT`, `SUBTILE_OCR` | binary locations |
 | Cache/tmp | `CACHE_DIR`, `TMP_DIR` | HLS segments and image cache |
+| Object storage (S3) | `app.ister.s3.connections[n].*`, `app.ister.disk.directories[n].s3-connection` / `.prefix`, `CACHE_S3_CONNECTION`, `TMP_S3_CONNECTION` | libraries in an S3-compatible bucket (AWS, MinIO, Garage, Ceph), attached to several nodes at once; optionally the cluster-shared cache and HLS transcode store — see the [object storage chapter](doc/admin/en/10-object-storage.md) |
 | Node identity | `app.ister.server.name`, `app.ister.server.url`, `app.ister.cluster.name` | unique per node |
 | Libraries | `app.ister.disk.libraries[n].*`, `app.ister.disk.directories[n].*` | see `disk/src/main/resources/disk.properties` |
 | Transcoder | `app.ister.transcoder.hls.*` | hwaccel (`vaapi`/`nvdec`), concurrency, timeouts |
@@ -88,6 +89,9 @@ tokens. A powerful **helper node** can additionally serve other nodes' directori
 transcoding, intro/outro detection and subtitle extraction/OCR (`app.ister.helper.disks[n].name`,
 `.jobs`), reading the source over HTTP; an owner can hand a job family off entirely with
 `app.ister.helper.offload-jobs`. See the [multi-node chapter](doc/admin/en/05-multi-node.md).
+An S3 directory has no owner: every node that configures it is attached and shares its queues
+(scan, analysis, transcode, streaming); with the shared S3 cache/tmp stores enabled, derived files
+and HLS output are published to the bucket instead of pushed node-to-node.
 
 ## Languages
 

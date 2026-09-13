@@ -2,6 +2,7 @@ package app.ister.disk;
 
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.repository.MediaFileRepository;
+import app.ister.core.storage.LocalCopy;
 import app.ister.disk.http.ByteRanges;
 import app.ister.disk.http.ByteRanges.Range;
 import lombok.extern.slf4j.Slf4j;
@@ -65,9 +66,11 @@ public class EpubResourceController {
             Map.entry("woff2", "font/woff2"));
 
     private final MediaFileRepository mediaFileRepository;
+    private final LocalCopy localCopy;
 
-    public EpubResourceController(MediaFileRepository mediaFileRepository) {
+    public EpubResourceController(MediaFileRepository mediaFileRepository, LocalCopy localCopy) {
         this.mediaFileRepository = mediaFileRepository;
+        this.localCopy = localCopy;
     }
 
     // Access control matches FileController: the security filter chain requires an authenticated
@@ -87,8 +90,8 @@ public class EpubResourceController {
         if (entryName == null) {
             return ResponseEntity.badRequest().build();
         }
-        Path epubPath = Path.of(mediaFile.get().getPath());
-        if (!Files.exists(epubPath)) {
+        Path epubPath = localCopy.localPathOrNull(mediaFile.get());
+        if (epubPath == null || !Files.exists(epubPath)) {
             return ResponseEntity.notFound().build();
         }
 

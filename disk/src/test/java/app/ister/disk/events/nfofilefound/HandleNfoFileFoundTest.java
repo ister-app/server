@@ -49,6 +49,10 @@ class HandleNfoFileFoundTest {
     @Mock
     private ServerEventService serverEventServiceMock;
 
+    @org.mockito.Spy
+    private app.ister.core.storage.FileAccess fileAccess = new app.ister.core.storage.FileAccess(
+            org.mockito.Mockito.mock(app.ister.core.storage.ObjectStoreRegistry.class));
+
     @InjectMocks
     private HandleNfoFileFound subject;
 

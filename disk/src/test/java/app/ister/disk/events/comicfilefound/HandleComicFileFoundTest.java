@@ -62,6 +62,13 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class HandleComicFileFoundTest {
 
+    @org.mockito.Spy
+    private app.ister.core.storage.LocalCopy localCopy = new app.ister.core.storage.LocalCopy(
+            org.mockito.Mockito.mock(app.ister.core.storage.ObjectStoreRegistry.class),
+            new app.ister.core.config.S3Properties(), System.getProperty("java.io.tmpdir"));
+    @Mock
+    private app.ister.core.storage.CacheDirectoryResolver cacheDirectoryResolver;
+
     @Mock
     private DirectoryRepository directoryRepository;
     @Mock
@@ -106,9 +113,10 @@ class HandleComicFileFoundTest {
 
     @BeforeEach
     void setUp() {
+        app.ister.disk.storage.CacheStoreMocks.realLocal(cacheDirectoryResolver);
         subject = new HandleComicFileFound(directoryRepository, mediaFileRepository, metadataRepository,
                 bookRepository, seriesRepository, imageRepository, cbzParser, pdfParser, messageSender,
-                serverEventService, scannerHelperService);
+                serverEventService, scannerHelperService, localCopy, cacheDirectoryResolver);
         node = NodeEntity.builder().name("node1").build();
         LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.COMIC).name("Comics").build();
         libraryDir = DirectoryEntity.builder()
@@ -128,8 +136,7 @@ class HandleComicFileFoundTest {
         lenient().when(directoryRepository.findById(directoryId)).thenReturn(Optional.of(libraryDir));
         lenient().when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         lenient().when(bookRepository.findById(volumeId)).thenReturn(Optional.of(volume));
-        lenient().when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node))
-                .thenReturn(List.of(cacheDir));
+        lenient().when(cacheDirectoryResolver.forThisNodeIfAny()).thenReturn(Optional.of(cacheDir));
     }
 
     private ComicFileFoundData event(Path path) {

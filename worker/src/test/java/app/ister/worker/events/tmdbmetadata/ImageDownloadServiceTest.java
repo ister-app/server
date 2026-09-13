@@ -3,10 +3,7 @@ package app.ister.worker.events.tmdbmetadata;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.NodeEntity;
-import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.ImageType;
-import app.ister.core.repository.DirectoryRepository;
-import app.ister.core.service.NodeService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -15,10 +12,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -31,10 +28,10 @@ class ImageDownloadServiceTest {
     private ImageDownloadService subject;
 
     @Mock
-    private NodeService nodeService;
+    private app.ister.core.storage.CacheDirectoryResolver cacheDirectoryResolver;
 
-    @Mock
-    private DirectoryRepository directoryRepository;
+    @org.junit.jupiter.api.io.TempDir
+    java.nio.file.Path tempDir;
 
     @Mock
     private ImageDownload imageDownload;
@@ -61,31 +58,34 @@ class ImageDownloadServiceTest {
         DirectoryEntity cacheDisk = buildCacheDisk(node);
         MovieEntity movie = MovieEntity.builder().id(UUID.randomUUID()).build();
 
-        when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
-        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node))
-                .thenReturn(List.of(cacheDisk));
+        cacheDisk.setPath(tempDir.resolve("cache").toString());
+        when(cacheDirectoryResolver.store()).thenReturn(new app.ister.core.storage.LocalCacheStore(cacheDisk));
+        org.springframework.test.util.ReflectionTestUtils.setField(subject, "tmpDir", tempDir.resolve("tmp").toString());
 
         subject.downloadAndSave("http://example.com/img.jpg", ImageType.BACKGROUND, "en",
                 "TMDB://http://example.com/img.jpg", new ImageSave.MediaEntityRef(movie, null, null, null, null));
 
+        // downloaded into tmp, then moved into the cache directory under a fresh name
+        ArgumentCaptor<String> downloadCaptor = ArgumentCaptor.forClass(String.class);
+        verify(imageDownload).download(eq("http://example.com/img.jpg"), downloadCaptor.capture());
+        assertTrue(downloadCaptor.getValue().startsWith(tempDir.resolve("tmp").toString()));
+
         ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-        verify(imageDownload).download(eq("http://example.com/img.jpg"), pathCaptor.capture());
-
-        String downloadedPath = pathCaptor.getValue();
-        assertTrue(downloadedPath.startsWith("/cache/"));
-        assertTrue(downloadedPath.endsWith(".jpg"));
-
-        verify(imageSave).save(cacheDisk, downloadedPath, ImageType.BACKGROUND, "en",
-                "TMDB://http://example.com/img.jpg", new ImageSave.MediaEntityRef(movie, null, null, null, null));
+        verify(imageSave).save(eq(cacheDisk), pathCaptor.capture(), eq(ImageType.BACKGROUND), eq("en"),
+                eq("TMDB://http://example.com/img.jpg"), eq(new ImageSave.MediaEntityRef(movie, null, null, null, null)));
+        String storedPath = pathCaptor.getValue();
+        assertTrue(storedPath.startsWith(tempDir.resolve("cache").toString()));
+        assertTrue(storedPath.endsWith(".jpg"));
+        assertTrue(java.nio.file.Files.exists(java.nio.file.Path.of(storedPath)));
+        try (var tmpFiles = java.nio.file.Files.list(tempDir.resolve("tmp"))) {
+            assertEquals(0, tmpFiles.count(), "no download left in tmp");
+        }
     }
 
     @Test
     void downloadAndSaveThrowsWhenNoCacheDirectory() {
-        NodeEntity node = buildNode();
-
-        when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
-        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node))
-                .thenReturn(List.of());
+        when(cacheDirectoryResolver.store()).thenThrow(new IllegalStateException("This node has no cache directory"));
+        org.springframework.test.util.ReflectionTestUtils.setField(subject, "tmpDir", tempDir.resolve("tmp").toString());
 
         ImageSave.MediaEntityRef ref = new ImageSave.MediaEntityRef(null, null, null, null, null);
         assertThrows(IllegalStateException.class, () ->

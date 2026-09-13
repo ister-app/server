@@ -7,7 +7,6 @@ import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
-import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.SearchEntityType;
@@ -19,7 +18,11 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.service.BookSeriesService;
+import app.ister.core.EventHandlingException;
 import app.ister.core.service.MessageSender;
+import app.ister.core.storage.CacheDirectoryResolver;
+import app.ister.core.storage.LocalCopy;
+import app.ister.core.storage.SourceUris;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
 import app.ister.core.util.LanguageTags;
@@ -32,12 +35,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.Month;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -52,7 +52,6 @@ import java.util.UUID;
 @Transactional
 @RequiredArgsConstructor
 public class HandleEpubFileFound implements Handle<EpubFileFoundData> {
-    private static final String FILE_URI_SCHEME = "file://";
 
     private final DirectoryRepository directoryRepository;
     private final MediaFileRepository mediaFileRepository;
@@ -64,6 +63,8 @@ public class HandleEpubFileFound implements Handle<EpubFileFoundData> {
     private final ServerEventService serverEventService;
     private final ScannerHelperService scannerHelperService;
     private final BookSeriesService bookSeriesService;
+    private final LocalCopy localCopy;
+    private final CacheDirectoryResolver cacheDirectoryResolver;
 
     @Override
     public EventType handles() {
@@ -88,13 +89,22 @@ public class HandleEpubFileFound implements Handle<EpubFileFoundData> {
         ActivityContext.report(ActivitySubjects.describe(book.get(), ActivitySubjects.describe(directoryEntity))
                 .withTitle(ActivitySubjects.fileName(messageData.getPath())));
 
-        Optional<EpubInfo> parsed = epubParser.parse(Path.of(messageData.getPath()));
+        try (LocalCopy.Handle local = localCopy.of(directoryEntity, messageData.getPath())) {
+            handle(messageData, directoryEntity, mediaFile.get(), book.get(), local.path());
+        } catch (IOException e) {
+            throw new EventHandlingException("Cannot read epub " + messageData.getPath(), e);
+        }
+    }
+
+    private void handle(EpubFileFoundData messageData, DirectoryEntity directoryEntity, MediaFileEntity entity,
+                        BookEntity bookEntity, Path localPath) {
+        Optional<EpubInfo> parsed = epubParser.parse(localPath);
         if (parsed.isEmpty()) {
             return;
         }
         EpubInfo info = parsed.get();
+        Optional<BookEntity> book = Optional.of(bookEntity);
 
-        MediaFileEntity entity = mediaFile.get();
         entity.setMediaOverlays(info.mediaOverlays());
         if (info.durationInMilliseconds() > 0) {
             entity.setDurationInMilliseconds(info.durationInMilliseconds());
@@ -107,7 +117,7 @@ public class HandleEpubFileFound implements Handle<EpubFileFoundData> {
 
         saveBookMetadata(book.get(), info, messageData.getPath());
         bookSeriesService.assignFromEpub(book.get(), info.seriesName(), info.seriesIndex());
-        extractCover(directoryEntity, book.get(), info, messageData.getPath());
+        extractCover(book.get(), info, localPath, messageData.getPath());
 
         // Comic volumes (no author) skip Open Library: BOOK_FOUND is a book-database lookup, and
         // the comic's series gets its metadata from Wikipedia via COMIC_SERIES_FOUND instead.
@@ -128,7 +138,7 @@ public class HandleEpubFileFound implements Handle<EpubFileFoundData> {
         if (info.title() == null && info.description() == null && info.releaseYear() <= 0) {
             return;
         }
-        String sourceUri = FILE_URI_SCHEME + path;
+        String sourceUri = SourceUris.of(path);
         MetadataEntity metadata = metadataRepository.findByBookEntityId(book.getId()).stream()
                 .filter(existing -> sourceUri.equals(existing.getSourceUri()))
                 .findFirst()
@@ -145,24 +155,22 @@ public class HandleEpubFileFound implements Handle<EpubFileFoundData> {
         serverEventService.createSearchIndexEvent(SearchEntityType.BOOK, book.getId());
     }
 
-    private void extractCover(DirectoryEntity libraryDir, BookEntity book, EpubInfo info, String epubPath) {
+    private void extractCover(BookEntity book, EpubInfo info, Path localPath, String epubPath) {
         if (info.coverEntry() == null) return;
         UUID bookId = book.getId();
         if (!imageRepository.findByBookEntityId(bookId).isEmpty()) return;
 
-        List<DirectoryEntity> cacheDirs = directoryRepository
-                .findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, libraryDir.getNodeEntity());
-        if (cacheDirs.isEmpty()) return;
-        DirectoryEntity cacheDir = cacheDirs.get(0);
+        DirectoryEntity cacheDir = cacheDirectoryResolver.forThisNodeIfAny().orElse(null);
+        if (cacheDir == null) return;
 
-        Optional<byte[]> coverBytes = epubParser.readEntry(Path.of(epubPath), info.coverEntry());
+        Optional<byte[]> coverBytes = epubParser.readEntry(localPath, info.coverEntry());
         if (coverBytes.isEmpty()) return;
 
         String extension = info.coverEntry().toLowerCase().endsWith(".png") ? "png" : "jpg";
-        Path outputPath = Paths.get(cacheDir.getPath(), "book-covers", bookId.toString(), "cover." + extension);
+        String storedPath;
         try {
-            Files.createDirectories(outputPath.getParent());
-            Files.write(outputPath, coverBytes.get());
+            storedPath = cacheDirectoryResolver.storeFor(cacheDir).write(
+                    "book-covers/" + bookId + "/cover." + extension, coverBytes.get(), "png".equals(extension) ? "image/png" : "image/jpeg");
         } catch (IOException e) {
             log.warn("Could not write epub cover for {}: {}", epubPath, e.getMessage());
             return;
@@ -171,9 +179,9 @@ public class HandleEpubFileFound implements Handle<EpubFileFoundData> {
         messageSender.sendImageFound(ImageFoundData.builder()
                 .eventType(EventType.IMAGE_FOUND)
                 .directoryEntityId(cacheDir.getId())
-                .path(outputPath.toString())
+                .path(storedPath)
                 .imageType(ImageType.COVER)
-                .sourceUri(FILE_URI_SCHEME + epubPath)
+                .sourceUri(SourceUris.of(epubPath))
                 .bookEntityId(bookId)
                 .build(), cacheDir.getName());
     }

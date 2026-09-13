@@ -72,7 +72,7 @@ public class NodeFactsProvider {
 
     private NodeFacts build() {
         List<DirectoryFact> directories = nodeRepository.findByName(nodeName)
-                .map(node -> directoryRepository.findByNodeEntity(node).stream()
+                .map(node -> directoryRepository.findAttachedTo(node).stream()
                         .sorted(Comparator.comparing(DirectoryEntity::getName))
                         .map(NodeFactsProvider::directoryFact)
                         .toList())
@@ -91,6 +91,13 @@ public class NodeFactsProvider {
     static DirectoryFact directoryFact(DirectoryEntity directory) {
         Long total = null;
         Long free = null;
+        if (directory.isS3()) {
+            // no filesystem to stat; buckets have no meaningful capacity
+            String library = directory.getLibraryEntity() == null ? null : directory.getLibraryEntity().getName();
+            return new DirectoryFact(directory.getName(), directory.getPath(),
+                    directory.getDirectoryType() == null ? null : directory.getDirectoryType().name(),
+                    library, null, null);
+        }
         try {
             Path path = Path.of(directory.getPath());
             if (Files.exists(path)) {

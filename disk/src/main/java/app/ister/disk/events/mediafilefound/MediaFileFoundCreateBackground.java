@@ -2,7 +2,7 @@ package app.ister.disk.events.mediafilefound;
 
 import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
-import com.github.kokorin.jaffree.ffmpeg.UrlInput;
+import app.ister.core.node.MediaFileInputResolver;
 import com.github.kokorin.jaffree.ffmpeg.UrlOutput;
 import org.springframework.stereotype.Component;
 
@@ -10,10 +10,10 @@ import java.nio.file.Path;
 
 @Component
 public class MediaFileFoundCreateBackground {
-    public void createBackground(Path toPath, Path mediaFilePath, String dirOfFFmpeg, long atDurationInMilliseconds) {
+    public void createBackground(Path toPath, String mediaFilePath, String dirOfFFmpeg, long atDurationInMilliseconds) {
         FFmpeg.atPath(Path.of(dirOfFFmpeg))
                 .addInput(
-                        UrlInput.fromPath(mediaFilePath)
+                        MediaFileInputResolver.ffmpegInput(mediaFilePath)
                                 .addArguments("-ss", atDurationInMilliseconds + "ms")
                 )
                 .addOutput(

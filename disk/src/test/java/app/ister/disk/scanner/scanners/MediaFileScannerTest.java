@@ -13,7 +13,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.nio.file.Path;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -38,11 +37,11 @@ class MediaFileScannerTest {
 
     @Test
     void analyzable() {
-        assertTrue(subject.analyzable(Path.of("/disk/movies/Movie (2024).mkv"), true, 0));
-        assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/s01e01.mkv"), true, 0));
-        assertTrue(subject.analyzable(Path.of("/disk/shows/SHOW (2024)/s01e01.mkv"), true, 0));
-        assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/s02E03.mkv"), true, 0));
-        assertFalse(subject.analyzable(Path.of("/disk/shows/Show (2024)/s01e01.png"), true, 0));
+        assertTrue(subject.analyzable("/disk/movies/Movie (2024).mkv", true, 0));
+        assertTrue(subject.analyzable("/disk/shows/Show (2024)/s01e01.mkv", true, 0));
+        assertTrue(subject.analyzable("/disk/shows/SHOW (2024)/s01e01.mkv", true, 0));
+        assertTrue(subject.analyzable("/disk/shows/Show (2024)/s02E03.mkv", true, 0));
+        assertFalse(subject.analyzable("/disk/shows/Show (2024)/s01e01.png", true, 0));
     }
 
     @Test
@@ -54,7 +53,7 @@ class MediaFileScannerTest {
                 .nodeEntity(NodeEntity.builder().name("node1").build())
                 .build();
         EpisodeEntity episode = EpisodeEntity.builder().id(UUID.randomUUID()).build();
-        Path path = Path.of("/disk/shows/Show (2024)/Season 01/s01e01.mkv");
+        String path = "/disk/shows/Show (2024)/Season 01/s01e01.mkv";
 
         when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 1, 1)).thenReturn(episode);
         when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path.toString())).thenReturn(Optional.empty());
@@ -76,7 +75,7 @@ class MediaFileScannerTest {
                 .nodeEntity(NodeEntity.builder().name("node1").build())
                 .build();
         MovieEntity movie = MovieEntity.builder().id(UUID.randomUUID()).build();
-        Path path = Path.of("/disk/movies/Movie (2024).mkv");
+        String path = "/disk/movies/Movie (2024).mkv";
 
         when(scannerHelperService.getOrCreateMovie(library, "Movie", 2024)).thenReturn(movie);
         when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path.toString())).thenReturn(Optional.empty());
@@ -100,7 +99,7 @@ class MediaFileScannerTest {
         MediaFileEntity existing = MediaFileEntity.builder()
                 .id(UUID.randomUUID())
                 .path("/disk/shows/Show (2024)/Season 01/s01e01.mkv").build();
-        Path path = Path.of("/disk/shows/Show (2024)/Season 01/s01e01.mkv");
+        String path = "/disk/shows/Show (2024)/Season 01/s01e01.mkv";
 
         when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 1, 1)).thenReturn(episode);
         when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path.toString())).thenReturn(Optional.of(existing));
@@ -120,7 +119,7 @@ class MediaFileScannerTest {
                 .build();
         EpisodeEntity episode6 = EpisodeEntity.builder().id(UUID.randomUUID()).build();
         EpisodeEntity episode7 = EpisodeEntity.builder().id(UUID.randomUUID()).build();
-        Path path = Path.of("/disk/shows/Show (2024)/Season 04/s04e06-e07.mkv");
+        String path = "/disk/shows/Show (2024)/Season 04/s04e06-e07.mkv";
 
         when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 4, 6)).thenReturn(episode6);
         when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 4, 7)).thenReturn(episode7);
@@ -153,7 +152,7 @@ class MediaFileScannerTest {
                 .build();
         EpisodeEntity episode6 = EpisodeEntity.builder().id(UUID.randomUUID()).build();
         EpisodeEntity episode7 = EpisodeEntity.builder().id(UUID.randomUUID()).build();
-        Path path = Path.of("/disk/shows/Show (2024)/Season 04/s04e06-e07.mkv");
+        String path = "/disk/shows/Show (2024)/Season 04/s04e06-e07.mkv";
         MediaFileEntity existing = MediaFileEntity.builder().id(UUID.randomUUID()).path(path.toString()).build();
 
         when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 4, 6)).thenReturn(episode6);
@@ -177,7 +176,7 @@ class MediaFileScannerTest {
                 .build();
         EpisodeEntity episode6 = EpisodeEntity.builder().id(UUID.randomUUID()).build();
         EpisodeEntity episode7 = EpisodeEntity.builder().id(UUID.randomUUID()).build();
-        Path path = Path.of("/disk/shows/Show (2024)/Season 04/s04e06-e07.mkv");
+        String path = "/disk/shows/Show (2024)/Season 04/s04e06-e07.mkv";
         MediaFileEntity existing = MediaFileEntity.builder().id(UUID.randomUUID()).path(path.toString()).build();
 
         when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 4, 6)).thenReturn(episode6);

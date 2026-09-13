@@ -69,6 +69,7 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
     private final MessageSender messageSender;
     private final DirectoryRepository directoryRepository;
     private final OwnDirectoriesProperties ownDirectories;
+    private final app.ister.core.config.DirectoryQueueNames directoryQueueNames;
 
     @Value("${app.ister.server.name}")
     private String nodeName;
@@ -86,7 +87,8 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
                                          ServerEventService serverEventService,
                                          MessageSender messageSender,
                                          DirectoryRepository directoryRepository,
-                                         OwnDirectoriesProperties ownDirectories) {
+                                         OwnDirectoriesProperties ownDirectories,
+                                         app.ister.core.config.DirectoryQueueNames directoryQueueNames) {
         this.podcastRepository = podcastRepository;
         this.podcastEpisodeRepository = podcastEpisodeRepository;
         this.metadataRepository = metadataRepository;
@@ -98,6 +100,7 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
         this.messageSender = messageSender;
         this.directoryRepository = directoryRepository;
         this.ownDirectories = ownDirectories;
+        this.directoryQueueNames = directoryQueueNames;
     }
 
     @Override
@@ -256,7 +259,7 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
      */
     private String downloadCacheDirectoryName(PodcastEntity podcast) {
         if (!ownDirectories.names().isEmpty()) {
-            return nodeName + "-cache-directory";
+            return directoryQueueNames.cacheDirName();
         }
         return podcastEpisodeRepository.findEpisodeIdsForPodcastOrdered(podcast.getId(), 50, 0).stream()
                 .flatMap(episodeId -> mediaFileRepository.findByPodcastEpisodeEntityId(episodeId).stream())
@@ -265,8 +268,9 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
                 .map(DirectoryEntity::getName)
                 .findFirst()
                 .or(() -> directoryRepository.findByDirectoryType(DirectoryType.LIBRARY).stream()
-                        .flatMap(lib -> directoryRepository
-                                .findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, lib.getNodeEntity()).stream())
+                        .flatMap(lib -> directoryRepository.findAttachedNodes(lib.getId()).stream())
+                        .flatMap(node -> directoryRepository
+                                .findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node).stream())
                         .map(DirectoryEntity::getName)
                         .findFirst())
                 .orElseGet(() -> {

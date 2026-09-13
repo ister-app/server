@@ -19,7 +19,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.nio.file.Path;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -66,7 +65,7 @@ class FileScanRequestedHandleTest {
     @Test
     void handle() {
         UUID directoryEntityUUID = UUID.randomUUID();
-        Path path = Path.of("/path");
+        String path = "/path";
         FileScanRequestedData fileScanRequestedData = FileScanRequestedData.builder()
                 .directoryEntityUUID(directoryEntityUUID)
                 .path(path)
@@ -90,7 +89,7 @@ class FileScanRequestedHandleTest {
     @Test
     void handleMusicDirectory() {
         UUID directoryEntityUUID = UUID.randomUUID();
-        Path path = Path.of("/music/Artist/Album/01 - Track.flac");
+        String path = "/music/Artist/Album/01 - Track.flac";
         FileScanRequestedData fileScanRequestedData = FileScanRequestedData.builder()
                 .directoryEntityUUID(directoryEntityUUID)
                 .path(path)

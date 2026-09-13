@@ -1,7 +1,6 @@
 package app.ister.disk.events.mediafilefound;
 
 import app.ister.core.entity.*;
-import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.StreamCodecType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
@@ -11,7 +10,11 @@ import app.ister.core.eventdata.MediaFileFoundData;
 import app.ister.core.eventdata.SubtitleExtractRequestedData;
 import app.ister.disk.events.subtitleextract.SubtitleExtractor;
 import app.ister.core.repository.*;
+import app.ister.core.node.MediaFileInputResolver;
 import app.ister.core.service.MessageSender;
+import app.ister.core.storage.CacheDirectoryResolver;
+import app.ister.core.storage.CacheStore;
+import app.ister.core.storage.SourceUris;
 import app.ister.core.service.NodeService;
 import app.ister.core.status.ActivityContext;
 import app.ister.core.status.ActivitySubjects;
@@ -24,6 +27,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -47,9 +52,14 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     private final MediaFileFoundEpisodeBoundaries mediaFileFoundEpisodeBoundaries;
     private final MediaFileFoundDetectCrop mediaFileFoundDetectCrop;
     private final MessageSender messageSender;
+    private final MediaFileInputResolver inputResolver;
+    private final CacheDirectoryResolver cacheDirectoryResolver;
 
     @Value("${app.ister.server.ffmpeg-dir}")
     private String dirOfFFmpeg;
+
+    @Value("${app.ister.server.tmp-dir}")
+    private String tmpDir;
 
     public HandleMediaFileFound(NodeService nodeService,
                                 DirectoryRepository directoryRepository,
@@ -64,7 +74,9 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
                                 MediaFileFoundGetDuration mediaFileFoundGetDuration,
                                 MediaFileFoundEpisodeBoundaries mediaFileFoundEpisodeBoundaries,
                                 MediaFileFoundDetectCrop mediaFileFoundDetectCrop,
-                                MessageSender messageSender) {
+                                MessageSender messageSender,
+                                MediaFileInputResolver inputResolver,
+                                CacheDirectoryResolver cacheDirectoryResolver) {
         this.nodeService = nodeService;
         this.directoryRepository = directoryRepository;
         this.mediaFileRepository = mediaFileRepository;
@@ -79,16 +91,18 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
         this.mediaFileFoundEpisodeBoundaries = mediaFileFoundEpisodeBoundaries;
         this.mediaFileFoundDetectCrop = mediaFileFoundDetectCrop;
         this.messageSender = messageSender;
+        this.inputResolver = inputResolver;
+        this.cacheDirectoryResolver = cacheDirectoryResolver;
     }
 
-    private static String getPathString(DirectoryEntity cacheDisk, Optional<EpisodeEntity> episodeEntity, Optional<MovieEntity> movieEntity) {
+    private static String getPathString(Optional<EpisodeEntity> episodeEntity, Optional<MovieEntity> movieEntity) {
         String id = null;
         if (episodeEntity.isPresent()) {
             id = episodeEntity.get().getId().toString();
         } else if (movieEntity.isPresent()) {
             id = movieEntity.get().getId().toString();
         }
-        return cacheDisk.getPath() + id + ".jpg";
+        return id + ".jpg";
     }
 
     @Override
@@ -135,11 +149,11 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
                 // taken at the midpoint of its own slice of the file.
                 for (MediaFileEpisodeEntity part : parts) {
                     episodeRepository.findById(part.getEpisodeEntityId()).ifPresent(partEpisode ->
-                            createBackgroundImage(Optional.of(partEpisode), Optional.empty(), mediaFileFoundData.getPath(),
+                            createBackgroundImage(Optional.of(partEpisode), Optional.empty(), mediaFileEntity,
                                     part.getStartInMilliseconds() + part.getDurationInMilliseconds() / 2));
                 }
             } else {
-                createBackgroundImage(episodeEntity, movieEntity, mediaFileFoundData.getPath(), mediaFileEntity.getDurationInMilliseconds() / 2);
+                createBackgroundImage(episodeEntity, movieEntity, mediaFileEntity, mediaFileEntity.getDurationInMilliseconds() / 2);
             }
             // Intro/outro detection is season-wide (it compares sibling episodes), so it runs as
             // its own event once this file's analysis is committed — after commit, or the handler
@@ -168,7 +182,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             return parts;
         }
         ActivityContext.step("boundaries");
-        List<Long> starts = mediaFileFoundEpisodeBoundaries.boundaryStarts(mediaFileEntity.getPath(), dirOfFFmpeg, duration, parts.size());
+        List<Long> starts = mediaFileFoundEpisodeBoundaries.boundaryStarts(inputResolver.resolve(mediaFileEntity), dirOfFFmpeg, duration, parts.size());
         for (int i = 0; i < parts.size(); i++) {
             long end = i + 1 < parts.size() ? starts.get(i + 1) : duration;
             parts.get(i).setStartInMilliseconds(starts.get(i));
@@ -187,10 +201,11 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
 
             // Analyze media file streams; duration is derived from the same ffprobe call.
             ActivityContext.step("probe");
-            var checkResult = mediaFileFoundCheckForStreams.checkForStreams(mediaFileEntity, dirOfFFmpeg);
+            String input = inputResolver.resolve(mediaFileEntity);
+            var checkResult = mediaFileFoundCheckForStreams.checkForStreams(mediaFileEntity, input, dirOfFFmpeg);
             long duration = checkResult.durationInMilliseconds() > 0
                     ? checkResult.durationInMilliseconds()
-                    : mediaFileFoundGetDuration.getDurationByDecodingFile(mediaFileEntity.getPath());
+                    : mediaFileFoundGetDuration.getDurationByDecodingFile(input);
             mediaFileEntity.setDurationInMilliseconds(duration);
             mediaFileRepository.save(mediaFileEntity);
 
@@ -228,7 +243,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
                 .filter(s -> s.getCodecType() == StreamCodecType.VIDEO && s.getWidth() > 0 && s.getHeight() > 0)
                 .findFirst()
                 .ifPresent(video -> mediaFileFoundDetectCrop
-                        .detectCrop(Path.of(mediaFileEntity.getPath()), dirOfFFmpeg, duration,
+                        .detectCrop(inputResolver.resolve(mediaFileEntity), dirOfFFmpeg, duration,
                                 video.getWidth(), video.getHeight())
                         .ifPresent(crop -> {
                             video.setCropX(crop.x());
@@ -242,19 +257,24 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
      * Check if the given {@link EpisodeEntity} or {@link MovieEntity} has image entities if not:
      * Create background image for media file and save a reference to it in the database.
      */
-    private void createBackgroundImage(Optional<EpisodeEntity> episodeEntity, Optional<MovieEntity> movieEntity, String mediaFilePath, long stillAtMilliseconds) {
+    private void createBackgroundImage(Optional<EpisodeEntity> episodeEntity, Optional<MovieEntity> movieEntity, MediaFileEntity mediaFileEntity, long stillAtMilliseconds) {
+        String mediaFilePath = mediaFileEntity.getPath();
         // Query the image repository directly instead of navigating the entities' LAZY
         // imagesEntities collection: this handler runs on a RabbitMQ listener thread with no
         // open-session-in-view, so lazy navigation would throw LazyInitializationException.
         boolean episodeNeedsBackground = episodeEntity.isPresent() && !imageRepository.existsByEpisodeEntityId(episodeEntity.get().getId());
         boolean movieNeedsBackground = movieEntity.isPresent() && !imageRepository.existsByMovieEntityId(movieEntity.get().getId());
         if (episodeNeedsBackground || movieNeedsBackground) {
-            NodeEntity nodeEntity = nodeService.getOrCreateNodeEntityForThisNode();
-            DirectoryEntity cacheDisk = directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeEntity).stream().findFirst().orElseThrow();
-            String toPath = getPathString(cacheDisk, episodeEntity, movieEntity);
+            CacheStore cacheStore = cacheDirectoryResolver.store();
+            DirectoryEntity cacheDisk = cacheStore.directory();
+            String relativeKey = getPathString(episodeEntity, movieEntity);
+            String toPath;
             try {
-                mediaFileFoundCreateBackground.createBackground(Path.of(toPath), Path.of(mediaFilePath), dirOfFFmpeg, stillAtMilliseconds);
-            } catch (JaffreeAbnormalExitException e) {
+                // ffmpeg writes a local file; the store moves it into place (or uploads it).
+                Path still = Files.createTempFile(Path.of(tmpDir), "still-", ".jpg");
+                mediaFileFoundCreateBackground.createBackground(still, inputResolver.resolve(mediaFileEntity), dirOfFFmpeg, stillAtMilliseconds);
+                toPath = cacheStore.write(relativeKey, still, "image/jpeg");
+            } catch (JaffreeAbnormalExitException | IOException e) {
                 log.error("Failed to create background image for {}: {}", mediaFilePath, e.getMessage());
                 return;
             }
@@ -262,7 +282,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             ImageEntity imageEntity = ImageEntity.builder()
                     .directoryEntityId(cacheDisk.getId())
                     .path(toPath)
-                    .sourceUri("file://" + mediaFilePath)
+                    .sourceUri(SourceUris.of(mediaFilePath))
                     .type(ImageType.BACKGROUND)
                     .episodeEntityId(episodeEntity.map(EpisodeEntity::getId).orElse(null))
                     .movieEntityId(movieEntity.map(MovieEntity::getId).orElse(null))

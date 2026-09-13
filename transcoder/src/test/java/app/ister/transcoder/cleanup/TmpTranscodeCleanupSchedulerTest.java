@@ -41,6 +41,14 @@ class TmpTranscodeCleanupSchedulerTest {
     @Mock
     private TmpCleanupService tmpCleanupService;
 
+    @org.mockito.Spy
+    private app.ister.core.storage.TmpStoreProvider tmpStoreProvider = new app.ister.core.storage.TmpStoreProvider((app.ister.core.storage.TmpStore) null);
+
+    @Mock
+    private app.ister.core.repository.DirectoryRepository directoryRepository;
+    @Mock
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
     @InjectMocks
     private TmpTranscodeCleanupScheduler subject;
 

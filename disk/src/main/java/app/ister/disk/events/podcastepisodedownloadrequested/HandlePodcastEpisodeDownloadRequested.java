@@ -7,15 +7,15 @@ import app.ister.core.EventHandlingException;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.PodcastEpisodeEntity;
-import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.AudioFileFoundData;
 import app.ister.core.eventdata.PodcastEpisodeDownloadRequestedData;
-import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.service.MessageSender;
-import app.ister.core.service.NodeService;
+import app.ister.core.storage.CacheDirectoryResolver;
+import app.ister.core.storage.CacheStore;
+import org.springframework.beans.factory.annotation.Value;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -33,7 +33,6 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -51,9 +50,11 @@ public class HandlePodcastEpisodeDownloadRequested implements Handle<PodcastEpis
 
     private final PodcastEpisodeRepository podcastEpisodeRepository;
     private final MediaFileRepository mediaFileRepository;
-    private final DirectoryRepository directoryRepository;
-    private final NodeService nodeService;
+    private final CacheDirectoryResolver cacheDirectoryResolver;
     private final MessageSender messageSender;
+
+    @Value("${app.ister.server.tmp-dir}")
+    private String tmpDir;
 
     /**
      * Redirects are followed manually in {@link #download}: podcast enclosures sit behind chains of
@@ -91,26 +92,26 @@ public class HandlePodcastEpisodeDownloadRequested implements Handle<PodcastEpis
         if (mediaFileRepository.existsByPodcastEpisodeEntityId(episode.getId())) {
             return; // already downloaded
         }
-        DirectoryEntity cacheDir = directoryRepository
-                .findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeService.getOrCreateNodeEntityForThisNode())
-                .stream().findFirst()
-                .orElseThrow(() -> new IllegalStateException("No cache directory found for this node"));
+        CacheStore cacheStore = cacheDirectoryResolver.store();
+        DirectoryEntity cacheDir = cacheStore.directory();
 
-        Path target = Path.of(cacheDir.getPath(), "podcasts", episode.getId() + "." + extensionFor(episode));
-        download(episode, target);
-
+        String relativeKey = "podcasts/" + episode.getId() + "." + extensionFor(episode);
+        String storedPath;
         long size;
         try {
-            size = Files.size(target);
+            Path downloaded = Files.createTempFile(Path.of(tmpDir), "podcast-", "." + extensionFor(episode));
+            download(episode, downloaded);
+            size = Files.size(downloaded);
+            storedPath = cacheStore.write(relativeKey, downloaded, null);
         } catch (IOException e) {
-            throw new EventHandlingException("Downloaded episode file unreadable: " + target, e);
+            throw new EventHandlingException("Downloaded episode file unreadable: " + relativeKey, e);
         }
         MediaFileEntity mediaFile = mediaFileRepository
-                .findByDirectoryEntityAndPath(cacheDir, target.toString())
+                .findByDirectoryEntityAndPath(cacheDir, storedPath)
                 .orElseGet(() -> MediaFileEntity.builder()
                         .directoryEntityId(cacheDir.getId())
                         .podcastEpisodeEntity(episode)
-                        .path(target.toString())
+                        .path(storedPath)
                         .size(size).build());
         mediaFile.setPodcastEpisodeEntity(episode);
         mediaFileRepository.save(mediaFile);
@@ -118,7 +119,7 @@ public class HandlePodcastEpisodeDownloadRequested implements Handle<PodcastEpis
         sendAudioFileFoundAfterCommit(AudioFileFoundData.builder()
                 .eventType(EventType.AUDIO_FILE_FOUND)
                 .directoryEntityUUID(cacheDir.getId())
-                .path(target.toString())
+                .path(storedPath)
                 .build(), cacheDir.getName());
     }
 

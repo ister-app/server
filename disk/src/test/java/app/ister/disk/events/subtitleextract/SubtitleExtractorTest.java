@@ -358,7 +358,7 @@ class SubtitleExtractorTest {
                 continue;
             }
             subject.extractOne(file.getPath(), file.getId(), streams, stream, subIdx, Path.of(cacheDirectory.getPath()), ffmpegDir)
-                    .map(extracted -> SubtitleExtractor.toEntity(file, stream, extracted, extracted.srtFile()))
+                    .map(extracted -> SubtitleExtractor.toEntity(file, stream, extracted, extracted.srtFile().toString()))
                     .ifPresent(result::add);
             subIdx++;
         }

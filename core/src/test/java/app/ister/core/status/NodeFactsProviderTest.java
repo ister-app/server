@@ -55,7 +55,7 @@ class NodeFactsProviderTest {
         NodeEntity node = NodeEntity.builder().id(UUID.randomUUID()).name("node1").build();
         LibraryEntity library = LibraryEntity.builder().name("Series").build();
         when(nodeRepository.findByName("node1")).thenReturn(Optional.of(node));
-        when(directoryRepository.findByNodeEntity(node)).thenReturn(List.of(
+        when(directoryRepository.findAttachedTo(node)).thenReturn(List.of(
                 DirectoryEntity.builder().name("node1-cache-directory").path("/nowhere/cache")
                         .directoryType(DirectoryType.CACHE).build(),
                 DirectoryEntity.builder().name("disk1").path(mounted.toString()).libraryEntity(library)
@@ -102,6 +102,6 @@ class NodeFactsProviderTest {
         when(nodeRepository.findByName("node1")).thenThrow(new IllegalStateException("db down"));
 
         assertNull(subject.facts());
-        verify(directoryRepository, times(0)).findByNodeEntity(any());
+        verify(directoryRepository, times(0)).findAttachedTo(any());
     }
 }

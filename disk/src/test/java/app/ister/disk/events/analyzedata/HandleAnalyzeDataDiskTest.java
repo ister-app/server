@@ -49,6 +49,9 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class HandleAnalyzeDataDiskTest {
 
+    @org.mockito.Spy
+    private app.ister.core.storage.TmpStoreProvider tmpStoreProvider = new app.ister.core.storage.TmpStoreProvider((app.ister.core.storage.TmpStore) null);
+
     @InjectMocks
     private HandleAnalyzeDataDisk subject;
 

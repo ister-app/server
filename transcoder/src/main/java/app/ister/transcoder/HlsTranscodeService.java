@@ -72,7 +72,7 @@ public class HlsTranscodeService {
     private static final Set<String> MPEGTS_NATIVE_AUDIO_CODECS = Set.of("aac", "mp3", "ac3", "eac3", "dts");
 
     /** Marker file written after a pass finished successfully: {@code done_<segmentPrefix>}. */
-    private static final String DONE_MARKER_PREFIX = "done_";
+    static final String DONE_MARKER_PREFIX = "done_";
 
     private static final String SEG_VIDEO_PREFIX = "seg_video_";
 

@@ -43,7 +43,8 @@ public class HandleTranscodeRequested implements Handle<TranscodeRequestedData> 
         log.debug("Handling TRANSCODE_REQUESTED for mediaFileId={}", data.getMediaFileId());
         mediaFileSubjects.describe(data.getMediaFileId()).ifPresent(ActivityContext::report);
         try {
-            hlsService.generateAllPlaylists(data.getMediaFileId(), data.getDirect(), data.getTranscode(), data.getSubtitleFormat());
+            hlsService.generateAllPlaylists(data.getMediaFileId(), data.getDirect(), data.getTranscode(), data.getSubtitleFormat(),
+                    data.getRequestingNodeUrl());
             if (data.getKeepUntilEpochMillis() != null) {
                 transcodeService.extendKeepUntil(data.getMediaFileId(), data.getKeepUntilEpochMillis());
             }

@@ -1,7 +1,5 @@
 package app.ister.disk;
 
-import app.ister.core.entity.DirectoryEntity;
-import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.StreamCodecType;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.ImageRepository;
@@ -12,6 +10,14 @@ import app.ister.core.utils.SafeFilename;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import app.ister.core.entity.ImageEntity;
+import app.ister.core.storage.CacheDirectoryResolver;
+import app.ister.core.storage.ObjectRef;
+import app.ister.core.storage.ObjectStat;
+import app.ister.core.storage.ObjectStore;
+import app.ister.core.storage.ObjectStoreRegistry;
+import app.ister.core.storage.RangedObject;
+import app.ister.disk.http.ByteRanges;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -61,6 +67,8 @@ public class FileController {
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final NodeService nodeService;
     private final DirectoryRepository directoryRepository;
+    private final ObjectStoreRegistry objectStoreRegistry;
+    private final CacheDirectoryResolver cacheDirectoryResolver;
 
     @Value("${app.ister.server.tmp-dir}")
     private String tmpDir;
@@ -80,6 +88,9 @@ public class FileController {
             @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch)
             throws IOException {
         var imageEntity = imageRepository.findById(id).orElseThrow();
+        if (ObjectRef.isS3Uri(imageEntity.getPath())) {
+            return downloadS3Image(imageEntity, width, ifNoneMatch);
+        }
         Path imagePath = Path.of(imageEntity.getPath());
         if (!Files.exists(imagePath)) {
             return ResponseEntity.notFound().build();
@@ -151,8 +162,14 @@ public class FileController {
      * pull the whole file over the network for every seek.
      */
     @GetMapping("/mediaFile/{id}/download")
-    public ResponseEntity<Resource> downloadMediaFile(@PathVariable UUID id) {
+    public ResponseEntity<Resource> downloadMediaFile(@PathVariable UUID id,
+                                               @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader,
+                                               HttpServletRequest request) throws IOException {
         var mediaFileEntity = mediaFileRepository.findById(id).orElseThrow();
+        if (ObjectRef.isS3Uri(mediaFileEntity.getPath())) {
+            return objectResource(objectStoreRegistry.forEntity(mediaFileEntity), ObjectStoreRegistry.keyOf(mediaFileEntity),
+                    rangeHeader, request);
+        }
         return fileResource(Path.of(mediaFileEntity.getPath()));
     }
 
@@ -162,11 +179,136 @@ public class FileController {
      * this file can only get at it here.
      */
     @GetMapping("/mediaFileStream/{id}/download")
-    public ResponseEntity<Resource> downloadMediaFileStream(@PathVariable UUID id) {
-        return mediaFileStreamRepository.findById(id)
-                .filter(stream -> stream.getCodecType() == StreamCodecType.EXTERNAL_SUBTITLE)
-                .map(stream -> fileResource(Path.of(stream.getPath())))
-                .orElseGet(() -> ResponseEntity.notFound().build());
+    public ResponseEntity<Resource> downloadMediaFileStream(@PathVariable UUID id,
+                                                     @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader,
+                                                     HttpServletRequest request) throws IOException {
+        var stream = mediaFileStreamRepository.findById(id)
+                .filter(s -> s.getCodecType() == StreamCodecType.EXTERNAL_SUBTITLE)
+                .orElse(null);
+        if (stream == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (ObjectRef.isS3Uri(stream.getPath())) {
+            // a sidecar .srt in an S3 library directory, or an extracted one in the shared S3 cache
+            ObjectStore store = objectStoreRegistry.forUri(stream.getPath()).orElse(null);
+            if (store == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return objectResource(store, ObjectRef.parse(stream.getPath()).key(), rangeHeader, request);
+        }
+        return fileResource(Path.of(stream.getPath()));
+    }
+
+    /**
+     * An S3 object proxied with byte-range support: the same contract as {@link #fileResource}
+     * ({@code Accept-Ranges: bytes}, 206 + {@code Content-Range} for a single range, 416 when the
+     * range starts past the end), so ffmpeg on a helper — or on this very node — can seek in an
+     * S3 file without S3 being reachable from where ffmpeg runs. The object is opened with the
+     * requested range, never skipped through: the body is an {@link InputStreamResource} (which
+     * Spring deliberately leaves out of its own, skip-based range handling) and the 206 status
+     * is set here. A HEAD gets the headers without a GET to S3.
+     */
+    ResponseEntity<Resource> objectResource(ObjectStore store, String key, String rangeHeader, HttpServletRequest request)
+            throws IOException {
+        Optional<ObjectStat> stat = store.stat(key);
+        if (stat.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        long size = stat.get().size();
+        ByteRanges.Range range = null;
+        if (rangeHeader != null) {
+            range = ByteRanges.parseRange(rangeHeader, size);
+            if (range == null) {
+                return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                        .header(HttpHeaders.CONTENT_RANGE, "bytes */" + size)
+                        .build();
+            }
+        }
+        long from = range == null ? 0 : range.start();
+        long to = range == null ? size - 1 : range.end();
+        long length = to - from + 1;
+        ResponseEntity.BodyBuilder response = ResponseEntity
+                .status(range != null ? HttpStatus.PARTIAL_CONTENT : HttpStatus.OK)
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .contentLength(length);
+        if (stat.get().etag() != null) {
+            response.eTag(stat.get().etag().startsWith("\"") ? stat.get().etag() : "\"" + stat.get().etag() + "\"");
+        }
+        if (range != null) {
+            response.header(HttpHeaders.CONTENT_RANGE, "bytes %d-%d/%d".formatted(from, to, size));
+        }
+        if (request != null && "HEAD".equalsIgnoreCase(request.getMethod())) {
+            return response.build();
+        }
+        RangedObject object = store.openRange(key, from, to);
+        InputStreamResource body = new InputStreamResource(object.body(), store.uri(key)) {
+            @Override
+            public long contentLength() {
+                return length;
+            }
+        };
+        return response.body(body);
+    }
+
+    /**
+     * Artwork that lives in an S3 directory (a cover next to the media, or — with a shared S3
+     * cache — a downloaded poster). Same ETag/width contract as the local branch; thumbnails are
+     * still generated into the local tmp dir, keyed on the object's ETag.
+     */
+    private ResponseEntity<InputStreamResource> downloadS3Image(ImageEntity imageEntity, Integer width, String ifNoneMatch)
+            throws IOException {
+        ObjectStore store = objectStoreRegistry.forEntity(imageEntity);
+        String key = ObjectStoreRegistry.keyOf(imageEntity);
+        Optional<ObjectStat> stat = store.stat(key);
+        if (stat.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Integer bucket = bucketWidth(width);
+        String identity = stat.get().etag() != null
+                ? stat.get().etag().replace("\"", "")
+                : "%s-%d".formatted(Long.toHexString(stat.get().lastModified().toEpochMilli()), stat.get().size());
+        String etag = bucket == null ? "\"%s\"".formatted(identity) : "\"%s-w%d\"".formatted(identity, bucket);
+        if (etag.equals(ifNoneMatch)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                    .eTag(etag)
+                    .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_REVALIDATE)
+                    .build();
+        }
+        if (bucket != null) {
+            Optional<ImageThumbnailCache.Thumbnail> thumbnail =
+                    imageThumbnailCache.thumbnail(imageEntity.getId(), identity, () -> store.open(key), bucket);
+            if (thumbnail.isPresent()) {
+                Path served = thumbnail.get().path();
+                InputStreamResource resource = new InputStreamResource(new FileInputStream(served.toFile())) {
+                    @Override
+                    public long contentLength() throws IOException {
+                        return Files.size(served);
+                    }
+                };
+                return ResponseEntity.ok()
+                        .eTag(etag)
+                        .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_REVALIDATE)
+                        .contentType(thumbnail.get().contentType())
+                        .body(resource);
+            }
+        }
+        String contentType = stat.get().contentType();
+        if (contentType == null || MediaType.APPLICATION_OCTET_STREAM_VALUE.equals(contentType)) {
+            contentType = key.toLowerCase().endsWith(".png") ? MediaType.IMAGE_PNG_VALUE : MediaType.IMAGE_JPEG_VALUE;
+        }
+        long size = stat.get().size();
+        InputStreamResource resource = new InputStreamResource(store.open(key)) {
+            @Override
+            public long contentLength() {
+                return size;
+            }
+        };
+        return ResponseEntity.ok()
+                .eTag(etag)
+                .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_REVALIDATE)
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(resource);
     }
 
     private static ResponseEntity<Resource> fileResource(Path path) {
@@ -186,15 +328,13 @@ public class FileController {
     @PostMapping("/cache/upload/{fileName}")
     public ResponseEntity<Void> uploadCacheFile(@PathVariable String fileName, HttpServletRequest request) throws IOException {
         String safeName = SafeFilename.require(fileName);
-        DirectoryEntity cacheDir = directoryRepository
-                .findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, nodeService.getOrCreateNodeEntityForThisNode())
-                .stream().findFirst().orElseThrow();
-        Path target = Path.of(cacheDir.getPath(), safeName);
-        Files.createDirectories(target.getParent());
-        Path tmp = target.resolveSibling("." + safeName + ".upload-" + UUID.randomUUID());
+        // Spooled to tmp first: the request body has no known length, and the store wants a file
+        // it can move into place (local) or upload with a content length (S3).
+        Path tmp = Path.of(tmpDir, "upload-" + UUID.randomUUID() + "-" + safeName);
+        Files.createDirectories(tmp.getParent());
         try (InputStream in = request.getInputStream()) {
             Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
-            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            cacheDirectoryResolver.store().write(safeName, tmp, null);
         } finally {
             Files.deleteIfExists(tmp);
         }

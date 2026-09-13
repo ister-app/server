@@ -8,7 +8,6 @@ import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.SeriesEntity;
-import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.ReadingDirection;
@@ -21,7 +20,11 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.SeriesRepository;
+import app.ister.core.EventHandlingException;
 import app.ister.core.service.MessageSender;
+import app.ister.core.storage.CacheDirectoryResolver;
+import app.ister.core.storage.LocalCopy;
+import app.ister.core.storage.SourceUris;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
 import lombok.RequiredArgsConstructor;
@@ -31,9 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.Month;
 import java.util.List;
@@ -52,7 +53,6 @@ import java.util.UUID;
 @Transactional
 @RequiredArgsConstructor
 public class HandleComicFileFound implements Handle<ComicFileFoundData> {
-    private static final String FILE_URI_SCHEME = "file://";
 
     private final DirectoryRepository directoryRepository;
     private final MediaFileRepository mediaFileRepository;
@@ -65,6 +65,8 @@ public class HandleComicFileFound implements Handle<ComicFileFoundData> {
     private final MessageSender messageSender;
     private final ServerEventService serverEventService;
     private final ScannerHelperService scannerHelperService;
+    private final LocalCopy localCopy;
+    private final CacheDirectoryResolver cacheDirectoryResolver;
 
     @Override
     public EventType handles() {
@@ -89,34 +91,39 @@ public class HandleComicFileFound implements Handle<ComicFileFoundData> {
         ActivityContext.report(ActivitySubjects.describe(volume.get(), ActivitySubjects.describe(directoryEntity))
                 .withTitle(ActivitySubjects.fileName(messageData.getPath())));
 
-        Path path = Path.of(messageData.getPath());
         String lower = messageData.getPath().toLowerCase();
-        if (lower.endsWith(".cbz")) {
-            handleCbz(directoryEntity, volume.get(), mediaFile.get(), path);
-        } else if (lower.endsWith(".pdf")) {
-            handlePdf(directoryEntity, volume.get(), mediaFile.get(), path);
-        } else {
+        if (!lower.endsWith(".cbz") && !lower.endsWith(".pdf")) {
             log.warn("ComicFileFound for unsupported extension: {}", messageData.getPath());
             return;
+        }
+        try (LocalCopy.Handle local = localCopy.of(directoryEntity, messageData.getPath())) {
+            Path path = local.path();
+            if (lower.endsWith(".cbz")) {
+                handleCbz(volume.get(), mediaFile.get(), path, messageData.getPath());
+            } else {
+                handlePdf(volume.get(), mediaFile.get(), path, messageData.getPath());
+            }
+        } catch (IOException e) {
+            throw new EventHandlingException("Cannot read comic " + messageData.getPath(), e);
         }
         serverEventService.createSearchIndexEvent(SearchEntityType.BOOK, volume.get().getId());
     }
 
-    private void handleCbz(DirectoryEntity directoryEntity, BookEntity volume, MediaFileEntity mediaFile, Path path) {
+    private void handleCbz(BookEntity volume, MediaFileEntity mediaFile, Path path, String sourcePath) {
         List<String> pages = cbzParser.pages(path);
         if (!pages.isEmpty()) {
             mediaFile.setPageCount(pages.size());
             mediaFileRepository.save(mediaFile);
         }
-        cbzParser.comicInfo(path).ifPresent(info -> applyComicInfo(volume, info, path));
+        cbzParser.comicInfo(path).ifPresent(info -> applyComicInfo(volume, info, sourcePath));
         if (!pages.isEmpty()) {
             cbzParser.readEntry(path, pages.getFirst())
-                    .ifPresent(bytes -> saveCover(directoryEntity, volume, bytes,
-                            extensionOf(pages.getFirst()), path));
+                    .ifPresent(bytes -> saveCover(volume, bytes,
+                            extensionOf(pages.getFirst()), sourcePath));
         }
     }
 
-    private void handlePdf(DirectoryEntity directoryEntity, BookEntity volume, MediaFileEntity mediaFile, Path path) {
+    private void handlePdf(BookEntity volume, MediaFileEntity mediaFile, Path path, String sourcePath) {
         int pageCount = pdfParser.pageCount(path);
         if (pageCount > 0) {
             mediaFile.setPageCount(pageCount);
@@ -125,7 +132,7 @@ public class HandleComicFileFound implements Handle<ComicFileFoundData> {
         // Rendering is failure-tolerant (native image without AWT): no cover is fine — a sibling
         // cbz/epub cover or a folder.jpg wins anyway.
         pdfParser.renderCoverJpeg(path)
-                .ifPresent(bytes -> saveCover(directoryEntity, volume, bytes, "jpg", path));
+                .ifPresent(bytes -> saveCover(volume, bytes, "jpg", sourcePath));
     }
 
     /**
@@ -133,8 +140,8 @@ public class HandleComicFileFound implements Handle<ComicFileFoundData> {
      * sourceUri, idempotent re-parse), and Number/Title refine the volume's series position and
      * display title.
      */
-    private void applyComicInfo(BookEntity volume, ComicInfoXml info, Path path) {
-        String sourceUri = FILE_URI_SCHEME + path;
+    private void applyComicInfo(BookEntity volume, ComicInfoXml info, String path) {
+        String sourceUri = SourceUris.of(path);
         MetadataEntity metadata = metadataRepository.findByBookEntityId(volume.getId()).stream()
                 .filter(existing -> sourceUri.equals(existing.getSourceUri()))
                 .findFirst()
@@ -180,23 +187,20 @@ public class HandleComicFileFound implements Handle<ComicFileFoundData> {
         }
     }
 
-    private void saveCover(DirectoryEntity libraryDir, BookEntity volume, byte[] coverBytes,
-                           String extension, Path sourcePath) {
+    private void saveCover(BookEntity volume, byte[] coverBytes, String extension, String sourcePath) {
         UUID volumeId = volume.getId();
         if (!imageRepository.findByBookEntityId(volumeId).isEmpty()) {
             return;
         }
-        List<DirectoryEntity> cacheDirs = directoryRepository
-                .findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, libraryDir.getNodeEntity());
-        if (cacheDirs.isEmpty()) {
+        DirectoryEntity cacheDir = cacheDirectoryResolver.forThisNodeIfAny().orElse(null);
+        if (cacheDir == null) {
             return;
         }
-        DirectoryEntity cacheDir = cacheDirs.getFirst();
 
-        Path outputPath = Paths.get(cacheDir.getPath(), "book-covers", volumeId.toString(), "cover." + extension);
+        String storedPath;
         try {
-            Files.createDirectories(outputPath.getParent());
-            Files.write(outputPath, coverBytes);
+            storedPath = cacheDirectoryResolver.storeFor(cacheDir).write(
+                    "book-covers/" + volumeId + "/cover." + extension, coverBytes, "png".equals(extension) ? "image/png" : "image/jpeg");
         } catch (IOException e) {
             log.warn("Could not write comic cover for {}: {}", sourcePath, e.getMessage());
             return;
@@ -205,9 +209,9 @@ public class HandleComicFileFound implements Handle<ComicFileFoundData> {
         messageSender.sendImageFound(ImageFoundData.builder()
                 .eventType(EventType.IMAGE_FOUND)
                 .directoryEntityId(cacheDir.getId())
-                .path(outputPath.toString())
+                .path(storedPath)
                 .imageType(ImageType.COVER)
-                .sourceUri(FILE_URI_SCHEME + sourcePath)
+                .sourceUri(SourceUris.of(sourcePath))
                 .bookEntityId(volumeId)
                 .build(), cacheDir.getName());
     }

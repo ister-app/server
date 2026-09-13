@@ -34,13 +34,14 @@ public class MediaFileFoundCheckForStreams {
         };
     }
 
-    public CheckResult checkForStreams(MediaFileEntity mediaFileEntity, String dirOfFFmpeg) {
+    /** @param input what ffprobe reads: the local path, or a URL for a remote or S3 file (see MediaFileInputResolver) */
+    public CheckResult checkForStreams(MediaFileEntity mediaFileEntity, String input, String dirOfFFmpeg) {
         List<MediaFileStreamEntity> result = new ArrayList<>();
         List<Long> durationList = new ArrayList<>();
         boolean hasAttachedPic = false;
         FFprobeResult mediaStreams = FFprobe.atPath(Paths.get(dirOfFFmpeg))
                 .setShowStreams(true)
-                .setInput(mediaFileEntity.getPath())
+                .setInput(input)
                 .setLogLevel(LogLevel.ERROR)
                 .execute();
 

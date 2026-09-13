@@ -34,6 +34,12 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class HandleImageFoundTest {
 
+    @Mock
+    private app.ister.core.repository.DirectoryRepository directoryRepository;
+    @org.mockito.Spy
+    private app.ister.core.storage.FileAccess fileAccess = new app.ister.core.storage.FileAccess(
+            org.mockito.Mockito.mock(app.ister.core.storage.ObjectStoreRegistry.class));
+
     @InjectMocks
     private HandleImageFound subject;
 
@@ -42,6 +48,12 @@ class HandleImageFoundTest {
 
     @TempDir
     Path tempDir;
+
+    @org.junit.jupiter.api.BeforeEach
+    void s3TestSetup() {
+        org.mockito.Mockito.lenient().when(directoryRepository.findById(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(java.util.Optional.of(app.ister.core.entity.DirectoryEntity.builder().name("local").path("/").build()));
+    }
 
     @Test
     void handles() {

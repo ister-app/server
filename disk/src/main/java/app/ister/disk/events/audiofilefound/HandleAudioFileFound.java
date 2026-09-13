@@ -10,7 +10,6 @@ import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.TrackCreditEntity;
 import app.ister.core.entity.TrackEntity;
-import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.SearchEntityType;
@@ -28,7 +27,13 @@ import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.TrackCreditRepository;
 import app.ister.core.repository.TrackRepository;
+import app.ister.core.node.MediaFileInputResolver;
 import app.ister.core.service.MessageSender;
+import app.ister.core.storage.CacheDirectoryResolver;
+import app.ister.core.storage.TmpStoreProvider;
+import app.ister.core.storage.CacheStore;
+import app.ister.core.storage.PathStrings;
+import app.ister.core.storage.SourceUris;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
 import app.ister.core.Handle;
@@ -62,7 +67,6 @@ import java.util.UUID;
 @Service
 @Transactional
 public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
-    private static final String FILE_URI_SCHEME = "file://";
 
     private final DirectoryRepository directoryRepository;
     private final MediaFileRepository mediaFileRepository;
@@ -80,6 +84,9 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
     private final MessageSender messageSender;
     private final ServerEventService serverEventService;
     private final Jaffree jaffree;
+    private final MediaFileInputResolver inputResolver;
+    private final CacheDirectoryResolver cacheDirectoryResolver;
+    private final TmpStoreProvider tmpStoreProvider;
 
     @Value("${app.ister.server.ffmpeg-dir}")
     private String dirOfFFmpeg;
@@ -102,7 +109,10 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                                 AudioFileFoundExtractCoverArt audioFileFoundExtractCoverArt,
                                 MessageSender messageSender,
                                 ServerEventService serverEventService,
-                                Jaffree jaffree) {
+                                Jaffree jaffree,
+                                MediaFileInputResolver inputResolver,
+                                CacheDirectoryResolver cacheDirectoryResolver,
+                                TmpStoreProvider tmpStoreProvider) {
         this.directoryRepository = directoryRepository;
         this.mediaFileRepository = mediaFileRepository;
         this.mediaFileStreamRepository = mediaFileStreamRepository;
@@ -119,6 +129,9 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         this.messageSender = messageSender;
         this.serverEventService = serverEventService;
         this.jaffree = jaffree;
+        this.inputResolver = inputResolver;
+        this.cacheDirectoryResolver = cacheDirectoryResolver;
+        this.tmpStoreProvider = tmpStoreProvider;
     }
 
     @Override
@@ -150,10 +163,11 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
             // reload detached entities with fresh session references
             MediaFileEntity freshEntity = mediaFileRepository.findById(entityId).orElseThrow();
             DirectoryEntity freshDirectory = directoryRepository.findById(directoryId).orElseThrow();
-            var checkResult = mediaFileFoundCheckForStreams.checkForStreams(freshEntity, dirOfFFmpeg);
+            String input = inputResolver.resolve(freshEntity);
+            var checkResult = mediaFileFoundCheckForStreams.checkForStreams(freshEntity, input, dirOfFFmpeg);
             long duration = checkResult.durationInMilliseconds() > 0
                     ? checkResult.durationInMilliseconds()
-                    : mediaFileFoundGetDuration.getDurationByDecodingFile(freshEntity.getPath());
+                    : mediaFileFoundGetDuration.getDurationByDecodingFile(input);
             freshEntity.setDurationInMilliseconds(duration);
             mediaFileRepository.save(freshEntity);
             checkResult.streams().forEach(s -> mediaFileStreamRepository.upsert(
@@ -204,7 +218,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         if (trackOpt.isEmpty()) return;
 
         TrackEntity track = trackOpt.get();
-        var format = jaffree.getFFPROBE().setShowFormat(true).setInput(mediaFile.getPath()).execute().getFormat();
+        var format = jaffree.getFFPROBE().setShowFormat(true).setInput(inputResolver.resolve(mediaFile)).execute().getFormat();
 
         UUID correctedTrackId = correctTrackNumberFromTags(mediaFile, track, format);
         if (!Objects.equals(correctedTrackId, track.getId())) {
@@ -222,7 +236,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                     .released(extractReleaseDate(format))
                     .genre(extractGenreTag(format))
                     .trackEntity(track)
-                    .sourceUri(FILE_URI_SCHEME + mediaFile.getPath())
+                    .sourceUri(SourceUris.of(mediaFile.getPath()))
                     .build());
             serverEventService.createSearchIndexEvent(SearchEntityType.TRACK, track.getId());
         }
@@ -240,7 +254,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         if (chapterOpt.isEmpty()) return;
 
         ChapterEntity chapter = chapterOpt.get();
-        var format = jaffree.getFFPROBE().setShowFormat(true).setInput(mediaFile.getPath()).execute().getFormat();
+        var format = jaffree.getFFPROBE().setShowFormat(true).setInput(inputResolver.resolve(mediaFile)).execute().getFormat();
         String title = extractTitle(format, mediaFile.getPath());
         if (title == null) return;
 
@@ -248,7 +262,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         metadataRepository.save(MetadataEntity.builder()
                 .title(title)
                 .chapterEntity(chapter)
-                .sourceUri(FILE_URI_SCHEME + mediaFile.getPath())
+                .sourceUri(SourceUris.of(mediaFile.getPath()))
                 .build());
     }
 
@@ -335,7 +349,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                 .released(released)
                 .genre(genre)
                 .albumEntity(album)
-                .sourceUri(FILE_URI_SCHEME + mediaFile.getPath())
+                .sourceUri(SourceUris.of(mediaFile.getPath()))
                 .build());
         serverEventService.createSearchIndexEvent(SearchEntityType.ALBUM, album.getId());
     }
@@ -474,7 +488,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
     }
 
     private static String titleFromFilename(String path) {
-        String filename = Paths.get(path).getFileName().toString();
+        String filename = PathStrings.fileName(path);
         // Strip extension
         int dot = filename.lastIndexOf('.');
         if (dot > 0) filename = filename.substring(0, dot);
@@ -504,14 +518,15 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
             return;
         }
 
-        List<DirectoryEntity> cacheDirs = directoryRepository
-                .findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, libraryDir.getNodeEntity());
-        if (cacheDirs.isEmpty()) return;
-        DirectoryEntity cacheDir = cacheDirs.get(0);
+        DirectoryEntity cacheDir = cacheDirectoryResolver.forThisNodeIfAny().orElse(null);
+        if (cacheDir == null) return;
+        CacheStore cacheStore = cacheDirectoryResolver.storeFor(cacheDir);
 
-        Path outputPath = Paths.get(cacheDir.getPath(), coverSubDir, coverOwnerId.toString(), "cover.jpg");
+        String storedPath;
         try {
-            audioFileFoundExtractCoverArt.extract(outputPath, mediaFile.getPath(), dirOfFFmpeg);
+            Path extracted = Files.createTempFile(Paths.get(tmpDir), "cover-", ".jpg");
+            audioFileFoundExtractCoverArt.extract(extracted, inputResolver.resolve(mediaFile), dirOfFFmpeg);
+            storedPath = cacheStore.write(coverSubDir + "/" + coverOwnerId + "/cover.jpg", extracted, "image/jpeg");
         } catch (Exception e) {
             log.warn("Failed to extract embedded cover art from {}: {}", mediaFile.getPath(), e.getMessage());
             return;
@@ -520,9 +535,9 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         messageSender.sendImageFound(ImageFoundData.builder()
                 .eventType(EventType.IMAGE_FOUND)
                 .directoryEntityId(cacheDir.getId())
-                .path(outputPath.toString())
+                .path(storedPath)
                 .imageType(ImageType.COVER)
-                .sourceUri(FILE_URI_SCHEME + mediaFile.getPath())
+                .sourceUri(SourceUris.of(mediaFile.getPath()))
                 .albumEntityId(albumId)
                 .bookEntityId(bookId)
                 .build(), cacheDir.getName());
@@ -531,7 +546,10 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
     private void deleteHlsCache(UUID mediaFileId) {
         if (mediaFileId == null) return;
         Path dir = Paths.get(tmpDir, mediaFileId.toString());
-        if (!Files.exists(dir)) return;
+        if (!Files.exists(dir)) {
+            deleteSharedHlsCache(mediaFileId);
+            return;
+        }
         try (var walk = Files.walk(dir)) {
             walk.sorted(Comparator.reverseOrder())
                     .forEach(p -> {
@@ -544,5 +562,17 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         } catch (IOException e) {
             log.warn("Could not delete HLS cache for {}: {}", mediaFileId, e.getMessage());
         }
+        deleteSharedHlsCache(mediaFileId);
+    }
+
+    /** The published copy in the cluster-shared tmp store, when there is one: the streams changed, so it is stale too. */
+    private void deleteSharedHlsCache(UUID mediaFileId) {
+        tmpStoreProvider.shared().ifPresent(store -> {
+            try {
+                store.deleteAll(mediaFileId);
+            } catch (IOException e) {
+                log.warn("Could not delete shared HLS cache for {}: {}", mediaFileId, e.getMessage());
+            }
+        });
     }
 }

@@ -65,6 +65,8 @@ class HlsServiceTest {
     @Mock private MessageSender messageSender;
     @Mock private RemoteNodeClient remoteNodeClient;
     @Mock private NodeTokenManager nodeTokenManager;
+    @Mock private app.ister.core.storage.ObjectStoreRegistry objectStoreRegistry;
+    @Mock private app.ister.core.repository.DirectoryRepository directoryRepository;
     @Mock private org.springframework.amqp.core.AmqpAdmin amqpAdmin;
     // With a mocked manager the TransactionTemplate executes its callback inline.
     @Mock private org.springframework.transaction.PlatformTransactionManager transactionManager;
@@ -96,7 +98,9 @@ class HlsServiceTest {
         lenient().when(amqpAdmin.getQueueProperties(anyString())).thenReturn(new java.util.Properties());
         hlsService = new HlsService(playlistBuilder, subtitleService, transcodeService,
                 mediaFileRepository, mediaFileStreamRepository, messageSender,
-                remoteNodeClient, new MediaFileInputResolver(nodeTokenManager, LOCAL_NODE_NAME), amqpAdmin, transactionManager);
+                remoteNodeClient, new MediaFileInputResolver(nodeTokenManager, objectStoreRegistry, new app.ister.core.config.S3Properties(),
+                        directoryRepository, LOCAL_NODE_NAME, "http://127.0.0.1:8080"),
+                objectStoreRegistry, new app.ister.core.storage.TmpStoreProvider((app.ister.core.storage.TmpStore) null), amqpAdmin, transactionManager);
         ReflectionTestUtils.setField(hlsService, "tmpDir", tempDir.toString());
         ReflectionTestUtils.setField(hlsService, "uploadDrainTimeoutMs", 5000L);
     }

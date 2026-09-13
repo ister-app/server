@@ -31,6 +31,26 @@ een single-node thuisopstelling.
 | Tijdelijke map | `TMP_DIR` | `/tmp/ister/` | HLS-transcode-uitvoer |
 | `app.ister.server.websocket.allowed-origins` | `APP_ISTER_SERVER_WEBSOCKET_ALLOWED_ORIGINS` | leeg | extra origins die de GraphQL-websocket-handshake accepteert. De publieke host uit `app.ister.server.url` is automatisch toegestaan (beide schema's, elke poort), dus dit is alleen nodig als de server onder een tweede naam wordt aangeboden. `*` staat elke origin toe. |
 
+## Objectopslag (S3)
+
+Zie [Objectopslag](10-object-storage.md). Connecties zijn geïndexeerde lijsten (`APP_ISTER_S3_CONNECTIONS_0_NAME`, …).
+
+| Instelling | Env var | Standaard | Opmerkingen |
+| --- | --- | --- | --- |
+| `app.ister.s3.connections[n].name` | | | waar directories en de gedeelde opslag naar verwijzen |
+| `app.ister.s3.connections[n].endpoint` | | leeg | leeg = AWS; `http://minio:9000` voor een zelfgehoste server |
+| `app.ister.s3.connections[n].region` | | `us-east-1` | |
+| `app.ister.s3.connections[n].bucket` | | | één bucket per connectie |
+| `app.ister.s3.connections[n].path-style` | | `true` | path-style-adressering, nodig voor MinIO/Garage/Ceph |
+| `app.ister.s3.connections[n].access-key` / `.secret-key` | | leeg | leeg = de standaard credential-keten van de SDK (AWS) |
+| `app.ister.disk.directories[n].s3-connection` / `.prefix` | | | maakt de directory een S3-directory (geen `path`); prefix optioneel |
+| `app.ister.s3.ffmpeg-direct` | `S3_FFMPEG_DIRECT` | `false` | `true`: ffmpeg leest presigned S3-URL's in plaats van de eigen proxy van de node |
+| `app.ister.s3.presign-ttl` | `S3_PRESIGN_TTL` | `2h` | levensduur van die URL's; houd hem boven de langste pass |
+| `app.ister.server.self-url` | `SELF_URL` | `http://127.0.0.1:<server.port>` | waar de node zijn eigen proxy bereikt voor ffmpeg; houd dit op loopback achter een gateway met request-timeouts |
+| `app.ister.s3.local-copy-dir` / `.local-copy-max-bytes` | `S3_LOCAL_COPY_DIR` / `S3_LOCAL_COPY_MAX_BYTES` | `<tmp-dir>/s3-scratch/` / 2 GiB | LRU-cache van objecten die als lokaal bestand gelezen moeten worden (epub/cbz/pdf, OCR) |
+| `app.ister.server.cache-s3-connection` / `.cache-s3-prefix` | `CACHE_S3_CONNECTION` / `CACHE_S3_PREFIX` | leeg / `cache` | de cluster-gedeelde cache; vervangt `CACHE_DIR` voor nieuwe afgeleide bestanden |
+| `app.ister.server.tmp-s3-connection` / `.tmp-s3-prefix` | `TMP_S3_CONNECTION` / `TMP_S3_PREFIX` | leeg / `tmp` | de cluster-gedeelde transcode-opslag; `TMP_DIR` blijft de lokale encodeer-scratch |
+
 ## Metadata en talen
 
 | Instelling | Env var | Standaard | Opmerkingen |

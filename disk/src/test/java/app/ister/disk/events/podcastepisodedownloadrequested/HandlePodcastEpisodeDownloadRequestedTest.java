@@ -36,7 +36,6 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -72,6 +71,9 @@ class HandlePodcastEpisodeDownloadRequestedTest {
 
     @TempDir
     Path cachePath;
+
+    @Mock
+    private app.ister.core.storage.CacheDirectoryResolver cacheDirectoryResolver;
 
     @InjectMocks
     private HandlePodcastEpisodeDownloadRequested subject;
@@ -142,8 +144,14 @@ class HandlePodcastEpisodeDownloadRequestedTest {
                 .directoryType(DirectoryType.CACHE)
                 .build();
         cacheDir.setId(UUID.randomUUID());
-        lenient().when(directoryRepository.findByDirectoryTypeAndNodeEntity(eq(DirectoryType.CACHE), any()))
-                .thenReturn(List.of(cacheDir));
+        lenient().when(cacheDirectoryResolver.forThisNode()).thenReturn(cacheDir);
+        app.ister.disk.storage.CacheStoreMocks.realLocal(cacheDirectoryResolver);
+        org.springframework.test.util.ReflectionTestUtils.setField(subject, "tmpDir", cachePath.resolve("tmp").toString());
+        try {
+            java.nio.file.Files.createDirectories(cachePath.resolve("tmp"));
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
         lenient().when(mediaFileRepository.findByDirectoryEntityAndPath(any(), any())).thenReturn(Optional.empty());
 
         TransactionSynchronizationManager.initSynchronization();

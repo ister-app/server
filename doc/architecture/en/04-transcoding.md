@@ -148,4 +148,20 @@ ranges, so FFmpeg's seeks and the transcoder's stream-end probes stay cheap. An 
 stream's path is owner-local too (cache directory or a sidecar `.srt`), so a remote transcoder
 fetches it once through `/mediaFileStream/{id}/download` into the file's transcode cache dir.
 
+An S3 directory has no owner: any attached node may consume the transcode queues, and the node
+the client talks to is not necessarily the one running the pass. `TranscodeRequestedData` and
+`TranscodePassRequestedData` therefore carry `requestingNodeUrl`; a transcoding node pushes to
+that node when it is another one (`HlsService.uploadTarget`), which reuses the helper-to-owner
+segment push.
+
+With `app.ister.server.tmp-s3-connection` set, the push target becomes the cluster-shared
+`TmpStore` (`S3TmpStore`, `tmp/{mediaFileId}/…`) instead: the watcher publishes stable segments,
+playlists and — last, after the pass — the done marker. The read side is a read-through: every
+`HlsService` lookup checks the local tmp dir first and then pulls the missing playlist, marker or
+segment from the store into it (`syncFromShared`), so the encoder-side invariants (size stability,
+done markers, `keep_until`, the local sweeps) are untouched and `HlsController` keeps serving real
+files. Waiting for a segment produced elsewhere polls the store instead of the local pass
+(`waitForSegment`). The tmp cleanup also sweeps the store, one node per run under an advisory lock;
+re-analysis (`deleteHlsCache`) drops the published directory too.
+
 

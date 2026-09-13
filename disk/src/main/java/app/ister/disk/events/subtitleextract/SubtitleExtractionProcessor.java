@@ -8,6 +8,9 @@ import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.StreamCodecType;
 import app.ister.core.node.MediaFileInputResolver;
 import app.ister.core.node.RemoteNodeClient;
+import app.ister.core.storage.CacheDirectoryResolver;
+import app.ister.core.storage.PathStrings;
+import app.ister.core.entity.NodeEntity;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
@@ -47,6 +50,7 @@ public class SubtitleExtractionProcessor {
     private final SubtitleExtractor extractor;
     private final MediaFileInputResolver inputResolver;
     private final RemoteNodeClient remoteNodeClient;
+    private final CacheDirectoryResolver cacheDirectoryResolver;
     private final TransactionTemplate readOnlyTransaction;
     private final TransactionTemplate writeTransaction;
 
@@ -63,6 +67,7 @@ public class SubtitleExtractionProcessor {
                                        SubtitleExtractor extractor,
                                        MediaFileInputResolver inputResolver,
                                        RemoteNodeClient remoteNodeClient,
+                                       CacheDirectoryResolver cacheDirectoryResolver,
                                        PlatformTransactionManager transactionManager) {
         this.mediaFileRepository = mediaFileRepository;
         this.mediaFileStreamRepository = mediaFileStreamRepository;
@@ -70,6 +75,7 @@ public class SubtitleExtractionProcessor {
         this.extractor = extractor;
         this.inputResolver = inputResolver;
         this.remoteNodeClient = remoteNodeClient;
+        this.cacheDirectoryResolver = cacheDirectoryResolver;
         this.readOnlyTransaction = new TransactionTemplate(transactionManager);
         this.readOnlyTransaction.setReadOnly(true);
         this.writeTransaction = new TransactionTemplate(transactionManager);
@@ -82,7 +88,7 @@ public class SubtitleExtractionProcessor {
      * @param ownerUrl       base URL of the node owning the file (upload target when remote)
      * @param ownerCachePath the owner's cache directory — where the SRT must end up and what the row records
      */
-    record ExtractionJob(String input, boolean remote, String ownerUrl, Path ownerCachePath,
+    record ExtractionJob(String input, boolean remote, String ownerUrl, DirectoryEntity ownerCache,
                          MediaFileEntity mediaFile, List<MediaFileStreamEntity> streams,
                          MediaFileStreamEntity stream, int subIdx, ActivitySubjects.Subject subject) {
     }
@@ -97,26 +103,30 @@ public class SubtitleExtractionProcessor {
         // Per stream, not per file: the file's streams are extracted concurrently (listener
         // concurrency) and each one cleans up after itself, so a shared directory would be
         // deleted from under a sibling still running mkvextract or waiting to upload.
-        Path srtDir = job.remote()
-                ? Path.of(tmpDir, "subtitles", mediaFileId.toString(), subtitleStreamId.toString())
-                : job.ownerCachePath();
+        // Always extracted into a scratch dir: the cache may be a bucket, and the tools need a
+        // local file anyway. The result is then uploaded to the owner (remote) or written into
+        // the cache store (local) under its file name.
+        Path srtDir = Path.of(tmpDir, "subtitles", mediaFileId.toString(), subtitleStreamId.toString());
         Optional<SubtitleExtractor.ExtractedSubtitle> extracted;
         try {
             Files.createDirectories(srtDir);
             ActivityContext.step("subtitles");
             extracted = extractor.extractOne(job.input(), mediaFileId, job.streams(), job.stream(), job.subIdx(), srtDir, dirOfFFmpeg);
-            if (job.remote() && extracted.isPresent()) {
-                ActivityContext.step("upload");
-                remoteNodeClient.uploadToCache(job.ownerUrl(), extracted.get().srtFile());
+            if (extracted.isPresent()) {
+                if (job.remote()) {
+                    ActivityContext.step("upload");
+                    remoteNodeClient.uploadToCache(job.ownerUrl(), extracted.get().srtFile());
+                } else {
+                    cacheDirectoryResolver.storeFor(job.ownerCache())
+                            .write(extracted.get().srtFile().getFileName().toString(), extracted.get().srtFile(), "text/plain");
+                }
             }
         } catch (IOException e) {
             // Network / disk trouble, not a tool failure: leave the row unflagged so the retry
             // (and later the scanner backfill) has another go.
             throw new EventHandlingException("Subtitle extraction of " + mediaFileId + " stream " + subtitleStreamId + " failed", e);
         } finally {
-            if (job.remote()) {
-                deleteQuietly(srtDir);
-            }
+            deleteQuietly(srtDir);
         }
         boolean failed = Boolean.TRUE.equals(job.stream().getExtractionFailed());
         writeTransaction.executeWithoutResult(_ -> store(job, extracted.orElse(null), failed));
@@ -149,12 +159,17 @@ public class SubtitleExtractionProcessor {
         int subIdx = (int) streams.stream()
                 .filter(s -> s.getCodecType() == StreamCodecType.SUBTITLE && s.getStreamIndex() < stream.getStreamIndex())
                 .count();
-        DirectoryEntity ownerCache = directoryRepository
-                .findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, inputResolver.owner(mediaFile))
-                .stream().findFirst()
-                .orElseThrow(() -> new IllegalStateException("Owning node of " + mediaFileId + " has no cache directory"));
-        return Optional.of(new ExtractionJob(inputResolver.resolve(mediaFile), inputResolver.isRemote(mediaFile),
-                inputResolver.owner(mediaFile).getUrl(), Path.of(ownerCache.getPath()),
+        // The SRT lands in the cache directory of the node that serves the file: the owner of a
+        // LOCAL directory (uploaded there when this is a helper), or this node for an S3 directory
+        // it is attached to — any attached node can then serve it through /mediaFileStream.
+        Optional<NodeEntity> remote = inputResolver.remoteNode(mediaFile);
+        DirectoryEntity ownerCache = remote
+                .map(node -> directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node)
+                        .stream().findFirst()
+                        .orElseThrow(() -> new IllegalStateException("Node " + node.getName() + " has no cache directory")))
+                .orElseGet(cacheDirectoryResolver::forThisNode);
+        return Optional.of(new ExtractionJob(inputResolver.resolve(mediaFile), remote.isPresent(),
+                remote.map(NodeEntity::getUrl).orElse(null), ownerCache,
                 mediaFile, streams, stream, subIdx, ActivitySubjects.describe(mediaFile)));
     }
 
@@ -173,13 +188,13 @@ public class SubtitleExtractionProcessor {
             }
             return;
         }
-        Path recordedPath = job.ownerCachePath().resolve(extracted.srtFile().getFileName());
+        String recordedPath = PathStrings.join(job.ownerCache().getPath(), extracted.srtFile().getFileName().toString());
         MediaFileEntity mediaFile = source.getMediaFileEntity();
-        if (mediaFileStreamRepository.existsByMediaFileEntityAndStreamIndexAndPath(mediaFile, source.getStreamIndex(), recordedPath.toString())) {
+        if (mediaFileStreamRepository.existsByMediaFileEntityAndStreamIndexAndPath(mediaFile, source.getStreamIndex(), recordedPath)) {
             return;
         }
         mediaFileStreamRepository.save(SubtitleExtractor.toEntity(mediaFile, source, extracted, recordedPath));
-        log.info("Stored extracted subtitle {} for {}{}", recordedPath.getFileName(), mediaFile.getPath(),
+        log.info("Stored extracted subtitle {} for {}{}", PathStrings.fileName(recordedPath), mediaFile.getPath(),
                 job.remote() ? " (uploaded to " + job.ownerUrl() + ")" : "");
     }
 

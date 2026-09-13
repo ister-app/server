@@ -60,6 +60,14 @@ class CacheCleanupSchedulerTest {
     @Mock
     private CacheCleanupService cacheCleanupService;
 
+    @Mock
+    private app.ister.core.storage.CacheDirectoryResolver cacheDirectoryResolver;
+    @org.mockito.Spy
+    private app.ister.core.storage.FileAccess fileAccess = new app.ister.core.storage.FileAccess(
+            org.mockito.Mockito.mock(app.ister.core.storage.ObjectStoreRegistry.class));
+    @Mock
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
     @InjectMocks
     private CacheCleanupScheduler subject;
 

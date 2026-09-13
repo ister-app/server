@@ -15,7 +15,12 @@ import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.NodeService;
 import app.ister.core.service.ServerEventService;
+import app.ister.core.storage.ObjectRef;
+import app.ister.core.storage.ObjectStore;
+import app.ister.core.storage.ObjectStoreRegistry;
+import app.ister.core.storage.PathStrings;
 import app.ister.disk.scanner.MusicPathObject;
+import app.ister.disk.scanner.ScanEntry;
 import app.ister.disk.scanner.enums.FileType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +29,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.util.Objects;
+import java.util.List;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -42,6 +49,7 @@ public class HandleAlbumFound implements Handle<AlbumFoundData> {
     private final MessageSender messageSender;
     private final NodeService nodeService;
     private final ServerEventService serverEventService;
+    private final ObjectStoreRegistry objectStoreRegistry;
 
     @Override
     public EventType handles() {
@@ -66,12 +74,12 @@ public class HandleAlbumFound implements Handle<AlbumFoundData> {
                     : album.getName();
 
             var node = nodeService.getOrCreateNodeEntityForThisNode();
-            directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node).stream()
+            directoryRepository.findAttachedTo(node, DirectoryType.LIBRARY).stream()
                     .filter(dir -> dir.getLibraryEntity() != null &&
                             dir.getLibraryEntity().getId().equals(album.getLibraryEntity().getId()))
                     .forEach(dir -> {
-                        Path albumPath = Path.of(dir.getPath(), album.getPersonEntity().getName(), albumDir);
-                        String nfoPath = albumPath.resolve("album.nfo").toString();
+                        String albumPath = PathStrings.join(PathStrings.join(dir.getPath(), album.getPersonEntity().getName()), albumDir);
+                        String nfoPath = PathStrings.join(albumPath, "album.nfo");
                         // This handler deletes album metadata in its own transaction, so both sends
                         // below must wait for the commit or the consumers race the delete.
                         otherPathFileRepository.findByDirectoryEntityAndPath(dir, nfoPath)
@@ -93,33 +101,53 @@ public class HandleAlbumFound implements Handle<AlbumFoundData> {
      * re-emitted {@code FILE_SCAN_REQUESTED} runs {@code ImageScanner}, which dedups on the
      * existing (directory, path) row and relinks the file via the sibling-tracks album lookup.
      */
-    private void rescanLocalAlbumImages(DirectoryEntity dir, Path albumPath) {
-        if (!Files.isDirectory(albumPath)) {
-            return;
+    private void rescanLocalAlbumImages(DirectoryEntity dir, String albumPath) {
+        for (ScanEntry file : listAlbumFiles(dir, albumPath)) {
+            if (new MusicPathObject(dir.getPath(), file.path(), false).getFileType() != FileType.IMAGE) {
+                continue;
+            }
+            publishAfterCommit(() -> messageSender.sendFileScanRequested(
+                    FileScanRequestedData.builder()
+                            .eventType(EventType.FILE_SCAN_REQUESTED)
+                            .path(file.path())
+                            .regularFile(true)
+                            .size(file.size())
+                            .lastModified(file.lastModified())
+                            .directoryEntityUUID(dir.getId())
+                            .build(),
+                    dir.getName()));
         }
-        try (var files = Files.list(albumPath)) {
-            files.filter(file -> new MusicPathObject(dir.getPath(), file.toString(), false)
-                            .getFileType() == FileType.IMAGE)
-                    .forEach(file -> {
-                        long size;
-                        try {
-                            size = Files.size(file);
-                        } catch (IOException e) {
-                            log.warn("Could not read size of {}: {}", file, e.getMessage());
-                            return;
-                        }
-                        publishAfterCommit(() -> messageSender.sendFileScanRequested(
-                                FileScanRequestedData.builder()
-                                        .eventType(EventType.FILE_SCAN_REQUESTED)
-                                        .path(file)
-                                        .regularFile(true)
-                                        .size(size)
-                                        .directoryEntityUUID(dir.getId())
-                                        .build(),
-                                dir.getName()));
-                    });
+    }
+
+    private List<ScanEntry> listAlbumFiles(DirectoryEntity dir, String albumPath) {
+        if (dir.isS3()) {
+            try {
+                ObjectStore store = objectStoreRegistry.forDirectory(dir);
+                return store.listShallow(ObjectRef.parse(albumPath).key() + "/").objects().stream()
+                        .map(o -> new ScanEntry(store.uri(o.key()), true, o.size(), o.lastModified()))
+                        .toList();
+            } catch (RuntimeException e) {
+                log.warn("Could not list album prefix {}: {}", albumPath, e.getMessage());
+                return List.of();
+            }
+        }
+        Path local = Path.of(albumPath);
+        if (!Files.isDirectory(local)) {
+            return List.of();
+        }
+        try (var files = Files.list(local)) {
+            return files.map(file -> {
+                try {
+                    return new ScanEntry(file.toString(), Files.isRegularFile(file), Files.size(file),
+                            Files.getLastModifiedTime(file).toInstant());
+                } catch (IOException e) {
+                    log.warn("Could not read {}: {}", file, e.getMessage());
+                    return null;
+                }
+            }).filter(Objects::nonNull).toList();
         } catch (IOException e) {
             log.warn("Could not list album directory {}: {}", albumPath, e.getMessage());
+            return List.of();
         }
     }
 }

@@ -25,7 +25,7 @@ class DirectoryQueueNamesTest {
     }
 
     private DirectoryQueueNames names() {
-        return new DirectoryQueueNames(own, helper, legacy, NODE);
+        return new DirectoryQueueNames(own, helper, legacy, new SharedStorageProperties(), NODE, NODE);
     }
 
     @Test

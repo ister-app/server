@@ -22,6 +22,8 @@ import java.io.IOException;
 @Transactional
 @RequiredArgsConstructor
 public class HandleNewDirectoriesScanRequested implements Handle<NewDirectoriesScanRequestedData> {
+    static final int SCAN_LOCK_NAMESPACE = 0x44495253; // "DIRS"
+
     private final DirectoryRepository directoryRepository;
     private final LibraryScanner libraryScanner;
 
@@ -40,6 +42,12 @@ public class HandleNewDirectoriesScanRequested implements Handle<NewDirectoriesS
     public void handle(NewDirectoriesScanRequestedData messageData) {
         log.debug("handle HandleNewDirectoriesScanRequested: {}", messageData);
         DirectoryEntity directoryEntity = directoryRepository.findById(messageData.getDirectoryEntityUUID()).orElseThrow();
+        // One scan per directory at a time, cluster-wide: an S3 directory is attached to several
+        // nodes and two overlapping scan requests would race each other's zombie sweep.
+        if (!directoryRepository.tryLockDirectoryScan(SCAN_LOCK_NAMESPACE, directoryEntity.getId())) {
+            log.info("Directory {} is already being scanned elsewhere, dropping this request", directoryEntity.getName());
+            return;
+        }
         ActivityContext.report(ActivitySubjects.describeDirectoryJob(directoryEntity));
         try {
             libraryScanner.scanDirectory(directoryEntity);

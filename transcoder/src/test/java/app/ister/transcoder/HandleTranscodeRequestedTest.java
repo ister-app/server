@@ -67,7 +67,7 @@ class HandleTranscodeRequestedTest {
                 .preTranscode(false)
                 .build();
         handler.listener(data);
-        verify(hlsService).generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT);
+        verify(hlsService).generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT, null);
     }
 
     @Test
@@ -83,7 +83,7 @@ class HandleTranscodeRequestedTest {
                 .build();
 
         assertDoesNotThrow(() -> handler.handle(data));
-        verify(hlsService).generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT);
+        verify(hlsService).generateAllPlaylists(id, true, false, SubtitleFormat.WEBVTT, null);
     }
 
     @Test
@@ -98,7 +98,7 @@ class HandleTranscodeRequestedTest {
                 .preTranscode(false)
                 .build();
 
-        doThrow(new IOException("ffprobe failure")).when(hlsService).generateAllPlaylists(any(), anyBoolean(), anyBoolean(), any());
+        doThrow(new IOException("ffprobe failure")).when(hlsService).generateAllPlaylists(any(), anyBoolean(), anyBoolean(), any(), any());
 
         assertThrows(EventHandlingException.class, () -> handler.handle(data));
     }
@@ -119,7 +119,7 @@ class HandleTranscodeRequestedTest {
 
         handler.handle(data);
 
-        verify(hlsService).generateAllPlaylists(id, false, true, SubtitleFormat.WEBVTT);
+        verify(hlsService).generateAllPlaylists(id, false, true, SubtitleFormat.WEBVTT, null);
         verify(hlsService).startAllPasses(id, false, true, PassFilter.preTranscode(null, null));
     }
 
@@ -161,7 +161,7 @@ class HandleTranscodeRequestedTest {
 
         handler.handle(data);
 
-        verify(hlsService).generateAllPlaylists(id, false, true, SubtitleFormat.WEBVTT);
+        verify(hlsService).generateAllPlaylists(id, false, true, SubtitleFormat.WEBVTT, null);
         verify(hlsService, never()).startAllPasses(any(), anyBoolean(), anyBoolean());
     }
 
@@ -215,7 +215,7 @@ class HandleTranscodeRequestedTest {
 
         handler.handle(data);
 
-        verify(hlsService).generateAllPlaylists(id, false, true, SubtitleFormat.WEBVTT);
+        verify(hlsService).generateAllPlaylists(id, false, true, SubtitleFormat.WEBVTT, null);
         verify(hlsService, never()).startAllPasses(any(), anyBoolean(), anyBoolean());
     }
 }

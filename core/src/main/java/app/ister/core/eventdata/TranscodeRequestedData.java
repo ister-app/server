@@ -16,6 +16,12 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class TranscodeRequestedData extends MessageData {
     private UUID mediaFileId;
+    /**
+     * URL of the node the client is talking to. An S3 directory has no owner, so the node that
+     * picks up the work pushes the produced segments/playlists here when it is not that node
+     * itself. Null (older producers, or local playback) = the transcoding node serves them.
+     */
+    private String requestingNodeUrl;
     private Boolean direct;
     private Boolean transcode;
     private SubtitleFormat subtitleFormat;

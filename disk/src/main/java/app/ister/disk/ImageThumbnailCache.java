@@ -2,6 +2,7 @@ package app.ister.disk;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.InputStreamSource;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 
@@ -62,6 +63,15 @@ public class ImageThumbnailCache {
     public Optional<Thumbnail> thumbnail(UUID imageId, Path source, int width) throws IOException {
         String signature = "%s-%d".formatted(
                 Long.toHexString(Files.getLastModifiedTime(source).toMillis()), Files.size(source));
+        return thumbnail(imageId, signature, () -> Files.newInputStream(source), width);
+    }
+
+    /**
+     * Same, for a source that is not a local file (an S3 object): {@code signature} must change
+     * whenever the source's bytes do (ETag, or size + last-modified), {@code source} is opened
+     * only on a miss.
+     */
+    public Optional<Thumbnail> thumbnail(UUID imageId, String signature, InputStreamSource source, int width) throws IOException {
         Path jpeg = cacheFile(imageId, signature, width, "jpg");
         Path png = cacheFile(imageId, signature, width, "png");
         Optional<Thumbnail> hit = hit(jpeg, MediaType.IMAGE_JPEG).or(() -> hit(png, MediaType.IMAGE_PNG));
@@ -76,7 +86,7 @@ public class ImageThumbnailCache {
                 return hit;
             }
             Optional<ImageScaler.ScaledImage> scaled;
-            try (InputStream in = Files.newInputStream(source)) {
+            try (InputStream in = source.getInputStream()) {
                 scaled = imageScaler.scale(in, width, ImageScaler.Alpha.PRESERVE, "image " + imageId);
             }
             if (scaled.isEmpty()) {

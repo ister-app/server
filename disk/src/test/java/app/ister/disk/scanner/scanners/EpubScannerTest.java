@@ -21,7 +21,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.nio.file.Path;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,7 +38,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class EpubScannerTest {
 
-    private static final Path EPUB_PATH = Path.of("/books/Author/Book (2020).epub");
+    private static final String EPUB_PATH = "/books/Author/Book (2020).epub";
 
     @Mock
     private ScannerHelperService scannerHelperService;
@@ -87,12 +86,12 @@ class EpubScannerTest {
 
     @Test
     void analyzableReturnsFalseForNonEpubFile() {
-        assertFalse(subject.analyzable(Path.of("/books/Author/Book/001_Chapter.mp3"), true, 1000));
+        assertFalse(subject.analyzable("/books/Author/Book/001_Chapter.mp3", true, 1000));
     }
 
     @Test
     void analyzableReturnsFalseForDirectory() {
-        assertFalse(subject.analyzable(Path.of("/books/Author"), false, 0));
+        assertFalse(subject.analyzable("/books/Author", false, 0));
     }
 
     @Test
@@ -120,7 +119,7 @@ class EpubScannerTest {
 
     @Test
     void analyzableWithDirectoryReturnsFalseForAudioFile() {
-        assertFalse(subject.analyzable(Path.of("/books/Author/Book/001_Chapter.mp3"), true, bookDir));
+        assertFalse(subject.analyzable("/books/Author/Book/001_Chapter.mp3", true, bookDir));
     }
 
     // ========== analyze ==========
@@ -149,7 +148,7 @@ class EpubScannerTest {
 
     @Test
     void analyzeReturnsEmptyForNonEpubPath() {
-        var result = subject.analyze(bookDir, Path.of("/books/Author/Book/cover.jpg"), true, 100);
+        var result = subject.analyze(bookDir, "/books/Author/Book/cover.jpg", true, 100);
 
         assertTrue(result.isEmpty());
         verify(mediaFileRepository, never()).save(any());

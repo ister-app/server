@@ -7,11 +7,19 @@ import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.NodeEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.LibraryType;
+import app.ister.core.enums.StorageKind;
+import app.ister.core.repository.DirectoryRepository;
+import lombok.RequiredArgsConstructor;
+
+import java.util.List;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.stereotype.Controller;
 
 @Controller
+@RequiredArgsConstructor
 public class DirectoryController {
+
+    private final DirectoryRepository directoryRepository;
 
     @SchemaMapping(typeName = "Image", field = "directory")
     public DirectoryEntity directory(ImageEntity imageEntity) {
@@ -26,6 +34,16 @@ public class DirectoryController {
     @SchemaMapping(typeName = "Directory", field = "node")
     public NodeEntity node(DirectoryEntity directoryEntity) {
         return directoryEntity.getNodeEntity();
+    }
+
+    @SchemaMapping(typeName = "Directory", field = "storageKind")
+    public StorageKind storageKind(DirectoryEntity directoryEntity) {
+        return directoryEntity.getStorageKind() == null ? StorageKind.LOCAL : directoryEntity.getStorageKind();
+    }
+
+    @SchemaMapping(typeName = "Directory", field = "attachedNodes")
+    public List<NodeEntity> attachedNodes(DirectoryEntity directoryEntity) {
+        return directoryRepository.findAttachedNodes(directoryEntity.getId());
     }
 
     @SchemaMapping(typeName = "Directory", field = "library")

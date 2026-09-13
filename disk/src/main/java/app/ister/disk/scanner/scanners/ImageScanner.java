@@ -1,5 +1,9 @@
 package app.ister.disk.scanner.scanners;
 
+import app.ister.core.storage.ObjectRef;
+import app.ister.core.storage.ObjectStore;
+import app.ister.core.storage.ObjectStoreRegistry;
+import app.ister.core.storage.PathStrings;
 import app.ister.core.entity.AlbumEntity;
 import app.ister.core.entity.BaseEntity;
 import app.ister.core.entity.DirectoryEntity;
@@ -30,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -50,34 +55,35 @@ public class ImageScanner implements Scanner {
     private final MediaFileRepository mediaFileRepository;
     private final MessageSender messageSender;
     private final Jaffree jaffree;
+    private final ObjectStoreRegistry objectStoreRegistry;
 
     @Override
-    public boolean analyzable(Path path, boolean isRegularFile, long size) {
-        return isRegularFile && new PathObject(path.toString()).getFileType().equals(FileType.IMAGE);
+    public boolean analyzable(String path, boolean isRegularFile, long size) {
+        return isRegularFile && new PathObject(path).getFileType().equals(FileType.IMAGE);
     }
 
-    public boolean analyzable(Path path, boolean isRegularFile, long size, DirectoryEntity directoryEntity) {
+    public boolean analyzable(String path, boolean isRegularFile, long size, DirectoryEntity directoryEntity) {
         if (!isRegularFile) {
             return false;
         }
         if (isMusicLibrary(directoryEntity)) {
-            MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), path.toString());
+            MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), path);
             return musicPath.getFileType().equals(FileType.IMAGE);
         }
         if (isBookLibrary(directoryEntity)) {
-            BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), path.toString());
+            BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), path);
             return bookPath.getFileType().equals(FileType.IMAGE);
         }
         if (isComicLibrary(directoryEntity)) {
-            ComicPathObject comicPath = new ComicPathObject(directoryEntity.getPath(), path.toString());
+            ComicPathObject comicPath = new ComicPathObject(directoryEntity.getPath(), path);
             return comicPath.getFileType().equals(FileType.IMAGE);
         }
         return analyzable(path, isRegularFile, size);
     }
 
     @Override
-    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, boolean isRegularFile, long size) {
-        if (imageRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString()).isPresent()) {
+    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, String path, boolean isRegularFile, long size) {
+        if (imageRepository.findByDirectoryEntityAndPath(directoryEntity, path).isPresent()) {
             return Optional.empty();
         }
         ImageType imageType = getImageType(path);
@@ -87,7 +93,7 @@ public class ImageScanner implements Scanner {
         var imageEntity = ImageEntity.builder()
                 .directoryEntityId(directoryEntity.getId())
                 .sourceUri("file://" + path)
-                .path(path.toString())
+                .path(path)
                 .type(imageType);
 
         // Only run the video-path linker for non-music/non-book libraries. Otherwise the video
@@ -100,7 +106,7 @@ public class ImageScanner implements Scanner {
         } else if (isComicLibrary(directoryEntity)) {
             linkToComicLibraryEntity(imageEntity, directoryEntity, path);
         } else {
-            linkToVideoLibraryEntity(imageEntity, new PathObject(path.toString()), directoryEntity);
+            linkToVideoLibraryEntity(imageEntity, new PathObject(path), directoryEntity);
         }
 
         ImageEntity build = imageEntity.build();
@@ -139,8 +145,8 @@ public class ImageScanner implements Scanner {
 
     /** Artwork inside a comic series directory (cover.jpg/folder.jpg) belongs to the series. */
     private void linkToComicLibraryEntity(ImageEntity.ImageEntityBuilder<?, ?> imageEntity,
-                                          DirectoryEntity directoryEntity, Path path) {
-        ComicPathObject comicPath = new ComicPathObject(directoryEntity.getPath(), path.toString());
+                                          DirectoryEntity directoryEntity, String path) {
+        ComicPathObject comicPath = new ComicPathObject(directoryEntity.getPath(), path);
         if (comicPath.getDirType() == DirType.SERIES && comicPath.getSeriesName() != null) {
             imageEntity.seriesEntity(scannerHelperService.getOrCreateComicSeries(
                     directoryEntity.getLibraryEntity(), comicPath.getSeriesName(), comicPath.getStartYear()));
@@ -148,8 +154,8 @@ public class ImageScanner implements Scanner {
     }
 
     private void linkToBookLibraryEntity(ImageEntity.ImageEntityBuilder<?, ?> imageEntity,
-                                          DirectoryEntity directoryEntity, Path path) {
-        BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), path.toString());
+                                          DirectoryEntity directoryEntity, String path) {
+        BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), path);
         if (bookPath.getDirType() == DirType.ARTIST) {
             imageEntity.personEntity(scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), bookPath.getAuthorName(), bookPath.getAuthorYear()));
         } else if (bookPath.getDirType() == DirType.ALBUM) {
@@ -159,8 +165,8 @@ public class ImageScanner implements Scanner {
     }
 
     private void linkToMusicLibraryEntity(ImageEntity.ImageEntityBuilder<?, ?> imageEntity,
-                                           DirectoryEntity directoryEntity, Path path) {
-        MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), path.toString());
+                                           DirectoryEntity directoryEntity, String path) {
+        MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), path);
         if (musicPath.getDirType() == DirType.ARTIST && !musicPath.isFlatAlbumStructure()) {
             imageEntity.personEntity(scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), musicPath.getArtistName(), musicPath.getArtistYear()));
             return;
@@ -174,7 +180,7 @@ public class ImageScanner implements Scanner {
             return;
         }
         String artistName = musicPath.isFlatAlbumStructure()
-                ? readAlbumArtistFromDirectory(path.getParent(), musicPath.getArtistName())
+                ? readAlbumArtistFromDirectory(directoryEntity, PathStrings.parent(path), musicPath.getArtistName())
                 : musicPath.getArtistName();
         var artist = scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), artistName, musicPath.getArtistYear());
         imageEntity.albumEntity(scannerHelperService.getOrCreateAlbum(directoryEntity.getLibraryEntity(), artist, musicPath.getAlbumName(), musicPath.getAlbumYear()));
@@ -189,60 +195,79 @@ public class ImageScanner implements Scanner {
      * <p>Empty when the audio in this directory has not been scanned yet; the caller then falls back
      * to the path-derived identity, which is what the audio scanner will use for the same files.
      */
-    private Optional<AlbumEntity> albumOfSiblingTracks(DirectoryEntity directoryEntity, Path imagePath) {
-        Path directory = imagePath.getParent();
+    private Optional<AlbumEntity> albumOfSiblingTracks(DirectoryEntity directoryEntity, String imagePath) {
+        String directory = PathStrings.parent(imagePath);
         if (directory == null) {
             return Optional.empty();
         }
-        try (var stream = Files.list(directory)) {
-            return stream
-                    .filter(this::isAudioFile)
-                    .map(audioFile -> mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, audioFile.toString()))
-                    .flatMap(Optional::stream)
-                    .map(MediaFileEntity::getTrackEntity)
-                    .filter(Objects::nonNull)
-                    .map(TrackEntity::getAlbumEntity)
-                    .filter(Objects::nonNull)
-                    .findFirst();
-        } catch (IOException e) {
-            log.warn("Could not list directory {}: {}", directory, e.getMessage());
-            return Optional.empty();
-        }
+        return listSiblingAudio(directoryEntity, directory).stream()
+                .map(audioFile -> mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, audioFile))
+                .flatMap(Optional::stream)
+                .map(MediaFileEntity::getTrackEntity)
+                .filter(Objects::nonNull)
+                .map(TrackEntity::getAlbumEntity)
+                .filter(Objects::nonNull)
+                .findFirst();
     }
 
-    private boolean isAudioFile(Path path) {
-        String name = path.toString().toLowerCase();
+    private boolean isAudioFile(String path) {
+        String name = path.toLowerCase();
         return AUDIO_EXTENSIONS.stream().anyMatch(ext -> name.endsWith("." + ext));
     }
 
-    private String readAlbumArtistFromDirectory(Path directory, String fallback) {
-        try (var stream = Files.list(directory)) {
-            return stream
-                    .filter(this::isAudioFile)
-                    .findFirst()
-                    .map(audioFile -> {
-                        try {
-                            var format = jaffree.getFFPROBE().setShowFormat(true).setInput(audioFile.toString()).execute().getFormat();
-                            if (format != null) {
-                                String tag = format.getTag("album_artist");
-                                if (tag == null) tag = format.getTag("ALBUM_ARTIST");
-                                // Same reading as AudioScanner, or the cover would land on another album.
-                                if (tag != null && !tag.isBlank()) return ArtistTagParser.primary(tag);
-                            }
-                        } catch (Exception e) {
-                            log.warn("Could not read album_artist from {}: {}", audioFile, e.getMessage());
-                        }
-                        return fallback;
-                    })
-                    .orElse(fallback);
+    /** The audio files next to an image, as full paths/uris: a directory listing for LOCAL, a shallow prefix listing for S3. */
+    private List<String> listSiblingAudio(DirectoryEntity directoryEntity, String directory) {
+        if (directoryEntity.isS3()) {
+            try {
+                ObjectStore store = objectStoreRegistry.forDirectory(directoryEntity);
+                String prefix = ObjectRef.parse(directory).key() + "/";
+                return store.listShallow(prefix).objects().stream()
+                        .map(o -> store.uri(o.key()))
+                        .filter(this::isAudioFile)
+                        .toList();
+            } catch (RuntimeException e) {
+                log.warn("Could not list {}: {}", directory, e.getMessage());
+                return List.of();
+            }
+        }
+        try (var stream = Files.list(Path.of(directory))) {
+            return stream.map(Path::toString).filter(this::isAudioFile).toList();
         } catch (IOException e) {
             log.warn("Could not list directory {}: {}", directory, e.getMessage());
-            return fallback;
+            return List.of();
         }
     }
 
-    private ImageType getImageType(Path path) {
-        var filenameWithoutExt = removeExtension(path.getFileName().toString());
+    /** What ffprobe should read: the path itself, or a short-lived presigned URL for an S3 object. */
+    private String probeInput(DirectoryEntity directoryEntity, String path) {
+        if (!directoryEntity.isS3()) {
+            return path;
+        }
+        return objectStoreRegistry.forDirectory(directoryEntity).presignGet(ObjectRef.parse(path).key(), Duration.ofMinutes(10));
+    }
+
+    private String readAlbumArtistFromDirectory(DirectoryEntity directoryEntity, String directory, String fallback) {
+        return listSiblingAudio(directoryEntity, directory).stream()
+                .findFirst()
+                .map(audioFile -> {
+                    try {
+                        var format = jaffree.getFFPROBE().setShowFormat(true).setInput(probeInput(directoryEntity, audioFile)).execute().getFormat();
+                        if (format != null) {
+                            String tag = format.getTag("album_artist");
+                            if (tag == null) tag = format.getTag("ALBUM_ARTIST");
+                            // Same reading as AudioScanner, or the cover would land on another album.
+                            if (tag != null && !tag.isBlank()) return ArtistTagParser.primary(tag);
+                        }
+                    } catch (Exception e) {
+                        log.warn("Could not read album_artist from {}: {}", audioFile, e.getMessage());
+                    }
+                    return fallback;
+                })
+                .orElse(fallback);
+    }
+
+    private ImageType getImageType(String path) {
+        var filenameWithoutExt = removeExtension(PathStrings.fileName(path));
         if (BACKGROUND_FILE_NAMES.stream().anyMatch(filenameWithoutExt::contains)) {
             return ImageType.BACKGROUND;
         } else if (COVER_FILE_NAMES.stream().anyMatch(filenameWithoutExt::contains)) {

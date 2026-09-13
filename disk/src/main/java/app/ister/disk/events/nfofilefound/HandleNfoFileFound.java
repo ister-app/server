@@ -14,6 +14,8 @@ import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.BookSeriesService;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
+import app.ister.core.storage.FileAccess;
+import java.util.Optional;
 import app.ister.core.util.LanguageTags;
 import app.ister.core.Handle;
 import app.ister.disk.nfo.Parser;
@@ -46,6 +48,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
     private final ScannerHelperService scannerHelperService;
     private final ServerEventService serverEventService;
     private final BookSeriesService bookSeriesService;
+    private final FileAccess fileAccess;
 
     @Override
     public EventType handles() {
@@ -98,7 +101,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
     private void analyzeArtistNfo(DirectoryEntity directoryEntity, String path, MusicPathObject musicPath) {
         var artist = scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), musicPath.getArtistName(), musicPath.getArtistYear());
         try {
-            Parser.parseArtist(path).ifPresent(parsed -> {
+            parse(directoryEntity, path, Parser::parseArtist).ifPresent(parsed -> {
                 String title = parsed.getName() != null ? parsed.getName() : musicPath.getArtistName();
                 String sourceUri = FILE_URI_PREFIX + path;
                 var metadata = metadataForSource(metadataRepository.findByPersonEntityId(artist.getId()), sourceUri,
@@ -119,7 +122,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
         var artist = scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), musicPath.getArtistName(), musicPath.getArtistYear());
         var album = scannerHelperService.getOrCreateAlbum(directoryEntity.getLibraryEntity(), artist, musicPath.getAlbumName(), musicPath.getAlbumYear());
         try {
-            Parser.parseAlbum(path).ifPresent(parsed -> {
+            parse(directoryEntity, path, Parser::parseAlbum).ifPresent(parsed -> {
                 String title = parsed.getTitle() != null ? parsed.getTitle() : musicPath.getAlbumName();
                 java.time.LocalDate released;
                 if (parsed.getReleasedate() != null) {
@@ -158,7 +161,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
     private void analyzeAuthorNfo(DirectoryEntity directoryEntity, String path, BookPathObject bookPath) {
         var author = scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), bookPath.getAuthorName(), bookPath.getAuthorYear());
         try {
-            Parser.parseArtist(path).ifPresent(parsed -> {
+            parse(directoryEntity, path, Parser::parseArtist).ifPresent(parsed -> {
                 String title = parsed.getName() != null ? parsed.getName() : bookPath.getAuthorName();
                 String sourceUri = FILE_URI_PREFIX + path;
                 var metadata = metadataForSource(metadataRepository.findByPersonEntityId(author.getId()), sourceUri,
@@ -179,7 +182,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
         var author = scannerHelperService.getOrCreatePerson(directoryEntity.getLibraryEntity(), bookPath.getAuthorName(), bookPath.getAuthorYear());
         var book = scannerHelperService.getOrCreateBook(directoryEntity.getLibraryEntity(), author, bookPath.getBookName(), bookPath.getBookYear());
         try {
-            Parser.parseAlbum(path).ifPresent(parsed -> {
+            parse(directoryEntity, path, Parser::parseAlbum).ifPresent(parsed -> {
                 String title = parsed.getTitle() != null ? parsed.getTitle() : bookPath.getBookName();
                 java.time.LocalDate released;
                 if (parsed.getReleasedate() != null) {
@@ -217,7 +220,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
     private void analyzeMovie(DirectoryEntity directoryEntity, String path, PathObject pathObject) {
         var movie = scannerHelperService.getOrCreateMovie(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear());
         try {
-            Parser.parseMovie(path).ifPresent(parsed -> {
+            parse(directoryEntity, path, Parser::parseMovie).ifPresent(parsed -> {
                 String sourceUri = FILE_URI_PREFIX + path;
                 var metadata = metadataForSource(metadataRepository.findByMovieEntityId(movie.getId()), sourceUri,
                         () -> MetadataEntity.builder().movieEntity(movie).sourceUri(sourceUri).build());
@@ -236,7 +239,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
     private void analyzeShow(DirectoryEntity directoryEntity, String path, PathObject pathObject) {
         var show = scannerHelperService.getOrCreateShow(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear());
         try {
-            Parser.parseShow(path).ifPresent(parsed -> {
+            parse(directoryEntity, path, Parser::parseShow).ifPresent(parsed -> {
                 String sourceUri = FILE_URI_PREFIX + path;
                 var metadata = metadataForSource(metadataRepository.findByShowEntityId(show.getId()), sourceUri,
                         () -> MetadataEntity.builder().showEntity(show).sourceUri(sourceUri).build());
@@ -255,7 +258,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
     private void analyzeEpisode(DirectoryEntity directoryEntity, String path, PathObject pathObject) {
         var episode = scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear(), pathObject.getSeason(), pathObject.getEpisode());
         try {
-            Parser.parseEpisode(path).ifPresent(parsed -> {
+            parse(directoryEntity, path, Parser::parseEpisode).ifPresent(parsed -> {
                 String sourceUri = FILE_URI_PREFIX + path;
                 var metadata = metadataForSource(metadataRepository.findByEpisodeEntityId(episode.getId()), sourceUri,
                         () -> MetadataEntity.builder().episodeEntity(episode).sourceUri(sourceUri).build());
@@ -287,5 +290,19 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
             f.setMetadataEntity(saved);
             otherPathFileRepository.save(f);
         });
+    }
+
+    /** Opens the nfo through the directory's storage (local file or S3 object) and hands the stream to the parser. */
+    private <T> Optional<T> parse(DirectoryEntity directoryEntity, String path,
+                                  java.util.function.Function<java.io.InputStream, Optional<T>> parser)
+            throws java.io.FileNotFoundException {
+        try (java.io.InputStream in = fileAccess.open(directoryEntity, path)) {
+            return parser.apply(in);
+        } catch (java.nio.file.NoSuchFileException | java.io.FileNotFoundException e) {
+            throw new java.io.FileNotFoundException(path);
+        } catch (java.io.IOException e) {
+            log.warn("Cannot read nfo {}: {}", path, e.getMessage());
+            return Optional.empty();
+        }
     }
 }

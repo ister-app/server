@@ -10,7 +10,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.nio.file.Path;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,29 +35,29 @@ class SubtitleScannerTest {
 
     @Test
     void analyzableForEpisodeSubtitle() {
-        assertTrue(subject.analyzable(Path.of("/disk/shows/Show (2024)/Season 01/s01e01.nl.srt"), true, 0));
+        assertTrue(subject.analyzable("/disk/shows/Show (2024)/Season 01/s01e01.nl.srt", true, 0));
     }
 
     @Test
     void notAnalyzableForNonSubtitleFile() {
-        assertFalse(subject.analyzable(Path.of("/disk/shows/Show (2024)/Season 01/s01e01.mkv"), true, 0));
+        assertFalse(subject.analyzable("/disk/shows/Show (2024)/Season 01/s01e01.mkv", true, 0));
     }
 
     @Test
     void notAnalyzableForDirectory() {
-        assertFalse(subject.analyzable(Path.of("/disk/shows/Show (2024)/Season 01/s01e01.nl.srt"), false, 0));
+        assertFalse(subject.analyzable("/disk/shows/Show (2024)/Season 01/s01e01.nl.srt", false, 0));
     }
 
     @Test
     void notAnalyzableForNonEpisodePath() {
-        assertFalse(subject.analyzable(Path.of("/disk/shows/Show (2024)/tvshow.srt"), true, 0));
+        assertFalse(subject.analyzable("/disk/shows/Show (2024)/tvshow.srt", true, 0));
     }
 
     @Test
     void analyzeCreatesNewEntityWhenNotExists() {
         UUID dirId = UUID.randomUUID();
         DirectoryEntity directoryEntity = DirectoryEntity.builder().id(dirId).name("disk1").build();
-        Path path = Path.of("/disk/shows/Show (2024)/Season 01/s01e01.nl.srt");
+        String path = "/disk/shows/Show (2024)/Season 01/s01e01.nl.srt";
 
         when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString())).thenReturn(Optional.empty());
 
@@ -72,7 +71,7 @@ class SubtitleScannerTest {
     @Test
     void analyzeReturnsExistingEntityWhenAlreadyExists() {
         DirectoryEntity directoryEntity = DirectoryEntity.builder().id(UUID.randomUUID()).name("disk1").build();
-        Path path = Path.of("/disk/shows/Show (2024)/Season 01/s01e01.nl.srt");
+        String path = "/disk/shows/Show (2024)/Season 01/s01e01.nl.srt";
         OtherPathFileEntity existing = OtherPathFileEntity.builder().path(path.toString()).build();
 
         when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString())).thenReturn(Optional.of(existing));

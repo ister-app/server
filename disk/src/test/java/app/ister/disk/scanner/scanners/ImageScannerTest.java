@@ -56,51 +56,51 @@ class ImageScannerTest {
 
     @Test
     void analyzable() {
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/background.jpg"), true, 0));
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/cover.png"), true, 0));
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/cover.jpg"), true, 0));
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/background.png"), true, 0));
-        assertTrue(subject.analyzable(Path.of("/disk/show/Show (2024)/Season 01/s01e01.jpg"), true, 0));
+        assertTrue(subject.analyzable("/disk/show/Show (2024)/background.jpg", true, 0));
+        assertTrue(subject.analyzable("/disk/show/Show (2024)/cover.png", true, 0));
+        assertTrue(subject.analyzable("/disk/show/Show (2024)/Season 01/cover.jpg", true, 0));
+        assertTrue(subject.analyzable("/disk/show/Show (2024)/Season 01/background.png", true, 0));
+        assertTrue(subject.analyzable("/disk/show/Show (2024)/Season 01/s01e01.jpg", true, 0));
     }
 
     @Test
     void notAnalyzable() {
-        assertFalse(subject.analyzable(Path.of("/disk/show/Show (2024)/s01e01.mkv"), true, 0));
-        assertFalse(subject.analyzable(Path.of("/disk/show/Show (2024)/background.jpg"), false, 0));
-        assertFalse(subject.analyzable(Path.of("/disk/show/Show (2024)/tvshow.nfo"), true, 0));
+        assertFalse(subject.analyzable("/disk/show/Show (2024)/s01e01.mkv", true, 0));
+        assertFalse(subject.analyzable("/disk/show/Show (2024)/background.jpg", false, 0));
+        assertFalse(subject.analyzable("/disk/show/Show (2024)/tvshow.nfo", true, 0));
     }
 
     @Test
     void analyzeShowBackground() {
-        ImageEntity result = (ImageEntity) subject.analyze(DirectoryEntity.builder().nodeEntity(NodeEntity.builder().name("disk1").build()).build(), Path.of("/disk/show/Show (2024)/background.jpg"), false, 0).orElseThrow();
+        ImageEntity result = (ImageEntity) subject.analyze(DirectoryEntity.builder().nodeEntity(NodeEntity.builder().name("disk1").build()).build(), "/disk/show/Show (2024)/background.jpg", false, 0).orElseThrow();
         assertEquals(ImageType.BACKGROUND, result.getType());
         assertNull(result.getSeasonEntity());
     }
 
     @Test
     void analyzeSeasonBackground() {
-        ImageEntity result = (ImageEntity) subject.analyze(DirectoryEntity.builder().nodeEntity(NodeEntity.builder().name("disk1").build()).build(), Path.of("/disk/show/Show (2024)/Season 01/background.jpg"), false, 0).orElseThrow();
+        ImageEntity result = (ImageEntity) subject.analyze(DirectoryEntity.builder().nodeEntity(NodeEntity.builder().name("disk1").build()).build(), "/disk/show/Show (2024)/Season 01/background.jpg", false, 0).orElseThrow();
         assertEquals(ImageType.BACKGROUND, result.getType());
         assertNull(result.getShowEntity());
     }
 
     @Test
     void analyzeEpisodeBackground() {
-        ImageEntity result = (ImageEntity) subject.analyze(DirectoryEntity.builder().nodeEntity(NodeEntity.builder().name("disk1").build()).build(), Path.of("/disk/show/Show (2024)/Season 01/s01e01-thumb.jpg"), false, 0).orElseThrow();
+        ImageEntity result = (ImageEntity) subject.analyze(DirectoryEntity.builder().nodeEntity(NodeEntity.builder().name("disk1").build()).build(), "/disk/show/Show (2024)/Season 01/s01e01-thumb.jpg", false, 0).orElseThrow();
         assertEquals(ImageType.BACKGROUND, result.getType());
         assertNull(result.getShowEntity());
     }
 
     @Test
     void analyzeEmpty() {
-        var result = subject.analyze(DirectoryEntity.builder().nodeEntity(NodeEntity.builder().name("disk1").build()).build(), Path.of("/disk/show/Show (2024)/Season 01/s01e01.mkv"), false, 0);
+        var result = subject.analyze(DirectoryEntity.builder().nodeEntity(NodeEntity.builder().name("disk1").build()).build(), "/disk/show/Show (2024)/Season 01/s01e01.mkv", false, 0);
         assertTrue(result.isEmpty());
     }
 
     @Test
     void analyzableWithDirectoryEntityReturnsFalseWhenNotRegularFile() {
         DirectoryEntity dir = DirectoryEntity.builder().build();
-        assertFalse(subject.analyzable(Path.of("/disk/show/background.jpg"), false, 0, dir));
+        assertFalse(subject.analyzable("/disk/show/background.jpg", false, 0, dir));
     }
 
     @Test
@@ -108,8 +108,8 @@ class ImageScannerTest {
         LibraryEntity musicLib = LibraryEntity.builder().libraryType(LibraryType.MUSIC).build();
         DirectoryEntity musicDir = DirectoryEntity.builder().path("/music").libraryEntity(musicLib).build();
 
-        assertTrue(subject.analyzable(Path.of("/music/The Beatles/background.jpg"), true, 0, musicDir));
-        assertFalse(subject.analyzable(Path.of("/music/The Beatles/artist.nfo"), true, 0, musicDir));
+        assertTrue(subject.analyzable("/music/The Beatles/background.jpg", true, 0, musicDir));
+        assertFalse(subject.analyzable("/music/The Beatles/artist.nfo", true, 0, musicDir));
     }
 
     @Test
@@ -117,8 +117,8 @@ class ImageScannerTest {
         LibraryEntity videoLib = LibraryEntity.builder().libraryType(LibraryType.SHOW).build();
         DirectoryEntity videoDir = DirectoryEntity.builder().path("/shows").libraryEntity(videoLib).build();
 
-        assertTrue(subject.analyzable(Path.of("/shows/Show (2024)/background.jpg"), true, 0, videoDir));
-        assertFalse(subject.analyzable(Path.of("/shows/Show (2024)/s01e01.mkv"), true, 0, videoDir));
+        assertTrue(subject.analyzable("/shows/Show (2024)/background.jpg", true, 0, videoDir));
+        assertFalse(subject.analyzable("/shows/Show (2024)/s01e01.mkv", true, 0, videoDir));
     }
 
     @Test
@@ -128,7 +128,7 @@ class ImageScannerTest {
 
         var result = subject.analyze(
                 DirectoryEntity.builder().nodeEntity(NodeEntity.builder().name("disk1").build()).build(),
-                Path.of("/disk/show/Show (2024)/background.jpg"), false, 0);
+                "/disk/show/Show (2024)/background.jpg", false, 0);
 
         assertTrue(result.isEmpty());
     }
@@ -137,7 +137,7 @@ class ImageScannerTest {
     void analyzeCoverImageType() {
         ImageEntity result = (ImageEntity) subject.analyze(
                 DirectoryEntity.builder().nodeEntity(NodeEntity.builder().name("disk1").build()).build(),
-                Path.of("/disk/show/Show (2024)/cover.png"), false, 0).orElseThrow();
+                "/disk/show/Show (2024)/cover.png", false, 0).orElseThrow();
         assertEquals(ImageType.COVER, result.getType());
     }
 
@@ -145,7 +145,7 @@ class ImageScannerTest {
     void analyzeMovieImage() {
         ImageEntity result = (ImageEntity) subject.analyze(
                 DirectoryEntity.builder().nodeEntity(NodeEntity.builder().name("disk1").build()).build(),
-                Path.of("/disk/movies/Movie (2024)-thumb.jpg"), false, 0).orElseThrow();
+                "/disk/movies/Movie (2024)-thumb.jpg", false, 0).orElseThrow();
         assertEquals(ImageType.BACKGROUND, result.getType());
         verify(scannerHelperService).getOrCreateMovie(any(), any(), anyInt());
     }
@@ -154,7 +154,7 @@ class ImageScannerTest {
     void analyzePosterNameIsNotDropped() {
         ImageEntity result = (ImageEntity) subject.analyze(
                 DirectoryEntity.builder().nodeEntity(NodeEntity.builder().name("disk1").build()).build(),
-                Path.of("/disk/show/Show (2024)/poster.jpg"), false, 0).orElseThrow();
+                "/disk/show/Show (2024)/poster.jpg", false, 0).orElseThrow();
         assertEquals(ImageType.COVER, result.getType());
     }
 
@@ -162,7 +162,7 @@ class ImageScannerTest {
     void analyzeBackgroundWinsOverCoverInMixedNames() {
         ImageEntity result = (ImageEntity) subject.analyze(
                 DirectoryEntity.builder().nodeEntity(NodeEntity.builder().name("disk1").build()).build(),
-                Path.of("/disk/show/Show (2024)/cover-thumb.jpg"), false, 0).orElseThrow();
+                "/disk/show/Show (2024)/cover-thumb.jpg", false, 0).orElseThrow();
         assertEquals(ImageType.BACKGROUND, result.getType());
     }
 
@@ -175,7 +175,7 @@ class ImageScannerTest {
                 .nodeEntity(NodeEntity.builder().name("disk1").build())
                 .build();
 
-        ImageEntity result = (ImageEntity) subject.analyze(musicDir, Path.of("/music/The Beatles/artist.jpg"), false, 0).orElseThrow();
+        ImageEntity result = (ImageEntity) subject.analyze(musicDir, "/music/The Beatles/artist.jpg", false, 0).orElseThrow();
 
         assertEquals(ImageType.COVER, result.getType());
         verify(scannerHelperService).getOrCreatePerson(any(), eq("The Beatles"), anyInt());
@@ -190,7 +190,7 @@ class ImageScannerTest {
                 .nodeEntity(NodeEntity.builder().name("disk1").build())
                 .build();
 
-        subject.analyze(musicDir, Path.of("/music/The Beatles/background.jpg"), false, 0);
+        subject.analyze(musicDir, "/music/The Beatles/background.jpg", false, 0);
 
         verify(scannerHelperService).getOrCreatePerson(any(), eq("The Beatles"), anyInt());
     }
@@ -205,7 +205,7 @@ class ImageScannerTest {
                 .build();
 
         // A compilation folder whose name the video path parser would classify as a show.
-        subject.analyze(musicDir, Path.of("/music/Various Artists/Qmusic Top 500 (2017)/cover.jpg"), false, 0);
+        subject.analyze(musicDir, "/music/Various Artists/Qmusic Top 500 (2017)/cover.jpg", false, 0);
 
         verify(scannerHelperService, never()).getOrCreateShow(any(), any(), anyInt());
         verify(scannerHelperService, never()).getOrCreateMovie(any(), any(), anyInt());
@@ -221,7 +221,7 @@ class ImageScannerTest {
                 .nodeEntity(NodeEntity.builder().name("disk1").build())
                 .build();
 
-        subject.analyze(musicDir, Path.of("/music/The Beatles/Abbey Road (1969)/cover.jpg"), false, 0);
+        subject.analyze(musicDir, "/music/The Beatles/Abbey Road (1969)/cover.jpg", false, 0);
 
         verify(scannerHelperService).getOrCreateAlbum(any(), any(), eq("Abbey Road"), eq(1969));
     }
@@ -236,7 +236,7 @@ class ImageScannerTest {
                 .nodeEntity(NodeEntity.builder().name("disk1").build())
                 .build();
 
-        subject.analyze(musicDir, Path.of("/music/Grease_ Soundtrack (1991)/cover.jpg"), false, 0);
+        subject.analyze(musicDir, "/music/Grease_ Soundtrack (1991)/cover.jpg", false, 0);
 
         verify(scannerHelperService).getOrCreateAlbum(any(), any(), eq("Grease_ Soundtrack"), eq(1991));
     }
@@ -258,7 +258,7 @@ class ImageScannerTest {
                         .trackEntity(TrackEntity.builder().albumEntity(album).build())
                         .build()));
 
-        ImageEntity result = (ImageEntity) subject.analyze(musicDir, albumDir.resolve("cover.jpg"), false, 0).orElseThrow();
+        ImageEntity result = (ImageEntity) subject.analyze(musicDir, albumDir.resolve("cover.jpg").toString(), false, 0).orElseThrow();
 
         // The album the tracks are on wins over the one the directory name spells out, so no
         // second, track-less album is created for the cover.
@@ -278,7 +278,7 @@ class ImageScannerTest {
                 .nodeEntity(NodeEntity.builder().name("disk1").build())
                 .build();
 
-        subject.analyze(musicDir, albumDir.resolve("cover.jpg"), false, 0);
+        subject.analyze(musicDir, albumDir.resolve("cover.jpg").toString(), false, 0);
 
         verify(scannerHelperService).getOrCreateAlbum(any(), any(), eq("Abbey Road"), eq(1969));
     }
@@ -295,7 +295,7 @@ class ImageScannerTest {
                 .nodeEntity(NodeEntity.builder().name("disk1").build())
                 .build();
 
-        subject.analyze(musicDir, albumDir.resolve("cover.jpg"), false, 0);
+        subject.analyze(musicDir, albumDir.resolve("cover.jpg").toString(), false, 0);
 
         // No audio files → fallback artist name "Soundtrack" is used
         verify(scannerHelperService).getOrCreateAlbum(any(), any(), eq("Soundtrack"), eq(2024));
@@ -321,7 +321,7 @@ class ImageScannerTest {
                 .nodeEntity(NodeEntity.builder().name("disk1").build())
                 .build();
 
-        subject.analyze(musicDir, albumDir.resolve("cover.jpg"), false, 0);
+        subject.analyze(musicDir, albumDir.resolve("cover.jpg").toString(), false, 0);
 
         verify(scannerHelperService).getOrCreatePerson(any(), eq("Various Artists"), anyInt());
     }
@@ -342,7 +342,7 @@ class ImageScannerTest {
                 .nodeEntity(NodeEntity.builder().name("disk1").build())
                 .build();
 
-        subject.analyze(musicDir, albumDir.resolve("cover.jpg"), false, 0);
+        subject.analyze(musicDir, albumDir.resolve("cover.jpg").toString(), false, 0);
 
         // Exception → fallback artist name used
         verify(scannerHelperService).getOrCreateAlbum(any(), any(), eq("Soundtrack"), eq(2024));

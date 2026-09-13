@@ -139,7 +139,7 @@ class HandleAlbumFoundTest {
         when(albumRepository.findById(albumId)).thenReturn(Optional.of(album));
         when(metadataRepository.findByAlbumEntityId(albumId)).thenReturn(List.of(meta));
         when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
-        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node))
+        when(directoryRepository.findAttachedTo(node, DirectoryType.LIBRARY))
                 .thenReturn(List.of(dir));
         when(otherPathFileRepository.findByDirectoryEntityAndPath(dir, expectedNfoPath))
                 .thenReturn(Optional.of(nfoFile));
@@ -191,7 +191,7 @@ class HandleAlbumFoundTest {
 
         when(albumRepository.findById(albumId)).thenReturn(Optional.of(album));
         when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
-        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node))
+        when(directoryRepository.findAttachedTo(node, DirectoryType.LIBRARY))
                 .thenReturn(List.of(dir));
         when(otherPathFileRepository.findByDirectoryEntityAndPath(dir, expectedNfoPath))
                 .thenReturn(Optional.empty());
@@ -248,7 +248,7 @@ class HandleAlbumFoundTest {
 
         when(albumRepository.findById(albumId)).thenReturn(Optional.of(album));
         when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
-        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node))
+        when(directoryRepository.findAttachedTo(node, DirectoryType.LIBRARY))
                 .thenReturn(List.of(dir));
         when(otherPathFileRepository.findByDirectoryEntityAndPath(any(), any())).thenReturn(Optional.empty());
 
@@ -259,7 +259,7 @@ class HandleAlbumFoundTest {
 
         ArgumentCaptor<FileScanRequestedData> captor = ArgumentCaptor.forClass(FileScanRequestedData.class);
         verify(messageSender).sendFileScanRequested(captor.capture(), eq("music-dir"));
-        assertEquals(cover, captor.getValue().getPath());
+        assertEquals(cover.toString(), captor.getValue().getPath());
         assertTrue(captor.getValue().getRegularFile());
         assertEquals(3, captor.getValue().getSize());
         assertEquals(dirId, captor.getValue().getDirectoryEntityUUID());
@@ -304,7 +304,7 @@ class HandleAlbumFoundTest {
 
         when(albumRepository.findById(albumId)).thenReturn(Optional.of(album));
         when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
-        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node))
+        when(directoryRepository.findAttachedTo(node, DirectoryType.LIBRARY))
                 .thenReturn(List.of(dir));
         when(otherPathFileRepository.findByDirectoryEntityAndPath(any(), any())).thenReturn(Optional.empty());
 
@@ -356,7 +356,7 @@ class HandleAlbumFoundTest {
 
         when(albumRepository.findById(albumId)).thenReturn(Optional.of(album));
         when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
-        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node))
+        when(directoryRepository.findAttachedTo(node, DirectoryType.LIBRARY))
                 .thenReturn(List.of(dir));
         when(otherPathFileRepository.findByDirectoryEntityAndPath(dir, nfoPath))
                 .thenReturn(Optional.of(new OtherPathFileEntity()));
@@ -432,7 +432,7 @@ class HandleAlbumFoundTest {
 
         when(albumRepository.findById(albumId)).thenReturn(Optional.of(album));
         when(nodeService.getOrCreateNodeEntityForThisNode()).thenReturn(node);
-        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, node))
+        when(directoryRepository.findAttachedTo(node, DirectoryType.LIBRARY))
                 .thenReturn(List.of(wrongLibDir, nullLibDir));
 
         subject.handle(AlbumFoundData.builder()

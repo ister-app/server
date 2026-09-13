@@ -116,6 +116,40 @@ All significant work is done asynchronously through RabbitMQ message queues. The
 
 **Directory/node-scoped queues:** transcode queues are not global. All directory-scoped queue names come from `core/.../config/DirectoryQueueNames`: `queues(base)` = own directories + cache dir (owner-only events), `queues(base, HelperJob)` additionally includes `app.ister.helper.disks` entries for that job and drops the own directories when the owner lists the job in `app.ister.helper.offload-jobs`. Three job families are helper-capable (`TRANSCODE`, `DETECT_SEGMENTS`, `SUBTITLES`): a helper node competes on the owner's queues, reads the source via `MediaFileInputResolver` (local path or the owner's tokenized, range-capable `/mediaFile/{id}/download`) and uploads results (`POST /cache/upload/{fileName}` for SRTs, `POST /transcode/upload/...` for segments). `NodeTokenManager`/`RemoteNodeClient` live in `core/.../node/`. The legacy `app.ister.transcoder.disks` maps to helper disks with the `TRANSCODE` job. See `doc/admin/en/05-multi-node.md`.
 
+## Architecture: Storage (`core/.../storage/`)
+
+A `DirectoryEntity` is `StorageKind.LOCAL` (absolute path, exactly one owning `nodeEntity`) or `S3`
+(`s3://bucket/prefix`, `nodeEntity == null`, N attached nodes in `directory_node` / `attachedNodes`).
+Rows of an S3 directory keep `s3://bucket/key` in the same `path` column, so the string-based path
+parsers and `(directory, path)` uniqueness are unchanged. Rules:
+
+- **Never `Path.of(entity.getPath())` in a handler.** Go through the seams: `ObjectStoreRegistry`
+  (one `S3ObjectStore` per `app.ister.s3.connections[n]`), `FileAccess` (stat/open/delete by
+  directory + path), `LocalCopy` (LRU-cached download for anything that needs a real file: zip,
+  PDFBox, OCR tools), `MediaFileInputResolver.resolve(mf)` for every ffmpeg/ffprobe input.
+- **Every derived-file writer uses `CacheDirectoryResolver.store()`/`storeFor(dir)`** (`CacheStore`):
+  with `app.ister.server.cache-s3-connection` set that is the cluster-shared `<cluster>-s3-cache`
+  directory, otherwise the node's `<node>-cache-directory`. Stored paths are always
+  `directory.path + "/" + key` for both kinds.
+- Queue subscription stays **config-derived** (`OwnDirectoriesProperties` names): listing an S3
+  directory in `app.ister.disk.directories[n]` (with `s3-connection` + `prefix`, no `path`) is
+  what attaches a node. `StartupTasks` creates the directory or attaches to it; a mismatching
+  bucket/prefix for the same name is fatal. `HandleNewDirectoriesScanRequested` guards a scan with
+  `DirectoryRepository.tryLockDirectoryScan` (advisory lock).
+- `MediaFileInputResolver.remoteNode(mf)`: the owner of a LOCAL directory, or any attached node of an
+  S3 directory this node has no connection for; an attached node reads S3 files through its own
+  `/mediaFile/{id}/download` over `app.ister.server.self-url` (loopback), or presigned URLs with
+  `app.ister.s3.ffmpeg-direct`. `FileController` proxies S3 objects with `Range`; the body must be
+  an `InputStreamResource` with the 206 set by us (Spring's own range handling skips the stream).
+- Shared HLS tmp (`app.ister.server.tmp-s3-connection`, `TmpStoreProvider`/`S3TmpStore`): encoding
+  stays local; `HlsService` publishes stable segments/playlists/done markers to `tmp/{mediaFileId}/`
+  and reads them through into the local tmp dir on a miss. Transcode DTOs carry `requestingNodeUrl`
+  for the no-shared-tmp case (S3 file requested on node A, transcoded on node B → pushed to A).
+- Tests: `FakeObjectStore` + `CacheStoreMocks` (disk tests); MinIO via Testcontainers
+  (`quay.io/minio/minio`, Docker Hub no longer serves it) in `S3ObjectStoreIntegrationTest` and
+  `S3LibraryScanIntegrationTest`. `TmpStoreProvider` has two constructors: the Spring one is
+  `@Autowired` (AOT needs that). See `doc/admin/en/10-object-storage.md`.
+
 ## Architecture: HLS Transcoding (transcoder module)
 
 Streaming is HLS. `HlsService` + `HlsTranscodeService` coordinate playlist building and FFmpeg.

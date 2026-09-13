@@ -30,5 +30,7 @@ public class OwnDirectoriesProperties {
         private String name;
         private String path;
         private String library;
+        private String s3Connection;
+        private String prefix;
     }
 }

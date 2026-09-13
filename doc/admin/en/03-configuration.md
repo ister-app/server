@@ -30,6 +30,26 @@ dedicated short env var, listed below. Defaults are sensible for a single-node h
 | Temp directory | `TMP_DIR` | `/tmp/ister/` | HLS transcode output |
 | `app.ister.server.websocket.allowed-origins` | `APP_ISTER_SERVER_WEBSOCKET_ALLOWED_ORIGINS` | empty | extra origins allowed on the GraphQL websocket handshake. The public host from `app.ister.server.url` is allowed automatically (both schemes, any port), so you only need this when the server is served under a second name. `*` allows any origin. |
 
+## Object storage (S3)
+
+See [Object storage](10-object-storage.md). Connections are indexed lists (`APP_ISTER_S3_CONNECTIONS_0_NAME`, …).
+
+| Setting | Env var | Default | Notes |
+| --- | --- | --- | --- |
+| `app.ister.s3.connections[n].name` | | | referenced by directories and the shared stores |
+| `app.ister.s3.connections[n].endpoint` | | empty | empty = AWS; `http://minio:9000` for a self-hosted server |
+| `app.ister.s3.connections[n].region` | | `us-east-1` | |
+| `app.ister.s3.connections[n].bucket` | | | one bucket per connection |
+| `app.ister.s3.connections[n].path-style` | | `true` | path-style addressing, needed by MinIO/Garage/Ceph |
+| `app.ister.s3.connections[n].access-key` / `.secret-key` | | empty | empty = the SDK's default credential chain (AWS) |
+| `app.ister.disk.directories[n].s3-connection` / `.prefix` | | | makes the directory an S3 directory (no `path`); prefix optional |
+| `app.ister.s3.ffmpeg-direct` | `S3_FFMPEG_DIRECT` | `false` | `true`: ffmpeg reads presigned S3 URLs instead of the node's own proxy |
+| `app.ister.s3.presign-ttl` | `S3_PRESIGN_TTL` | `2h` | lifetime of those URLs; keep above the longest pass |
+| `app.ister.server.self-url` | `SELF_URL` | `http://127.0.0.1:<server.port>` | where the node reaches its own proxy for ffmpeg; keep it on loopback behind a gateway with request timeouts |
+| `app.ister.s3.local-copy-dir` / `.local-copy-max-bytes` | `S3_LOCAL_COPY_DIR` / `S3_LOCAL_COPY_MAX_BYTES` | `<tmp-dir>/s3-scratch/` / 2 GiB | LRU cache of objects that must be read as a local file (epub/cbz/pdf, OCR) |
+| `app.ister.server.cache-s3-connection` / `.cache-s3-prefix` | `CACHE_S3_CONNECTION` / `CACHE_S3_PREFIX` | empty / `cache` | the cluster-shared cache; replaces `CACHE_DIR` for new derived files |
+| `app.ister.server.tmp-s3-connection` / `.tmp-s3-prefix` | `TMP_S3_CONNECTION` / `TMP_S3_PREFIX` | empty / `tmp` | the cluster-shared transcode store; `TMP_DIR` stays the local encoding scratch |
+
 ## Metadata and languages
 
 | Setting | Env var | Default | Notes |

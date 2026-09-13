@@ -1,5 +1,6 @@
 package app.ister.disk.events.analyzedata;
 
+import app.ister.core.storage.TmpStoreProvider;
 import app.ister.core.status.ActivityContext;
 import app.ister.core.status.ActivitySubjects;
 import app.ister.core.Handle;
@@ -42,6 +43,7 @@ public class HandleAnalyzeDataDisk implements Handle<AnalyzeData> {
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final MediaFileSegmentRepository mediaFileSegmentRepository;
     private final OtherPathFileRepository otherPathFileRepository;
+    private final TmpStoreProvider tmpStoreProvider;
     private final MediaFileEpisodeRepository mediaFileEpisodeRepository;
     private final MediaFileEpisodeService mediaFileEpisodeService;
     private final MessageSender messageSender;
@@ -123,7 +125,10 @@ public class HandleAnalyzeDataDisk implements Handle<AnalyzeData> {
 
     private void deleteHlsCache(UUID mediaFileId) {
         Path dir = Paths.get(tmpDir, mediaFileId.toString());
-        if (!Files.exists(dir)) return;
+        if (!Files.exists(dir)) {
+            deleteSharedHlsCache(mediaFileId);
+            return;
+        }
         try (var walk = Files.walk(dir)) {
             walk.sorted(Comparator.reverseOrder())
                     .forEach(p -> {
@@ -136,5 +141,17 @@ public class HandleAnalyzeDataDisk implements Handle<AnalyzeData> {
         } catch (IOException e) {
             log.warn("Could not delete HLS cache for {}: {}", mediaFileId, e.getMessage());
         }
+        deleteSharedHlsCache(mediaFileId);
+    }
+
+    /** The published copy in the cluster-shared tmp store, when there is one: the streams changed, so it is stale too. */
+    private void deleteSharedHlsCache(UUID mediaFileId) {
+        tmpStoreProvider.shared().ifPresent(store -> {
+            try {
+                store.deleteAll(mediaFileId);
+            } catch (IOException e) {
+                log.warn("Could not delete shared HLS cache for {}: {}", mediaFileId, e.getMessage());
+            }
+        });
     }
 }

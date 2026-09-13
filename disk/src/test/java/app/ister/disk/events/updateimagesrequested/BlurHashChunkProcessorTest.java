@@ -32,11 +32,27 @@ class BlurHashChunkProcessorTest {
 
     private static final UUID DIRECTORY_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
+    @Mock
+    private app.ister.core.repository.DirectoryRepository directoryRepository;
+    @org.mockito.Spy
+    private app.ister.core.storage.FileAccess fileAccess = new app.ister.core.storage.FileAccess(
+            org.mockito.Mockito.mock(app.ister.core.storage.ObjectStoreRegistry.class));
+    @org.mockito.Spy
+    private app.ister.core.storage.LocalCopy localCopy = new app.ister.core.storage.LocalCopy(
+            org.mockito.Mockito.mock(app.ister.core.storage.ObjectStoreRegistry.class),
+            new app.ister.core.config.S3Properties(), System.getProperty("java.io.tmpdir"));
+
     @InjectMocks
     private BlurHashChunkProcessor subject;
 
     @Mock
     private ImageRepository imageRepository;
+
+    @org.junit.jupiter.api.BeforeEach
+    void s3TestSetup() {
+        org.mockito.Mockito.lenient().when(directoryRepository.findById(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(java.util.Optional.of(app.ister.core.entity.DirectoryEntity.builder().name("local").path("/").build()));
+    }
 
     @Test
     void processWithoutCursorStartsAtTheBeginningOfTheDirectory() {

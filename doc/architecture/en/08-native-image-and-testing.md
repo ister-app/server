@@ -44,7 +44,12 @@ Never edit a migration that has been applied anywhere.
 
 - Unit tests are JUnit 5 + Mockito; Mockito runs as a `-javaagent`, wired in the root
   `build.gradle`.
-- `jimfs` (in-memory filesystem) backs the disk/file-path tests.
+- `jimfs` (in-memory filesystem) backs the disk/file-path tests; `FakeObjectStore` (disk tests) is the
+  in-memory stand-in for an S3 bucket, and `CacheStoreMocks` stubs the cache-store seam in handler tests.
+- `S3ObjectStoreIntegrationTest` (core) and `S3LibraryScanIntegrationTest` (server) run against a
+  real MinIO through Testcontainers — MinIO no longer publishes to Docker Hub, so the tests pull
+  `quay.io/minio/minio`. The AWS SDK v2 (`software.amazon.awssdk:s3` + `url-connection-client`)
+  ships its own native-image reachability metadata; no hand-maintained hints were needed for it.
 - **ffmpeg must be on `PATH`** — the transcoder tests shell out to it, and CI installs it before the
   build.
 - Integration tests are **not** a separate source set or task. They run under the normal `test`

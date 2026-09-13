@@ -17,7 +17,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.file.Path;
 import java.util.Optional;
 
 @Component
@@ -29,25 +28,25 @@ public class SubtitleScanner implements Scanner {
     private final MessageSender messageSender;
 
     @Override
-    public boolean analyzable(Path path, boolean isRegularFile, long size) {
+    public boolean analyzable(String path, boolean isRegularFile, long size) {
         return isRegularFile
-                && new PathObject(path.toString()).getDirType().equals(DirType.EPISODE)
-                && new PathObject(path.toString()).getFileType().equals(FileType.SUBTITLE);
+                && new PathObject(path).getDirType().equals(DirType.EPISODE)
+                && new PathObject(path).getFileType().equals(FileType.SUBTITLE);
     }
 
     @Override
-    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, boolean isRegularFile, long size) {
-        Optional<OtherPathFileEntity> otherPathFileEntity = otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString());
+    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, String path, boolean isRegularFile, long size) {
+        Optional<OtherPathFileEntity> otherPathFileEntity = otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path);
         if (otherPathFileEntity.isEmpty()) {
             var entity = OtherPathFileEntity.builder()
                     .directoryEntityId(directoryEntity.getId())
                     .pathFileType(PathFileType.SUBTITLE)
-                    .path(path.toString()).build();
+                    .path(path).build();
             otherPathFileRepository.save(entity);
             messageSender.sendSubtitleFileFound(SubtitleFileFoundData.builder()
                     .directoryEntityUUID(directoryEntity.getId())
                     .eventType(EventType.SUBTITLE_FILE_FOUND)
-                    .path(path.toString()).build(), directoryEntity.getName());
+                    .path(path).build(), directoryEntity.getName());
             return Optional.of(entity);
         } else {
             return Optional.of(otherPathFileEntity.get());

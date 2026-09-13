@@ -1,5 +1,6 @@
 package app.ister.disk.scanner.scanners;
 
+import app.ister.core.storage.PathStrings;
 import app.ister.core.entity.BaseEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.OtherPathFileEntity;
@@ -20,7 +21,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.file.Path;
 import java.util.Optional;
 
 @Component
@@ -32,45 +32,45 @@ public class NfoScanner implements Scanner {
     private final MessageSender messageSender;
 
     @Override
-    public boolean analyzable(Path path, boolean isRegularFile, long size) {
-        PathObject pathObject = new PathObject(path.toString());
-        Boolean showCorrect = pathObject.getDirType().equals(DirType.SHOW) && path.getFileName().toString().equals("tvshow.nfo");
+    public boolean analyzable(String path, boolean isRegularFile, long size) {
+        PathObject pathObject = new PathObject(path);
+        Boolean showCorrect = pathObject.getDirType().equals(DirType.SHOW) && PathStrings.fileName(path).equals("tvshow.nfo");
         Boolean episodeCorrect = pathObject.getDirType().equals(DirType.EPISODE) && pathObject.getFileType().equals(FileType.NFO);
         return (isRegularFile
                 && pathObject.getFileType().equals(FileType.NFO)
                 && (showCorrect ^ episodeCorrect));
     }
 
-    public boolean analyzable(Path path, boolean isRegularFile, long size, DirectoryEntity directoryEntity) {
+    public boolean analyzable(String path, boolean isRegularFile, long size, DirectoryEntity directoryEntity) {
         if (!isRegularFile) {
             return false;
         }
         if (directoryEntity.getLibraryEntity() != null
                 && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.MUSIC) {
-            MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), path.toString());
+            MusicPathObject musicPath = new MusicPathObject(directoryEntity.getPath(), path);
             return musicPath.getFileType().equals(FileType.NFO);
         }
         if (directoryEntity.getLibraryEntity() != null
                 && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.BOOK) {
-            BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), path.toString());
+            BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), path);
             return bookPath.getFileType().equals(FileType.NFO);
         }
         return analyzable(path, isRegularFile, size);
     }
 
     @Override
-    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, boolean isRegularFile, long size) {
-        Optional<OtherPathFileEntity> otherPathFileEntity = otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString());
+    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, String path, boolean isRegularFile, long size) {
+        Optional<OtherPathFileEntity> otherPathFileEntity = otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path);
         if (otherPathFileEntity.isEmpty()) {
             var entity = OtherPathFileEntity.builder()
                     .directoryEntityId(directoryEntity.getId())
                     .pathFileType(PathFileType.NFO)
-                    .path(path.toString()).build();
+                    .path(path).build();
             otherPathFileRepository.save(entity);
             messageSender.sendNfoFileFound(NfoFileFoundData.builder()
                     .directoryEntityUUID(directoryEntity.getId())
                     .eventType(EventType.NFO_FILE_FOUND)
-                    .path(path.toString()).build(), directoryEntity.getName());
+                    .path(path).build(), directoryEntity.getName());
             return Optional.of(entity);
         } else {
             return Optional.of(otherPathFileEntity.get());

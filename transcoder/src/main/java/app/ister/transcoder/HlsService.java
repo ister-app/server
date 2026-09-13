@@ -2,6 +2,11 @@ package app.ister.transcoder;
 
 import app.ister.core.node.MediaFileInputResolver;
 import app.ister.core.node.RemoteNodeClient;
+import app.ister.core.storage.ObjectRef;
+import app.ister.core.storage.ObjectStore;
+import app.ister.core.storage.ObjectStoreRegistry;
+import app.ister.core.storage.TmpStore;
+import app.ister.core.storage.TmpStoreProvider;
 import app.ister.core.config.LanguageMatcher;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MediaFileStreamEntity;
@@ -75,7 +80,16 @@ public class HlsService {
     private final MessageSender messageSender;
     private final RemoteNodeClient remoteNodeClient;
     private final MediaFileInputResolver inputResolver;
+    private final ObjectStoreRegistry objectStoreRegistry;
+    private final TmpStoreProvider tmpStoreProvider;
     private final AmqpAdmin amqpAdmin;
+
+    /**
+     * Where produced segments/playlists of a file must be pushed to besides the local tmp dir:
+     * the requesting node of an S3 file, or the owner of a LOCAL file this helper transcodes.
+     * Keyed by media file id, filled when a pass starts, read by the playlist re-upload hook.
+     */
+    private final ConcurrentHashMap<UUID, String> uploadTargets = new ConcurrentHashMap<>();
 
     /**
      * Short read-only transactions for the HTTP request paths. The HLS endpoints poll for
@@ -91,6 +105,7 @@ public class HlsService {
                       HlsTranscodeService transcodeService, MediaFileRepository mediaFileRepository,
                       MediaFileStreamRepository mediaFileStreamRepository, MessageSender messageSender,
                       RemoteNodeClient remoteNodeClient, MediaFileInputResolver inputResolver,
+                      ObjectStoreRegistry objectStoreRegistry, TmpStoreProvider tmpStoreProvider,
                       AmqpAdmin amqpAdmin, PlatformTransactionManager transactionManager) {
         this.amqpAdmin = amqpAdmin;
         this.playlistBuilder = playlistBuilder;
@@ -101,6 +116,8 @@ public class HlsService {
         this.messageSender = messageSender;
         this.remoteNodeClient = remoteNodeClient;
         this.inputResolver = inputResolver;
+        this.objectStoreRegistry = objectStoreRegistry;
+        this.tmpStoreProvider = tmpStoreProvider;
         this.readOnlyTransaction = new TransactionTemplate(transactionManager);
         this.readOnlyTransaction.setReadOnly(true);
     }
@@ -108,8 +125,16 @@ public class HlsService {
     @Value("${app.ister.server.tmp-dir}")
     private String tmpDir;
 
+    /** This node's public URL, as other nodes and clients see it. */
+    @Value("${app.ister.server.url:}")
+    private String ownUrl;
+
     @Value("${app.ister.server.hls.master-playlist-timeout-ms:120000}")
     private long masterPlaylistTimeoutMs;
+
+    /** Same budget as HlsTranscodeService.waitForSegment, for segments produced on another node via the shared tmp store. */
+    @Value("${app.ister.server.hls.segment-timeout-ms:60000}")
+    private long segmentTimeoutMs;
 
     /** After the pass completes, keep retrying failed segment uploads for at most this long. */
     @Value("${app.ister.transcoder.hls.upload-drain-timeout-ms:300000}")
@@ -143,9 +168,10 @@ public class HlsService {
             UUID mediaFileId = UUID.fromString(playlist.getParent().getFileName().toString());
             MediaFileEntity mediaFile = readOnlyTransaction.execute(_ ->
                     mediaFileRepository.findById(mediaFileId).orElse(null));
-            if (mediaFile == null || !isRemote(mediaFile)) return;
-            remoteNodeClient.uploadFile(mediaFile.getDirectoryEntity().getNodeEntity().getUrl(),
-                    mediaFileId, playlist);
+            if (mediaFile == null) return;
+            Optional<UploadTarget> target = uploadTarget(mediaFile);
+            if (target.isEmpty()) return;
+            target.get().upload(mediaFileId, playlist);
         } catch (Exception e) {
             log.warn("Could not re-upload corrected playlist {}: {}", playlist, e.toString());
         }
@@ -171,6 +197,7 @@ public class HlsService {
     public String getMasterPlaylist(UUID mediaFileId, boolean direct, boolean transcode, SubtitleFormat subtitleFormat) throws IOException {
         Path cacheFile = cacheDir(mediaFileId).resolve(masterCacheFilename(direct, transcode, subtitleFormat));
 
+        syncFromShared(mediaFileId, cacheFile);
         if (Files.exists(cacheFile)) {
             String cached = Files.readString(cacheFile);
             if (isCurrentMaster(cached)) {
@@ -200,16 +227,17 @@ public class HlsService {
                 .direct(direct)
                 .transcode(transcode)
                 .subtitleFormat(subtitleFormat)
+                .requestingNodeUrl(ownUrl)
                 .build();
         messageSender.sendTranscodeRequested(request, directoryName);
 
         try {
-            return waitForMasterPlaylist(cacheFile, masterPlaylistTimeoutMs / 2);
+            return waitForMasterPlaylist(mediaFileId, cacheFile, masterPlaylistTimeoutMs / 2);
         } catch (IOException _) {
             // The event may have been lost or dead-lettered; re-issue it once before giving up.
             log.warn("Master playlist for {} not produced in time, re-sending TRANSCODE_REQUESTED once", mediaFileId);
             messageSender.sendTranscodeRequested(request, directoryName);
-            return waitForMasterPlaylist(cacheFile, masterPlaylistTimeoutMs / 2);
+            return waitForMasterPlaylist(mediaFileId, cacheFile, masterPlaylistTimeoutMs / 2);
         }
     }
 
@@ -224,6 +252,13 @@ public class HlsService {
      * transaction; everything after runs detached and only reads basic fields.
      */
     public void generateAllPlaylists(UUID mediaFileId, boolean direct, boolean transcode, SubtitleFormat subtitleFormat) throws IOException {
+        generateAllPlaylists(mediaFileId, direct, transcode, subtitleFormat, null);
+    }
+
+    /** @param requestingNodeUrl see {@link TranscodeRequestedData#getRequestingNodeUrl()} */
+    public void generateAllPlaylists(UUID mediaFileId, boolean direct, boolean transcode, SubtitleFormat subtitleFormat,
+                                     String requestingNodeUrl) throws IOException {
+        rememberUploadTarget(mediaFileId, requestingNodeUrl);
         Path cacheFile = cacheDir(mediaFileId).resolve(masterCacheFilename(direct, transcode, subtitleFormat));
 
         // Duplicate TRANSCODE_REQUESTED events are common (poll-timeout re-sends,
@@ -241,7 +276,7 @@ public class HlsService {
             // (isRemote/resolveInputPath) needs explicit touching just like the streams.
             Hibernate.initialize(entity.getMediaFileStreamEntity());
             if (entity.getDirectoryEntity() != null) {
-                entity.getDirectoryEntity().getNodeEntity().getUrl();
+                inputResolver.remoteNodeUrl(entity);
             }
             return entity;
         });
@@ -258,13 +293,13 @@ public class HlsService {
         writeAllMasterVariantsForAudioOnly(mediaFile, mediaFileId);
         log.debug("Generated all playlists for {}", mediaFileId);
 
-        if (isRemote(mediaFile)) {
-            String nodeUrl = mediaFile.getDirectoryEntity().getNodeEntity().getUrl();
+        Optional<UploadTarget> target = uploadTarget(mediaFile);
+        if (target.isPresent()) {
             try (Stream<Path> files = Files.list(cacheDir(mediaFileId))) {
                 files.filter(p -> p.toString().endsWith(EXT_M3U8))
                         .forEach(p -> {
                             try {
-                                remoteNodeClient.uploadFile(nodeUrl, mediaFileId, p);
+                                target.get().upload(mediaFileId, p);
                             } catch (IOException e) {
                                 log.warn("Playlist upload failed: {}", p, e);
                             }
@@ -285,7 +320,8 @@ public class HlsService {
     }
 
     private void doStartPass(TranscodePassRequestedData data, MediaFileEntity mediaFile) {
-        boolean remote = isRemote(mediaFile);
+        rememberUploadTarget(data.getMediaFileId(), data.getRequestingNodeUrl());
+        Optional<UploadTarget> target = uploadTarget(mediaFile);
         boolean background = Boolean.TRUE.equals(data.getBackground());
         String mediaFilePath = resolveInputPath(mediaFile);
 
@@ -312,12 +348,12 @@ public class HlsService {
 
         transcodeService.ensurePassStarted(data.getPassKey(), passStarter, background);
 
-        if (remote) {
-            String nodeUrl = mediaFile.getDirectoryEntity().getNodeEntity().getUrl();
+        if (target.isPresent()) {
+            UploadTarget uploadTarget = target.get();
             UUID mediaFileId = data.getMediaFileId();
             CompletableFuture<Void> passFuture = transcodeService.getActiveFuture(data.getPassKey());
             watcherExecutor.submit(() ->
-                    watchAndUpload(cacheDirPath, segmentPrefix, nodeUrl, mediaFileId, passFuture));
+                    watchAndUpload(cacheDirPath, segmentPrefix, uploadTarget, mediaFileId, passFuture));
         }
     }
 
@@ -466,6 +502,7 @@ public class HlsService {
                 .passCategory(PASS_CATEGORY_VIDEO)
                 .qualityLabel(qualityLabel)
                 .background(true)
+                .requestingNodeUrl(requesterOf(mediaFileId))
                 .build());
     }
 
@@ -486,6 +523,7 @@ public class HlsService {
                 .qualityLabel(qualityLabel)
                 .audioStreamIndex(streamIdx)
                 .background(true)
+                .requestingNodeUrl(requesterOf(mediaFileId))
                 .build());
     }
 
@@ -495,6 +533,7 @@ public class HlsService {
      */
     public String getStreamPlaylist(UUID mediaFileId, String streamFilename) throws IOException {
         Path cacheFile = cacheDir(mediaFileId).resolve(streamFilename);
+        syncFromShared(mediaFileId, cacheFile);
         if (isCurrentPlaylist(cacheFile)) {
             Files.setLastModifiedTime(cacheFile, FileTime.fromMillis(System.currentTimeMillis()));
             return Files.readString(cacheFile);
@@ -532,10 +571,12 @@ public class HlsService {
         String[] parts = segmentFilename.replace(".ts", "").split("_");
         String qualityLabel = parts[2];
         String passKey = mediaFileId + "_video_" + qualityLabel;
-        Path completed = completedSegmentOrNull(mediaFileId, cacheFile, SEG_VIDEO_PREFIX + qualityLabel + "_");
+        String segmentPrefix = SEG_VIDEO_PREFIX + qualityLabel + "_";
+        syncSegmentFromShared(mediaFileId, cacheFile, segmentPrefix);
+        Path completed = completedSegmentOrNull(mediaFileId, cacheFile, segmentPrefix);
         if (completed != null) return completed;
         requestPassIfNeeded(mediaFileId, passKey, PASS_CATEGORY_VIDEO, qualityLabel, null);
-        return transcodeService.waitForSegment(cacheFile, passKey);
+        return waitForSegment(mediaFileId, cacheFile, passKey, segmentPrefix);
     }
 
     /**
@@ -585,10 +626,12 @@ public class HlsService {
         int streamIdx = Integer.parseInt(parts[2]);
         String bitrateLabel = parts[3];
         String passKey = mediaFileId + "_audio_" + streamIdx + "_" + bitrateLabel;
-        Path completed = completedSegmentOrNull(mediaFileId, cacheFile, SEG_AUDIO_PREFIX + streamIdx + "_" + bitrateLabel + "_");
+        String segmentPrefix = SEG_AUDIO_PREFIX + streamIdx + "_" + bitrateLabel + "_";
+        syncSegmentFromShared(mediaFileId, cacheFile, segmentPrefix);
+        Path completed = completedSegmentOrNull(mediaFileId, cacheFile, segmentPrefix);
         if (completed != null) return completed;
         requestPassIfNeeded(mediaFileId, passKey, PASS_CATEGORY_AUDIO, bitrateLabel, streamIdx);
-        return transcodeService.waitForSegment(cacheFile, passKey);
+        return waitForSegment(mediaFileId, cacheFile, passKey, segmentPrefix);
     }
 
     /**
@@ -639,6 +682,7 @@ public class HlsService {
                         .passCategory(passCategory)
                         .qualityLabel(qualityLabel)
                         .audioStreamIndex(audioStreamIndex)
+                        .requestingNodeUrl(requesterOf(mediaFileId))
                         .build(),
                 ctx.directoryName());
     }
@@ -668,7 +712,8 @@ public class HlsService {
         SubtitleContext ctx = readOnlyTransaction.execute(status -> {
             MediaFileStreamEntity subtitleStream = mediaFileStreamRepository.findById(subtitleId).orElseThrow();
             MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
-            return new SubtitleContext(subtitleStream, resolveInputPath(mediaFile), externalSrtUrl(subtitleStream, mediaFile));
+            return new SubtitleContext(subtitleStream, resolveInputPath(mediaFile), externalSrtUrl(subtitleStream, mediaFile),
+                    externalSrtStore(subtitleStream, mediaFile));
         });
         MediaFileStreamEntity subtitleStream = ctx.subtitleStream();
         String mediaFilePath = ctx.mediaFilePath();
@@ -699,7 +744,7 @@ public class HlsService {
             MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
             String mediaFilePath = stream.getCodecType() == StreamCodecType.EXTERNAL_SUBTITLE ? null
                     : resolveInputPath(mediaFile);
-            return new SubtitleContext(stream, mediaFilePath, externalSrtUrl(stream, mediaFile));
+            return new SubtitleContext(stream, mediaFilePath, externalSrtUrl(stream, mediaFile), externalSrtStore(stream, mediaFile));
         });
         MediaFileStreamEntity stream = ctx.subtitleStream();
 
@@ -908,8 +953,160 @@ public class HlsService {
         return inputResolver.isRemote(mediaFile);
     }
 
+    /** A requester that is another node becomes the push target for everything this node produces for the file. */
+    private void rememberUploadTarget(UUID mediaFileId, String requestingNodeUrl) {
+        if (mediaFileId == null || requestingNodeUrl == null || requestingNodeUrl.isBlank()) {
+            return;
+        }
+        if (ownUrl != null && !ownUrl.isBlank() && stripSlash(ownUrl).equals(stripSlash(requestingNodeUrl))) {
+            uploadTargets.remove(mediaFileId);
+        } else {
+            uploadTargets.put(mediaFileId, stripSlash(requestingNodeUrl));
+        }
+    }
+
+    private String requesterOf(UUID mediaFileId) {
+        return mediaFileId == null ? null : uploadTargets.get(mediaFileId);
+    }
+
+    private static String stripSlash(String url) {
+        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+    }
+
+    /**
+     * The node the produced segments and playlists must be pushed to, if any: the node that
+     * requested playback when that is not this node (an S3 file transcoded by another attached
+     * node, or a helper), else — for a LOCAL file owned elsewhere — its owner. Empty when this
+     * node serves the file itself.
+     */
+    private Optional<UploadTarget> uploadTarget(MediaFileEntity mediaFile) {
+        Optional<TmpStore> shared = tmpStoreProvider.shared();
+        if (shared.isPresent()) {
+            // Everything goes to the cluster-shared store; whoever serves the playback reads
+            // it through from there, so the requester and the owner no longer matter.
+            return Optional.of(new SharedTmpTarget(shared.get()));
+        }
+        String requester = requesterOf(mediaFile.getId());
+        if (requester != null) {
+            return Optional.of(new NodeTarget(requester));
+        }
+        return inputResolver.remoteNodeUrl(mediaFile).map(NodeTarget::new);
+    }
+
+    /** Where a produced file must be published besides the local tmp dir. */
+    private interface UploadTarget {
+        void upload(UUID mediaFileId, Path file) throws IOException;
+    }
+
+    private final class NodeTarget implements UploadTarget {
+        private final String nodeUrl;
+
+        NodeTarget(String nodeUrl) {
+            this.nodeUrl = nodeUrl;
+        }
+
+        @Override
+        public void upload(UUID mediaFileId, Path file) throws IOException {
+            remoteNodeClient.uploadFile(nodeUrl, mediaFileId, file);
+        }
+
+        @Override
+        public String toString() {
+            return nodeUrl;
+        }
+    }
+
+    private static final class SharedTmpTarget implements UploadTarget {
+        private final TmpStore store;
+
+        SharedTmpTarget(TmpStore store) {
+            this.store = store;
+        }
+
+        @Override
+        public void upload(UUID mediaFileId, Path file) throws IOException {
+            store.put(mediaFileId, file);
+        }
+
+        @Override
+        public String toString() {
+            return "shared tmp store";
+        }
+    }
+
+    // ========== Shared tmp store: read-through ==========
+
+    /**
+     * Pulls a playlist/marker of the media file from the shared tmp store into the local tmp dir
+     * when it is not there yet. Local first: the node that ran the pass never round-trips.
+     */
+    private boolean syncFromShared(UUID mediaFileId, Path localFile) {
+        if (Files.exists(localFile)) {
+            return true;
+        }
+        Optional<TmpStore> shared = tmpStoreProvider.shared();
+        if (shared.isEmpty()) {
+            return false;
+        }
+        try {
+            return shared.get().copyToLocal(mediaFileId, localFile.getFileName().toString(), localFile);
+        } catch (IOException e) {
+            log.debug("Could not read {} from the shared tmp store: {}", localFile.getFileName(), e.getMessage());
+            return false;
+        }
+    }
+
+    /** A segment plus, when the pass finished elsewhere, its done marker, so the local fast path applies. */
+    private void syncSegmentFromShared(UUID mediaFileId, Path segmentFile, String segmentPrefix) {
+        if (tmpStoreProvider.shared().isEmpty()) {
+            return;
+        }
+        syncFromShared(mediaFileId, cacheDir(mediaFileId).resolve(HlsTranscodeService.DONE_MARKER_PREFIX + segmentPrefix));
+        syncFromShared(mediaFileId, segmentFile);
+    }
+
+    /**
+     * Waits for a segment: the local pass, and — with a shared tmp store — a pass running on
+     * another attached node, whose finished segments appear in the store one by one.
+     */
+    private Path waitForSegment(UUID mediaFileId, Path cacheFile, String passKey, String segmentPrefix) throws IOException {
+        if (tmpStoreProvider.shared().isEmpty() || transcodeService.isPassActive(passKey)) {
+            return transcodeService.waitForSegment(cacheFile, passKey);
+        }
+        long deadline = System.currentTimeMillis() + segmentTimeoutMs;
+        long delay = 250;
+        while (System.currentTimeMillis() < deadline) {
+            if (transcodeService.isPassActive(passKey)) {
+                // this node picked the pass up after all
+                return transcodeService.waitForSegment(cacheFile, passKey);
+            }
+            syncSegmentFromShared(mediaFileId, cacheFile, segmentPrefix);
+            Path stable = transcodeService.stableSegmentOrNull(cacheFile);
+            if (stable != null) {
+                return stable;
+            }
+            try {
+                Thread.sleep(delay);
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while waiting for segment");
+            }
+            delay = Math.min(delay * 2, 1000);
+        }
+        throw new IOException("Timeout waiting for HLS segment from the shared tmp store: " + cacheFile);
+    }
+
     private String resolveInputPath(MediaFileEntity mediaFile) {
         return inputResolver.resolve(mediaFile);
+    }
+
+    /** Inside the read transaction: the store of a sidecar .srt in an S3 directory this node is attached to, else null. */
+    private ObjectStore externalSrtStore(MediaFileStreamEntity stream, MediaFileEntity mediaFile) {
+        if (stream.getCodecType() != StreamCodecType.EXTERNAL_SUBTITLE || !ObjectRef.isS3Uri(stream.getPath())
+                || isRemote(mediaFile)) {
+            return null;
+        }
+        return objectStoreRegistry.forUri(stream.getPath()).orElse(null);
     }
 
     /** Inside the read transaction: the owner's download URL for a remote external subtitle, else null. */
@@ -931,18 +1128,23 @@ public class HlsService {
         if (stream.getCodecType() != StreamCodecType.EXTERNAL_SUBTITLE) {
             return null;
         }
-        if (ctx.externalSrtUrl() == null) {
+        if (ctx.externalSrtUrl() == null && ctx.externalSrtStore() == null) {
             return stream.getPath();
         }
         Path local = cacheDir(mediaFileId).resolve("ext_" + stream.getId() + ".srt");
         if (!Files.exists(local)) {
             Files.createDirectories(local.getParent());
-            remoteNodeClient.downloadToFile(ctx.externalSrtUrl(), local);
+            if (ctx.externalSrtUrl() != null) {
+                remoteNodeClient.downloadToFile(ctx.externalSrtUrl(), local);
+            } else {
+                // a sidecar .srt in the S3 library directory this node is attached to
+                ctx.externalSrtStore().copyToLocal(ObjectRef.parse(stream.getPath()).key(), local);
+            }
         }
         return local.toString();
     }
 
-    private void watchAndUpload(Path cacheDirPath, String prefix, String nodeUrl,
+    private void watchAndUpload(Path cacheDirPath, String prefix, UploadTarget target,
                                  UUID mediaFileId, CompletableFuture<Void> passFuture) {
         Set<String> uploaded = new HashSet<>();
         long drainDeadline = -1;
@@ -958,19 +1160,31 @@ public class HlsService {
                     running = false;
                 }
             }
-            if (running && !scanAndUploadBatch(cacheDirPath, prefix, nodeUrl, mediaFileId, uploaded)) {
+            if (running && !scanAndUploadBatch(cacheDirPath, prefix, target, mediaFileId, uploaded)) {
                 running = false;
+            }
+        }
+        // The done marker goes last: a reader that sees it may serve every segment without
+        // waiting on stability, so it must never arrive before the segments themselves.
+        if (passFuture.isDone() && !passFuture.isCompletedExceptionally()) {
+            Path marker = cacheDirPath.resolve(HlsTranscodeService.DONE_MARKER_PREFIX + prefix);
+            if (Files.exists(marker)) {
+                try {
+                    target.upload(mediaFileId, marker);
+                } catch (IOException e) {
+                    log.warn("Done marker upload failed for {}: {}", marker, e.getMessage());
+                }
             }
         }
     }
 
-    private boolean scanAndUploadBatch(Path cacheDirPath, String prefix, String nodeUrl,
+    private boolean scanAndUploadBatch(Path cacheDirPath, String prefix, UploadTarget target,
                                         UUID mediaFileId, Set<String> uploaded) {
         try (Stream<Path> files = Files.list(cacheDirPath)) {
             files.filter(p -> p.getFileName().toString().startsWith(prefix)
                            && p.getFileName().toString().endsWith(".ts")
                            && !uploaded.contains(p.getFileName().toString()))
-                 .forEach(p -> tryUploadSegment(nodeUrl, mediaFileId, p, uploaded));
+                 .forEach(p -> tryUploadSegment(target, mediaFileId, p, uploaded));
             Thread.sleep(500);
             return true;
         } catch (InterruptedException _) {
@@ -985,10 +1199,10 @@ public class HlsService {
         }
     }
 
-    private void tryUploadSegment(String nodeUrl, UUID mediaFileId, Path p, Set<String> uploaded) {
+    private void tryUploadSegment(UploadTarget target, UUID mediaFileId, Path p, Set<String> uploaded) {
         try {
             if (transcodeService.stableSegmentOrNull(p) != null) {
-                remoteNodeClient.uploadFile(nodeUrl, mediaFileId, p);
+                target.upload(mediaFileId, p);
                 uploaded.add(p.getFileName().toString());
             }
         } catch (IOException e) {
@@ -1025,9 +1239,10 @@ public class HlsService {
         }
     }
 
-    private String waitForMasterPlaylist(Path cacheFile, long timeoutMs) throws IOException {
+    private String waitForMasterPlaylist(UUID mediaFileId, Path cacheFile, long timeoutMs) throws IOException {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
+            syncFromShared(mediaFileId, cacheFile);
             if (Files.exists(cacheFile)) {
                 String content = Files.readString(cacheFile);
                 // Guard against reading the file between creation and the write completing
@@ -1115,6 +1330,7 @@ public class HlsService {
      * @param externalSrtUrl tokenized download URL of an {@code EXTERNAL_SUBTITLE} stream when the
      *                       media file lives on another node; null when local or not external.
      */
-    private record SubtitleContext(MediaFileStreamEntity subtitleStream, String mediaFilePath, String externalSrtUrl) {
+    private record SubtitleContext(MediaFileStreamEntity subtitleStream, String mediaFilePath, String externalSrtUrl,
+                                   ObjectStore externalSrtStore) {
     }
 }

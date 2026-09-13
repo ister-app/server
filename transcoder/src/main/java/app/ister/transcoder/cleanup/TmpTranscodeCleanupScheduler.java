@@ -7,6 +7,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import app.ister.core.repository.DirectoryRepository;
+import app.ister.core.storage.TmpStore;
+import app.ister.core.storage.TmpStoreProvider;
+import java.util.UUID;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -30,7 +36,13 @@ public class TmpTranscodeCleanupScheduler {
     private final MediaFileRepository mediaFileRepository;
     private final HlsTranscodeService transcodeService;
     private final TmpCleanupService tmpCleanupService;
+    private final TmpStoreProvider tmpStoreProvider;
+    private final DirectoryRepository directoryRepository;
+    private final PlatformTransactionManager transactionManager;
     private final Clock clock = Clock.systemUTC();
+
+    static final int SHARED_TMP_CLEANUP_LOCK_NAMESPACE = 0x544d5043; // "TMPC"
+    static final UUID SHARED_TMP_CLEANUP_LOCK_KEY = UUID.nameUUIDFromBytes("shared-tmp-cleanup".getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
     @Value("${app.ister.server.tmp-dir}")
     private String tmpDir;
@@ -62,5 +74,43 @@ public class TmpTranscodeCleanupScheduler {
         } catch (IOException e) {
             log.error("Tmp cleanup failed for {}", tmpDir, e);
         }
+        tmpStoreProvider.shared().ifPresent(this::cleanShared);
+    }
+
+    /**
+     * The cluster-shared tmp store holds no live pass state (that is local to the node that
+     * ran the pass), so its rule is simpler: a media file's published directory goes when the
+     * file is gone, or when nothing was published for it within min-age. One node per run sweeps
+     * it, decided by a transaction-scoped advisory lock.
+     */
+    private void cleanShared(TmpStore store) {
+        new TransactionTemplate(transactionManager).executeWithoutResult(_ -> {
+            if (!directoryRepository.tryLockDirectoryScan(SHARED_TMP_CLEANUP_LOCK_NAMESPACE, SHARED_TMP_CLEANUP_LOCK_KEY)) {
+                log.info("Shared tmp store is being cleaned by another node, skipping");
+                return;
+            }
+            java.time.Instant cutoff = clock.instant().minus(minAge);
+            long deleted = 0;
+            long kept = 0;
+            try {
+                for (UUID mediaFileId : store.mediaFileIds()) {
+                    boolean orphan = !mediaFileRepository.existsById(mediaFileId);
+                    boolean idle = store.lastActivity(mediaFileId).map(t -> !t.isAfter(cutoff)).orElse(true);
+                    if (!orphan && !idle) {
+                        kept++;
+                        continue;
+                    }
+                    if (dryRun) {
+                        log.info("Tmp cleanup [dry-run] would delete {} shared transcode dir {}", orphan ? "orphan" : "idle", mediaFileId);
+                    } else {
+                        store.deleteAll(mediaFileId);
+                    }
+                    deleted++;
+                }
+                log.info("Shared tmp cleanup {}: {} transcode dirs removed, {} kept", dryRun ? "[dry-run]" : "[live]", deleted, kept);
+            } catch (IOException | RuntimeException e) {
+                log.error("Shared tmp cleanup failed", e);
+            }
+        });
     }
 }

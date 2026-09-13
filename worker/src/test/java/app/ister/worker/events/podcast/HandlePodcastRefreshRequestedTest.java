@@ -72,6 +72,9 @@ class HandlePodcastRefreshRequestedTest {
     @Mock
     private OwnDirectoriesProperties ownDirectories;
 
+    @Mock
+    private app.ister.core.config.DirectoryQueueNames directoryQueueNames;
+
     @InjectMocks
     private HandlePodcastRefreshRequested subject;
 
@@ -79,6 +82,7 @@ class HandlePodcastRefreshRequestedTest {
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(directoryQueueNames.cacheDirName()).thenReturn("node1-cache-directory");
         ReflectionTestUtils.setField(subject, "nodeName", "node1");
         ReflectionTestUtils.setField(subject, "autoDownloadCount", 2);
 
@@ -120,6 +124,7 @@ class HandlePodcastRefreshRequestedTest {
         NodeEntity owner = NodeEntity.builder().name("prod").url("https://media/api").build();
         when(directoryRepository.findByDirectoryType(DirectoryType.LIBRARY))
                 .thenReturn(List.of(DirectoryEntity.builder().name("tv").directoryType(DirectoryType.LIBRARY).nodeEntity(owner).build()));
+        when(directoryRepository.findAttachedNodes(any())).thenReturn(List.of(owner));
         when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, owner))
                 .thenReturn(List.of(DirectoryEntity.builder().name("prod-cache-directory").directoryType(DirectoryType.CACHE).nodeEntity(owner).build()));
 

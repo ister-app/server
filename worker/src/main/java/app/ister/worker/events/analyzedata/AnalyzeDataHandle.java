@@ -5,6 +5,7 @@ import app.ister.core.MessageQueue;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.NodeEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.AnalyzeData;
@@ -119,7 +120,7 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
             // send alone never reaches the external lookup.
             directoryRepository.findByLibraryEntityAndDirectoryType(person.getLibraryEntity(), DirectoryType.LIBRARY)
                     .stream()
-                    .map(dir -> dir.getNodeEntity().getName())
+                    .flatMap(dir -> nodeNamesOf(dir).stream())
                     .distinct()
                     .forEach(nodeName -> publishAfterCommit(() ->
                             dispatcher.personFoundToNode(data.getPersonId(), nodeName)));
@@ -137,7 +138,7 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
             imageRepository.deleteAll(imageRepository.findByAlbumEntityId(album.getId()));
             directoryRepository.findByLibraryEntityAndDirectoryType(album.getLibraryEntity(), DirectoryType.LIBRARY)
                     .stream()
-                    .map(dir -> dir.getNodeEntity().getName())
+                    .flatMap(dir -> nodeNamesOf(dir).stream())
                     .distinct()
                     .forEach(nodeName -> publishAfterCommit(() ->
                             dispatcher.albumFoundToNode(data.getAlbumId(), nodeName)));
@@ -259,5 +260,13 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
     private Map<UUID, DirectoryEntity> directoriesById() {
         return StreamSupport.stream(directoryRepository.findAll().spliterator(), false)
                 .collect(Collectors.toMap(DirectoryEntity::getId, Function.identity()));
+    }
+
+    /** The node(s) that hold a directory: its owner, or for an S3 directory every attached node. */
+    private List<String> nodeNamesOf(DirectoryEntity dir) {
+        if (dir.getNodeEntity() != null) {
+            return List.of(dir.getNodeEntity().getName());
+        }
+        return directoryRepository.findAttachedNodes(dir.getId()).stream().map(NodeEntity::getName).toList();
     }
 }

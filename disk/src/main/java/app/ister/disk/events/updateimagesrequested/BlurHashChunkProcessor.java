@@ -1,7 +1,12 @@
 package app.ister.disk.events.updateimagesrequested;
 
 import app.ister.core.entity.ImageEntity;
+import app.ister.core.entity.DirectoryEntity;
+import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.ImageRepository;
+import app.ister.core.storage.FileAccess;
+import app.ister.core.storage.LocalCopy;
+import app.ister.core.storage.ObjectStat;
 import app.ister.disk.RasterImageDecoder;
 import io.trbl.blurhash.BlurHash;
 import lombok.RequiredArgsConstructor;
@@ -11,11 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,6 +35,9 @@ import java.util.UUID;
 public class BlurHashChunkProcessor {
 
     private final ImageRepository imageRepository;
+    private final DirectoryRepository directoryRepository;
+    private final LocalCopy localCopy;
+    private final FileAccess fileAccess;
 
     /**
      * A processed chunk. {@code lastId} is the id of the final image, in the database's ordering,
@@ -52,7 +56,8 @@ public class BlurHashChunkProcessor {
         if (images.isEmpty()) {
             return new Chunk(0, null);
         }
-        images.forEach(this::applyBlurHash);
+        DirectoryEntity directory = directoryRepository.findById(directoryEntityId).orElseThrow();
+        images.forEach(image -> applyBlurHash(directory, image));
         imageRepository.saveAll(images);
         return new Chunk(images.size(), images.getLast().getId());
     }
@@ -65,17 +70,17 @@ public class BlurHashChunkProcessor {
                         directoryEntityId, limit));
     }
 
-    private void applyBlurHash(ImageEntity imageEntity) {
-        try {
-            BufferedImage bi = RasterImageDecoder.read(new File(imageEntity.getPath()));
+    private void applyBlurHash(DirectoryEntity directory, ImageEntity imageEntity) {
+        try (LocalCopy.Handle local = localCopy.of(directory, imageEntity.getPath())) {
+            BufferedImage bi = RasterImageDecoder.read(local.path().toFile());
             String blurHash = BlurHash.encode(bi);
 
-            BasicFileAttributes attrs = Files.readAttributes(
-                    Path.of(imageEntity.getPath()), BasicFileAttributes.class);
+            ObjectStat stat = fileAccess.stat(directory, imageEntity.getPath())
+                    .orElseThrow(() -> new java.nio.file.NoSuchFileException(imageEntity.getPath()));
 
             imageEntity.setBlurHash(blurHash);
-            imageEntity.setFileLastModifiedTime(attrs.lastModifiedTime().toInstant());
-            imageEntity.setFileCreationTime(attrs.creationTime().toInstant());
+            imageEntity.setFileLastModifiedTime(stat.lastModified());
+            imageEntity.setFileCreationTime(FileAccess.creationTime(directory, imageEntity.getPath(), stat));
 
             log.debug("Updated blur-hash for {}", imageEntity.getPath());
         } catch (IOException | RuntimeException | LinkageError e) {

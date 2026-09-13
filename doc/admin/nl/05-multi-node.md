@@ -106,6 +106,16 @@ helper-schijven met alleen de `TRANSCODE`-job en vervangt, zoals voorheen, de ei
 van de node voor het transcoderen) en logt een deprecatiewaarschuwing; verplaats het naar
 `app.ister.helper.disks`.
 
+## S3-directories: gekoppelde nodes
+
+Een directory in een S3-bucket ([Objectopslag](10-object-storage.md)) breekt de één-eigenaar-regel
+bewust: hij heeft geen eigenaar-node, en elke node die hem opsomt — zelfde naam, zelfde connectie,
+zelfde prefix — is eraan *gekoppeld* en leest zijn queues naast de andere. Scannen, analyseren,
+transcoderen en streamen van die directory zijn gedeeld werk, dus een node toevoegen is de manier
+om capaciteit toe te voegen; helper-regels zijn er niet voor nodig. Staan ook de gedeelde cache- en
+transcode-opslag aan, dan wordt de hierboven beschreven segment-push vervangen door publiceren naar
+de bucket, waar elke node uit terugleest.
+
 ## Uitgewerkt voorbeeld
 
 `docker-compose-nodes-local.yml` in de repository draait een compleet cluster van drie nodes

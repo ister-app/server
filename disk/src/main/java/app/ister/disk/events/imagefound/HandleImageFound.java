@@ -5,7 +5,12 @@ import app.ister.core.status.ActivitySubjects;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.ImageFoundData;
+import app.ister.core.entity.DirectoryEntity;
+import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.ImageRepository;
+import app.ister.core.storage.FileAccess;
+import app.ister.core.storage.ObjectStat;
+import java.time.Instant;
 import app.ister.core.EventHandlingException;
 import app.ister.core.Handle;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -13,18 +18,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Optional;
 
 @Service
 @Transactional
 public class HandleImageFound implements Handle<ImageFoundData> {
     private final ImageRepository imageRepository;
+    private final DirectoryRepository directoryRepository;
+    private final FileAccess fileAccess;
 
-    public HandleImageFound(ImageRepository imageRepository) {
+    public HandleImageFound(ImageRepository imageRepository, DirectoryRepository directoryRepository, FileAccess fileAccess) {
         this.imageRepository = imageRepository;
+        this.directoryRepository = directoryRepository;
+        this.fileAccess = fileAccess;
     }
 
     @Override
@@ -42,7 +48,11 @@ public class HandleImageFound implements Handle<ImageFoundData> {
     public void handle(app.ister.core.eventdata.ImageFoundData messageData) {
         ActivityContext.subject(ActivitySubjects.fileName(messageData.getPath()));
         try {
-            BasicFileAttributes basicFileAttributes = Files.readAttributes(Path.of(messageData.getPath()), BasicFileAttributes.class);
+            DirectoryEntity directory = directoryRepository.findById(messageData.getDirectoryEntityId()).orElseThrow();
+            ObjectStat stat = fileAccess.stat(directory, messageData.getPath())
+                    .orElseThrow(() -> new java.nio.file.NoSuchFileException(messageData.getPath()));
+            Instant lastModified = stat.lastModified();
+            Instant created = FileAccess.creationTime(directory, messageData.getPath(), stat);
 
             Optional<ImageEntity> oldImageEntity = imageRepository.findByDirectoryEntityIdAndPath(messageData.getDirectoryEntityId(), messageData.getPath());
 
@@ -54,8 +64,8 @@ public class HandleImageFound implements Handle<ImageFoundData> {
             ImageEntity imageEntity;
             if (oldImageEntity.isPresent()) {
                 imageEntity = oldImageEntity.get();
-                imageEntity.setFileLastModifiedTime(basicFileAttributes.lastModifiedTime().toInstant());
-                imageEntity.setFileCreationTime(basicFileAttributes.creationTime().toInstant());
+                imageEntity.setFileLastModifiedTime(lastModified);
+                imageEntity.setFileCreationTime(created);
                 imageEntity.setShowEntityId(messageData.getShowEntityId());
                 imageEntity.setMovieEntityId(messageData.getMovieEntityId());
                 imageEntity.setEpisodeEntityId(messageData.getEpisodeEntityId());
@@ -80,8 +90,8 @@ public class HandleImageFound implements Handle<ImageFoundData> {
                         .bookEntityId(messageData.getBookEntityId())
                         .seriesEntityId(messageData.getSeriesEntityId())
                         .podcastEntityId(messageData.getPodcastEntityId())
-                        .fileLastModifiedTime(basicFileAttributes.lastModifiedTime().toInstant())
-                        .fileCreationTime(basicFileAttributes.creationTime().toInstant())
+                        .fileLastModifiedTime(lastModified)
+                        .fileCreationTime(created)
                         .build();
             }
             imageRepository.save(imageEntity);

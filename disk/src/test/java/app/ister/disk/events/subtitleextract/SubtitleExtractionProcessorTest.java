@@ -37,6 +37,9 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class SubtitleExtractionProcessorTest {
 
+    @Mock
+    private app.ister.core.storage.CacheDirectoryResolver cacheDirectoryResolver;
+
     @Mock private MediaFileRepository mediaFileRepository;
     @Mock private MediaFileStreamRepository mediaFileStreamRepository;
     @Mock private DirectoryRepository directoryRepository;
@@ -58,8 +61,9 @@ class SubtitleExtractionProcessorTest {
 
     @BeforeEach
     void setUp() {
+        app.ister.disk.storage.CacheStoreMocks.realLocal(cacheDirectoryResolver);
         subject = new SubtitleExtractionProcessor(mediaFileRepository, mediaFileStreamRepository, directoryRepository,
-                extractor, inputResolver, remoteNodeClient, transactionManager);
+                extractor, inputResolver, remoteNodeClient, cacheDirectoryResolver, transactionManager);
         ReflectionTestUtils.setField(subject, "dirOfFFmpeg", "/usr/bin");
         ReflectionTestUtils.setField(subject, "tmpDir", tempDir.resolve("tmp").toString());
         ownerCache = tempDir.resolve("owner-cache");
@@ -76,18 +80,19 @@ class SubtitleExtractionProcessorTest {
 
         lenient().when(mediaFileStreamRepository.findById(streamId)).thenReturn(Optional.of(subtitleStream));
         lenient().when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
-        lenient().when(inputResolver.owner(mediaFile)).thenReturn(owner);
+        DirectoryEntity ownerCacheDir = DirectoryEntity.builder().directoryType(DirectoryType.CACHE).path(ownerCache.toString()).build();
         lenient().when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, owner))
-                .thenReturn(List.of(DirectoryEntity.builder().directoryType(DirectoryType.CACHE).path(ownerCache.toString()).build()));
+                .thenReturn(List.of(ownerCacheDir));
+        lenient().when(cacheDirectoryResolver.forThisNode()).thenReturn(ownerCacheDir);
     }
 
     private void local() {
-        when(inputResolver.isRemote(mediaFile)).thenReturn(false);
+        when(inputResolver.remoteNode(mediaFile)).thenReturn(Optional.empty());
         when(inputResolver.resolve(mediaFile)).thenReturn("/tv/a.mkv");
     }
 
     private void remote() {
-        when(inputResolver.isRemote(mediaFile)).thenReturn(true);
+        when(inputResolver.remoteNode(mediaFile)).thenReturn(Optional.of(owner));
         when(inputResolver.resolve(mediaFile)).thenReturn("http://owner:8080/mediaFile/" + mediaFileId + "/download?token=t");
     }
 

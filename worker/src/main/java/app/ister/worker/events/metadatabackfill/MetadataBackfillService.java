@@ -2,6 +2,7 @@ package app.ister.worker.events.metadatabackfill;
 
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.DirectoryEntity;
+import app.ister.core.entity.NodeEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.TrackEntity;
@@ -258,7 +259,15 @@ public class MetadataBackfillService {
         return directoryRepository.findByDirectoryType(DirectoryType.LIBRARY).stream()
                 .filter(dir -> dir.getLibraryEntity() != null)
                 .collect(Collectors.groupingBy(dir -> dir.getLibraryEntity().getId(),
-                        Collectors.mapping(dir -> dir.getNodeEntity().getName(), Collectors.toSet())));
+                        Collectors.flatMapping(dir -> nodeNamesOf(dir).stream(), Collectors.toSet())));
+    }
+
+    /** The node(s) that hold a directory: its owner, or for an S3 directory every attached node. */
+    private List<String> nodeNamesOf(DirectoryEntity dir) {
+        if (dir.getNodeEntity() != null) {
+            return List.of(dir.getNodeEntity().getName());
+        }
+        return directoryRepository.findAttachedNodes(dir.getId()).stream().map(NodeEntity::getName).toList();
     }
 
     /** Media files of many owners in one query, grouped back per owner id. */

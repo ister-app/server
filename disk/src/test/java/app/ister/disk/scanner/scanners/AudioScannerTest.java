@@ -28,7 +28,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.nio.file.Path;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -72,12 +71,12 @@ class AudioScannerTest {
 
     @Test
     void analyzableReturnsTrueForRegularFile() {
-        assertTrue(subject.analyzable(Path.of("/music/Artist/Album/01 - Track.flac"), true, 1000));
+        assertTrue(subject.analyzable("/music/Artist/Album/01 - Track.flac", true, 1000));
     }
 
     @Test
     void analyzableReturnsFalseForNonRegularFile() {
-        assertFalse(subject.analyzable(Path.of("/music/Artist/Album/"), false, 0));
+        assertFalse(subject.analyzable("/music/Artist/Album/", false, 0));
     }
 
     // ========== analyzable(path, isRegularFile, directoryEntity) ==========
@@ -85,38 +84,38 @@ class AudioScannerTest {
     @Test
     void analyzableWithDirectoryReturnsFalseForDirectory() {
         DirectoryEntity dir = buildMusicDir("/music");
-        assertFalse(subject.analyzable(Path.of("/music/Artist/Album/"), false, dir));
+        assertFalse(subject.analyzable("/music/Artist/Album/", false, dir));
     }
 
     @Test
     void analyzableWithDirectoryReturnsFalseWhenNoLibrary() {
         DirectoryEntity dir = DirectoryEntity.builder().path("/music").build();
-        assertFalse(subject.analyzable(Path.of("/music/Artist/Album/01.flac"), true, dir));
+        assertFalse(subject.analyzable("/music/Artist/Album/01.flac", true, dir));
     }
 
     @Test
     void analyzableWithDirectoryReturnsFalseWhenNotMusicLibrary() {
         LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MOVIE).name("Movies").build();
         DirectoryEntity dir = DirectoryEntity.builder().path("/movies").libraryEntity(library).build();
-        assertFalse(subject.analyzable(Path.of("/movies/Movie/movie.mp4"), true, dir));
+        assertFalse(subject.analyzable("/movies/Movie/movie.mp4", true, dir));
     }
 
     @Test
     void analyzableWithDirectoryReturnsTrueForAudioFile() {
         DirectoryEntity dir = buildMusicDir("/music");
-        assertTrue(subject.analyzable(Path.of("/music/Artist/Album/01 - Track.flac"), true, dir));
+        assertTrue(subject.analyzable("/music/Artist/Album/01 - Track.flac", true, dir));
     }
 
     @Test
     void analyzableWithDirectoryReturnsFalseForNfoFile() {
         DirectoryEntity dir = buildMusicDir("/music");
-        assertFalse(subject.analyzable(Path.of("/music/Artist/artist.nfo"), true, dir));
+        assertFalse(subject.analyzable("/music/Artist/artist.nfo", true, dir));
     }
 
     @Test
     void analyzableWithDirectoryReturnsFalseForImageFile() {
         DirectoryEntity dir = buildMusicDir("/music");
-        assertFalse(subject.analyzable(Path.of("/music/Artist/artist.jpg"), true, dir));
+        assertFalse(subject.analyzable("/music/Artist/artist.jpg", true, dir));
     }
 
     // ========== analyze — new file ==========
@@ -124,7 +123,7 @@ class AudioScannerTest {
     @Test
     void analyzeCreatesNewMediaFileAndSendsEvent() {
         DirectoryEntity dir = buildMusicDir("/music");
-        Path audioPath = Path.of("/music/Artist/Album (2024)/01 - Track.flac");
+        String audioPath = "/music/Artist/Album (2024)/01 - Track.flac";
 
         LibraryEntity library = dir.getLibraryEntity();
         PersonEntity artist = buildArtist(library);
@@ -146,7 +145,7 @@ class AudioScannerTest {
     @Test
     void analyzeReturnsEmptyForNonAudioPath() {
         DirectoryEntity dir = buildMusicDir("/music");
-        Path nfoPath = Path.of("/music/Artist/artist.nfo");
+        String nfoPath = "/music/Artist/artist.nfo";
 
         var result = subject.analyze(dir, nfoPath, true, 100);
 
@@ -157,7 +156,7 @@ class AudioScannerTest {
     @Test
     void analyzeDoesNotSaveWhenMediaFileExistsWithCorrectTrack() {
         DirectoryEntity dir = buildMusicDir("/music");
-        Path audioPath = Path.of("/music/Artist/Album (2024)/01 - Track.flac");
+        String audioPath = "/music/Artist/Album (2024)/01 - Track.flac";
 
         LibraryEntity library = dir.getLibraryEntity();
         PersonEntity artist = buildArtist(library);
@@ -186,7 +185,7 @@ class AudioScannerTest {
     @Test
     void analyzeFixesWrongTrackAssociation() {
         DirectoryEntity dir = buildMusicDir("/music");
-        Path audioPath = Path.of("/music/Artist/Album (2024)/01 - Track.flac");
+        String audioPath = "/music/Artist/Album (2024)/01 - Track.flac";
 
         LibraryEntity library = dir.getLibraryEntity();
         PersonEntity artist = buildArtist(library);
@@ -220,7 +219,7 @@ class AudioScannerTest {
     @Test
     void analyzeFixesNullTrackOnExistingFile() {
         DirectoryEntity dir = buildMusicDir("/music");
-        Path audioPath = Path.of("/music/Artist/Album (2024)/01 - Track.flac");
+        String audioPath = "/music/Artist/Album (2024)/01 - Track.flac";
 
         LibraryEntity library = dir.getLibraryEntity();
         PersonEntity artist = buildArtist(library);
@@ -252,7 +251,7 @@ class AudioScannerTest {
     @Test
     void analyzeReadsAlbumArtistTagForFlatAlbumStructure() {
         DirectoryEntity dir = buildMusicDir("/music");
-        Path audioPath = Path.of("/music/Album (2024)/01 - Track.flac");
+        String audioPath = "/music/Album (2024)/01 - Track.flac";
 
         LibraryEntity library = dir.getLibraryEntity();
         PersonEntity artist = buildArtist(library);
@@ -282,7 +281,7 @@ class AudioScannerTest {
     @Test
     void analyzeFallsBackToPathArtistWhenTagLookupFails() {
         DirectoryEntity dir = buildMusicDir("/music");
-        Path audioPath = Path.of("/music/Album (2024)/01 - Track.flac");
+        String audioPath = "/music/Album (2024)/01 - Track.flac";
 
         LibraryEntity library = dir.getLibraryEntity();
         PersonEntity artist = buildArtist(library);
@@ -307,19 +306,19 @@ class AudioScannerTest {
     @Test
     void analyzableWithDirectoryReturnsTrueForAudiobookChapter() {
         DirectoryEntity dir = buildBookDir();
-        assertTrue(subject.analyzable(Path.of("/books/Author/Book/001_Chapter.mp3"), true, dir));
+        assertTrue(subject.analyzable("/books/Author/Book/001_Chapter.mp3", true, dir));
     }
 
     @Test
     void analyzableWithDirectoryReturnsFalseForEpub() {
         DirectoryEntity dir = buildBookDir();
-        assertFalse(subject.analyzable(Path.of("/books/Author/Book.epub"), true, dir));
+        assertFalse(subject.analyzable("/books/Author/Book.epub", true, dir));
     }
 
     @Test
     void analyzeCreatesChapterMediaFileAndSendsEvent() {
         DirectoryEntity dir = buildBookDir();
-        Path chapterPath = Path.of("/books/Author/Book/001_Chapter.mp3");
+        String chapterPath = "/books/Author/Book/001_Chapter.mp3";
 
         LibraryEntity library = dir.getLibraryEntity();
         PersonEntity author = buildArtist(library);
@@ -346,7 +345,7 @@ class AudioScannerTest {
     void analyzeReturnsEmptyForNonAudioBookFile() {
         DirectoryEntity dir = buildBookDir();
 
-        var result = subject.analyze(dir, Path.of("/books/Author/Book/cover.jpg"), true, 100);
+        var result = subject.analyze(dir, "/books/Author/Book/cover.jpg", true, 100);
 
         assertTrue(result.isEmpty());
         verify(mediaFileRepository, never()).save(any());
@@ -355,7 +354,7 @@ class AudioScannerTest {
     @Test
     void analyzeKeepsExistingChapterAssociation() {
         DirectoryEntity dir = buildBookDir();
-        Path chapterPath = Path.of("/books/Author/Book/001_Chapter.mp3");
+        String chapterPath = "/books/Author/Book/001_Chapter.mp3";
 
         LibraryEntity library = dir.getLibraryEntity();
         PersonEntity author = buildArtist(library);
@@ -383,7 +382,7 @@ class AudioScannerTest {
     @Test
     void analyzeFixesWrongChapterAssociation() {
         DirectoryEntity dir = buildBookDir();
-        Path chapterPath = Path.of("/books/Author/Book/001_Chapter.mp3");
+        String chapterPath = "/books/Author/Book/001_Chapter.mp3";
 
         LibraryEntity library = dir.getLibraryEntity();
         PersonEntity author = buildArtist(library);

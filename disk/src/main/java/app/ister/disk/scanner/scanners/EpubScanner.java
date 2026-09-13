@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.nio.file.Path;
 import java.util.Optional;
 
 /**
@@ -40,14 +39,14 @@ public class EpubScanner implements Scanner {
     private final MessageSender messageSender;
 
     @Override
-    public boolean analyzable(Path path, boolean isRegularFile, long size) {
-        return isRegularFile && path.toString().toLowerCase().endsWith(".epub");
+    public boolean analyzable(String path, boolean isRegularFile, long size) {
+        return isRegularFile && path.toLowerCase().endsWith(".epub");
     }
 
     /**
      * Returns true if this path is an epub file in the given book library directory.
      */
-    public boolean analyzable(Path path, boolean isRegularFile, DirectoryEntity directoryEntity) {
+    public boolean analyzable(String path, boolean isRegularFile, DirectoryEntity directoryEntity) {
         if (!isRegularFile) {
             return false;
         }
@@ -55,13 +54,13 @@ public class EpubScanner implements Scanner {
                 || directoryEntity.getLibraryEntity().getLibraryType() != LibraryType.BOOK) {
             return false;
         }
-        BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), path.toString());
+        BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), path);
         return bookPath.getFileType().equals(FileType.EPUB);
     }
 
     @Override
-    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, Path path, boolean isRegularFile, long size) {
-        BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), path.toString());
+    public Optional<BaseEntity> analyze(DirectoryEntity directoryEntity, String path, boolean isRegularFile, long size) {
+        BookPathObject bookPath = new BookPathObject(directoryEntity.getPath(), path);
         if (!bookPath.getFileType().equals(FileType.EPUB)) {
             return Optional.empty();
         }
@@ -70,14 +69,14 @@ public class EpubScanner implements Scanner {
         PersonEntity author = scannerHelperService.getOrCreatePerson(library, bookPath.getAuthorName(), bookPath.getAuthorYear());
         BookEntity book = scannerHelperService.getOrCreateBook(library, author, bookPath.getBookName(), bookPath.getBookYear());
 
-        Optional<MediaFileEntity> existing = mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString());
+        Optional<MediaFileEntity> existing = mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, path);
         final String directoryName = directoryEntity.getName();
         MediaFileEntity entity;
         if (existing.isEmpty()) {
             entity = MediaFileEntity.builder()
                     .directoryEntityId(directoryEntity.getId())
                     .bookEntity(book)
-                    .path(path.toString())
+                    .path(path)
                     .size(size).build();
             mediaFileRepository.save(entity);
         } else {
@@ -95,7 +94,7 @@ public class EpubScanner implements Scanner {
                 .directoryEntityUUID(directoryEntity.getId())
                 .bookEntityUUID(book.getId())
                 .mediaFileEntityUUID(entity.getId())
-                .path(path.toString()).build(), directoryName);
+                .path(path).build(), directoryName);
         return Optional.of(book);
     }
 

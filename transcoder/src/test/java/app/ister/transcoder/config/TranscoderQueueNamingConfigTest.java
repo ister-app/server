@@ -30,7 +30,7 @@ class TranscoderQueueNamingConfigTest {
 
     private TranscoderQueueNamingConfig namingConfig() {
         return new TranscoderQueueNamingConfig(
-                new DirectoryQueueNames(directoryConfig, helperProperties, disksConfig, NODE_NAME));
+                new DirectoryQueueNames(directoryConfig, helperProperties, disksConfig, new app.ister.core.config.SharedStorageProperties(), NODE_NAME, NODE_NAME));
     }
 
     /**

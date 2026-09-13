@@ -80,6 +80,13 @@ class HandleEpubFileFoundTest {
     @Mock
     private BookSeriesService bookSeriesService;
 
+    @org.mockito.Spy
+    private app.ister.core.storage.LocalCopy localCopy = new app.ister.core.storage.LocalCopy(
+            org.mockito.Mockito.mock(app.ister.core.storage.ObjectStoreRegistry.class),
+            new app.ister.core.config.S3Properties(), System.getProperty("java.io.tmpdir"));
+    @Mock
+    private app.ister.core.storage.CacheDirectoryResolver cacheDirectoryResolver;
+
     @InjectMocks
     private HandleEpubFileFound subject;
 
@@ -100,6 +107,7 @@ class HandleEpubFileFoundTest {
 
     @BeforeEach
     void setUp() {
+        app.ister.disk.storage.CacheStoreMocks.realLocal(cacheDirectoryResolver);
         node = NodeEntity.builder().name("node1").build();
         LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.BOOK).name("Books").build();
         libraryDir = DirectoryEntity.builder()
@@ -292,8 +300,7 @@ class HandleEpubFileFoundTest {
         when(epubParser.parse(Path.of(EPUB_PATH))).thenReturn(Optional.of(info("OEBPS/cover.png", false, 0)));
         when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of());
         when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of());
-        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node))
-                .thenReturn(List.of(cacheDir));
+        when(cacheDirectoryResolver.forThisNodeIfAny()).thenReturn(Optional.of(cacheDir));
         when(epubParser.readEntry(Path.of(EPUB_PATH), "OEBPS/cover.png")).thenReturn(Optional.of(COVER));
 
         subject.handle(event());
@@ -328,7 +335,7 @@ class HandleEpubFileFoundTest {
         when(epubParser.parse(Path.of(EPUB_PATH))).thenReturn(Optional.of(info("OEBPS/cover.jpg", false, 0)));
         when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of());
         when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of());
-        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node)).thenReturn(List.of());
+        when(cacheDirectoryResolver.forThisNodeIfAny()).thenReturn(Optional.empty());
 
         subject.handle(event());
 
@@ -340,8 +347,7 @@ class HandleEpubFileFoundTest {
         when(epubParser.parse(Path.of(EPUB_PATH))).thenReturn(Optional.of(info("OEBPS/cover.jpg", false, 0)));
         when(metadataRepository.findByBookEntityId(bookId)).thenReturn(List.of());
         when(imageRepository.findByBookEntityId(bookId)).thenReturn(List.of());
-        when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node))
-                .thenReturn(List.of(cacheDir));
+        when(cacheDirectoryResolver.forThisNodeIfAny()).thenReturn(Optional.of(cacheDir));
         when(epubParser.readEntry(Path.of(EPUB_PATH), "OEBPS/cover.jpg")).thenReturn(Optional.empty());
 
         subject.handle(event());
