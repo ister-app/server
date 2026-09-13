@@ -1089,6 +1089,8 @@ type Directory {
     name: String!
     "The owning node of a LOCAL directory; null for an S3 directory, which every attached node can serve."
     node: Node
+    "The node to stream this directory's files from: the owner of a LOCAL directory, else (S3) the node answering this request when it is attached, else any attached node."
+    servingNode: Node!
     library: Library!
     "Absolute path for LOCAL, s3://bucket/prefix for S3."
     path: String!

@@ -20,6 +20,7 @@ import org.springframework.stereotype.Controller;
 public class DirectoryController {
 
     private final DirectoryRepository directoryRepository;
+    private final app.ister.core.service.NodeService nodeService;
 
     @SchemaMapping(typeName = "Image", field = "directory")
     public DirectoryEntity directory(ImageEntity imageEntity) {
@@ -34,6 +35,23 @@ public class DirectoryController {
     @SchemaMapping(typeName = "Directory", field = "node")
     public NodeEntity node(DirectoryEntity directoryEntity) {
         return directoryEntity.getNodeEntity();
+    }
+
+    /**
+     * Where a client should stream the directory's files from. A LOCAL directory has one owner;
+     * an S3 directory can be served by every attached node, and the node the client is already
+     * talking to is the natural choice when it is one of them.
+     */
+    @SchemaMapping(typeName = "Directory", field = "servingNode")
+    public NodeEntity servingNode(DirectoryEntity directoryEntity) {
+        if (directoryEntity.getNodeEntity() != null) {
+            return directoryEntity.getNodeEntity();
+        }
+        NodeEntity self = nodeService.getOrCreateNodeEntityForThisNode();
+        List<NodeEntity> attached = directoryRepository.findAttachedNodes(directoryEntity.getId());
+        return attached.stream().filter(n -> n.getId().equals(self.getId())).findFirst()
+                .or(() -> attached.stream().findFirst())
+                .orElse(self);
     }
 
     @SchemaMapping(typeName = "Directory", field = "storageKind")
