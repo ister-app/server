@@ -1,5 +1,28 @@
 # Changelog
 
+## server v4.0.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `4.0.0` |
+| `ghcr.io/ister-app/migrations` | `4.0.0` |
+
+### Breaking changes
+
+- feat!: S3 object storage — libraries in a bucket, attached to several nodes, shared cache and transcode stores ([`626f73d`](https://github.com/ister-app/server/commit/626f73d))
+
+### Features
+
+- feat(api): Directory.servingNode — the node a client streams a directory from ([`d796643`](https://github.com/ister-app/server/commit/d796643))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:4.0.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v3.5.2...v4.0.0
+
 ## server v3.5.2
 
 | Image | Tag |
