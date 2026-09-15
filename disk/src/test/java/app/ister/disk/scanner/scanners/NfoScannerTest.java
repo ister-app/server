@@ -53,7 +53,7 @@ class NfoScannerTest {
         String path = "/path";
         OtherPathFileEntity otherPathFileEntity = OtherPathFileEntity.builder().build();
 
-        when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString())).thenReturn(Optional.of(otherPathFileEntity));
+        when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path)).thenReturn(Optional.of(otherPathFileEntity));
 
         assertEquals(Optional.of(otherPathFileEntity), subject.analyze(directoryEntity, path, true, 0));
     }
@@ -63,14 +63,14 @@ class NfoScannerTest {
         DirectoryEntity directoryEntity = DirectoryEntity.builder().id(UUID.randomUUID()).name("disk1").nodeEntity(NodeEntity.builder().name("TestServer").build()).build();
         String path = "/path";
 
-        when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString())).thenReturn(Optional.empty());
+        when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path)).thenReturn(Optional.empty());
 
         Optional<BaseEntity> result = subject.analyze(directoryEntity, path, true, 0);
 
         OtherPathFileEntity created = (OtherPathFileEntity) result.orElseThrow();
         assertEquals(directoryEntity.getId(), created.getDirectoryEntityId());
         assertEquals(PathFileType.NFO, created.getPathFileType());
-        assertEquals(path.toString(), created.getPath());
+        assertEquals(path, created.getPath());
 
         verify(otherPathFileRepository).save(created);
         verify(messageSender).sendNfoFileFound(any(NfoFileFoundData.class), any(String.class));

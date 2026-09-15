@@ -15,6 +15,8 @@ import static app.ister.core.utils.AfterCommitPublisher.publishAfterCommit;
 @Service
 @Slf4j
 @RequiredArgsConstructor
+// Sonar FP: Lombok @SuperBuilder declares builder() on the subclass itself
+@SuppressWarnings("java:S3252")
 public class ServerEventService {
     private final MessageSender messageSender;
 

@@ -126,7 +126,7 @@ class EpubScannerTest {
 
     @Test
     void analyzeCreatesMediaFileAndSendsEventAfterCommit() {
-        when(mediaFileRepository.findByDirectoryEntityAndPath(bookDir, EPUB_PATH.toString()))
+        when(mediaFileRepository.findByDirectoryEntityAndPath(bookDir, EPUB_PATH))
                 .thenReturn(Optional.empty());
 
         var result = subject.analyze(bookDir, EPUB_PATH, true, 4200);
@@ -135,7 +135,7 @@ class EpubScannerTest {
         assertEquals(book, result.get());
         ArgumentCaptor<MediaFileEntity> saved = ArgumentCaptor.forClass(MediaFileEntity.class);
         verify(mediaFileRepository).save(saved.capture());
-        assertEquals(EPUB_PATH.toString(), saved.getValue().getPath());
+        assertEquals(EPUB_PATH, saved.getValue().getPath());
         assertEquals(book, saved.getValue().getBookEntity());
 
         verifyNoInteractions(messageSender);
@@ -143,7 +143,7 @@ class EpubScannerTest {
         ArgumentCaptor<EpubFileFoundData> data = ArgumentCaptor.forClass(EpubFileFoundData.class);
         verify(messageSender).sendEpubFileFound(data.capture(), eq("books-dir"));
         assertEquals(bookId, data.getValue().getBookEntityUUID());
-        assertEquals(EPUB_PATH.toString(), data.getValue().getPath());
+        assertEquals(EPUB_PATH, data.getValue().getPath());
     }
 
     @Test
@@ -157,10 +157,10 @@ class EpubScannerTest {
     @Test
     void analyzeDoesNotResendEventForUnchangedExistingFile() {
         MediaFileEntity existing = MediaFileEntity.builder()
-                .path(EPUB_PATH.toString())
+                .path(EPUB_PATH)
                 .bookEntity(book)
                 .build();
-        when(mediaFileRepository.findByDirectoryEntityAndPath(bookDir, EPUB_PATH.toString()))
+        when(mediaFileRepository.findByDirectoryEntityAndPath(bookDir, EPUB_PATH))
                 .thenReturn(Optional.of(existing));
 
         var result = subject.analyze(bookDir, EPUB_PATH, true, 4200);
@@ -175,10 +175,10 @@ class EpubScannerTest {
         BookEntity otherBook = BookEntity.builder()
                 .id(UUID.randomUUID()).libraryEntity(library).personEntity(author).name("Other").build();
         MediaFileEntity existing = MediaFileEntity.builder()
-                .path(EPUB_PATH.toString())
+                .path(EPUB_PATH)
                 .bookEntity(otherBook)
                 .build();
-        when(mediaFileRepository.findByDirectoryEntityAndPath(bookDir, EPUB_PATH.toString()))
+        when(mediaFileRepository.findByDirectoryEntityAndPath(bookDir, EPUB_PATH))
                 .thenReturn(Optional.of(existing));
 
         subject.analyze(bookDir, EPUB_PATH, true, 4200);
@@ -192,10 +192,10 @@ class EpubScannerTest {
     @Test
     void analyzeAttachesEpubToBookWhenExistingFileHasNoBook() {
         MediaFileEntity existing = MediaFileEntity.builder()
-                .path(EPUB_PATH.toString())
+                .path(EPUB_PATH)
                 .bookEntity(null)
                 .build();
-        when(mediaFileRepository.findByDirectoryEntityAndPath(bookDir, EPUB_PATH.toString()))
+        when(mediaFileRepository.findByDirectoryEntityAndPath(bookDir, EPUB_PATH))
                 .thenReturn(Optional.of(existing));
 
         subject.analyze(bookDir, EPUB_PATH, true, 4200);

@@ -1155,26 +1155,32 @@ public class HlsService {
                 // retrying for a bounded drain window instead of looping forever.
                 if (drainDeadline < 0) {
                     drainDeadline = System.currentTimeMillis() + uploadDrainTimeoutMs;
-                } else if (System.currentTimeMillis() > drainDeadline) {
+                }
+                running = System.currentTimeMillis() <= drainDeadline;
+                if (!running) {
                     log.warn("Giving up uploading remaining segments for {} after {} ms", cacheDirPath, uploadDrainTimeoutMs);
-                    running = false;
                 }
             }
-            if (running && !scanAndUploadBatch(cacheDirPath, prefix, target, mediaFileId, uploaded)) {
-                running = false;
-            }
+            running = running && scanAndUploadBatch(cacheDirPath, prefix, target, mediaFileId, uploaded);
         }
-        // The done marker goes last: a reader that sees it may serve every segment without
-        // waiting on stability, so it must never arrive before the segments themselves.
         if (passFuture.isDone() && !passFuture.isCompletedExceptionally()) {
-            Path marker = cacheDirPath.resolve(HlsTranscodeService.DONE_MARKER_PREFIX + prefix);
-            if (Files.exists(marker)) {
-                try {
-                    target.upload(mediaFileId, marker);
-                } catch (IOException e) {
-                    log.warn("Done marker upload failed for {}: {}", marker, e.getMessage());
-                }
-            }
+            uploadDoneMarker(cacheDirPath, prefix, target, mediaFileId);
+        }
+    }
+
+    /**
+     * The done marker goes last: a reader that sees it may serve every segment without waiting on
+     * stability, so it must never arrive before the segments themselves.
+     */
+    private void uploadDoneMarker(Path cacheDirPath, String prefix, UploadTarget target, UUID mediaFileId) {
+        Path marker = cacheDirPath.resolve(HlsTranscodeService.DONE_MARKER_PREFIX + prefix);
+        if (!Files.exists(marker)) {
+            return;
+        }
+        try {
+            target.upload(mediaFileId, marker);
+        } catch (IOException e) {
+            log.warn("Done marker upload failed for {}: {}", marker, e.getMessage());
         }
     }
 

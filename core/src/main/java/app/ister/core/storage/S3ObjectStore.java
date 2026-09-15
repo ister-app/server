@@ -168,7 +168,7 @@ public class S3ObjectStore implements ObjectStore {
     public InputStream open(String key) throws IOException {
         try {
             return client.getObject(GetObjectRequest.builder().bucket(bucket).key(key).build());
-        } catch (NoSuchKeyException e) {
+        } catch (NoSuchKeyException _) {
             throw new java.nio.file.NoSuchFileException(uri(key));
         } catch (SdkException e) {
             throw new IOException("S3 get failed for " + uri(key), e);
@@ -183,7 +183,7 @@ public class S3ObjectStore implements ObjectStore {
                     GetObjectRequest.builder().bucket(bucket).key(key).range(range).build());
             GetObjectResponse response = body.response();
             long total;
-            long start = from;
+            long start;
             long end;
             String contentRange = response.contentRange();
             if (contentRange != null && contentRange.startsWith("bytes ")) {
@@ -200,7 +200,7 @@ public class S3ObjectStore implements ObjectStore {
                 start = 0;
             }
             return new RangedObject(body, start, end, total, response.eTag(), response.contentType());
-        } catch (NoSuchKeyException e) {
+        } catch (NoSuchKeyException _) {
             throw new java.nio.file.NoSuchFileException(uri(key));
         } catch (S3Exception e) {
             if (e.statusCode() == 416) {
@@ -260,7 +260,7 @@ public class S3ObjectStore implements ObjectStore {
             client.getObject(GetObjectRequest.builder().bucket(bucket).key(key).build(),
                     ResponseTransformer.toFile(tmp));
             Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (NoSuchKeyException e) {
+        } catch (NoSuchKeyException _) {
             throw new java.nio.file.NoSuchFileException(uri(key));
         } catch (SdkException e) {
             Files.deleteIfExists(tmp);
@@ -272,7 +272,7 @@ public class S3ObjectStore implements ObjectStore {
     public String presignGet(String key, Duration ttl) {
         GetObjectPresignRequest request = GetObjectPresignRequest.builder()
                 .signatureDuration(ttl)
-                .getObjectRequest(GetObjectRequest.builder().bucket(bucket).key(key).build())
+                .getObjectRequest(get -> get.bucket(bucket).key(key))
                 .build();
         return presigner.presignGetObject(request).url().toString();
     }

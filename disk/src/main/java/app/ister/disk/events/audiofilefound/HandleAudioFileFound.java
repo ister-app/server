@@ -177,7 +177,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
 
             saveTrackMetadataFromTags(messageData.getTrackEntityUUID(), freshEntity);
             saveChapterMetadataFromTags(messageData.getChapterEntityUUID(), freshEntity);
-            extractEmbeddedCoverArt(freshDirectory, freshEntity, checkResult.hasAttachedPic());
+            extractEmbeddedCoverArt(freshEntity, checkResult.hasAttachedPic());
             deleteHlsCache(freshEntity.getId());
             requestPlaylistPreGenerationAfterCommit(freshEntity.getId(), freshDirectory.getName());
         });
@@ -489,6 +489,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
 
     private static String titleFromFilename(String path) {
         String filename = PathStrings.fileName(path);
+        if (filename == null) return null;
         // Strip extension
         int dot = filename.lastIndexOf('.');
         if (dot > 0) filename = filename.substring(0, dot);
@@ -497,7 +498,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         return filename.isBlank() ? null : filename.strip();
     }
 
-    private void extractEmbeddedCoverArt(DirectoryEntity libraryDir, MediaFileEntity mediaFile, boolean hasAttachedPic) {
+    private void extractEmbeddedCoverArt(MediaFileEntity mediaFile, boolean hasAttachedPic) {
         if (!hasAttachedPic) return;
         UUID albumId = null;
         UUID bookId = null;
@@ -526,7 +527,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         try {
             Path extracted = Files.createTempFile(Paths.get(tmpDir), "cover-", ".jpg");
             audioFileFoundExtractCoverArt.extract(extracted, inputResolver.resolve(mediaFile), dirOfFFmpeg);
-            storedPath = cacheStore.write(coverSubDir + "/" + coverOwnerId + "/cover.jpg", extracted, "image/jpeg");
+            storedPath = cacheStore.write(String.join("/", coverSubDir, coverOwnerId.toString(), "cover.jpg"), extracted, "image/jpeg");
         } catch (Exception e) {
             log.warn("Failed to extract embedded cover art from {}: {}", mediaFile.getPath(), e.getMessage());
             return;

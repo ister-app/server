@@ -133,7 +133,7 @@ class AudioScannerTest {
         when(scannerHelperService.getOrCreatePerson(library, "Artist", 0)).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Album", 2024)).thenReturn(album);
         when(scannerHelperService.getOrCreateTrack(artist, album, 1, 1)).thenReturn(track);
-        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath.toString()))
+        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath))
                 .thenReturn(Optional.empty());
 
         var result = subject.analyze(dir, audioPath, true, 5000);
@@ -166,14 +166,14 @@ class AudioScannerTest {
         ReflectionTestUtils.setField(track, "id", trackId);
 
         MediaFileEntity existing = MediaFileEntity.builder()
-                .path(audioPath.toString())
+                .path(audioPath)
                 .trackEntity(track)
                 .build();
 
         when(scannerHelperService.getOrCreatePerson(library, "Artist", 0)).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Album", 2024)).thenReturn(album);
         when(scannerHelperService.getOrCreateTrack(artist, album, 1, 1)).thenReturn(track);
-        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath.toString()))
+        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath))
                 .thenReturn(Optional.of(existing));
 
         var result = subject.analyze(dir, audioPath, true, 5000);
@@ -199,14 +199,14 @@ class AudioScannerTest {
         ReflectionTestUtils.setField(wrongTrack, "id", wrongTrackId);
 
         MediaFileEntity existing = MediaFileEntity.builder()
-                .path(audioPath.toString())
+                .path(audioPath)
                 .trackEntity(wrongTrack)
                 .build();
 
         when(scannerHelperService.getOrCreatePerson(library, "Artist", 0)).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Album", 2024)).thenReturn(album);
         when(scannerHelperService.getOrCreateTrack(artist, album, 1, 1)).thenReturn(correctTrack);
-        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath.toString()))
+        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath))
                 .thenReturn(Optional.of(existing));
 
         var result = subject.analyze(dir, audioPath, true, 5000);
@@ -229,14 +229,14 @@ class AudioScannerTest {
         ReflectionTestUtils.setField(track, "id", trackId);
 
         MediaFileEntity existing = MediaFileEntity.builder()
-                .path(audioPath.toString())
+                .path(audioPath)
                 .trackEntity(null)
                 .build();
 
         when(scannerHelperService.getOrCreatePerson(library, "Artist", 0)).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Album", 2024)).thenReturn(album);
         when(scannerHelperService.getOrCreateTrack(artist, album, 1, 1)).thenReturn(track);
-        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath.toString()))
+        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath))
                 .thenReturn(Optional.of(existing));
 
         var result = subject.analyze(dir, audioPath, true, 5000);
@@ -269,7 +269,7 @@ class AudioScannerTest {
         when(scannerHelperService.getOrCreatePerson(library, "Tag Artist", 0)).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Album", 2024)).thenReturn(album);
         when(scannerHelperService.getOrCreateTrack(artist, album, 1, 1)).thenReturn(track);
-        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath.toString()))
+        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath))
                 .thenReturn(Optional.empty());
 
         var result2 = subject.analyze(dir, audioPath, true, 5000);
@@ -292,7 +292,7 @@ class AudioScannerTest {
         when(scannerHelperService.getOrCreatePerson(library, "Album", 0)).thenReturn(artist);
         when(scannerHelperService.getOrCreateAlbum(library, artist, "Album", 2024)).thenReturn(album);
         when(scannerHelperService.getOrCreateTrack(artist, album, 1, 1)).thenReturn(track);
-        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath.toString()))
+        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, audioPath))
                 .thenReturn(Optional.empty());
 
         var result = subject.analyze(dir, audioPath, true, 5000);
@@ -329,7 +329,7 @@ class AudioScannerTest {
         when(scannerHelperService.getOrCreatePerson(library, "Author", 0)).thenReturn(author);
         when(scannerHelperService.getOrCreateBook(library, author, "Book", 0)).thenReturn(book);
         when(scannerHelperService.getOrCreateChapter(author, book, 1)).thenReturn(chapter);
-        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, chapterPath.toString()))
+        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, chapterPath))
                 .thenReturn(Optional.empty());
 
         var result = subject.analyze(dir, chapterPath, true, 5000);
@@ -363,14 +363,14 @@ class AudioScannerTest {
         ReflectionTestUtils.setField(chapter, "id", UUID.randomUUID());
 
         MediaFileEntity existing = MediaFileEntity.builder()
-                .path(chapterPath.toString())
+                .path(chapterPath)
                 .chapterEntity(chapter)
                 .build();
 
         when(scannerHelperService.getOrCreatePerson(library, "Author", 0)).thenReturn(author);
         when(scannerHelperService.getOrCreateBook(library, author, "Book", 0)).thenReturn(book);
         when(scannerHelperService.getOrCreateChapter(author, book, 1)).thenReturn(chapter);
-        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, chapterPath.toString()))
+        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, chapterPath))
                 .thenReturn(Optional.of(existing));
 
         var result = subject.analyze(dir, chapterPath, true, 5000);
@@ -391,14 +391,14 @@ class AudioScannerTest {
         ReflectionTestUtils.setField(chapter, "id", UUID.randomUUID());
 
         MediaFileEntity existing = MediaFileEntity.builder()
-                .path(chapterPath.toString())
+                .path(chapterPath)
                 .chapterEntity(null)
                 .build();
 
         when(scannerHelperService.getOrCreatePerson(library, "Author", 0)).thenReturn(author);
         when(scannerHelperService.getOrCreateBook(library, author, "Book", 0)).thenReturn(book);
         when(scannerHelperService.getOrCreateChapter(author, book, 1)).thenReturn(chapter);
-        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, chapterPath.toString()))
+        when(mediaFileRepository.findByDirectoryEntityAndPath(dir, chapterPath))
                 .thenReturn(Optional.of(existing));
 
         subject.analyze(dir, chapterPath, true, 5000);

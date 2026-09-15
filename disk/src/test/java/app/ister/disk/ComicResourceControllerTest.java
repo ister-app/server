@@ -47,7 +47,7 @@ class ComicResourceControllerTest {
 
     @org.mockito.Spy
     private app.ister.core.storage.LocalCopy localCopy = new app.ister.core.storage.LocalCopy(
-            org.mockito.Mockito.mock(app.ister.core.storage.ObjectStoreRegistry.class),
+            mock(app.ister.core.storage.ObjectStoreRegistry.class),
             new app.ister.core.config.S3Properties(), System.getProperty("java.io.tmpdir"));
 
     @Mock

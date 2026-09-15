@@ -89,28 +89,40 @@ public class TmpTranscodeCleanupScheduler {
                 log.info("Shared tmp store is being cleaned by another node, skipping");
                 return;
             }
-            java.time.Instant cutoff = clock.instant().minus(minAge);
-            long deleted = 0;
-            long kept = 0;
-            try {
-                for (UUID mediaFileId : store.mediaFileIds()) {
-                    boolean orphan = !mediaFileRepository.existsById(mediaFileId);
-                    boolean idle = store.lastActivity(mediaFileId).map(t -> !t.isAfter(cutoff)).orElse(true);
-                    if (!orphan && !idle) {
-                        kept++;
-                        continue;
-                    }
-                    if (dryRun) {
-                        log.info("Tmp cleanup [dry-run] would delete {} shared transcode dir {}", orphan ? "orphan" : "idle", mediaFileId);
-                    } else {
-                        store.deleteAll(mediaFileId);
-                    }
-                    deleted++;
-                }
-                log.info("Shared tmp cleanup {}: {} transcode dirs removed, {} kept", dryRun ? "[dry-run]" : "[live]", deleted, kept);
-            } catch (IOException | RuntimeException e) {
-                log.error("Shared tmp cleanup failed", e);
-            }
+            sweepShared(store);
         });
+    }
+
+    private void sweepShared(TmpStore store) {
+        java.time.Instant cutoff = clock.instant().minus(minAge);
+        long deleted = 0;
+        long kept = 0;
+        try {
+            for (UUID mediaFileId : store.mediaFileIds()) {
+                if (sweepSharedDir(store, mediaFileId, cutoff)) {
+                    deleted++;
+                } else {
+                    kept++;
+                }
+            }
+            log.info("Shared tmp cleanup {}: {} transcode dirs removed, {} kept", dryRun ? "[dry-run]" : "[live]", deleted, kept);
+        } catch (IOException | RuntimeException e) {
+            log.error("Shared tmp cleanup failed", e);
+        }
+    }
+
+    /** @return whether the directory was (or, in dry-run, would have been) deleted */
+    private boolean sweepSharedDir(TmpStore store, UUID mediaFileId, java.time.Instant cutoff) throws IOException {
+        boolean orphan = !mediaFileRepository.existsById(mediaFileId);
+        boolean idle = store.lastActivity(mediaFileId).map(t -> !t.isAfter(cutoff)).orElse(true);
+        if (!orphan && !idle) {
+            return false;
+        }
+        if (dryRun) {
+            log.info("Tmp cleanup [dry-run] would delete {} shared transcode dir {}", orphan ? "orphan" : "idle", mediaFileId);
+        } else {
+            store.deleteAll(mediaFileId);
+        }
+        return true;
     }
 }

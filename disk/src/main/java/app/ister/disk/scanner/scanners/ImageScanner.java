@@ -278,6 +278,6 @@ public class ImageScanner implements Scanner {
     }
 
     private String removeExtension(String string) {
-        return string.replaceFirst("[.][^.]+$", "");
+        return string == null ? "" : string.replaceFirst("[.][^.]+$", "");
     }
 }

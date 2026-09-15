@@ -141,6 +141,8 @@ public class PlayQueuePrefetchService {
      * Requests a background pre-transcode of every analyzed media file of the item, in the
      * stream settings the client last reported (falling back to the pre-transcode defaults).
      */
+    // Sonar FP: Lombok @SuperBuilder declares builder() on the subclass itself
+    @SuppressWarnings("java:S3252")
     private void prefetchItem(PlayQueueEntity queue, PlayQueueItemEntity item) {
         long keepUntilEpochMillis = System.currentTimeMillis() + Duration.ofHours(keepHours).toMillis();
         // Prefetch only what the owner of the queue will play: their audio languages and quality cap.

@@ -298,7 +298,7 @@ public class HandleNfoFileFound implements Handle<NfoFileFoundData> {
             throws java.io.FileNotFoundException {
         try (java.io.InputStream in = fileAccess.open(directoryEntity, path)) {
             return parser.apply(in);
-        } catch (java.nio.file.NoSuchFileException | java.io.FileNotFoundException e) {
+        } catch (java.nio.file.NoSuchFileException | java.io.FileNotFoundException _) {
             throw new java.io.FileNotFoundException(path);
         } catch (java.io.IOException e) {
             log.warn("Cannot read nfo {}: {}", path, e.getMessage());

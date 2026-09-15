@@ -59,7 +59,7 @@ class SubtitleScannerTest {
         DirectoryEntity directoryEntity = DirectoryEntity.builder().id(dirId).name("disk1").build();
         String path = "/disk/shows/Show (2024)/Season 01/s01e01.nl.srt";
 
-        when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString())).thenReturn(Optional.empty());
+        when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path)).thenReturn(Optional.empty());
 
         var result = subject.analyze(directoryEntity, path, true, 0L);
 
@@ -72,9 +72,9 @@ class SubtitleScannerTest {
     void analyzeReturnsExistingEntityWhenAlreadyExists() {
         DirectoryEntity directoryEntity = DirectoryEntity.builder().id(UUID.randomUUID()).name("disk1").build();
         String path = "/disk/shows/Show (2024)/Season 01/s01e01.nl.srt";
-        OtherPathFileEntity existing = OtherPathFileEntity.builder().path(path.toString()).build();
+        OtherPathFileEntity existing = OtherPathFileEntity.builder().path(path).build();
 
-        when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path.toString())).thenReturn(Optional.of(existing));
+        when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path)).thenReturn(Optional.of(existing));
 
         var result = subject.analyze(directoryEntity, path, true, 0L);
 

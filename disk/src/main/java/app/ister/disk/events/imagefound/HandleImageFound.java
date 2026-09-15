@@ -52,7 +52,7 @@ public class HandleImageFound implements Handle<ImageFoundData> {
             ObjectStat stat = fileAccess.stat(directory, messageData.getPath())
                     .orElseThrow(() -> new java.nio.file.NoSuchFileException(messageData.getPath()));
             Instant lastModified = stat.lastModified();
-            Instant created = FileAccess.creationTime(directory, messageData.getPath(), stat);
+            Instant created = FileAccess.creationTime(messageData.getPath(), stat);
 
             Optional<ImageEntity> oldImageEntity = imageRepository.findByDirectoryEntityIdAndPath(messageData.getDirectoryEntityId(), messageData.getPath());
 

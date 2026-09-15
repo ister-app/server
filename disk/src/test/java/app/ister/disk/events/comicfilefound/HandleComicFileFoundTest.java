@@ -53,6 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -64,7 +65,7 @@ class HandleComicFileFoundTest {
 
     @org.mockito.Spy
     private app.ister.core.storage.LocalCopy localCopy = new app.ister.core.storage.LocalCopy(
-            org.mockito.Mockito.mock(app.ister.core.storage.ObjectStoreRegistry.class),
+            mock(app.ister.core.storage.ObjectStoreRegistry.class),
             new app.ister.core.config.S3Properties(), System.getProperty("java.io.tmpdir"));
     @Mock
     private app.ister.core.storage.CacheDirectoryResolver cacheDirectoryResolver;

@@ -43,7 +43,7 @@ public class LocalCopy {
     private final ObjectStoreRegistry registry;
     private final Path scratchDir;
     private final long maxBytes;
-    private final Map<Path, AtomicInteger> inUse = new ConcurrentHashMap<>();
+    private final Map<Path, Pin> inUse = new ConcurrentHashMap<>();
 
     public LocalCopy(ObjectStoreRegistry registry, S3Properties properties,
                      @Value("${app.ister.server.tmp-dir}") String tmpDir) {
@@ -77,8 +77,8 @@ public class LocalCopy {
         }
         ObjectRef ref = ObjectRef.parse(path);
         Path target = scratchDir.resolve(sha256(path)).resolve(ref.fileName());
-        AtomicInteger pin = inUse.computeIfAbsent(target, _ -> new AtomicInteger());
-        pin.incrementAndGet();
+        Pin pin = inUse.computeIfAbsent(target, _ -> new Pin());
+        pin.count.incrementAndGet();
         try {
             if (Files.isRegularFile(target)) {
                 Files.setLastModifiedTime(target, FileTime.from(Instant.now()));
@@ -97,8 +97,8 @@ public class LocalCopy {
         }
     }
 
-    private void release(Path target, AtomicInteger pin) {
-        if (pin != null && pin.decrementAndGet() <= 0) {
+    private void release(Path target, Pin pin) {
+        if (pin != null && pin.count.decrementAndGet() <= 0) {
             inUse.remove(target, pin);
         }
     }
@@ -123,16 +123,15 @@ public class LocalCopy {
             if (total <= maxBytes) {
                 break;
             }
-            if (inUse.containsKey(file) || file.toString().endsWith(".part")) {
-                continue;
-            }
-            long size = size(file);
-            try {
-                Files.deleteIfExists(file);
-                Files.deleteIfExists(file.getParent());
-                total -= size;
-            } catch (IOException e) {
-                log.debug("Cannot delete {}: {}", file, e.getMessage());
+            if (!inUse.containsKey(file) && !file.toString().endsWith(".part")) {
+                long size = size(file);
+                try {
+                    Files.deleteIfExists(file);
+                    Files.deleteIfExists(file.getParent());
+                    total -= size;
+                } catch (IOException e) {
+                    log.debug("Cannot delete {}: {}", file, e.getMessage());
+                }
             }
         }
     }
@@ -161,11 +160,16 @@ public class LocalCopy {
         }
     }
 
+    /** Reference count plus the lock a concurrent download of the same object waits on. */
+    private static final class Pin {
+        private final AtomicInteger count = new AtomicInteger();
+    }
+
     public final class Handle implements AutoCloseable {
         private final Path path;
-        private final AtomicInteger pin;
+        private final Pin pin;
 
-        private Handle(Path path, AtomicInteger pin) {
+        private Handle(Path path, Pin pin) {
             this.path = path;
             this.pin = pin;
         }

@@ -8,7 +8,6 @@ import app.ister.core.eventdata.MediaFileFoundData;
 import app.ister.core.eventdata.SubtitleExtractRequestedData;
 import app.ister.core.repository.*;
 import app.ister.core.service.MessageSender;
-import app.ister.core.service.NodeService;
 import com.github.kokorin.jaffree.process.JaffreeAbnormalExitException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,8 +35,6 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class HandleMediaFileFoundTest {
-    @Mock
-    private NodeService nodeServiceMock;
     @Mock
     private DirectoryRepository directoryRepositoryMock;
     @Mock
@@ -72,13 +69,9 @@ class HandleMediaFileFoundTest {
     private HandleMediaFileFound subject;
 
     @org.junit.jupiter.api.BeforeEach
-    void s3TestSetup() {
-        org.mockito.Mockito.lenient().when(inputResolver.resolve(org.mockito.ArgumentMatchers.any()))
-                .thenAnswer(inv -> ((app.ister.core.entity.MediaFileEntity) inv.getArgument(0)).getPath());
-    }
-
-    @org.junit.jupiter.api.BeforeEach
-    void cacheStoreSetup() {
+    void setUp() {
+        lenient().when(inputResolver.resolve(any()))
+                .thenAnswer(inv -> ((MediaFileEntity) inv.getArgument(0)).getPath());
         app.ister.disk.storage.CacheStoreMocks.fake(cacheDirectoryResolver);
         ReflectionTestUtils.setField(subject, "tmpDir", System.getProperty("java.io.tmpdir"));
     }
@@ -176,7 +169,7 @@ class HandleMediaFileFoundTest {
 
         subject.handle(data);
 
-        verifyNoInteractions(nodeServiceMock, mediaFileFoundGetDurationMock, mediaFileFoundCheckForStreamsMock);
+        verifyNoInteractions(mediaFileFoundGetDurationMock, mediaFileFoundCheckForStreamsMock);
     }
 
     @Test
@@ -218,7 +211,6 @@ class HandleMediaFileFoundTest {
                 .path(filePath)
                 .build();
         MediaFileEntity mediaFileEntity = MediaFileEntity.builder().path(filePath).build();
-        NodeEntity nodeEntity = NodeEntity.builder().name("node1").build();
         DirectoryEntity cacheDirectory = DirectoryEntity.builder()
                 .id(UUID.randomUUID()).path("/cache/").name("cache").build();
 
@@ -248,7 +240,6 @@ class HandleMediaFileFoundTest {
                 .path(filePath)
                 .build();
         MediaFileEntity mediaFileEntity = MediaFileEntity.builder().path(filePath).build();
-        NodeEntity nodeEntity = NodeEntity.builder().name("node1").build();
         DirectoryEntity cacheDirectory = DirectoryEntity.builder()
                 .id(UUID.randomUUID()).path("/cache/").name("cache").build();
 
@@ -278,7 +269,6 @@ class HandleMediaFileFoundTest {
                 .path(filePath)
                 .build();
         MediaFileEntity mediaFileEntity = MediaFileEntity.builder().path(filePath).build();
-        NodeEntity nodeEntity = NodeEntity.builder().name("node1").build();
         DirectoryEntity cacheDirectory = DirectoryEntity.builder()
                 .id(UUID.randomUUID()).path("/cache/").name("cache").build();
 
@@ -340,7 +330,6 @@ class HandleMediaFileFoundTest {
                 .path(filePath)
                 .build();
         MediaFileEntity mediaFileEntity = MediaFileEntity.builder().id(fileId).path(filePath).build();
-        NodeEntity nodeEntity = NodeEntity.builder().name("node1").build();
         DirectoryEntity cacheDirectory = DirectoryEntity.builder()
                 .id(UUID.randomUUID()).path("/cache/").name("cache").build();
         MediaFileEpisodeEntity part0 = MediaFileEpisodeEntity.builder()

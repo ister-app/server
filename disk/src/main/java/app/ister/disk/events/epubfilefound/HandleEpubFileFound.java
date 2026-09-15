@@ -90,13 +90,13 @@ public class HandleEpubFileFound implements Handle<EpubFileFoundData> {
                 .withTitle(ActivitySubjects.fileName(messageData.getPath())));
 
         try (LocalCopy.Handle local = localCopy.of(directoryEntity, messageData.getPath())) {
-            handle(messageData, directoryEntity, mediaFile.get(), book.get(), local.path());
+            handle(messageData, mediaFile.get(), book.get(), local.path());
         } catch (IOException e) {
             throw new EventHandlingException("Cannot read epub " + messageData.getPath(), e);
         }
     }
 
-    private void handle(EpubFileFoundData messageData, DirectoryEntity directoryEntity, MediaFileEntity entity,
+    private void handle(EpubFileFoundData messageData, MediaFileEntity entity,
                         BookEntity bookEntity, Path localPath) {
         Optional<EpubInfo> parsed = epubParser.parse(localPath);
         if (parsed.isEmpty()) {

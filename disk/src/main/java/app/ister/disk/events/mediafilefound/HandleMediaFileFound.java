@@ -15,7 +15,6 @@ import app.ister.core.service.MessageSender;
 import app.ister.core.storage.CacheDirectoryResolver;
 import app.ister.core.storage.CacheStore;
 import app.ister.core.storage.SourceUris;
-import app.ister.core.service.NodeService;
 import app.ister.core.status.ActivityContext;
 import app.ister.core.status.ActivitySubjects;
 import app.ister.core.utils.AfterCommitPublisher;
@@ -37,7 +36,6 @@ import java.util.Optional;
 @Service
 @Transactional
 public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
-    private final NodeService nodeService;
     private final DirectoryRepository directoryRepository;
     private final MediaFileRepository mediaFileRepository;
     private final EpisodeRepository episodeRepository;
@@ -61,8 +59,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     @Value("${app.ister.server.tmp-dir}")
     private String tmpDir;
 
-    public HandleMediaFileFound(NodeService nodeService,
-                                DirectoryRepository directoryRepository,
+    public HandleMediaFileFound(DirectoryRepository directoryRepository,
                                 MediaFileRepository mediaFileRepository,
                                 EpisodeRepository episodeRepository,
                                 MovieRepository movieRepository,
@@ -77,7 +74,6 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
                                 MessageSender messageSender,
                                 MediaFileInputResolver inputResolver,
                                 CacheDirectoryResolver cacheDirectoryResolver) {
-        this.nodeService = nodeService;
         this.directoryRepository = directoryRepository;
         this.mediaFileRepository = mediaFileRepository;
         this.episodeRepository = episodeRepository;

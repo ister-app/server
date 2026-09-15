@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,10 +38,10 @@ class BlurHashChunkProcessorTest {
     private app.ister.core.repository.DirectoryRepository directoryRepository;
     @org.mockito.Spy
     private app.ister.core.storage.FileAccess fileAccess = new app.ister.core.storage.FileAccess(
-            org.mockito.Mockito.mock(app.ister.core.storage.ObjectStoreRegistry.class));
+            mock(app.ister.core.storage.ObjectStoreRegistry.class));
     @org.mockito.Spy
     private app.ister.core.storage.LocalCopy localCopy = new app.ister.core.storage.LocalCopy(
-            org.mockito.Mockito.mock(app.ister.core.storage.ObjectStoreRegistry.class),
+            mock(app.ister.core.storage.ObjectStoreRegistry.class),
             new app.ister.core.config.S3Properties(), System.getProperty("java.io.tmpdir"));
 
     @InjectMocks
@@ -50,7 +52,7 @@ class BlurHashChunkProcessorTest {
 
     @org.junit.jupiter.api.BeforeEach
     void s3TestSetup() {
-        org.mockito.Mockito.lenient().when(directoryRepository.findById(org.mockito.ArgumentMatchers.any()))
+        lenient().when(directoryRepository.findById(any()))
                 .thenReturn(java.util.Optional.of(app.ister.core.entity.DirectoryEntity.builder().name("local").path("/").build()));
     }
 

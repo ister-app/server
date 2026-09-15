@@ -208,6 +208,7 @@ public class FileController {
      * Spring deliberately leaves out of its own, skip-based range handling) and the 206 status
      * is set here. A HEAD gets the headers without a GET to S3.
      */
+    @SuppressWarnings("java:S2095") // the opened body is owned by the response; the container closes it after writing
     ResponseEntity<Resource> objectResource(ObjectStore store, String key, String rangeHeader, HttpServletRequest request)
             throws IOException {
         Optional<ObjectStat> stat = store.stat(key);

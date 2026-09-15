@@ -56,7 +56,7 @@ class MediaFileScannerTest {
         String path = "/disk/shows/Show (2024)/Season 01/s01e01.mkv";
 
         when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 1, 1)).thenReturn(episode);
-        when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path.toString())).thenReturn(Optional.empty());
+        when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path)).thenReturn(Optional.empty());
 
         Optional<BaseEntity> result = subject.analyze(directory, path, true, 1024L);
 
@@ -78,7 +78,7 @@ class MediaFileScannerTest {
         String path = "/disk/movies/Movie (2024).mkv";
 
         when(scannerHelperService.getOrCreateMovie(library, "Movie", 2024)).thenReturn(movie);
-        when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path.toString())).thenReturn(Optional.empty());
+        when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path)).thenReturn(Optional.empty());
 
         Optional<BaseEntity> result = subject.analyze(directory, path, true, 2048L);
 
@@ -102,7 +102,7 @@ class MediaFileScannerTest {
         String path = "/disk/shows/Show (2024)/Season 01/s01e01.mkv";
 
         when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 1, 1)).thenReturn(episode);
-        when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path.toString())).thenReturn(Optional.of(existing));
+        when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path)).thenReturn(Optional.of(existing));
 
         subject.analyze(directory, path, true, 1024L);
 
@@ -123,7 +123,7 @@ class MediaFileScannerTest {
 
         when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 4, 6)).thenReturn(episode6);
         when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 4, 7)).thenReturn(episode7);
-        when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path.toString())).thenReturn(Optional.empty());
+        when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path)).thenReturn(Optional.empty());
 
         Optional<BaseEntity> result = subject.analyze(directory, path, true, 1024L);
 
@@ -153,11 +153,11 @@ class MediaFileScannerTest {
         EpisodeEntity episode6 = EpisodeEntity.builder().id(UUID.randomUUID()).build();
         EpisodeEntity episode7 = EpisodeEntity.builder().id(UUID.randomUUID()).build();
         String path = "/disk/shows/Show (2024)/Season 04/s04e06-e07.mkv";
-        MediaFileEntity existing = MediaFileEntity.builder().id(UUID.randomUUID()).path(path.toString()).build();
+        MediaFileEntity existing = MediaFileEntity.builder().id(UUID.randomUUID()).path(path).build();
 
         when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 4, 6)).thenReturn(episode6);
         when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 4, 7)).thenReturn(episode7);
-        when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path.toString())).thenReturn(Optional.of(existing));
+        when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path)).thenReturn(Optional.of(existing));
         when(mediaFileEpisodeRepository.findByMediaFileEntityIdOrderByPartNumber(existing.getId())).thenReturn(java.util.List.of());
 
         subject.analyze(directory, path, true, 1024L);
@@ -177,11 +177,11 @@ class MediaFileScannerTest {
         EpisodeEntity episode6 = EpisodeEntity.builder().id(UUID.randomUUID()).build();
         EpisodeEntity episode7 = EpisodeEntity.builder().id(UUID.randomUUID()).build();
         String path = "/disk/shows/Show (2024)/Season 04/s04e06-e07.mkv";
-        MediaFileEntity existing = MediaFileEntity.builder().id(UUID.randomUUID()).path(path.toString()).build();
+        MediaFileEntity existing = MediaFileEntity.builder().id(UUID.randomUUID()).path(path).build();
 
         when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 4, 6)).thenReturn(episode6);
         when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 4, 7)).thenReturn(episode7);
-        when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path.toString())).thenReturn(Optional.of(existing));
+        when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path)).thenReturn(Optional.of(existing));
         when(mediaFileEpisodeRepository.findByMediaFileEntityIdOrderByPartNumber(existing.getId()))
                 .thenReturn(java.util.List.of(MediaFileEpisodeEntity.builder().build()));
 

@@ -27,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,7 +40,7 @@ class HandleImageFoundTest {
     private app.ister.core.repository.DirectoryRepository directoryRepository;
     @org.mockito.Spy
     private app.ister.core.storage.FileAccess fileAccess = new app.ister.core.storage.FileAccess(
-            org.mockito.Mockito.mock(app.ister.core.storage.ObjectStoreRegistry.class));
+            mock(app.ister.core.storage.ObjectStoreRegistry.class));
 
     @InjectMocks
     private HandleImageFound subject;
@@ -51,7 +53,7 @@ class HandleImageFoundTest {
 
     @org.junit.jupiter.api.BeforeEach
     void s3TestSetup() {
-        org.mockito.Mockito.lenient().when(directoryRepository.findById(org.mockito.ArgumentMatchers.any()))
+        lenient().when(directoryRepository.findById(any()))
                 .thenReturn(java.util.Optional.of(app.ister.core.entity.DirectoryEntity.builder().name("local").path("/").build()));
     }
 

@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -81,7 +82,7 @@ class S3LibraryScannerTest {
         scanner(dir, store).scan();
 
         ArgumentCaptor<FileScanRequestedData> events = ArgumentCaptor.forClass(FileScanRequestedData.class);
-        verify(messageSender, org.mockito.Mockito.times(3)).sendFileScanRequested(events.capture(), eq("shows-s3"));
+        verify(messageSender, times(3)).sendFileScanRequested(events.capture(), eq("shows-s3"));
         assertThat(events.getAllValues()).extracting(FileScanRequestedData::getPath).containsExactlyInAnyOrder(
                 "s3://bucket/media/shows/Show (2024)/Season 01/s01e01.mkv",
                 "s3://bucket/media/shows/Show (2024)/Season 01/s01e01.en.srt",
@@ -116,8 +117,9 @@ class S3LibraryScannerTest {
         DirectoryEntity dir = showDirectory("media");
         dir.setPath("s3://other-bucket/media");
 
-        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
-                () -> scanner(dir, new FakeObjectStore("bucket")).scan());
+        S3LibraryScanner scanner = scanner(dir, new FakeObjectStore("bucket"));
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, scanner::scan);
     }
 
     /** DirectoryPruner is what both walks share; a quick check of the per-type rules on S3 uris. */

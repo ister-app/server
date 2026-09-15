@@ -37,6 +37,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -64,7 +65,7 @@ class CacheCleanupSchedulerTest {
     private app.ister.core.storage.CacheDirectoryResolver cacheDirectoryResolver;
     @org.mockito.Spy
     private app.ister.core.storage.FileAccess fileAccess = new app.ister.core.storage.FileAccess(
-            org.mockito.Mockito.mock(app.ister.core.storage.ObjectStoreRegistry.class));
+            mock(app.ister.core.storage.ObjectStoreRegistry.class));
     @Mock
     private org.springframework.transaction.PlatformTransactionManager transactionManager;
 

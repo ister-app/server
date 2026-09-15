@@ -43,7 +43,7 @@ public class FileAccess {
     }
 
     /** Creation time where the storage has one, else the modification time. */
-    public static java.time.Instant creationTime(DirectoryEntity directory, String path, ObjectStat stat) throws IOException {
+    public static java.time.Instant creationTime(String path, ObjectStat stat) throws IOException {
         if (!ObjectRef.isS3Uri(path)) {
             return Files.readAttributes(Path.of(path), BasicFileAttributes.class).creationTime().toInstant();
         }

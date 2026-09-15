@@ -26,9 +26,26 @@ public class TmpStoreProvider {
         ObjectStore store = registry.byConnection(properties.getTmpS3Connection())
                 .orElseThrow(() -> new IllegalStateException("app.ister.server.tmp-s3-connection refers to S3 connection '"
                         + properties.getTmpS3Connection() + "' which is not configured (app.ister.s3.connections)"));
-        String prefix = properties.getTmpS3Prefix() == null ? "" : properties.getTmpS3Prefix().strip().replaceAll("^/+|/+$", "");
+        String prefix = stripSlashes(properties.getTmpS3Prefix());
         this.shared = new S3TmpStore(store, prefix);
         log.info("HLS transcode output is shared through s3://{}/{}", store.bucket(), prefix);
+    }
+
+    /** The prefix without its leading and trailing slashes; {@code ""} for a missing one. */
+    private static String stripSlashes(String value) {
+        if (value == null) {
+            return "";
+        }
+        String trimmed = value.strip();
+        int start = 0;
+        int end = trimmed.length();
+        while (start < end && trimmed.charAt(start) == '/') {
+            start++;
+        }
+        while (end > start && trimmed.charAt(end - 1) == '/') {
+            end--;
+        }
+        return trimmed.substring(start, end);
     }
 
     /** Test seam. */

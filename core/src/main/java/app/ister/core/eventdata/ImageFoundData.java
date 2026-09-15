@@ -41,6 +41,8 @@ public class ImageFoundData extends MessageData {
     @Nullable
     private UUID podcastEntityId;
 
+    // Sonar FP: Lombok @SuperBuilder declares builder() on the subclass itself
+    @SuppressWarnings("java:S3252")
     public static ImageFoundData fromImageEntity(ImageEntity imageEntity) {
         return ImageFoundData.builder()
                 .eventType(EventType.IMAGE_FOUND)

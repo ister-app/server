@@ -21,6 +21,8 @@ public class AudioFileFoundData extends MessageData {
     private UUID chapterEntityUUID;
     private String path;
 
+    // Sonar FP: Lombok @SuperBuilder declares builder() on the subclass itself
+    @SuppressWarnings("java:S3252")
     public static AudioFileFoundData fromMediaFileEntity(MediaFileEntity m) {
         return AudioFileFoundData.builder()
                 .eventType(EventType.AUDIO_FILE_FOUND)

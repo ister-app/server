@@ -383,7 +383,8 @@ class StartupTasksTest {
         when(config.getDirectories()).thenReturn(List.of(s3DirectoryConfig("shows-s3", "minio", "other-shows", "Shows")));
         when(directoryRepository.findByName("shows-s3")).thenReturn(Optional.of(existing));
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> startupTasks.onApplicationEvent(rootEvent()));
+        ContextRefreshedEvent event = rootEvent();
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> startupTasks.onApplicationEvent(event));
         assertTrue(ex.getMessage().contains("s3://media/other-shows"));
     }
 
@@ -396,11 +397,12 @@ class StartupTasksTest {
                 .directoryType(DirectoryType.LIBRARY).build();
         when(config.getDirectories()).thenReturn(List.of(directoryConfig("shows-s3", "/media/shows", "Shows")));
         when(directoryRepository.findByName("shows-s3")).thenReturn(Optional.of(existing));
-        assertThrows(IllegalStateException.class, () -> startupTasks.onApplicationEvent(rootEvent()));
+        ContextRefreshedEvent event = rootEvent();
+        assertThrows(IllegalStateException.class, () -> startupTasks.onApplicationEvent(event));
 
         s3Connection("minio", "media");
         when(config.getDirectories()).thenReturn(List.of(s3DirectoryConfig("shows-s3", "nope", "shows", "Shows")));
-        assertThrows(IllegalStateException.class, () -> startupTasks.onApplicationEvent(rootEvent()));
+        assertThrows(IllegalStateException.class, () -> startupTasks.onApplicationEvent(event));
     }
 
     @Test

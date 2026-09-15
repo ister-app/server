@@ -41,9 +41,14 @@ public class S3TmpStore implements TmpStore {
     @Override
     public void put(UUID mediaFileId, Path file) throws IOException {
         String name = file.getFileName().toString();
-        String contentType = name.endsWith(".m3u8") ? "application/vnd.apple.mpegurl"
-                : name.endsWith(".ts") ? "video/mp2t" : null;
-        store.put(key(mediaFileId, name), file, contentType);
+        store.put(key(mediaFileId, name), file, contentType(name));
+    }
+
+    private static String contentType(String name) {
+        if (name.endsWith(".m3u8")) {
+            return "application/vnd.apple.mpegurl";
+        }
+        return name.endsWith(".ts") ? "video/mp2t" : null;
     }
 
     @Override

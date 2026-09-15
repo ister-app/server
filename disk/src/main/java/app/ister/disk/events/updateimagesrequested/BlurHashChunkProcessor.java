@@ -80,7 +80,7 @@ public class BlurHashChunkProcessor {
 
             imageEntity.setBlurHash(blurHash);
             imageEntity.setFileLastModifiedTime(stat.lastModified());
-            imageEntity.setFileCreationTime(FileAccess.creationTime(directory, imageEntity.getPath(), stat));
+            imageEntity.setFileCreationTime(FileAccess.creationTime(imageEntity.getPath(), stat));
 
             log.debug("Updated blur-hash for {}", imageEntity.getPath());
         } catch (IOException | RuntimeException | LinkageError e) {
