@@ -42,6 +42,13 @@ public class CacheCleanupService {
         this.clock = clock;
     }
 
+    /**
+     * How many zombies a dry run names in the log at INFO. Enough to judge whether the sweep
+     * picks the right files; the rest goes to DEBUG. A dry run over a full cache once logged
+     * 5000 lines a night, and the scheduler already prints the totals.
+     */
+    static final int DRY_RUN_EXAMPLES = 20;
+
     public CleanupResult clean(Path cacheRoot, Set<String> referencedPaths, Duration minAge, boolean dryRun)
             throws IOException {
         if (!Files.isDirectory(cacheRoot)) {
@@ -61,7 +68,11 @@ public class CacheCleanupService {
             if (isZombie(file, attrs, referencedPaths, cutoff)) {
                 long size = attrs.size();
                 if (dryRun) {
-                    log.info("Cache cleanup [dry-run] would delete zombie {} ({} bytes)", file, size);
+                    if (deleted < DRY_RUN_EXAMPLES) {
+                        log.info("Cache cleanup [dry-run] would delete zombie {} ({} bytes)", file, size);
+                    } else {
+                        log.debug("Cache cleanup [dry-run] would delete zombie {} ({} bytes)", file, size);
+                    }
                 } else {
                     Files.delete(file);
                     log.debug("Cache cleanup deleted zombie {} ({} bytes)", file, size);

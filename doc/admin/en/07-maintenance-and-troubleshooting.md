@@ -24,7 +24,8 @@ should know about, what to back up, and the usual suspects when something looks 
 
 **Important:** the cache cleanup ships with
 **`app.ister.server.cache-cleanup.dry-run=true`** — by default it only *logs* what it would
-delete. Run a deploy or two, check the log lines look sane, then set
+delete: one summary line per run (count and size) plus the first twenty candidates by name; the
+full list is on DEBUG. Run a deploy or two, check those lines look sane, then set
 `CACHE_CLEANUP_DRY_RUN=false` to let it actually reclaim disk space. It never touches files
 younger than `CACHE_CLEANUP_MIN_AGE` (24h), and it never touches your media.
 

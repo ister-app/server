@@ -155,7 +155,11 @@ public class CacheCleanupScheduler {
                     continue;
                 }
                 if (dryRun) {
-                    log.info("Cache cleanup [dry-run] would delete {}", object.key());
+                    if (deleted < CacheCleanupService.DRY_RUN_EXAMPLES) {
+                        log.info("Cache cleanup [dry-run] would delete {}", object.key());
+                    } else {
+                        log.debug("Cache cleanup [dry-run] would delete {}", object.key());
+                    }
                 } else {
                     store.delete(object.key());
                 }

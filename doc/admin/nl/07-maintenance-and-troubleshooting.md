@@ -25,7 +25,9 @@ en de gebruikelijke verdachten wanneer iets er raar uitziet.
 
 **Belangrijk:** de cache-opschoning wordt geleverd met
 **`app.ister.server.cache-cleanup.dry-run=true`** — standaard *logt* hij alleen wat hij zou
-verwijderen. Draai een deploy of twee, controleer of de logregels er verstandig uitzien, en zet
+verwijderen: één samenvattingsregel per run (aantal en omvang) plus de eerste twintig kandidaten
+bij naam; de volledige lijst staat op DEBUG. Draai een deploy of twee, controleer of die regels er
+verstandig uitzien, en zet
 dan `CACHE_CLEANUP_DRY_RUN=false` om daadwerkelijk schijfruimte terug te winnen. Hij komt nooit
 aan bestanden jonger dan `CACHE_CLEANUP_MIN_AGE` (24u), en nooit aan je media.
 
