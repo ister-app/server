@@ -26,7 +26,7 @@ public class PathObject {
     private static final String REGEX_FILE_TYPE = ".*\\.(.*)";
     private static final List<String> IMAGE_FILE_TYPES = List.of("jpg", "png");
     private static final List<String> NFO_FILE_TYPES = List.of("nfo");
-    private static final List<String> MEDIA_FILES_FILE_TYPES = List.of("mkv", "mp4");
+    private static final List<String> MEDIA_FILES_FILE_TYPES = List.of("mkv", "mp4", "webm", "m4v", "flv", "avi");
     private static final List<String> SUBTITLE_FILES_FILE_TYPES = List.of("srt");
     private String name;
     private int year;

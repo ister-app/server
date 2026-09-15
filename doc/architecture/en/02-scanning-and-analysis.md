@@ -22,7 +22,7 @@ See the [scan-flow diagram](../diagrams/scan-flow.md). `scanLibraries()` sends
 `NEW_DIRECTORIES_SCAN_REQUEST` per directory; the disk handler walks the filesystem and emits one
 `FILE_SCAN_REQUESTED` per file. `FileScanRequestedHandle` routes on extension (and library type).
 The extension lists are exact and short (`PathObject`): images are `jpg`/`png`, video is
-`mkv`/`mp4`, subtitles are `srt` — a `.jpeg` or `.avi` is simply not picked up. Which scanners run
+`mkv`/`mp4`/`webm`/`m4v`/`flv`/`avi`, subtitles are `srt` — a `.jpeg` or `.wmv` is simply not picked up. Which scanners run
 at all depends on the library type: a COMIC library uses only `ComicScanner` + `ImageScanner`;
 MUSIC uses audio/image/nfo, BOOK adds `EpubScanner`; only movie/show libraries run the
 `SubtitleScanner` and `MediaFileScanner`.

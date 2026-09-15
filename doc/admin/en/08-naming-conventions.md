@@ -51,7 +51,7 @@ The Wire (2002)/
 - **Multi-episode files**: `s04e06-e07.mkv` (also written `s04e06e07` or `s04e06-07`) creates
   both episodes pointing at the one file, up to **three** episodes per file. An implausible range
   (backwards, or wider than three) is logged and treated as the single first episode.
-- Video containers: `.mkv`, `.mp4`. Subtitles: `.srt` next to the episode, matched by filename
+- Video containers: `.mkv`, `.mp4`, `.webm`, `.m4v`, `.flv`, `.avi`. Subtitles: `.srt` next to the episode, matched by filename
   prefix; a language code between the last two dots (`s01e01.en.srt`, `s01e01.nld.srt`) sets the
   subtitle language. Image-based subtitles embedded in the container are OCRed; untagged streams
   fall back to `app.ister.server.subtitle-ocr-default-language` (default `eng`).
@@ -78,7 +78,7 @@ Heat (1995)/
   rule above: `Heat (1995)-cover.jpg` (or `-poster`/`-folder`) becomes the poster,
   `Heat (1995)-thumb.jpg` (or `-background`) the backdrop. A bare `Heat (1995).jpg` carries
   **no** type token and is dropped.
-- Same containers as shows (`.mkv`, `.mp4`). Movie-level `.nfo` files and subtitles are currently
+- Same containers as shows (`.mkv`, `.mp4`, `.webm`, `.m4v`, `.flv`, `.avi`). Movie-level `.nfo` files and subtitles are currently
   not picked up for movies.
 
 ## Music

@@ -75,7 +75,7 @@ never from the filename.
 `.epub`; loose patterns like `attackontitan_vol27.pdf`, `series_issue8.pdf` and `name#3.cbz`
 are tolerated.
 
-In SHOW and MOVIE libraries the recognised video containers are `mkv` and `mp4`; subtitles: `.srt`
+In SHOW and MOVIE libraries the recognised video containers are `mkv`, `mp4`, `webm`, `m4v`, `flv` and `avi`; subtitles: `.srt`
 next to the video (image subtitles inside mkv are extracted and OCR'd); local artwork: `jpg`/`png`;
 `.nfo` files are read for metadata hints. Other library types accept their own extension lists —
 see the naming reference.

@@ -76,7 +76,7 @@ nooit aan de bestandsnaam.
 `.epub`; losse patronen als `attackontitan_vol27.pdf`, `series_issue8.pdf` en `name#3.cbz`
 worden getolereerd.
 
-In SHOW- en MOVIE-libraries zijn de herkende videocontainers `mkv` en `mp4`; ondertitels: `.srt`
+In SHOW- en MOVIE-libraries zijn de herkende videocontainers `mkv`, `mp4`, `webm`, `m4v`, `flv` en `avi`; ondertitels: `.srt`
 naast de video (beeldondertitels in mkv worden geëxtraheerd en met OCR omgezet); lokale artwork:
 `jpg`/`png`; `.nfo`-bestanden worden gelezen voor metadata-hints. Andere librarytypes hebben hun
 eigen extensielijsten — zie de naamreferentie.

@@ -23,7 +23,7 @@ Zie het [scan-flow-diagram](../diagrams/scan-flow.md). `scanLibraries()` stuurt 
 `NEW_DIRECTORIES_SCAN_REQUEST`; de disk-handler loopt door het filesystem en stuurt per bestand één
 `FILE_SCAN_REQUESTED`. `FileScanRequestedHandle` routeert op extensie (en library-type). De
 extensielijsten zijn exact en kort (`PathObject`): afbeeldingen zijn `jpg`/`png`, video is
-`mkv`/`mp4`, ondertitels zijn `srt` — een `.jpeg` of `.avi` wordt simpelweg niet opgepakt. Welke
+`mkv`/`mp4`/`webm`/`m4v`/`flv`/`avi`, ondertitels zijn `srt` — een `.jpeg` of `.wmv` wordt simpelweg niet opgepakt. Welke
 scanners überhaupt draaien hangt af van het library-type: een COMIC-library gebruikt alleen
 `ComicScanner` + `ImageScanner`; MUSIC gebruikt audio/image/nfo, BOOK voegt de `EpubScanner` toe;
 alleen film-/show-libraries draaien de `SubtitleScanner` en `MediaFileScanner`:

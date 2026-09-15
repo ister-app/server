@@ -177,6 +177,27 @@ class PathObjectTest {
 
     @ParameterizedTest
     @CsvSource({
+        "/disk/shows/Show (2024)/Season 01/s01e01.webm, EPISODE",
+        "/disk/shows/Show (2024)/Season 01/s01e01.M4V, EPISODE",
+        "/disk/shows/Show (2024)/Season 01/s01e01.flv, EPISODE",
+        "/disk/shows/Show (2024)/Season 01/s01e01.avi, EPISODE",
+        "/disk/movies/Movie (2024).webm, MOVIE",
+        "/disk/movies/Movie (2024).m4v, MOVIE"
+    })
+    void otherVideoContainersAreMedia(String path, DirType dirType) {
+        var subject = new PathObject(path);
+        assertEquals(dirType, subject.getDirType());
+        assertEquals(FileType.MEDIA, subject.getFileType());
+    }
+
+    @Test
+    void unknownContainerIsNotMedia() {
+        var subject = new PathObject("/disk/shows/Show (2024)/Season 01/s01e01.wmv");
+        assertEquals(FileType.NONE, subject.getFileType());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
         "/disk/shows/Show (2024)/Season 04/s04e06-e07.mkv, 4, 6, 7",
         "/disk/shows/Show (2024)/Season 04/s04e06-07.mkv, 4, 6, 7",
         "/disk/shows/Show (2024)/Season 04/s04e06e07.mkv, 4, 6, 7",

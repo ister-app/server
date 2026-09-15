@@ -54,7 +54,7 @@ The Wire (2002)/
   `s04e06-07`) maakt beide afleveringen aan, wijzend naar dat ene bestand, tot maximaal **drie**
   afleveringen per bestand. Een onplausibele reeks (achterstevoren, of breder dan drie) wordt
   gelogd en behandeld als alleen de eerste aflevering.
-- Videocontainers: `.mkv`, `.mp4`. Ondertitels: `.srt` naast de aflevering, gekoppeld op
+- Videocontainers: `.mkv`, `.mp4`, `.webm`, `.m4v`, `.flv`, `.avi`. Ondertitels: `.srt` naast de aflevering, gekoppeld op
   bestandsnaam-prefix; een taalcode tussen de laatste twee punten (`s01e01.en.srt`,
   `s01e01.nld.srt`) bepaalt de ondertiteltaal. In de container ingebedde beeldondertitels worden
   ge-OCR'd; streams zonder taaltag vallen terug op
@@ -83,7 +83,7 @@ Heat (1995)/
   typeregel hierboven: `Heat (1995)-cover.jpg` (of `-poster`/`-folder`) wordt de poster,
   `Heat (1995)-thumb.jpg` (of `-background`) de achtergrond. Een kaal `Heat (1995).jpg` bevat
   **geen** type-token en wordt genegeerd.
-- Dezelfde containers als series (`.mkv`, `.mp4`). `.nfo`-bestanden en ondertitels op filmniveau
+- Dezelfde containers als series (`.mkv`, `.mp4`, `.webm`, `.m4v`, `.flv`, `.avi`). `.nfo`-bestanden en ondertitels op filmniveau
   worden op dit moment niet opgepakt.
 
 ## Muziek
