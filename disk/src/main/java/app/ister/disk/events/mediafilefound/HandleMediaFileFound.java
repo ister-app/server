@@ -24,7 +24,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -34,7 +35,6 @@ import java.util.Optional;
 
 @Slf4j
 @Service
-@Transactional
 public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     private final DirectoryRepository directoryRepository;
     private final MediaFileRepository mediaFileRepository;
@@ -52,6 +52,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     private final MessageSender messageSender;
     private final MediaFileInputResolver inputResolver;
     private final CacheDirectoryResolver cacheDirectoryResolver;
+    private final TransactionTemplate transactionTemplate;
 
     @Value("${app.ister.server.ffmpeg-dir}")
     private String dirOfFFmpeg;
@@ -73,7 +74,8 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
                                 MediaFileFoundDetectCrop mediaFileFoundDetectCrop,
                                 MessageSender messageSender,
                                 MediaFileInputResolver inputResolver,
-                                CacheDirectoryResolver cacheDirectoryResolver) {
+                                CacheDirectoryResolver cacheDirectoryResolver,
+                                PlatformTransactionManager transactionManager) {
         this.directoryRepository = directoryRepository;
         this.mediaFileRepository = mediaFileRepository;
         this.episodeRepository = episodeRepository;
@@ -89,6 +91,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
         this.messageSender = messageSender;
         this.inputResolver = inputResolver;
         this.cacheDirectoryResolver = cacheDirectoryResolver;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     private static String getPathString(Optional<EpisodeEntity> episodeEntity, Optional<MovieEntity> movieEntity) {
@@ -113,12 +116,13 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     }
 
     /**
-     * When the scanner find the media file it saves the data in the database.
-     * The scanner is not analyzing the media file, because it can take a bit longer.
-     * So this handler will analyze the media file.
-     * - The duration of the file.
-     * - And the containing streams (video, audio and subtitles streams).
-     * - And will create a background image.
+     * When the scanner finds a media file it only saves the row; analysing the file (duration,
+     * streams, crop, episode boundaries, a background still) is this handler's job.
+     * <p>
+     * All of that shells out to ffprobe/ffmpeg and on a slow disk takes minutes per file, so it
+     * runs <em>outside</em> any transaction: holding a connection "idle in transaction" that
+     * long starved the pool for every other handler and bloated postgres. Only the persisting of
+     * the result is one short transaction; the events that need those rows go out after commit.
      */
     @Override
     public void handle(app.ister.core.eventdata.MediaFileFoundData mediaFileFoundData) {
@@ -136,14 +140,15 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             subject = ActivitySubjects.describe(movieEntity.get(), subject);
         }
         ActivityContext.report(subject);
-        var mediaFile = checkMediaFile(directoryEntity, mediaFileFoundData.getPath());
+        Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, mediaFileFoundData.getPath());
         mediaFile.ifPresent(mediaFileEntity -> {
-            var parts = updateEpisodeBoundaries(mediaFileEntity);
+            Analysis analysis = analyze(mediaFileEntity);
+            transactionTemplate.executeWithoutResult(status -> persist(directoryEntity, mediaFileEntity, analysis));
             ActivityContext.step("still");
-            if (parts.size() >= 2) {
+            if (analysis.parts().size() >= 2) {
                 // Multi-episode file: every contained episode gets its own background still,
                 // taken at the midpoint of its own slice of the file.
-                for (MediaFileEpisodeEntity part : parts) {
+                for (MediaFileEpisodeEntity part : analysis.parts()) {
                     episodeRepository.findById(part.getEpisodeEntityId()).ifPresent(partEpisode ->
                             createBackgroundImage(Optional.of(partEpisode), Optional.empty(), mediaFileEntity,
                                     part.getStartInMilliseconds() + part.getDurationInMilliseconds() / 2));
@@ -151,29 +156,75 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             } else {
                 createBackgroundImage(episodeEntity, movieEntity, mediaFileEntity, mediaFileEntity.getDurationInMilliseconds() / 2);
             }
-            // Intro/outro detection is season-wide (it compares sibling episodes), so it runs as
-            // its own event once this file's analysis is committed — after commit, or the handler
-            // would still see the old duration/detector version. Idempotent on the handler side,
-            // so firing once per analyzed episode is fine.
+            // Intro/outro detection is season-wide (it compares sibling episodes) and must see the
+            // committed duration/detector version, hence after the persist. Idempotent on the
+            // handler side, so firing once per analyzed episode is fine.
             episodeEntity.ifPresent(episode -> {
                 DetectSegmentsData detectSegmentsData = DetectSegmentsData.builder()
                         .eventType(EventType.DETECT_SEGMENTS)
                         .seasonEntityUUID(episode.getSeasonEntity().getId())
                         .directoryEntityUUID(directoryEntity.getId())
                         .build();
-                AfterCommitPublisher.publishAfterCommit(() ->
-                        messageSender.sendDetectSegments(detectSegmentsData, directoryEntity.getName()));
+                messageSender.sendDetectSegments(detectSegmentsData, directoryEntity.getName());
             });
         });
     }
 
+    /** What the ffprobe/ffmpeg passes found; nothing here has touched the database yet. */
+    record Analysis(List<MediaFileStreamEntity> streams, List<MediaFileEpisodeEntity> parts) {
+    }
+
+    /** The slow part: probe the streams and duration, detect the crop, locate episode boundaries. */
+    private Analysis analyze(MediaFileEntity mediaFileEntity) {
+        ActivityContext.step("probe");
+        String input = inputResolver.resolve(mediaFileEntity);
+        var checkResult = mediaFileFoundCheckForStreams.checkForStreams(mediaFileEntity, input, dirOfFFmpeg);
+        long duration = checkResult.durationInMilliseconds() > 0
+                ? checkResult.durationInMilliseconds()
+                : mediaFileFoundGetDuration.getDurationByDecodingFile(input);
+        mediaFileEntity.setDurationInMilliseconds(duration);
+
+        var streams = checkResult.streams();
+        ActivityContext.step("crop");
+        detectAndSetCrop(mediaFileEntity, streams, duration);
+
+        return new Analysis(streams, locateEpisodeBoundaries(mediaFileEntity, duration));
+    }
+
+    /** The short transaction: replace the stream rows, store duration, crop and boundaries. */
+    private void persist(DirectoryEntity directoryEntity, MediaFileEntity mediaFileEntity, Analysis analysis) {
+        // Clear existing stream metadata so re-analysis on retry doesn't hit duplicate-key errors.
+        mediaFileStreamRepository.deleteAllByMediaFileEntityId(mediaFileEntity.getId());
+        mediaFileStreamRepository.flush();
+        mediaFileRepository.save(mediaFileEntity);
+        mediaFileStreamRepository.saveAll(analysis.streams());
+        if (analysis.parts().size() >= 2) {
+            mediaFileEpisodeRepository.saveAll(analysis.parts());
+        }
+        // Embedded subtitles become SRTs in their own event, one per stream: extraction and
+        // OCR take minutes and a helper node may do them. After commit, or the handler would
+        // not find the rows.
+        analysis.streams().stream()
+                .filter(SubtitleExtractor::isExtractable)
+                .forEach(stream -> {
+                    SubtitleExtractRequestedData data = SubtitleExtractRequestedData.builder()
+                            .eventType(EventType.SUBTITLE_EXTRACT_REQUESTED)
+                            .mediaFileEntityUUID(mediaFileEntity.getId())
+                            .directoryEntityUUID(directoryEntity.getId())
+                            .subtitleStreamEntityUUID(stream.getId())
+                            .build();
+                    AfterCommitPublisher.publishAfterCommit(() ->
+                            messageSender.sendSubtitleExtractRequested(data, directoryEntity.getName()));
+                });
+    }
+
     /**
      * For a multi-episode file (s04e06-e07.mkv): compute where each episode starts, preferring the
-     * MKV chapter markers, and store the slices on the link rows. Idempotent on re-analysis.
+     * MKV chapter markers, and put the slices on the link rows (saved by {@link #persist}).
+     * Idempotent on re-analysis.
      */
-    private List<MediaFileEpisodeEntity> updateEpisodeBoundaries(MediaFileEntity mediaFileEntity) {
+    private List<MediaFileEpisodeEntity> locateEpisodeBoundaries(MediaFileEntity mediaFileEntity, long duration) {
         List<MediaFileEpisodeEntity> parts = mediaFileEpisodeRepository.findByMediaFileEntityIdOrderByPartNumber(mediaFileEntity.getId());
-        long duration = mediaFileEntity.getDurationInMilliseconds();
         if (parts.size() < 2 || duration <= 0) {
             return parts;
         }
@@ -184,49 +235,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             parts.get(i).setStartInMilliseconds(starts.get(i));
             parts.get(i).setDurationInMilliseconds(end - starts.get(i));
         }
-        mediaFileEpisodeRepository.saveAll(parts);
         return parts;
-    }
-
-    private Optional<MediaFileEntity> checkMediaFile(DirectoryEntity directoryEntity, String file) {
-        Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, file);
-        mediaFile.ifPresent(mediaFileEntity -> {
-            // Clear existing stream metadata so re-analysis on retry doesn't hit duplicate-key errors.
-            mediaFileStreamRepository.deleteAllByMediaFileEntityId(mediaFileEntity.getId());
-            mediaFileStreamRepository.flush();
-
-            // Analyze media file streams; duration is derived from the same ffprobe call.
-            ActivityContext.step("probe");
-            String input = inputResolver.resolve(mediaFileEntity);
-            var checkResult = mediaFileFoundCheckForStreams.checkForStreams(mediaFileEntity, input, dirOfFFmpeg);
-            long duration = checkResult.durationInMilliseconds() > 0
-                    ? checkResult.durationInMilliseconds()
-                    : mediaFileFoundGetDuration.getDurationByDecodingFile(input);
-            mediaFileEntity.setDurationInMilliseconds(duration);
-            mediaFileRepository.save(mediaFileEntity);
-
-            var streams = checkResult.streams();
-            ActivityContext.step("crop");
-            detectAndSetCrop(mediaFileEntity, streams, duration);
-            mediaFileStreamRepository.saveAll(streams);
-
-            // Embedded subtitles become SRTs in their own event, one per stream: extraction and
-            // OCR take minutes, must not hold this transaction, and a helper node may do them.
-            // After commit, or the handler would not find the rows.
-            streams.stream()
-                    .filter(SubtitleExtractor::isExtractable)
-                    .forEach(stream -> {
-                        SubtitleExtractRequestedData data = SubtitleExtractRequestedData.builder()
-                                .eventType(EventType.SUBTITLE_EXTRACT_REQUESTED)
-                                .mediaFileEntityUUID(mediaFileEntity.getId())
-                                .directoryEntityUUID(directoryEntity.getId())
-                                .subtitleStreamEntityUUID(stream.getId())
-                                .build();
-                        AfterCommitPublisher.publishAfterCommit(() ->
-                                messageSender.sendSubtitleExtractRequested(data, directoryEntity.getName()));
-                    });
-        });
-        return mediaFile;
     }
 
     /**

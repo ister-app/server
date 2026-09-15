@@ -27,6 +27,12 @@ albums left without tracks. A moved or renamed file comes back as a *new* track,
 orphan is deleted its watch status, play-queue and playlist items and rating are handed over to the
 track by the same artist with the same title that still has a file; every removed track and album
 gets a delete in the search index.
+
+`HandleMediaFileFound` does its ffprobe/ffmpeg work (streams, duration, crop detection, episode
+boundaries, the background still) *outside* any transaction and persists the result in one short
+`TransactionTemplate` block. On a slow disk a single file takes minutes; holding a connection
+"idle in transaction" that long starved the pool for every other handler. The events that need
+the new rows (subtitle extraction, intro detection) are sent after that commit.
 The extension lists are exact and short (`PathObject`): images are `jpg`/`png`, video is
 `mkv`/`mp4`/`webm`/`m4v`/`flv`/`avi`, subtitles are `srt` — a `.jpeg` or `.wmv` is simply not picked up. Which scanners run
 at all depends on the library type: a COMIC library uses only `ComicScanner` + `ImageScanner`;

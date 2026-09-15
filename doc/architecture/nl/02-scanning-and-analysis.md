@@ -27,7 +27,13 @@ voor een MUSIC-library ruimt `OrphanTrackCleanupService` daarna de tracks zonder
 albums zonder tracks op. Een verplaatst of hernoemd bestand komt terug als een *nieuwe* track, dus
 voordat een wees verdwijnt gaan zijn kijkstatus, wachtrij- en playlist-items en rating over naar de
 track van dezelfde artiest met dezelfde titel die nog wel een bestand heeft; elke verwijderde track
-en elk verwijderd album krijgt een delete in de zoekindex. De
+en elk verwijderd album krijgt een delete in de zoekindex.
+
+`HandleMediaFileFound` doet zijn ffprobe-/ffmpeg-werk (streams, duur, cropdetectie, afleveringsgrenzen,
+de achtergrondstill) *buiten* elke transactie en slaat het resultaat op in één kort
+`TransactionTemplate`-blok. Op een trage schijf duurt één bestand minuten; een verbinding zo lang
+"idle in transaction" houden liet de pool leeglopen voor alle andere handlers. De events die de
+nieuwe rijen nodig hebben (ondertitelextractie, introdetectie) gaan na die commit de deur uit. De
 extensielijsten zijn exact en kort (`PathObject`): afbeeldingen zijn `jpg`/`png`, video is
 `mkv`/`mp4`/`webm`/`m4v`/`flv`/`avi`, ondertitels zijn `srt` — een `.jpeg` of `.wmv` wordt simpelweg niet opgepakt. Welke
 scanners überhaupt draaien hangt af van het library-type: een COMIC-library gebruikt alleen

@@ -64,6 +64,9 @@ class HandleMediaFileFoundTest {
     private app.ister.core.node.MediaFileInputResolver inputResolver;
     @Mock
     private app.ister.core.storage.CacheDirectoryResolver cacheDirectoryResolver;
+    // A mocked manager hands out a null status and commits into the void, so the persist block runs inline.
+    @Mock
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     @InjectMocks
     private HandleMediaFileFound subject;
