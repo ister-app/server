@@ -140,9 +140,16 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             subject = ActivitySubjects.describe(movieEntity.get(), subject);
         }
         ActivityContext.report(subject);
-        Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, mediaFileFoundData.getPath());
-        mediaFile.ifPresent(mediaFileEntity -> {
-            Analysis analysis = analyze(mediaFileEntity);
+        // The lookup and the input resolution need a session: the file's directory is a lazy
+        // proxy, and resolving an S3 or remote file reads its storage kind and owning node.
+        Loaded loaded = transactionTemplate.execute(status ->
+                mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, mediaFileFoundData.getPath())
+                        .map(entity -> new Loaded(entity, inputResolver.resolve(entity)))
+                        .orElse(null));
+        Optional.ofNullable(loaded).ifPresent(l -> {
+            MediaFileEntity mediaFileEntity = l.mediaFile();
+            String input = l.input();
+            Analysis analysis = analyze(mediaFileEntity, input);
             transactionTemplate.executeWithoutResult(status -> persist(directoryEntity, mediaFileEntity, analysis));
             ActivityContext.step("still");
             if (analysis.parts().size() >= 2) {
@@ -150,11 +157,11 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
                 // taken at the midpoint of its own slice of the file.
                 for (MediaFileEpisodeEntity part : analysis.parts()) {
                     episodeRepository.findById(part.getEpisodeEntityId()).ifPresent(partEpisode ->
-                            createBackgroundImage(Optional.of(partEpisode), Optional.empty(), mediaFileEntity,
+                            createBackgroundImage(Optional.of(partEpisode), Optional.empty(), mediaFileEntity, input,
                                     part.getStartInMilliseconds() + part.getDurationInMilliseconds() / 2));
                 }
             } else {
-                createBackgroundImage(episodeEntity, movieEntity, mediaFileEntity, mediaFileEntity.getDurationInMilliseconds() / 2);
+                createBackgroundImage(episodeEntity, movieEntity, mediaFileEntity, input, mediaFileEntity.getDurationInMilliseconds() / 2);
             }
             // Intro/outro detection is season-wide (it compares sibling episodes) and must see the
             // committed duration/detector version, hence after the persist. Idempotent on the
@@ -170,14 +177,17 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
         });
     }
 
+    /** The media file row plus what ffmpeg should open for it (a path, or a URL for S3/remote files). */
+    record Loaded(MediaFileEntity mediaFile, String input) {
+    }
+
     /** What the ffprobe/ffmpeg passes found; nothing here has touched the database yet. */
     record Analysis(List<MediaFileStreamEntity> streams, List<MediaFileEpisodeEntity> parts) {
     }
 
     /** The slow part: probe the streams and duration, detect the crop, locate episode boundaries. */
-    private Analysis analyze(MediaFileEntity mediaFileEntity) {
+    private Analysis analyze(MediaFileEntity mediaFileEntity, String input) {
         ActivityContext.step("probe");
-        String input = inputResolver.resolve(mediaFileEntity);
         var checkResult = mediaFileFoundCheckForStreams.checkForStreams(mediaFileEntity, input, dirOfFFmpeg);
         long duration = checkResult.durationInMilliseconds() > 0
                 ? checkResult.durationInMilliseconds()
@@ -186,9 +196,9 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
 
         var streams = checkResult.streams();
         ActivityContext.step("crop");
-        detectAndSetCrop(mediaFileEntity, streams, duration);
+        detectAndSetCrop(input, streams, duration);
 
-        return new Analysis(streams, locateEpisodeBoundaries(mediaFileEntity, duration));
+        return new Analysis(streams, locateEpisodeBoundaries(mediaFileEntity, input, duration));
     }
 
     /** The short transaction: replace the stream rows, store duration, crop and boundaries. */
@@ -223,13 +233,13 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
      * MKV chapter markers, and put the slices on the link rows (saved by {@link #persist}).
      * Idempotent on re-analysis.
      */
-    private List<MediaFileEpisodeEntity> locateEpisodeBoundaries(MediaFileEntity mediaFileEntity, long duration) {
+    private List<MediaFileEpisodeEntity> locateEpisodeBoundaries(MediaFileEntity mediaFileEntity, String input, long duration) {
         List<MediaFileEpisodeEntity> parts = mediaFileEpisodeRepository.findByMediaFileEntityIdOrderByPartNumber(mediaFileEntity.getId());
         if (parts.size() < 2 || duration <= 0) {
             return parts;
         }
         ActivityContext.step("boundaries");
-        List<Long> starts = mediaFileFoundEpisodeBoundaries.boundaryStarts(inputResolver.resolve(mediaFileEntity), dirOfFFmpeg, duration, parts.size());
+        List<Long> starts = mediaFileFoundEpisodeBoundaries.boundaryStarts(input, dirOfFFmpeg, duration, parts.size());
         for (int i = 0; i < parts.size(); i++) {
             long end = i + 1 < parts.size() ? starts.get(i + 1) : duration;
             parts.get(i).setStartInMilliseconds(starts.get(i));
@@ -243,12 +253,12 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
      * crop rect on the stream row (full frame = detected, no bars). Failure
      * leaves the columns null so the scanner's backfill retries later.
      */
-    private void detectAndSetCrop(MediaFileEntity mediaFileEntity, List<MediaFileStreamEntity> streams, long duration) {
+    private void detectAndSetCrop(String input, List<MediaFileStreamEntity> streams, long duration) {
         streams.stream()
                 .filter(s -> s.getCodecType() == StreamCodecType.VIDEO && s.getWidth() > 0 && s.getHeight() > 0)
                 .findFirst()
                 .ifPresent(video -> mediaFileFoundDetectCrop
-                        .detectCrop(inputResolver.resolve(mediaFileEntity), dirOfFFmpeg, duration,
+                        .detectCrop(input, dirOfFFmpeg, duration,
                                 video.getWidth(), video.getHeight())
                         .ifPresent(crop -> {
                             video.setCropX(crop.x());
@@ -262,7 +272,8 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
      * Check if the given {@link EpisodeEntity} or {@link MovieEntity} has image entities if not:
      * Create background image for media file and save a reference to it in the database.
      */
-    private void createBackgroundImage(Optional<EpisodeEntity> episodeEntity, Optional<MovieEntity> movieEntity, MediaFileEntity mediaFileEntity, long stillAtMilliseconds) {
+    private void createBackgroundImage(Optional<EpisodeEntity> episodeEntity, Optional<MovieEntity> movieEntity, MediaFileEntity mediaFileEntity,
+                                       String input, long stillAtMilliseconds) {
         String mediaFilePath = mediaFileEntity.getPath();
         // Query the image repository directly instead of navigating the entities' LAZY
         // imagesEntities collection: this handler runs on a RabbitMQ listener thread with no
@@ -277,7 +288,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             try {
                 // ffmpeg writes a local file; the store moves it into place (or uploads it).
                 Path still = Files.createTempFile(Path.of(tmpDir), "still-", ".jpg");
-                mediaFileFoundCreateBackground.createBackground(still, inputResolver.resolve(mediaFileEntity), dirOfFFmpeg, stillAtMilliseconds);
+                mediaFileFoundCreateBackground.createBackground(still, input, dirOfFFmpeg, stillAtMilliseconds);
                 toPath = cacheStore.write(relativeKey, still, "image/jpeg");
             } catch (JaffreeAbnormalExitException | IOException e) {
                 log.error("Failed to create background image for {}: {}", mediaFilePath, e.getMessage());

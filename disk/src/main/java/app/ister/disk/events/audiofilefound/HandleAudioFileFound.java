@@ -157,15 +157,20 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
     @Override
     public void handle(AudioFileFoundData messageData) {
         var directoryEntity = directoryRepository.findById(messageData.getDirectoryEntityUUID()).orElseThrow();
-        Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, messageData.getPath());
-        if (mediaFile.isEmpty()) {
+        // The lookup and the input resolution need a session: the file's directory is a lazy
+        // proxy, and resolving an S3 or remote file reads its storage kind and owning node.
+        Loaded loaded = transactionTemplate.execute(status ->
+                mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, messageData.getPath())
+                        .map(e -> new Loaded(e, inputResolver.resolve(e)))
+                        .orElse(null));
+        if (loaded == null) {
             log.warn("AudioFileFound: media file entity not found for path={} directoryId={} — skipping analysis",
                     messageData.getPath(), messageData.getDirectoryEntityUUID());
             return;
         }
-        MediaFileEntity entity = mediaFile.get();
+        MediaFileEntity entity = loaded.mediaFile();
+        String input = loaded.input();
         ActivityContext.report(ActivitySubjects.describe(entity));
-        String input = inputResolver.resolve(entity);
         var checkResult = mediaFileFoundCheckForStreams.checkForStreams(entity, input, dirOfFFmpeg);
         long duration = checkResult.durationInMilliseconds() > 0
                 ? checkResult.durationInMilliseconds()
@@ -179,9 +184,13 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                 persist(directoryEntity, messageData, duration, checkResult.streams(), format));
 
         if (coverOwner != null) {
-            extractEmbeddedCoverArt(coverOwner, checkResult.hasAttachedPic());
+            extractEmbeddedCoverArt(coverOwner, input, checkResult.hasAttachedPic());
         }
         deleteHlsCache(entity.getId());
+    }
+
+    /** The media file row plus what ffmpeg should open for it (a path, or a URL for S3/remote files). */
+    record Loaded(MediaFileEntity mediaFile, String input) {
     }
 
     /** Whose cover an embedded picture would be, resolved inside the transaction (lazy associations). */
@@ -533,7 +542,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         return filename.isBlank() ? null : filename.strip();
     }
 
-    private void extractEmbeddedCoverArt(CoverOwner owner, boolean hasAttachedPic) {
+    private void extractEmbeddedCoverArt(CoverOwner owner, String input, boolean hasAttachedPic) {
         if (!hasAttachedPic) return;
         MediaFileEntity mediaFile = owner.mediaFile();
         UUID albumId = owner.albumId();
@@ -559,7 +568,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         String storedPath;
         try {
             Path extracted = Files.createTempFile(Paths.get(tmpDir), "cover-", ".jpg");
-            audioFileFoundExtractCoverArt.extract(extracted, inputResolver.resolve(mediaFile), dirOfFFmpeg);
+            audioFileFoundExtractCoverArt.extract(extracted, input, dirOfFFmpeg);
             storedPath = cacheStore.write(String.join("/", coverSubDir, coverOwnerId.toString(), "cover.jpg"), extracted, "image/jpeg");
         } catch (Exception e) {
             log.warn("Failed to extract embedded cover art from {}: {}", mediaFile.getPath(), e.getMessage());
