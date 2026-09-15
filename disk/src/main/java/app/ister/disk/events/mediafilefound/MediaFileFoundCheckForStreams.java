@@ -41,6 +41,11 @@ public class MediaFileFoundCheckForStreams {
         boolean hasAttachedPic = false;
         FFprobeResult mediaStreams = FFprobe.atPath(Paths.get(dirOfFFmpeg))
                 .setShowStreams(true)
+                // Blu-ray rips carry PGS subtitle streams whose first packet sits well past the
+                // default 5 MB probe window; without a wider look ffprobe reports them without
+                // codec parameters (and warns about it on every file).
+                .setProbeSize(50_000_000L)
+                .setAnalyzeDuration(20_000_000L)
                 .setInput(input)
                 .setLogLevel(LogLevel.ERROR)
                 .execute();
