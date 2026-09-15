@@ -1,4 +1,6 @@
 type Query {
+    "Admin only. Number of events whose handler kept failing and that wait in the dead-letter queue."
+    deadLetterCount: Int!
     getServerInfo: ServerInfo
     "Initial state for the serverActivity/nowPlaying subscriptions: last known cluster-wide status."
     serverActivitySnapshot: ServerActivitySnapshot!
@@ -178,6 +180,12 @@ type Mutation {
     refreshTrack(trackId: ID!): Boolean!
     "Admin only. Rebuilds the search index into a fresh collection and swaps it in; search stays available while it runs."
     rebuildSearchIndex: Boolean!
+    """
+    Admin only. Sends every dead-lettered event back to the queue it failed on, e.g. after the bug
+    that dead-lettered it has been deployed. Returns the number replayed; an event that fails again
+    simply dead-letters again.
+    """
+    replayDeadLetters: Int!
     "Sets the calling user's rating (1-10) for a media item. Pass rating: null to clear it. Returns true."
     setRating(mediaType: RatingMediaType!, mediaId: ID!, rating: Int): Boolean!
     """

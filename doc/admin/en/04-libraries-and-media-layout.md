@@ -101,6 +101,7 @@ The maintenance mutations (also exposed in the client's admin screens):
 | `refreshMetadata(FORCE, libraryId)` | Rebuild one library: wipe stored metadata, artwork and stream info, then re-fetch everything (e.g. after a wrong match, or to pick up newly added fields on old items). | Heavy: an external fetch per item, ffprobe per file. |
 | `refreshMovie/Show/Episode/Person/Album/Track(id)` | The same wipe-and-refetch for a single item (the ⋮ menu on its detail page). There is **no** per-item refresh for books, comics or podcasts. | One item (a show fans out to its episodes). |
 | `rebuildSearchIndex` | Rebuild the Typesense index into a fresh collection (after enabling search or changing languages). | Reads the whole database once; search stays available. |
+| `replayDeadLetters` | Events whose handler kept failing wait in the dead-letter queue (`deadLetterCount` shows how many). After the cause is fixed, this sends them back to their original queue. | One republish per event; one that fails again dead-letters again. |
 | `refreshPodcasts` | Re-fetch every subscribed feed now instead of waiting for the hourly refresh. **Not** admin-only. | Cheap (conditional GET per feed). |
 | `downloadPodcastEpisode(episodeId)` | Pull one older episode into the cache on demand. Not admin-only. | One download. |
 

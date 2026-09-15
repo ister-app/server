@@ -105,6 +105,7 @@ De onderhouds-mutations (ook beschikbaar in de beheerschermen van de client):
 | `refreshMetadata(FORCE, libraryId)` | Eén bibliotheek opnieuw opbouwen: opgeslagen metadata, afbeeldingen en streaminfo wissen en alles opnieuw ophalen (bv. na een verkeerde match, of om nieuwe velden op oude items te vullen). | Zwaar: een externe fetch per item, ffprobe per bestand. |
 | `refreshMovie/Show/Episode/Person/Album/Track(id)` | Dezelfde wipe-en-herfetch voor één item (het ⋮-menu op de detailpagina). Er is **geen** per-item-verversing voor boeken, comics of podcasts. | Eén item (een show waaiert uit naar zijn afleveringen). |
 | `rebuildSearchIndex` | De Typesense-index opnieuw opbouwen in een verse collectie (na het inschakelen van zoeken of het wijzigen van talen). | Leest de hele database één keer; zoeken blijft beschikbaar. |
+| `replayDeadLetters` | Events waarvan de handler bleef falen wachten in de dead-letter-queue (`deadLetterCount` toont hoeveel). Zodra de oorzaak is verholpen stuurt dit ze terug naar hun oorspronkelijke queue. | Eén republish per event; wat opnieuw faalt komt weer in de dead-letter-queue. |
 | `refreshPodcasts` | Alle geabonneerde feeds nu ophalen in plaats van op de uurlijkse verversing te wachten. **Niet** admin-only. | Goedkoop (conditional GET per feed). |
 | `downloadPodcastEpisode(episodeId)` | Eén oudere aflevering op verzoek naar de cache halen. Niet admin-only. | Eén download. |
 
