@@ -42,7 +42,13 @@ its own directories.
 Failed listeners retry with exponential backoff (`spring.rabbitmq.listener.simple.retry.*` in
 `core.properties`: 3 attempts, 2s initial interval, multiplier 2). After the final failure a
 `RepublishMessageRecoverer` moves the message to the **`app.ister.server.dead-letter`** queue with
-the exception preserved in the message headers (`RabbitReliabilityConfig`). Recent failures also
+the exception preserved in the message headers (`RabbitReliabilityConfig`). Failures that would
+look the same on the next attempt (a required column left null, a response the client cannot
+parse, a message with the wrong event type) skip the retries and dead-letter at once
+(`RabbitReliabilityConfig.isRetryable`); unique-key races between parallel handlers are still
+retried, the second attempt finds the row. The admin mutation `replayDeadLetters` sends every
+dead-lettered event back to its original queue (`DeadLetterService`), and `deadLetterCount` shows
+how many are waiting. Recent failures also
 feed the `RecentFailuresBuffer` for the status subscriptions ([chapter
 5](05-continue-watching-and-status.md)). The Helm chart's e2e fails on any dead-lettered event,
 which is why every external call must sit behind a configurable base URL.

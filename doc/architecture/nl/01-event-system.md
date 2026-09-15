@@ -43,7 +43,13 @@ Mislukte listeners proberen het opnieuw met exponentiële backoff
 (`spring.rabbitmq.listener.simple.retry.*` in `core.properties`: 3 pogingen, 2s beginInterval,
 multiplier 2). Na de laatste mislukking verplaatst een `RepublishMessageRecoverer` het bericht naar
 de **`app.ister.server.dead-letter`**-queue, met de exceptie bewaard in de message-headers
-(`RabbitReliabilityConfig`). Recente mislukkingen voeden ook de `RecentFailuresBuffer` voor de
+(`RabbitReliabilityConfig`). Mislukkingen die er bij een volgende poging precies zo uitzien (een
+verplichte kolom die leeg blijft, een antwoord dat de client niet kan parsen, een bericht met het
+verkeerde eventtype) slaan de retries over en gaan meteen naar de dead-letter-queue
+(`RabbitReliabilityConfig.isRetryable`); unique-key-races tussen parallelle handlers worden wél
+herhaald, de tweede poging vindt de rij. De admin-mutation `replayDeadLetters` stuurt elk
+dead-lettered event terug naar zijn oorspronkelijke queue (`DeadLetterService`), en
+`deadLetterCount` toont hoeveel er wachten. Recente mislukkingen voeden ook de `RecentFailuresBuffer` voor de
 status-subscriptions ([hoofdstuk 5](05-continue-watching-and-status.md)). De e2e van de Helm-chart
 faalt op elk dead-lettered event — daarom moet elke externe call achter een configureerbare
 base-URL zitten.

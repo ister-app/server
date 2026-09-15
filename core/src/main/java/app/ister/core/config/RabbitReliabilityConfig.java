@@ -13,9 +13,11 @@ import org.springframework.boot.amqp.autoconfigure.RabbitTemplateCustomizer;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
+import org.springframework.boot.amqp.autoconfigure.RabbitListenerRetrySettingsCustomizer;
 import org.springframework.context.annotation.Configuration;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * Failed event handling: listener retry is configured in core.properties
@@ -29,6 +31,41 @@ import java.time.Instant;
 public class RabbitReliabilityConfig {
 
     public static final String DEAD_LETTER_QUEUE = "app.ister.server.dead-letter";
+
+    /**
+     * Failures that look exactly the same on the next attempt: a required column left null, a
+     * response the client cannot parse, a message with the wrong event type. Retrying those only
+     * costs the backoff and three stack traces per message. Unique-constraint races between
+     * parallel handlers are deliberately <em>not</em> here: the second attempt finds the row.
+     */
+    private static final List<Class<? extends Throwable>> NON_RETRYABLE = List.of(
+            org.hibernate.PropertyValueException.class,
+            IllegalArgumentException.class);
+    // Parse failures from either Jackson generation: Feign's decoder still uses Jackson 2, Spring
+    // itself Jackson 3. Matched by package so core needs neither on its compile classpath.
+    private static final List<String> NON_RETRYABLE_PACKAGES = List.of("com.fasterxml.jackson.", "tools.jackson.");
+
+    /** The listener wraps the handler's exception, so the whole cause chain is inspected. */
+    public static boolean isRetryable(Throwable failure) {
+        for (Throwable t = failure; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            for (Class<? extends Throwable> type : NON_RETRYABLE) {
+                if (type.isInstance(t)) {
+                    return false;
+                }
+            }
+            String name = t.getClass().getName();
+            if (NON_RETRYABLE_PACKAGES.stream().anyMatch(name::startsWith)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Keeps the attempts/backoff from core.properties; only adds the classification above. */
+    @Bean
+    public RabbitListenerRetrySettingsCustomizer skipRetriesForDeterministicFailures() {
+        return settings -> settings.setExceptionPredicate(RabbitReliabilityConfig::isRetryable);
+    }
 
     @Bean
     public Queue deadLetterQueue() {
