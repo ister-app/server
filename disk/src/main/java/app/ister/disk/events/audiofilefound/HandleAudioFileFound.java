@@ -6,6 +6,7 @@ import app.ister.core.entity.AlbumEntity;
 import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.MediaFileStreamEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.TrackCreditEntity;
@@ -46,7 +47,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -65,7 +67,6 @@ import java.util.UUID;
 
 @Slf4j
 @Service
-@Transactional
 public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
 
     private final DirectoryRepository directoryRepository;
@@ -84,6 +85,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
     private final MessageSender messageSender;
     private final ServerEventService serverEventService;
     private final Jaffree jaffree;
+    private final TransactionTemplate transactionTemplate;
     private final MediaFileInputResolver inputResolver;
     private final CacheDirectoryResolver cacheDirectoryResolver;
     private final TmpStoreProvider tmpStoreProvider;
@@ -112,7 +114,8 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                                 Jaffree jaffree,
                                 MediaFileInputResolver inputResolver,
                                 CacheDirectoryResolver cacheDirectoryResolver,
-                                TmpStoreProvider tmpStoreProvider) {
+                                TmpStoreProvider tmpStoreProvider,
+                                PlatformTransactionManager transactionManager) {
         this.directoryRepository = directoryRepository;
         this.mediaFileRepository = mediaFileRepository;
         this.mediaFileStreamRepository = mediaFileStreamRepository;
@@ -132,6 +135,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         this.inputResolver = inputResolver;
         this.cacheDirectoryResolver = cacheDirectoryResolver;
         this.tmpStoreProvider = tmpStoreProvider;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     @Override
@@ -145,42 +149,75 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         Handle.super.listener(audioFileFoundData);
     }
 
+    /**
+     * Everything that shells out to ffprobe/ffmpeg (stream probe, tag read, cover-art extraction)
+     * runs outside a transaction; only {@link #persist} holds one, briefly, under the row lock.
+     * Ten consumers holding a connection for the length of a probe each starved the pool.
+     */
     @Override
     public void handle(AudioFileFoundData messageData) {
         var directoryEntity = directoryRepository.findById(messageData.getDirectoryEntityUUID()).orElseThrow();
-        Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndPathForUpdate(directoryEntity, messageData.getPath());
+        Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndPath(directoryEntity, messageData.getPath());
         if (mediaFile.isEmpty()) {
             log.warn("AudioFileFound: media file entity not found for path={} directoryId={} — skipping analysis",
                     messageData.getPath(), messageData.getDirectoryEntityUUID());
             return;
         }
-        mediaFile.ifPresent(entity -> {
-            ActivityContext.report(ActivitySubjects.describe(entity));
-            UUID entityId = entity.getId();
-            UUID directoryId = directoryEntity.getId();
-            // native bulk DELETE; clearAutomatically=true evicts all session entities afterwards
-            mediaFileStreamRepository.deleteAllByMediaFileEntityId(entityId);
-            // reload detached entities with fresh session references
-            MediaFileEntity freshEntity = mediaFileRepository.findById(entityId).orElseThrow();
-            DirectoryEntity freshDirectory = directoryRepository.findById(directoryId).orElseThrow();
-            String input = inputResolver.resolve(freshEntity);
-            var checkResult = mediaFileFoundCheckForStreams.checkForStreams(freshEntity, input, dirOfFFmpeg);
-            long duration = checkResult.durationInMilliseconds() > 0
-                    ? checkResult.durationInMilliseconds()
-                    : mediaFileFoundGetDuration.getDurationByDecodingFile(input);
-            freshEntity.setDurationInMilliseconds(duration);
-            mediaFileRepository.save(freshEntity);
-            checkResult.streams().forEach(s -> mediaFileStreamRepository.upsert(
-                    new MediaFileStreamRepository.StreamUpsert(
-                            s.getCodecName(), s.getCodecType().name(), s.getHeight(), s.getLanguage(),
-                            freshEntity.getId(), s.getPath(), s.getStreamIndex(), s.getTitle(), s.getWidth())));
+        MediaFileEntity entity = mediaFile.get();
+        ActivityContext.report(ActivitySubjects.describe(entity));
+        String input = inputResolver.resolve(entity);
+        var checkResult = mediaFileFoundCheckForStreams.checkForStreams(entity, input, dirOfFFmpeg);
+        long duration = checkResult.durationInMilliseconds() > 0
+                ? checkResult.durationInMilliseconds()
+                : mediaFileFoundGetDuration.getDurationByDecodingFile(input);
+        // The tag read is only worth it when the track/chapter the tags are for exists.
+        boolean readTags = (messageData.getTrackEntityUUID() != null && trackRepository.findById(messageData.getTrackEntityUUID()).isPresent())
+                || (messageData.getChapterEntityUUID() != null && chapterRepository.findById(messageData.getChapterEntityUUID()).isPresent());
+        Format format = readTags ? jaffree.getFFPROBE().setShowFormat(true).setInput(input).execute().getFormat() : null;
 
-            saveTrackMetadataFromTags(messageData.getTrackEntityUUID(), freshEntity);
-            saveChapterMetadataFromTags(messageData.getChapterEntityUUID(), freshEntity);
-            extractEmbeddedCoverArt(freshEntity, checkResult.hasAttachedPic());
-            deleteHlsCache(freshEntity.getId());
-            requestPlaylistPreGenerationAfterCommit(freshEntity.getId(), freshDirectory.getName());
-        });
+        CoverOwner coverOwner = transactionTemplate.execute(status ->
+                persist(directoryEntity, messageData, duration, checkResult.streams(), format));
+
+        if (coverOwner != null) {
+            extractEmbeddedCoverArt(coverOwner, checkResult.hasAttachedPic());
+        }
+        deleteHlsCache(entity.getId());
+    }
+
+    /** Whose cover an embedded picture would be, resolved inside the transaction (lazy associations). */
+    record CoverOwner(MediaFileEntity mediaFile, UUID albumId, UUID bookId) {
+    }
+
+    /** The short transaction: lock the row, replace the streams, store duration and tag-derived metadata. */
+    private CoverOwner persist(DirectoryEntity directoryEntity, AudioFileFoundData messageData, long duration,
+                               List<MediaFileStreamEntity> streams, Format format) {
+        Optional<MediaFileEntity> locked = mediaFileRepository.findByDirectoryEntityAndPathForUpdate(directoryEntity, messageData.getPath());
+        if (locked.isEmpty()) {
+            log.warn("AudioFileFound: media file {} disappeared before it could be saved", messageData.getPath());
+            return null;
+        }
+        UUID entityId = locked.get().getId();
+        // native bulk DELETE; clearAutomatically=true evicts all session entities afterwards
+        mediaFileStreamRepository.deleteAllByMediaFileEntityId(entityId);
+        // reload detached entities with fresh session references
+        MediaFileEntity freshEntity = mediaFileRepository.findById(entityId).orElseThrow();
+        DirectoryEntity freshDirectory = directoryRepository.findById(directoryEntity.getId()).orElseThrow();
+        freshEntity.setDurationInMilliseconds(duration);
+        mediaFileRepository.save(freshEntity);
+        streams.forEach(s -> mediaFileStreamRepository.upsert(
+                new MediaFileStreamRepository.StreamUpsert(
+                        s.getCodecName(), s.getCodecType().name(), s.getHeight(), s.getLanguage(),
+                        freshEntity.getId(), s.getPath(), s.getStreamIndex(), s.getTitle(), s.getWidth())));
+
+        saveTrackMetadataFromTags(messageData.getTrackEntityUUID(), freshEntity, format);
+        saveChapterMetadataFromTags(messageData.getChapterEntityUUID(), freshEntity, format);
+        requestPlaylistPreGenerationAfterCommit(freshEntity.getId(), freshDirectory.getName());
+
+        TrackEntity track = freshEntity.getTrackEntity();
+        UUID albumId = track != null && track.getAlbumEntity() != null ? track.getAlbumEntity().getId() : null;
+        UUID bookId = freshEntity.getChapterEntity() != null && freshEntity.getChapterEntity().getBookEntity() != null
+                ? freshEntity.getChapterEntity().getBookEntity().getId() : null;
+        return new CoverOwner(freshEntity, albumId, bookId);
     }
 
     /**
@@ -212,13 +249,12 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                 .build(), directoryName);
     }
 
-    private void saveTrackMetadataFromTags(UUID trackEntityUUID, MediaFileEntity mediaFile) {
-        if (trackEntityUUID == null) return;
+    private void saveTrackMetadataFromTags(UUID trackEntityUUID, MediaFileEntity mediaFile, Format format) {
+        if (trackEntityUUID == null || format == null) return;
         Optional<TrackEntity> trackOpt = trackRepository.findById(trackEntityUUID);
         if (trackOpt.isEmpty()) return;
 
         TrackEntity track = trackOpt.get();
-        var format = jaffree.getFFPROBE().setShowFormat(true).setInput(inputResolver.resolve(mediaFile)).execute().getFormat();
 
         UUID correctedTrackId = correctTrackNumberFromTags(mediaFile, track, format);
         if (!Objects.equals(correctedTrackId, track.getId())) {
@@ -248,13 +284,12 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
      * Audiobook chapters keep their path-derived number (the ordering is what matters); only the
      * chapter title is taken from the ID3 title tag, falling back to the filename.
      */
-    private void saveChapterMetadataFromTags(UUID chapterEntityUUID, MediaFileEntity mediaFile) {
-        if (chapterEntityUUID == null) return;
+    private void saveChapterMetadataFromTags(UUID chapterEntityUUID, MediaFileEntity mediaFile, Format format) {
+        if (chapterEntityUUID == null || format == null) return;
         Optional<ChapterEntity> chapterOpt = chapterRepository.findById(chapterEntityUUID);
         if (chapterOpt.isEmpty()) return;
 
         ChapterEntity chapter = chapterOpt.get();
-        var format = jaffree.getFFPROBE().setShowFormat(true).setInput(inputResolver.resolve(mediaFile)).execute().getFormat();
         String title = extractTitle(format, mediaFile.getPath());
         if (title == null) return;
 
@@ -498,20 +533,18 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         return filename.isBlank() ? null : filename.strip();
     }
 
-    private void extractEmbeddedCoverArt(MediaFileEntity mediaFile, boolean hasAttachedPic) {
+    private void extractEmbeddedCoverArt(CoverOwner owner, boolean hasAttachedPic) {
         if (!hasAttachedPic) return;
-        UUID albumId = null;
-        UUID bookId = null;
+        MediaFileEntity mediaFile = owner.mediaFile();
+        UUID albumId = owner.albumId();
+        UUID bookId = owner.bookId();
         UUID coverOwnerId;
         String coverSubDir;
-        TrackEntity track = mediaFile.getTrackEntity();
-        if (track != null && track.getAlbumEntity() != null) {
-            albumId = track.getAlbumEntity().getId();
+        if (albumId != null) {
             if (!imageRepository.findByAlbumEntityId(albumId).isEmpty()) return;
             coverOwnerId = albumId;
             coverSubDir = "album-covers";
-        } else if (mediaFile.getChapterEntity() != null && mediaFile.getChapterEntity().getBookEntity() != null) {
-            bookId = mediaFile.getChapterEntity().getBookEntity().getId();
+        } else if (bookId != null) {
             if (!imageRepository.findByBookEntityId(bookId).isEmpty()) return;
             coverOwnerId = bookId;
             coverSubDir = "book-covers";

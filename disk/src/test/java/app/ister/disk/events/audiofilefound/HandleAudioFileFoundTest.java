@@ -119,6 +119,8 @@ class HandleAudioFileFoundTest {
     @org.mockito.Spy
     private app.ister.core.storage.TmpStoreProvider tmpStoreProvider = new app.ister.core.storage.TmpStoreProvider((app.ister.core.storage.TmpStore) null);
 
+    @Mock
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
     @InjectMocks
     private HandleAudioFileFound subject;
 
@@ -162,6 +164,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
 
@@ -184,7 +188,7 @@ class HandleAudioFileFoundTest {
         ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
-        when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.empty());
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.empty());
 
         var data = AudioFileFoundData.builder()
                 .eventType(EventType.AUDIO_FILE_FOUND)
@@ -239,6 +243,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
         when(trackRepositoryMock.findById(TRACK_ID)).thenReturn(Optional.of(track));
@@ -274,6 +280,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId2)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 0L));
 
@@ -332,6 +340,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
         when(trackRepositoryMock.findById(TRACK_ID)).thenReturn(Optional.of(track));
@@ -393,6 +403,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
         when(trackRepositoryMock.findById(TRACK_ID)).thenReturn(Optional.of(track));
@@ -462,6 +474,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
         when(trackRepositoryMock.findById(TRACK_ID)).thenReturn(Optional.of(track));
@@ -536,6 +550,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
         when(trackRepositoryMock.findById(TRACK_ID)).thenReturn(Optional.of(wrongTrack));
@@ -589,6 +605,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any()))
                 .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
@@ -643,6 +661,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any()))
                 .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
@@ -704,6 +724,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any()))
                 .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
@@ -750,6 +772,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any()))
                 .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
@@ -795,6 +819,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any()))
                 .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
@@ -828,6 +854,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 0L));
 
@@ -869,6 +897,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, CHAPTER_PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, CHAPTER_PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any()))
                 .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
@@ -898,6 +928,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, CHAPTER_PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, CHAPTER_PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any()))
                 .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
@@ -924,6 +956,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any()))
                 .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
@@ -960,6 +994,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any()))
                 .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), true, 180000L));
@@ -998,6 +1034,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any()))
                 .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), true, 180000L));
@@ -1035,6 +1073,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, CHAPTER_PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, CHAPTER_PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any()))
                 .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), true, 180000L));
@@ -1074,6 +1114,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any()))
                 .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), true, 180000L));
@@ -1126,6 +1168,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any()))
                 .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
@@ -1161,6 +1205,8 @@ class HandleAudioFileFoundTest {
 
         when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
         when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
         when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
         when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 1000L));
 
