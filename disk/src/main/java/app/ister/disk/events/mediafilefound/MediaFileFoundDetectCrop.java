@@ -68,8 +68,10 @@ public class MediaFileFoundDetectCrop {
                                 .addArguments("-map", "0:v:0")
                                 .addArguments("-vf", "cropdetect=limit=24:round=2:reset=0")
                                 .addArguments("-frames:v", String.valueOf(FRAMES_PER_SAMPLE)))
-                        // cropdetect reports at info level; ERROR would silence it.
+                        // cropdetect reports at info level; ERROR would silence it. -nostats drops
+                        // the per-frame progress lines, which are the bulk of what ffmpeg prints.
                         .setLogLevel(LogLevel.INFO)
+                        .addArgument("-nostats")
                         .setOutputListener(line -> {
                             if (line.contains("crop=")) {
                                 cropLines.add(line);
