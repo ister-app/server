@@ -64,7 +64,9 @@ public class MediaFileFoundCheckForStreams {
             MediaFileStreamEntity.MediaFileStreamEntityBuilder<?, ?> mediaFileStream = MediaFileStreamEntity.builder()
                     .mediaFileEntity(mediaFileEntity)
                     .streamIndex(stream.getIndex())
-                    .codecName(stream.getCodecName())
+                    // ffprobe reports "unknown" for e.g. the rtp hint tracks in an iTunes m4v; Jaffree
+                    // then hands us null, and codec_name is NOT NULL in the database.
+                    .codecName(stream.getCodecName() != null ? stream.getCodecName() : "unknown")
                     .codecType(codecTypeToEnum(stream.getCodecType().toString()))
                     .language(stream.getTag("language"))
                     .title(stream.getTag("title"))
