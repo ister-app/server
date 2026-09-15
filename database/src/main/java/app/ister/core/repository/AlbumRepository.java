@@ -17,6 +17,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface AlbumRepository extends JpaRepository<AlbumEntity, UUID> {
+    /** Albums in a library that no track references any more. */
+    @Query("select a from AlbumEntity a where a.libraryEntity.id = :libraryId"
+            + " and not exists (select t from TrackEntity t where t.albumEntity = a)")
+    List<AlbumEntity> findEmptyInLibrary(@Param("libraryId") UUID libraryId);
+
     Optional<AlbumEntity> findByPersonEntityAndNameAndReleaseYear(PersonEntity personEntity, String name, int releaseYear);
 
     /**

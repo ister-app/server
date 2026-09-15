@@ -21,7 +21,13 @@ maakt de cache-directories op disk aan en valideert de multi-node-configuratie. 
 
 Zie het [scan-flow-diagram](../diagrams/scan-flow.md). `scanLibraries()` stuurt per directory een
 `NEW_DIRECTORIES_SCAN_REQUEST`; de disk-handler loopt door het filesystem en stuurt per bestand één
-`FILE_SCAN_REQUESTED`. `FileScanRequestedHandle` routeert op extensie (en library-type). De
+`FILE_SCAN_REQUESTED`. `FileScanRequestedHandle` routeert op extensie (en library-type). Na de
+wandeling worden de rijen van bestanden die niet meer gezien zijn verwijderd (`ScannedCache`), en
+voor een MUSIC-library ruimt `OrphanTrackCleanupService` daarna de tracks zonder mediabestand en de
+albums zonder tracks op. Een verplaatst of hernoemd bestand komt terug als een *nieuwe* track, dus
+voordat een wees verdwijnt gaan zijn kijkstatus, wachtrij- en playlist-items en rating over naar de
+track van dezelfde artiest met dezelfde titel die nog wel een bestand heeft; elke verwijderde track
+en elk verwijderd album krijgt een delete in de zoekindex. De
 extensielijsten zijn exact en kort (`PathObject`): afbeeldingen zijn `jpg`/`png`, video is
 `mkv`/`mp4`/`webm`/`m4v`/`flv`/`avi`, ondertitels zijn `srt` — een `.jpeg` of `.wmv` wordt simpelweg niet opgepakt. Welke
 scanners überhaupt draaien hangt af van het library-type: een COMIC-library gebruikt alleen

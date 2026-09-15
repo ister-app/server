@@ -8,6 +8,7 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.MessageSender;
+import app.ister.core.service.OrphanTrackCleanupService;
 import app.ister.disk.scanner.LibraryScanner;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
@@ -44,6 +45,8 @@ class LibraryScannerTest {
     private MediaFileRepository mediaFileRepository;
     @Mock
     private OtherPathFileRepository otherPathFileRepository;
+    @Mock
+    private OrphanTrackCleanupService orphanTrackCleanupService;
 
     @Test
     void simpleTest() throws IOException {

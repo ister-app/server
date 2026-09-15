@@ -28,6 +28,10 @@ public interface RatingRepository extends CrudRepository<RatingEntity, UUID> {
 
     Optional<RatingEntity> findByUserEntityAndTrackEntity(UserEntity userEntity, TrackEntity trackEntity);
 
+    List<RatingEntity> findByTrackEntity(TrackEntity trackEntity);
+
+    List<RatingEntity> findByAlbumEntity(AlbumEntity albumEntity);
+
     Optional<RatingEntity> findByUserEntityAndBookEntity(UserEntity userEntity, BookEntity bookEntity);
 
     Optional<RatingEntity> findByUserEntityAndPodcastEntity(UserEntity userEntity, app.ister.core.entity.PodcastEntity podcastEntity);

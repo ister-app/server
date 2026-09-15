@@ -1,6 +1,7 @@
 package app.ister.core.repository;
 
 import app.ister.core.entity.AlbumEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.SortingEnum;
@@ -20,6 +21,22 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface TrackRepository extends JpaRepository<TrackEntity, UUID> {
+    /** Tracks in a library whose media files have all been swept away by a scan. */
+    @Query("select t from TrackEntity t where t.albumEntity.libraryEntity.id = :libraryId"
+            + " and not exists (select m from MediaFileEntity m where m.trackEntity = t)")
+    List<TrackEntity> findOrphansInLibrary(@Param("libraryId") UUID libraryId);
+
+    /**
+     * Tracks by the same artist with the same title that still have a media file — the likely
+     * new home of a track whose file was moved or renamed. Newest first.
+     */
+    @Query("select distinct t from TrackEntity t join MetadataEntity md on md.trackEntity = t"
+            + " where t.personEntity = :person and lower(md.title) = lower(:title) and t.id <> :excludeId"
+            + " and exists (select m from MediaFileEntity m where m.trackEntity = t)"
+            + " order by t.dateCreated desc")
+    List<TrackEntity> findReplacementCandidates(@Param("person") PersonEntity person, @Param("title") String title,
+                                                @Param("excludeId") UUID excludeId);
+
     Optional<TrackEntity> findByAlbumEntityAndNumberAndDiscNumber(AlbumEntity albumEntity, int number, int discNumber);
     List<TrackEntity> findByAlbumEntity_Id(UUID albumId, Sort sort);
     List<TrackEntity> findByAlbumEntity_LibraryEntity_LibraryTypeAndMetadataEntitiesIsEmpty(LibraryType libraryType);

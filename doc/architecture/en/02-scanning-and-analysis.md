@@ -21,6 +21,12 @@ validates the multi-node configuration. See the [startup diagram](../diagrams/st
 See the [scan-flow diagram](../diagrams/scan-flow.md). `scanLibraries()` sends
 `NEW_DIRECTORIES_SCAN_REQUEST` per directory; the disk handler walks the filesystem and emits one
 `FILE_SCAN_REQUESTED` per file. `FileScanRequestedHandle` routes on extension (and library type).
+After the walk the rows of files that were not seen again are deleted (`ScannedCache`), and for a
+MUSIC library `OrphanTrackCleanupService` then removes the tracks left without a media file and the
+albums left without tracks. A moved or renamed file comes back as a *new* track, so before an
+orphan is deleted its watch status, play-queue and playlist items and rating are handed over to the
+track by the same artist with the same title that still has a file; every removed track and album
+gets a delete in the search index.
 The extension lists are exact and short (`PathObject`): images are `jpg`/`png`, video is
 `mkv`/`mp4`/`webm`/`m4v`/`flv`/`avi`, subtitles are `srt` — a `.jpeg` or `.wmv` is simply not picked up. Which scanners run
 at all depends on the library type: a COMIC library uses only `ComicScanner` + `ImageScanner`;

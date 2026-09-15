@@ -38,6 +38,8 @@ public interface WatchStatusRepository extends JpaRepository<WatchStatusEntity, 
 
     Optional<WatchStatusEntity> findByUserEntityAndPlayQueueItemIdAndPodcastEpisodeEntity(UserEntity userEntity, UUID playQueueItemId, app.ister.core.entity.PodcastEpisodeEntity podcastEpisodeEntity);
 
+    List<WatchStatusEntity> findByTrackEntity(app.ister.core.entity.TrackEntity trackEntity);
+
     Optional<WatchStatusEntity> findByUserEntityAndPlayQueueItemIdAndTrackEntity(UserEntity userEntity, UUID playQueueItemId, app.ister.core.entity.TrackEntity trackEntity);
 
     // Per-item playback history (GraphQL playbackHistory)

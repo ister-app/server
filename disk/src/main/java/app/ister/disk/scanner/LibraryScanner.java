@@ -5,6 +5,7 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.MessageSender;
+import app.ister.core.service.OrphanTrackCleanupService;
 import app.ister.core.storage.ObjectStoreRegistry;
 import app.ister.disk.scanner.scanners.AudioScanner;
 import app.ister.disk.scanner.scanners.ComicScanner;
@@ -39,6 +40,7 @@ public class LibraryScanner {
     private final MediaFileRepository mediaFileRepository;
     private final OtherPathFileRepository otherPathFileRepository;
     private final ObjectStoreRegistry objectStoreRegistry;
+    private final OrphanTrackCleanupService orphanTrackCleanupService;
 
     public void scanDirectory(DirectoryEntity directoryEntity) throws IOException {
         if (directoryEntity.isS3()) {
@@ -53,6 +55,7 @@ public class LibraryScanner {
         ScannedCache scannedCache = new ScannedCache(directoryEntity, imageRepository, mediaFileRepository, otherPathFileRepository);
         Files.walkFileTree(path, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new AnalyzerSimpleFileVisitor(directoryEntity, scannedCache, messageSender, scanners()));
         scannedCache.removeNotScannedFilesFromDatabase();
+        orphanTrackCleanupService.cleanUp(directoryEntity.getLibraryEntity());
     }
 
     private void scanS3Directory(DirectoryEntity directoryEntity) {
@@ -61,6 +64,7 @@ public class LibraryScanner {
         new S3LibraryScanner(directoryEntity, objectStoreRegistry.forDirectory(directoryEntity),
                 new ScanEntryDispatcher(directoryEntity, scannedCache, messageSender, scanners())).scan();
         scannedCache.removeNotScannedFilesFromDatabase();
+        orphanTrackCleanupService.cleanUp(directoryEntity.getLibraryEntity());
     }
 
     private Scanners scanners() {

@@ -8,4 +8,5 @@ import java.util.UUID;
 
 @Repository
 public interface PlayQueueItemRepository extends JpaRepository<PlayQueueItemEntity, UUID> {
+    java.util.List<PlayQueueItemEntity> findByTrackEntityId(UUID trackEntityId);
 }

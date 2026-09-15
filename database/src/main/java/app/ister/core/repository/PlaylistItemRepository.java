@@ -33,4 +33,6 @@ public interface PlaylistItemRepository extends JpaRepository<PlaylistItemEntity
     List<UUID> findMediaIdsForPlaylistShuffled(@Param("playlistId") UUID playlistId, @Param("seed") String seed, @Param("excludeId") UUID excludeId, @Param("limit") int limit, @Param("offset") int offset);
 
     long countByPlaylistEntityId(UUID playlistId);
+
+    List<PlaylistItemEntity> findByTrackEntityId(UUID trackEntityId);
 }
