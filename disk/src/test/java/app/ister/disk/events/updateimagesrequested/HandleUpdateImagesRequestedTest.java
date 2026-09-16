@@ -60,7 +60,7 @@ class HandleUpdateImagesRequestedTest {
 
     @Test
     void listenerCallsHandleWithCorrectEventType() {
-        when(chunkProcessor.process(any(), any(), anyInt())).thenReturn(new BlurHashChunkProcessor.Chunk(0, null));
+        when(chunkProcessor.process(any(), any(), anyInt())).thenReturn(new BlurHashChunkProcessor.Chunk(0, null, true));
         assertDoesNotThrow(() -> subject.listener(request(null)));
     }
 
@@ -68,7 +68,7 @@ class HandleUpdateImagesRequestedTest {
     void fullChunkContinuesTheSweepAfterTheLastProcessedImage() {
         UUID lastId = UUID.fromString("22222222-2222-2222-2222-222222222222");
         when(chunkProcessor.process(DIRECTORY_ID, null, CHUNK_SIZE))
-                .thenReturn(new BlurHashChunkProcessor.Chunk(CHUNK_SIZE, lastId));
+                .thenReturn(new BlurHashChunkProcessor.Chunk(CHUNK_SIZE, lastId, false));
 
         subject.handle(request(null));
 
@@ -84,7 +84,7 @@ class HandleUpdateImagesRequestedTest {
     void sweepResumesFromTheCursorOfTheIncomingMessage() {
         UUID cursor = UUID.fromString("33333333-3333-3333-3333-333333333333");
         when(chunkProcessor.process(DIRECTORY_ID, cursor, CHUNK_SIZE))
-                .thenReturn(new BlurHashChunkProcessor.Chunk(0, null));
+                .thenReturn(new BlurHashChunkProcessor.Chunk(0, null, true));
 
         subject.handle(request(cursor));
 
@@ -94,7 +94,7 @@ class HandleUpdateImagesRequestedTest {
     @Test
     void emptyChunkEndsTheSweep() {
         when(chunkProcessor.process(DIRECTORY_ID, null, CHUNK_SIZE))
-                .thenReturn(new BlurHashChunkProcessor.Chunk(0, null));
+                .thenReturn(new BlurHashChunkProcessor.Chunk(0, null, true));
 
         subject.handle(request(null));
 
@@ -106,11 +106,25 @@ class HandleUpdateImagesRequestedTest {
     void shortChunkEndsTheSweep() {
         UUID lastId = UUID.fromString("44444444-4444-4444-4444-444444444444");
         when(chunkProcessor.process(DIRECTORY_ID, null, CHUNK_SIZE))
-                .thenReturn(new BlurHashChunkProcessor.Chunk(CHUNK_SIZE - 1, lastId));
+                .thenReturn(new BlurHashChunkProcessor.Chunk(CHUNK_SIZE - 1, lastId, true));
 
         subject.handle(request(null));
 
         verify(messageSender, never()).sendUpdateImagesRequested(any(), any());
+    }
+
+    /** A chunk cut short by the time budget is not exhausted: the sweep continues after its last image. */
+    @Test
+    void timeBoxedChunkContinuesTheSweep() {
+        UUID lastId = UUID.fromString("55555555-5555-5555-5555-555555555555");
+        when(chunkProcessor.process(DIRECTORY_ID, null, CHUNK_SIZE))
+                .thenReturn(new BlurHashChunkProcessor.Chunk(3, lastId, false));
+
+        subject.handle(request(null));
+
+        ArgumentCaptor<UpdateImagesRequestedData> successor = ArgumentCaptor.forClass(UpdateImagesRequestedData.class);
+        verify(messageSender).sendUpdateImagesRequested(successor.capture(), eq(DIRECTORY_NAME));
+        assertEquals(lastId, successor.getValue().getAfterId());
     }
 
     private static UpdateImagesRequestedData request(UUID afterId) {

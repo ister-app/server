@@ -28,6 +28,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 @ExtendWith(MockitoExtension.class)
 class BlurHashChunkProcessorTest {
@@ -89,6 +91,7 @@ class BlurHashChunkProcessorTest {
 
         assertEquals(1, chunk.size());
         assertEquals(image.getId(), chunk.lastId());
+        assertTrue(chunk.exhausted(), "fewer than a chunk: the directory is done");
         assertNotNull(image.getBlurHash());
         assertNotNull(image.getFileLastModifiedTime());
         assertNotNull(image.getFileCreationTime());
@@ -122,5 +125,34 @@ class BlurHashChunkProcessorTest {
     private static ImageEntity imageAt(Path path) throws IOException {
         ImageIO.write(new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB), "png", path.toFile());
         return ImageEntity.builder().id(UUID.randomUUID()).path(path.toString()).build();
+    }
+
+    /** With no time budget the chunk stops after the first image and reports it is not exhausted. */
+    @Test
+    void processStopsWhenTheTimeBudgetIsSpent(@TempDir Path tempDir) throws IOException {
+        ImageEntity first = imageAt(tempDir.resolve("a.png"));
+        ImageEntity second = imageAt(tempDir.resolve("b.png"));
+        when(imageRepository.findByDirectoryEntityIdAndBlurHashIsNullOrderById(eq(DIRECTORY_ID), any()))
+                .thenReturn(List.of(first, second));
+        org.springframework.test.util.ReflectionTestUtils.setField(subject, "chunkSeconds", 0L);
+
+        BlurHashChunkProcessor.Chunk chunk = subject.process(DIRECTORY_ID, null, 500);
+
+        assertEquals(1, chunk.size());
+        assertEquals(first.getId(), chunk.lastId());
+        assertFalse(chunk.exhausted());
+        assertNotNull(first.getBlurHash());
+        assertNull(second.getBlurHash());
+        verify(imageRepository).saveAll(List.of(first));
+    }
+
+    @Test
+    void downscaleKeepsSmallImagesAndShrinksLargeOnes() {
+        BufferedImage small = new BufferedImage(50, 30, BufferedImage.TYPE_INT_RGB);
+        assertSame(small, BlurHashChunkProcessor.downscale(small, 96));
+        BufferedImage large = new BufferedImage(2000, 3000, BufferedImage.TYPE_INT_RGB);
+        BufferedImage scaled = BlurHashChunkProcessor.downscale(large, 96);
+        assertTrue(scaled.getHeight() <= 96 && scaled.getWidth() <= 96);
+        assertTrue(scaled.getWidth() >= 60, "aspect ratio roughly kept");
     }
 }

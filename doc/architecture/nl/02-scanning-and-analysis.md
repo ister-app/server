@@ -263,7 +263,13 @@ de gedownloade artwork en dus de overgrote meerderheid van de afbeeldingen.
 Elk bericht verwerkt hoogstens `app.ister.server.blur-hash.chunk-size` afbeeldingen en publiceert
 daarna een opvolgerbericht met een keyset-cursor (`afterId`). Eén sweep over een hele library in één
 bericht duurde vroeger langer dan RabbitMQ's `consumer_timeout` (30 minuten), waarna het bericht
-teruggezet werd en de sweep eindeloos opnieuw begon zonder ooit te committen.
+teruggezet werd en de sweep eindeloos opnieuw begon zonder ooit te committen. De chunkgrootte alleen
+sluit dat op een drukke node niet uit, dus een chunk is ook **in tijd begrensd**
+(`app.ister.server.blur-hash.chunk-seconds`, standaard 120): is het budget op, dan worden de tot dan
+toe gehashte afbeeldingen gecommit en gaat de opvolger verder na de laatste daarvan; alleen een chunk
+die eindigt met minder afbeeldingen dan de chunkgrootte beëindigt de sweep (`Chunk.exhausted`).
+Afbeeldingen worden vóór het coderen verkleind tot hoogstens 96 pixels aan de lange zijde: een
+BlurHash vangt een paar gradiënten, dus een poster op volle grootte hashen is verspilde CPU.
 
 Twee subtiliteiten:
 

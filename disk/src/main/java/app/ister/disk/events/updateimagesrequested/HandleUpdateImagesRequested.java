@@ -48,7 +48,7 @@ public class HandleUpdateImagesRequested implements Handle<UpdateImagesRequested
         BlurHashChunkProcessor.Chunk chunk =
                 chunkProcessor.process(data.getDirectoryEntityId(), data.getAfterId(), chunkSize);
 
-        if (chunk.size() < chunkSize) {
+        if (chunk.exhausted()) {
             log.info("Blur-hash sweep finished for directory {}", data.getDirectoryName());
             return;
         }

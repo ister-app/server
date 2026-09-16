@@ -245,7 +245,12 @@ downloaded artwork and therefore the vast majority of images.
 Each message processes at most `app.ister.server.blur-hash.chunk-size` images, then publishes a
 successor message carrying a keyset cursor (`afterId`). One sweep over a whole library in a single
 message used to exceed RabbitMQ's `consumer_timeout` (30 minutes), so the message was requeued and
-the sweep restarted endlessly without ever committing.
+the sweep restarted endlessly without ever committing. The chunk size alone does not rule that out
+on a busy node, so a chunk is also **time-boxed** (`app.ister.server.blur-hash.chunk-seconds`,
+default 120): when the budget is spent the images hashed so far are committed and the successor
+continues after the last of them; only a chunk that finishes with fewer images than the chunk size
+ends the sweep (`Chunk.exhausted`). Images are downscaled to at most 96 pixels on the long side
+before encoding: a BlurHash captures a few gradients, so hashing a full-size poster is wasted CPU.
 
 Two subtleties:
 
