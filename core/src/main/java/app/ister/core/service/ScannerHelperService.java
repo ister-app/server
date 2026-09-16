@@ -177,7 +177,7 @@ public class ScannerHelperService {
                             .number(trackNumber)
                             .discNumber(discNumber).build();
                     trackRepository.save(trackEntity);
-                    serverEventService.createTrackFoundEvent(trackEntity.getId());
+                    serverEventService.createSearchIndexEvent(SearchEntityType.TRACK, trackEntity.getId());
                     return trackEntity;
                 });
     }
@@ -334,7 +334,6 @@ public class ScannerHelperService {
                             .bookEntity(bookEntity)
                             .number(chapterNumber).build();
                     chapterRepository.save(chapterEntity);
-                    serverEventService.createChapterFoundEvent(chapterEntity.getId());
                     continueWatchingService.recomputeForBook(bookEntity.getId());
                     return chapterEntity;
                 });

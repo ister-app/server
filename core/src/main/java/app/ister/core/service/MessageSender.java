@@ -129,20 +129,12 @@ public class MessageSender {
         send(APP_ISTER_SERVER_ALBUM_FOUND, nodeName, albumFoundData);
     }
 
-    public void sendTrackFound(TrackFoundData trackFoundData) {
-        send(APP_ISTER_SERVER_TRACK_FOUND, trackFoundData);
-    }
-
     public void sendAudioFileFound(AudioFileFoundData audioFileFoundData, String directoryName) {
         send(APP_ISTER_SERVER_AUDIO_FILE_FOUND, directoryName, audioFileFoundData);
     }
 
     public void sendBookFound(BookFoundData bookFoundData) {
         send(APP_ISTER_SERVER_BOOK_FOUND, bookFoundData);
-    }
-
-    public void sendChapterFound(ChapterFoundData chapterFoundData) {
-        send(APP_ISTER_SERVER_CHAPTER_FOUND, chapterFoundData);
     }
 
     public void sendEpubFileFound(EpubFileFoundData epubFileFoundData, String directoryName) {
@@ -155,14 +147,6 @@ public class MessageSender {
 
     public void sendComicSeriesFound(ComicSeriesFoundData comicSeriesFoundData) {
         send(APP_ISTER_SERVER_COMIC_SERIES_FOUND, comicSeriesFoundData);
-    }
-
-    public void sendPodcastFound(PodcastFoundData podcastFoundData) {
-        send(APP_ISTER_SERVER_PODCAST_FOUND, podcastFoundData);
-    }
-
-    public void sendPodcastEpisodeFound(PodcastEpisodeFoundData podcastEpisodeFoundData) {
-        send(APP_ISTER_SERVER_PODCAST_EPISODE_FOUND, podcastEpisodeFoundData);
     }
 
     /** Global queue: any worker node may pick up a feed refresh. */

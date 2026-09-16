@@ -212,7 +212,6 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
                     .podcastEpisodeEntity(episode)
                     .sourceUri(FEED_URI_PREFIX + podcast.getFeedUrl())
                     .build());
-            serverEventService.createPodcastEpisodeFoundEvent(episode.getId());
         }
         requestAutoDownloads(podcast);
     }

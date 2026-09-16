@@ -59,7 +59,7 @@ which is why every external call must sit behind a configurable base URL.
 | --- | --- |
 | **Node** `.{nodeName}` | `PERSON_FOUND`, `ALBUM_FOUND` — the node-scoped sends (`MessageSender`) that reach the **disk** handlers on the node holding the files (artist/album `.nfo` and folder-artwork re-parse); the maintenance flows dispatch them via `worker/.../FoundEventDispatcher`. The same events also have global sends for the worker's enrichment handlers (see below). |
 | **Directory** `.{dirName}` | `NEW_DIRECTORIES_SCAN_REQUEST`, `FILE_SCAN_REQUESTED`, `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `EPUB_FILE_FOUND`, `COMIC_FILE_FOUND`, `SUBTITLE_FILE_FOUND`, `IMAGE_FOUND`, `NFO_FILE_FOUND`, `UPDATE_IMAGES_REQUESTED`, `ANALYZE_DATA` (disk), `DETECT_SEGMENTS`, `SUBTITLE_EXTRACT_REQUESTED`, `PRE_TRANSCODE_RECENTLY_WATCHED`, `TRANSCODE_REQUESTED`, `TRANSCODE_PASS_REQUESTED` |
-| **Global** | `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND` (worker), `ALBUM_FOUND` (worker), `TRACK_FOUND` (no consumer), `BOOK_FOUND`, `COMIC_SERIES_FOUND`, `CHAPTER_FOUND` (no consumer), `PODCAST_FOUND` (no consumer), `PODCAST_EPISODE_FOUND` (no consumer), `PODCAST_REFRESH_REQUESTED`, `CONTINUE_WATCHING_REBUILD_REQUESTED`, `ANALYZE_DATA` (worker), `METADATA_BACKFILL_REQUESTED`, `SEARCH_INDEX_REQUESTED`, `SEARCH_REINDEX_REQUESTED` |
+| **Global** | `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND` (worker), `ALBUM_FOUND` (worker), `BOOK_FOUND`, `COMIC_SERIES_FOUND`, `PODCAST_REFRESH_REQUESTED`, `CONTINUE_WATCHING_REBUILD_REQUESTED`, `ANALYZE_DATA` (worker), `METADATA_BACKFILL_REQUESTED`, `SEARCH_INDEX_REQUESTED`, `SEARCH_REINDEX_REQUESTED` |
 | **Cache directory** `.{nodeName}-cache-directory` | `PODCAST_EPISODE_DOWNLOAD_REQUESTED` exists **only** with this suffix (the download lands on that node's disk). Beyond that, nearly every directory-scoped queue also gets a cache-directory variant: `DiskQueueNamingConfig` adds one for each of its queues (`FILE_SCAN_REQUESTED`, `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `IMAGE_FOUND`, `SUBTITLE_FILE_FOUND`, `NFO_FILE_FOUND`, `EPUB_FILE_FOUND`, `COMIC_FILE_FOUND`, `UPDATE_IMAGES_REQUESTED`, `ANALYZE_DATA`, `DETECT_SEGMENTS`, `SUBTITLE_EXTRACT_REQUESTED`, `PRE_TRANSCODE_RECENTLY_WATCHED`, …), and `TranscoderQueueNamingConfig` does the same for the transcode queues — downloaded podcast episodes live in the cache directory and must flow through the same pipelines. |
 
 `PRE_TRANSCODE_RECENTLY_WATCHED` is suffixed with the **directory name**: `PreTranscodeScheduler`
@@ -109,7 +109,7 @@ cache-directory queue is always consumed by its owner, offloaded or not. The dep
 | `HandleAlbumFound` | worker | `ALBUM_FOUND` (global queue) | `IMAGE_FOUND` |
 | `HandleBookFound` | worker | `BOOK_FOUND` | `IMAGE_FOUND` (Open Library cover, only when none exists yet) |
 | `HandleComicSeriesFound` | worker | `COMIC_SERIES_FOUND` | `IMAGE_FOUND` (Wikipedia thumbnail, only when no local artwork) |
-| `HandlePodcastRefreshRequested` | worker | `PODCAST_REFRESH_REQUESTED` | `IMAGE_FOUND` (feed cover), `PODCAST_EPISODE_FOUND`, `PODCAST_EPISODE_DOWNLOAD_REQUESTED` (newest N) |
+| `HandlePodcastRefreshRequested` | worker | `PODCAST_REFRESH_REQUESTED` | `IMAGE_FOUND` (feed cover), `PODCAST_EPISODE_DOWNLOAD_REQUESTED` (newest N) |
 | `HandleContinueWatchingRebuildRequested` | worker | `CONTINUE_WATCHING_REBUILD_REQUESTED` | — |
 | `HandleTranscodeRequested` | transcoder | `TRANSCODE_REQUESTED` | `TRANSCODE_PASS_REQUESTED` |
 | `HandleTranscodePassRequested` | transcoder | `TRANSCODE_PASS_REQUESTED` | — |

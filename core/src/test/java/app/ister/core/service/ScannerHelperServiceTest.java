@@ -1,5 +1,6 @@
 package app.ister.core.service;
 
+import app.ister.core.enums.SearchEntityType;
 import app.ister.core.entity.*;
 import app.ister.core.repository.*;
 import org.junit.jupiter.api.Test;
@@ -321,7 +322,7 @@ class ScannerHelperServiceTest {
 
         assertEquals(existing, subject.getOrCreateTrack(artist, album, 1, 1));
         verify(trackRepository, never()).save(any());
-        verify(serverEventService, never()).createTrackFoundEvent(any());
+        verify(serverEventService, never()).createSearchIndexEvent(any(), any());
     }
 
     @Test
@@ -336,7 +337,7 @@ class ScannerHelperServiceTest {
         assertEquals(1, result.getNumber());
         assertEquals(1, result.getDiscNumber());
         verify(trackRepository).save(result);
-        verify(serverEventService).createTrackFoundEvent(result.getId());
+        verify(serverEventService).createSearchIndexEvent(SearchEntityType.TRACK, result.getId());
     }
 
     @Test
@@ -564,7 +565,6 @@ class ScannerHelperServiceTest {
 
         assertEquals(existing, subject.getOrCreateChapter(author, book, 1));
         verify(chapterRepository, never()).save(any());
-        verify(serverEventService, never()).createChapterFoundEvent(any());
     }
 
     @Test
@@ -577,6 +577,5 @@ class ScannerHelperServiceTest {
 
         assertEquals(1, result.getNumber());
         verify(chapterRepository).save(result);
-        verify(serverEventService).createChapterFoundEvent(result.getId());
     }
 }

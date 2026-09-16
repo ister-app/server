@@ -172,7 +172,6 @@ class HandlePodcastRefreshRequestedTest {
         verify(podcastEpisodeRepository, times(2)).save(saved.capture());
         assertEquals(List.of("guid-1", "guid-2"),
                 saved.getAllValues().stream().map(PodcastEpisodeEntity::getGuid).toList());
-        verify(serverEventService, times(2)).createPodcastEpisodeFoundEvent(any());
 
         // Only the not-yet-downloaded episode gets a download request, on this node's cache dir.
         ArgumentCaptor<PodcastEpisodeDownloadRequestedData> download =
@@ -196,7 +195,6 @@ class HandlePodcastRefreshRequestedTest {
         subject.handle(event());
 
         verify(podcastEpisodeRepository, never()).save(any());
-        verify(serverEventService, never()).createPodcastEpisodeFoundEvent(any());
     }
 
     @Test

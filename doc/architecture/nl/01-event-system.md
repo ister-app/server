@@ -60,7 +60,7 @@ base-URL zitten.
 | --- | --- |
 | **Node** `.{nodeName}` | `PERSON_FOUND`, `ALBUM_FOUND` — de node-gescopete sends (`MessageSender`) die de **disk**-handlers bereiken op de node met de bestanden (herparse van artiest-/album-`.nfo` en map-artwork); de onderhoudsflows dispatchen ze via `worker/.../FoundEventDispatcher`. Dezelfde events hebben óók globale sends voor de verrijkingshandlers van de worker (zie hieronder). |
 | **Directory** `.{dirName}` | `NEW_DIRECTORIES_SCAN_REQUEST`, `FILE_SCAN_REQUESTED`, `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `EPUB_FILE_FOUND`, `COMIC_FILE_FOUND`, `SUBTITLE_FILE_FOUND`, `IMAGE_FOUND`, `NFO_FILE_FOUND`, `UPDATE_IMAGES_REQUESTED`, `ANALYZE_DATA` (disk), `DETECT_SEGMENTS`, `SUBTITLE_EXTRACT_REQUESTED`, `PRE_TRANSCODE_RECENTLY_WATCHED`, `TRANSCODE_REQUESTED`, `TRANSCODE_PASS_REQUESTED` |
-| **Globaal** | `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND` (worker), `ALBUM_FOUND` (worker), `TRACK_FOUND` (geen consumer), `BOOK_FOUND`, `COMIC_SERIES_FOUND`, `CHAPTER_FOUND` (geen consumer), `PODCAST_FOUND` (geen consumer), `PODCAST_EPISODE_FOUND` (geen consumer), `PODCAST_REFRESH_REQUESTED`, `CONTINUE_WATCHING_REBUILD_REQUESTED`, `ANALYZE_DATA` (worker), `METADATA_BACKFILL_REQUESTED`, `SEARCH_INDEX_REQUESTED`, `SEARCH_REINDEX_REQUESTED` |
+| **Globaal** | `SHOW_FOUND`, `EPISODE_FOUND`, `MOVIE_FOUND`, `PERSON_FOUND` (worker), `ALBUM_FOUND` (worker), `BOOK_FOUND`, `COMIC_SERIES_FOUND`, `PODCAST_REFRESH_REQUESTED`, `CONTINUE_WATCHING_REBUILD_REQUESTED`, `ANALYZE_DATA` (worker), `METADATA_BACKFILL_REQUESTED`, `SEARCH_INDEX_REQUESTED`, `SEARCH_REINDEX_REQUESTED` |
 | **Cache-directory** `.{nodeName}-cache-directory` | `PODCAST_EPISODE_DOWNLOAD_REQUESTED` bestaat **alleen** met deze suffix (de download landt op de disk van die node). Daarnaast krijgt bijna elke directory-gescopete queue óók een cache-directory-variant: `DiskQueueNamingConfig` voegt er één toe voor elk van zijn queues (`FILE_SCAN_REQUESTED`, `MEDIA_FILE_FOUND`, `AUDIO_FILE_FOUND`, `IMAGE_FOUND`, `SUBTITLE_FILE_FOUND`, `NFO_FILE_FOUND`, `EPUB_FILE_FOUND`, `COMIC_FILE_FOUND`, `UPDATE_IMAGES_REQUESTED`, `ANALYZE_DATA`, `DETECT_SEGMENTS`, `SUBTITLE_EXTRACT_REQUESTED`, `PRE_TRANSCODE_RECENTLY_WATCHED`, …), en `TranscoderQueueNamingConfig` doet hetzelfde voor de transcode-queues — gedownloade podcastafleveringen staan in de cache-directory en moeten door dezelfde pipelines. |
 
 `PRE_TRANSCODE_RECENTLY_WATCHED` krijgt de **directorynaam** als suffix: `PreTranscodeScheduler`
@@ -111,7 +111,7 @@ helper-schijven met de `TRANSCODE`-job.
 | `HandleAlbumFound` | worker | `ALBUM_FOUND` (globale queue) | `IMAGE_FOUND` |
 | `HandleBookFound` | worker | `BOOK_FOUND` | `IMAGE_FOUND` (Open Library-cover, alleen als er nog geen is) |
 | `HandleComicSeriesFound` | worker | `COMIC_SERIES_FOUND` | `IMAGE_FOUND` (Wikipedia-thumbnail, alleen zonder lokale artwork) |
-| `HandlePodcastRefreshRequested` | worker | `PODCAST_REFRESH_REQUESTED` | `IMAGE_FOUND` (feed-cover), `PODCAST_EPISODE_FOUND`, `PODCAST_EPISODE_DOWNLOAD_REQUESTED` (nieuwste N) |
+| `HandlePodcastRefreshRequested` | worker | `PODCAST_REFRESH_REQUESTED` | `IMAGE_FOUND` (feed-cover), `PODCAST_EPISODE_DOWNLOAD_REQUESTED` (nieuwste N) |
 | `HandleContinueWatchingRebuildRequested` | worker | `CONTINUE_WATCHING_REBUILD_REQUESTED` | — |
 | `HandleTranscodeRequested` | transcoder | `TRANSCODE_REQUESTED` | `TRANSCODE_PASS_REQUESTED` |
 | `HandleTranscodePassRequested` | transcoder | `TRANSCODE_PASS_REQUESTED` | — |

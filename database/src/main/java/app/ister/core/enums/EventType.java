@@ -18,14 +18,18 @@ public enum EventType {
     PRE_TRANSCODE_RECENTLY_WATCHED,
     PERSON_FOUND,
     ALBUM_FOUND,
+    /** No longer published (never had a queue or consumer); kept because the value is persisted. */
     TRACK_FOUND,
     AUDIO_FILE_FOUND,
     BOOK_FOUND,
+    /** No longer published (never had a queue or consumer); kept because the value is persisted. */
     CHAPTER_FOUND,
     EPUB_FILE_FOUND,
     COMIC_FILE_FOUND,
     COMIC_SERIES_FOUND,
+    /** No longer published (never had a queue or consumer); kept because the value is persisted. */
     PODCAST_FOUND,
+    /** No longer published (never had a queue or consumer); kept because the value is persisted. */
     PODCAST_EPISODE_FOUND,
     PODCAST_REFRESH_REQUESTED,
     PODCAST_EPISODE_DOWNLOAD_REQUESTED,

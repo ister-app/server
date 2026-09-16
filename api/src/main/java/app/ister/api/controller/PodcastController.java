@@ -116,7 +116,7 @@ public class PodcastController {
                     .active(true)
                     .build();
             podcastRepository.save(podcast);
-            serverEventService.createPodcastFoundEvent(podcast.getId());
+            serverEventService.createSearchIndexEvent(SearchEntityType.PODCAST, podcast.getId());
         }
         requestRefresh(podcast.getId());
         return podcast;

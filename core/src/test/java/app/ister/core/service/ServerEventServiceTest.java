@@ -4,16 +4,12 @@ import app.ister.core.enums.EventType;
 import app.ister.core.enums.SearchEntityType;
 import app.ister.core.eventdata.AlbumFoundData;
 import app.ister.core.eventdata.BookFoundData;
-import app.ister.core.eventdata.ChapterFoundData;
-import app.ister.core.eventdata.PodcastEpisodeFoundData;
-import app.ister.core.eventdata.PodcastFoundData;
 import app.ister.core.eventdata.SearchIndexRequestedData;
 import app.ister.core.eventdata.SearchReindexRequestedData;
 import app.ister.core.eventdata.PersonFoundData;
 import app.ister.core.eventdata.EpisodeFoundData;
 import app.ister.core.eventdata.MovieFoundData;
 import app.ister.core.eventdata.ShowFoundData;
-import app.ister.core.eventdata.TrackFoundData;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -98,18 +94,6 @@ class ServerEventServiceTest {
     }
 
     @Test
-    void createTrackFoundEventSendsCorrectData() {
-        UUID trackId = UUID.randomUUID();
-
-        subject.createTrackFoundEvent(trackId);
-
-        ArgumentCaptor<TrackFoundData> captor = ArgumentCaptor.forClass(TrackFoundData.class);
-        verify(messageSender).sendTrackFound(captor.capture());
-        assertEquals(trackId, captor.getValue().getTrackId());
-        assertEquals(EventType.TRACK_FOUND, captor.getValue().getEventType());
-    }
-
-    @Test
     void createBookFoundEventSendsCorrectData() {
         UUID bookId = UUID.randomUUID();
 
@@ -120,46 +104,6 @@ class ServerEventServiceTest {
         assertEquals(bookId, captor.getValue().getBookId());
         assertEquals(EventType.BOOK_FOUND, captor.getValue().getEventType());
         assertEquals(SearchEntityType.BOOK, captureSearchIndexEvent().getEntityType());
-    }
-
-    /** Chapters are not searchable on their own, so no index event is emitted. */
-    @Test
-    void createChapterFoundEventSendsNoSearchIndexEvent() {
-        UUID chapterId = UUID.randomUUID();
-
-        subject.createChapterFoundEvent(chapterId);
-
-        ArgumentCaptor<ChapterFoundData> captor = ArgumentCaptor.forClass(ChapterFoundData.class);
-        verify(messageSender).sendChapterFound(captor.capture());
-        assertEquals(chapterId, captor.getValue().getChapterId());
-        assertEquals(EventType.CHAPTER_FOUND, captor.getValue().getEventType());
-        verify(messageSender, never()).sendSearchIndexRequested(any());
-    }
-
-    @Test
-    void createPodcastFoundEventSendsCorrectData() {
-        UUID podcastId = UUID.randomUUID();
-
-        subject.createPodcastFoundEvent(podcastId);
-
-        ArgumentCaptor<PodcastFoundData> captor = ArgumentCaptor.forClass(PodcastFoundData.class);
-        verify(messageSender).sendPodcastFound(captor.capture());
-        assertEquals(podcastId, captor.getValue().getPodcastId());
-        assertEquals(EventType.PODCAST_FOUND, captor.getValue().getEventType());
-        assertEquals(SearchEntityType.PODCAST, captureSearchIndexEvent().getEntityType());
-    }
-
-    @Test
-    void createPodcastEpisodeFoundEventSendsNoSearchIndexEvent() {
-        UUID episodeId = UUID.randomUUID();
-
-        subject.createPodcastEpisodeFoundEvent(episodeId);
-
-        ArgumentCaptor<PodcastEpisodeFoundData> captor = ArgumentCaptor.forClass(PodcastEpisodeFoundData.class);
-        verify(messageSender).sendPodcastEpisodeFound(captor.capture());
-        assertEquals(episodeId, captor.getValue().getPodcastEpisodeId());
-        assertEquals(EventType.PODCAST_EPISODE_FOUND, captor.getValue().getEventType());
-        verify(messageSender, never()).sendSearchIndexRequested(any());
     }
 
     @Test

@@ -75,36 +75,6 @@ public class ServerEventService {
                         .build()));
     }
 
-    public void createChapterFoundEvent(UUID chapterId) {
-        publishAfterCommit(() -> messageSender.sendChapterFound(ChapterFoundData.builder()
-                        .eventType(EventType.CHAPTER_FOUND)
-                        .chapterId(chapterId)
-                        .build()));
-    }
-
-    public void createTrackFoundEvent(UUID trackId) {
-        publishAfterCommit(() -> messageSender.sendTrackFound(TrackFoundData.builder()
-                        .eventType(EventType.TRACK_FOUND)
-                        .trackId(trackId)
-                        .build()));
-        createSearchIndexEvent(SearchEntityType.TRACK, trackId);
-    }
-
-    public void createPodcastFoundEvent(UUID podcastId) {
-        publishAfterCommit(() -> messageSender.sendPodcastFound(PodcastFoundData.builder()
-                        .eventType(EventType.PODCAST_FOUND)
-                        .podcastId(podcastId)
-                        .build()));
-        createSearchIndexEvent(SearchEntityType.PODCAST, podcastId);
-    }
-
-    public void createPodcastEpisodeFoundEvent(UUID podcastEpisodeId) {
-        publishAfterCommit(() -> messageSender.sendPodcastEpisodeFound(PodcastEpisodeFoundData.builder()
-                        .eventType(EventType.PODCAST_EPISODE_FOUND)
-                        .podcastEpisodeId(podcastEpisodeId)
-                        .build()));
-    }
-
     public void createSearchIndexEvent(SearchEntityType entityType, UUID entityId) {
         sendSearchIndexEvent(entityType, entityId, SearchIndexRequestedData.Action.UPSERT);
     }

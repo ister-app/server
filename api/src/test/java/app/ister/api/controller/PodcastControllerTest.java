@@ -152,7 +152,7 @@ class PodcastControllerTest {
         assertEquals("https://example.org/feed", result.getFeedUrl());
         assertEquals(library, result.getLibraryEntity());
         verify(podcastRepository).save(result);
-        verify(serverEventService).createPodcastFoundEvent(result.getId());
+        verify(serverEventService).createSearchIndexEvent(SearchEntityType.PODCAST, result.getId());
         verify(messageSender).sendPodcastRefreshRequested(any(PodcastRefreshRequestedData.class));
     }
 

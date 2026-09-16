@@ -161,13 +161,6 @@ class MessageSenderTest {
     }
 
     @Test
-    void sendTrackFound() {
-        TrackFoundData data = TrackFoundData.builder().build();
-        subject.sendTrackFound(data);
-        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_TRACK_FOUND, data);
-    }
-
-    @Test
     void sendAudioFileFound() {
         AudioFileFoundData data = AudioFileFoundData.builder().build();
         subject.sendAudioFileFound(data, "disk1");
@@ -182,31 +175,10 @@ class MessageSenderTest {
     }
 
     @Test
-    void sendChapterFound() {
-        ChapterFoundData data = ChapterFoundData.builder().build();
-        subject.sendChapterFound(data);
-        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_CHAPTER_FOUND, data);
-    }
-
-    @Test
     void sendEpubFileFound() {
         EpubFileFoundData data = EpubFileFoundData.builder().build();
         subject.sendEpubFileFound(data, "disk1");
         verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_EPUB_FILE_FOUND + ".disk1", data);
-    }
-
-    @Test
-    void sendPodcastFound() {
-        PodcastFoundData data = PodcastFoundData.builder().build();
-        subject.sendPodcastFound(data);
-        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_PODCAST_FOUND, data);
-    }
-
-    @Test
-    void sendPodcastEpisodeFound() {
-        PodcastEpisodeFoundData data = PodcastEpisodeFoundData.builder().build();
-        subject.sendPodcastEpisodeFound(data);
-        verify(rabbitTemplateMock).convertAndSend(APP_ISTER_SERVER_PODCAST_EPISODE_FOUND, data);
     }
 
     @Test
