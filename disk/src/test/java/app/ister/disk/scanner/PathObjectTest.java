@@ -262,4 +262,23 @@ class PathObjectTest {
         assertEquals(DirType.EPISODE, subject.getDirType());
         assertEquals(FileType.SUBTITLE, subject.getFileType());
     }
+
+
+    /** iTunes exports carry a "(1080p HD)" suffix, sometimes truncated: never a show named by the file. */
+    @ParameterizedTest
+    @CsvSource({
+        "/disk/shows/Big Time Rush (2009)/Season 02/s02e19 Big Time Prom Kings (1080p HD).mp4, Big Time Rush, 2009, 2, 19",
+        "'/disk/shows/White Collar (2009)/S01E01, Pilot (1080p.mp4', White Collar, 2009, 1, 1",
+        "'/disk/shows/White Collar (2009)/S01E06, All In (1080.mp4', White Collar, 2009, 1, 6",
+        "/disk/shows/Victorious (2010)/Season 00/s00e08 101 Bonus Content Season 3 (1080p HD.mp4, Victorious, 2010, 0, 8"
+    })
+    void yearLikeFragmentInFileNameIsNotAShow(String path, String name, int year, int season, int episode) {
+        var subject = new PathObject(path);
+        assertEquals(name, subject.getName());
+        assertEquals(year, subject.getYear());
+        assertEquals(season, subject.getSeason());
+        assertEquals(episode, subject.getEpisode());
+        assertEquals(DirType.EPISODE, subject.getDirType());
+        assertEquals(FileType.MEDIA, subject.getFileType());
+    }
 }

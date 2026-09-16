@@ -17,7 +17,10 @@ import java.util.stream.IntStream;
 public class PathObject {
 
     private static final String REGEX_MOVIE = ".*\\/(.*)\\((\\d{4})\\)[a-zA-Z-]*\\.[a-zA-Z]+";
-    private static final String REGEX_SHOW = ".*\\/(.*)\\((\\d{4})\\)*";
+    // A show is one path component "Name (YYYY)": the year must end that component (the closing
+    // bracket is tolerated missing for truncated directory names). A year-like fragment inside a
+    // file name, such as "Pilot (1080p HD).mp4", must not become a show.
+    private static final String REGEX_SHOW = ".*\\/([^\\/]*)\\((\\d{4})\\)?(?:\\/.*)?$";
     private static final String REGEX_SEASON = "season\\s+(\\d{1,4})";
     private static final String REGEX_EPISODE = "s(\\d{1,4})e(\\d{1,4})(?:(?:-e?|e)(\\d{1,4}))?.*";
     // A file may hold at most this many consecutive episodes; longer "ranges" are almost
