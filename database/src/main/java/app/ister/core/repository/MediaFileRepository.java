@@ -12,6 +12,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import app.ister.core.entity.LibraryEntity;
+import app.ister.core.entity.MovieEntity;
+import org.springframework.data.jpa.repository.Modifying;
 
 public interface MediaFileRepository extends CrudRepository<MediaFileEntity, UUID> {
 
@@ -56,4 +59,15 @@ public interface MediaFileRepository extends CrudRepository<MediaFileEntity, UUI
 
     /** Downloaded podcast episodes in a directory, oldest first (retention sweep). */
     List<MediaFileEntity> findByDirectoryEntityIdAndPodcastEpisodeEntityIsNotNullOrderByDateCreatedAsc(UUID directoryEntityId);
+
+
+    /**
+     * A file of the library whose path contains the given fragment, e.g. {@code "Name (2007)"}: the
+     * way the scanner finds the movie a merged-away duplicate name now belongs to.
+     */
+    Optional<MediaFileEntity> findFirstByMovieEntityLibraryEntityAndPathContaining(LibraryEntity libraryEntity, String fragment);
+
+    @Modifying
+    @Query("UPDATE MediaFileEntity m SET m.movieEntity = :target WHERE m.movieEntity = :source")
+    int moveToMovie(@Param("source") MovieEntity source, @Param("target") MovieEntity target);
 }

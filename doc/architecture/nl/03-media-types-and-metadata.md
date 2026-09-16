@@ -26,6 +26,16 @@ De `MOVIE_FOUND`- / `SHOW_FOUND`- / `EPISODE_FOUND`-handlers halen TMDB-details 
 `MetadataEntity`-rijen op en downloaden posters/achtergronden (verstuurd als `IMAGE_FOUND` op de
 cache-directory).
 
+De identiteit van een film komt uit het pad (`Titel (jaar)`), dus dezelfde film onder twee
+maptitels ("De Smurfen" naast "The Smurfs") wordt als twee rijen gescand. Zodra TMDB de tweede aan
+een id koppelt dat een andere film van de library al draagt, geeft `MovieFoundHandle` hem aan
+`MovieMergeService`: de bestanden, afspeelwachtrij- en afspeellijst-items verhuizen naar de
+verrijkte rij, kijkstatus en beoordelingen verhuizen tenzij de gebruiker er daar al een heeft, en
+de eigen metadata, afbeeldingen en credits van de dubbele vervallen. `ScannerHelperService.getOrCreateMovie`
+herleidt een samengevoegde titel via de verhuisde bestanden, zodat een herscan hem niet opnieuw
+aanmaakt. Twee kopieën in dezelfde scanronde kunnen er nog doorheen glippen als beide handlers
+draaien voordat een van beide het TMDB-id zet; de eerstvolgende `refreshMetadata` voegt ze samen.
+
 Uit de details-response wordt meer gehaald dan titel/overview. **Per taal** krijgt de metadata-rij
 ook de gelokaliseerde `genre`-lijst (kommagescheiden namen — dit activeert het GENRE-filter en de
 `genre_<tag>`-zoekvelden voor video) en de `tagline`. **Taalonafhankelijke** feiten zijn kolommen op

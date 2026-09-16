@@ -34,6 +34,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.verifyNoInteractions;
+import app.ister.core.service.MovieMergeService;
+import app.ister.core.entity.LibraryEntity;
+import org.mockito.Mockito;
 
 @ExtendWith(MockitoExtension.class)
 class MovieFoundHandleTest {
@@ -43,6 +46,9 @@ class MovieFoundHandleTest {
 
     @Mock
     private MovieRepository movieRepository;
+
+    @Mock
+    private MovieMergeService movieMergeService;
 
     @Mock
     private MovieMetadata movieMetadata;
@@ -248,5 +254,37 @@ class MovieFoundHandleTest {
                 .eventType(EventType.MOVIE_FOUND)
                 .build();
         assertDoesNotThrow(() -> subject.listener(data));
+    }
+
+
+    @Test
+    void handleMergesIntoTheMovieThatAlreadyCarriesTheTmdbId() throws IOException {
+        ReflectionTestUtils.setField(subject, "apikey", "test-key");
+        LibraryEntity library = LibraryEntity.builder().id(UUID.randomUUID()).build();
+        UUID movieId = UUID.randomUUID();
+        MovieEntity movieEntity = MovieEntity.builder().id(movieId).libraryEntity(library).name("De Smurfen").releaseYear(2011).build();
+        MovieEntity twin = MovieEntity.builder().id(UUID.randomUUID()).libraryEntity(library).name("The Smurfs").releaseYear(2011).tmdbId(41513).build();
+        TMDBResult result = TMDBResult.builder().language("eng").title("The Smurfs").tmdbId(41513).build();
+        when(movieRepository.findById(movieId)).thenReturn(Optional.of(movieEntity));
+        when(movieMetadata.getMetadata(eq("De Smurfen"), eq(2011), anyString())).thenReturn(Optional.of(result));
+        when(movieRepository.findFirstByLibraryEntityAndTmdbIdAndIdNot(library, 41513, movieId)).thenReturn(Optional.of(twin));
+
+        subject.handle(MovieFoundData.builder().eventType(EventType.MOVIE_FOUND).movieId(movieId).build());
+
+        verify(movieMergeService).mergeInto(movieEntity, twin);
+        verifyNoInteractions(metaDataSave, imageDownloadService, creditsService, tmdbExtrasService);
+        assertEquals(null, movieEntity.getTmdbId());
+    }
+
+    @Test
+    void handleSkipsAMovieThatNoLongerExists() {
+        ReflectionTestUtils.setField(subject, "apikey", "test-key");
+        UUID movieId = UUID.randomUUID();
+        when(movieRepository.findById(movieId)).thenReturn(Optional.empty());
+
+        assertDoesNotThrow(() -> subject.handle(MovieFoundData.builder().eventType(EventType.MOVIE_FOUND).movieId(movieId).build()));
+
+        verifyNoInteractions(movieMetadata, metaDataSave, movieMergeService);
+        Mockito.verify(movieRepository, Mockito.never()).findFirstByLibraryEntityAndTmdbIdAndIdNot(any(), any(), any());
     }
 }

@@ -15,6 +15,8 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
+import app.ister.core.repository.MediaFileRepository;
+import app.ister.core.entity.MediaFileEntity;
 
 @ExtendWith(MockitoExtension.class)
 class ScannerHelperServiceTest {
@@ -24,6 +26,8 @@ class ScannerHelperServiceTest {
 
     @Mock
     private MovieRepository movieRepository;
+    @Mock
+    private MediaFileRepository mediaFileRepository;
     @Mock
     private ShowRepository showRepository;
     @Mock
@@ -577,5 +581,21 @@ class ScannerHelperServiceTest {
 
         assertEquals(1, result.getNumber());
         verify(chapterRepository).save(result);
+    }
+
+
+    /** A title merged into its TMDB twin is resolved through the moved files, not recreated. */
+    @Test
+    void getOrCreateMovieResolvesAMergedTitleThroughItsFiles() {
+        MovieEntity twin = MovieEntity.builder().name("The Smurfs").releaseYear(2011).build();
+        MediaFileEntity file = MediaFileEntity.builder().movieEntity(twin).path("/films/De Smurfen (2011).mkv").build();
+        when(movieRepository.findByLibraryEntityAndNameAndReleaseYear(library, "De Smurfen", 2011))
+                .thenReturn(Optional.empty());
+        when(mediaFileRepository.findFirstByMovieEntityLibraryEntityAndPathContaining(library, "De Smurfen (2011)"))
+                .thenReturn(Optional.of(file));
+
+        assertEquals(twin, subject.getOrCreateMovie(library, "De Smurfen", 2011));
+        verify(movieRepository, never()).save(any());
+        verifyNoInteractions(serverEventService);
     }
 }

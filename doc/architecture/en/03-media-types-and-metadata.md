@@ -26,6 +26,16 @@ Adding a language requires a re-scan plus a reindex.
 `MetadataEntity` rows, and download posters/backdrops (emitted as `IMAGE_FOUND` on the cache
 directory).
 
+A movie's identity comes from its path (`Title (year)`), so the same film under two directory
+titles ("De Smurfen" next to "The Smurfs") is scanned as two rows. When TMDB matches the second
+one to an id another movie of the library already carries, `MovieFoundHandle` hands it to
+`MovieMergeService`: the files, play-queue and playlist entries move to the enriched row, watch
+status and ratings move unless the user already has one there, and the duplicate's own metadata,
+images and credits are dropped. `ScannerHelperService.getOrCreateMovie` resolves a merged-away
+title through the moved files, so a rescan does not recreate it. Two copies scanned in the same
+pass can still slip through when both handlers run before either sets the TMDB id; the next
+`refreshMetadata` merges them.
+
 The details response is mined for more than title/overview. **Per language** the metadata row also
 carries the localized `genre` list (comma-separated names — this is what lights up the GENRE filter
 and the `genre_<tag>` search fields for video) and the `tagline`. **Language-independent** facts are

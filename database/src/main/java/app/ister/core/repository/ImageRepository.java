@@ -14,6 +14,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.Modifying;
 
 public interface ImageRepository extends CrudRepository<ImageEntity, UUID> {
     Page<ImageEntity> findAll(Pageable pageable);
@@ -106,4 +107,10 @@ public interface ImageRepository extends CrudRepository<ImageEntity, UUID> {
     /** The distinct external providers images were fetched from, for attribution display. */
     @Query("select distinct i.source from ImageEntity i where i.source is not null")
     List<MetadataSource> findDistinctSources();
+
+
+    /** Rows only; the cached files become zombies that the daily cache sweep removes. */
+    @Modifying
+    @Query("DELETE FROM ImageEntity i WHERE i.movieEntityId = :movieId")
+    void deleteByMovieId(@Param("movieId") UUID movieId);
 }

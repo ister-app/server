@@ -7,6 +7,7 @@ import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.eventdata.MovieFoundData;
 import app.ister.core.repository.MovieRepository;
+import app.ister.core.service.MovieMergeService;
 import app.ister.core.EventHandlingException;
 import app.ister.core.Handle;
 import app.ister.worker.events.tmdbmetadata.*;
@@ -28,6 +29,7 @@ import static app.ister.core.MessageQueue.APP_ISTER_SERVER_MOVIE_FOUND;
 @RequiredArgsConstructor
 public class MovieFoundHandle implements Handle<MovieFoundData> {
     private final MovieRepository movieRepository;
+    private final MovieMergeService movieMergeService;
     private final MovieMetadata movieMetadata;
     private final MetadataSave metaDataSave;
     private final ImageDownloadService imageDownloadService;
@@ -57,18 +59,31 @@ public class MovieFoundHandle implements Handle<MovieFoundData> {
             return;
         }
         try {
-            var movieEntity = movieRepository.findById(movieFoundData.getMovieId()).orElseThrow();
+            var found = movieRepository.findById(movieFoundData.getMovieId());
+            if (found.isEmpty()) {
+                // Merged into its TMDB twin by an earlier event (or deleted); nothing left to enrich.
+                log.info("Movie {} no longer exists, skipping metadata fetch", movieFoundData.getMovieId());
+                return;
+            }
+            var movieEntity = found.get();
             ActivityContext.report(ActivitySubjects.describe(movieEntity, ActivitySubjects.empty()).withTitle(movieEntity.getName()));
             Integer tmdbMovieId = null;
             for (String language : languageProperties.tags()) {
                 Optional<TMDBResult> tmdbResult = movieMetadata.getMetadata(movieEntity.getName(), movieEntity.getReleaseYear(), language);
                 if (tmdbResult.isPresent()) {
-                    metaDataSave.save(tmdbResult.get(), movieEntity, null, null);
-                    saveImages(tmdbResult.get(), movieEntity);
                     if (tmdbMovieId == null) {
                         tmdbMovieId = tmdbResult.get().getTmdbId();
+                        Optional<app.ister.core.entity.MovieEntity> twin = tmdbMovieId == null ? Optional.empty()
+                                : movieRepository.findFirstByLibraryEntityAndTmdbIdAndIdNot(movieEntity.getLibraryEntity(), tmdbMovieId, movieEntity.getId());
+                        if (twin.isPresent()) {
+                            // Same film under another directory title: fold this row into the enriched one.
+                            movieMergeService.mergeInto(movieEntity, twin.get());
+                            return;
+                        }
                         applyDetails(tmdbResult.get(), movieEntity);
                     }
+                    metaDataSave.save(tmdbResult.get(), movieEntity, null, null);
+                    saveImages(tmdbResult.get(), movieEntity);
                 }
             }
             // Credits and extras are language independent: fetch once.

@@ -290,4 +290,7 @@ public interface WatchStatusRepository extends JpaRepository<WatchStatusEntity, 
             ORDER BY pe.podcast_entity_id, wse.date_updated DESC
             """, nativeQuery = true)
     List<RecentEntry> findRecentPodcastEpisodeEntries(@Param("userId") UUID userId, @Param("cutoff") Instant cutoff);
+
+
+    List<WatchStatusEntity> findByMovieEntity(MovieEntity movieEntity);
 }

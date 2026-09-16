@@ -50,4 +50,7 @@ public interface RatingRepository extends CrudRepository<RatingEntity, UUID> {
     List<RatingEntity> findByUserEntityExternalIdAndBookEntityIn(String userEntityExternalId, Collection<BookEntity> bookEntities);
 
     List<RatingEntity> findByUserEntityExternalIdAndPodcastEntityIn(String userEntityExternalId, Collection<app.ister.core.entity.PodcastEntity> podcastEntities);
+
+
+    List<RatingEntity> findByMovieEntity(MovieEntity movieEntity);
 }

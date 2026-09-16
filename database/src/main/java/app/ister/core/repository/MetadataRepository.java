@@ -8,6 +8,8 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.repository.query.Param;
 
 @Repository
 public interface MetadataRepository extends JpaRepository<MetadataEntity, UUID> {
@@ -37,4 +39,9 @@ public interface MetadataRepository extends JpaRepository<MetadataEntity, UUID> 
     /** The distinct external providers metadata was fetched from, for attribution display. */
     @Query("select distinct m.source from MetadataEntity m where m.source is not null")
     List<MetadataSource> findDistinctSources();
+
+
+    @Modifying
+    @Query("DELETE FROM MetadataEntity m WHERE m.movieEntity.id = :movieId")
+    void deleteByMovieId(@Param("movieId") UUID movieId);
 }

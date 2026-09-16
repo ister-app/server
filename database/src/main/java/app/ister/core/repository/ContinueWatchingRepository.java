@@ -130,4 +130,9 @@ public interface ContinueWatchingRepository extends JpaRepository<ContinueWatchi
                         @Param("bookId") UUID bookId,
                         @Param("bookTargetId") UUID bookTargetId,
                         @Param("lastWatched") Instant lastWatched);
+
+
+    @Modifying
+    @Query("DELETE FROM ContinueWatchingEntity c WHERE c.movieEntity.id = :movieId")
+    void deleteByMovieId(@Param("movieId") UUID movieId);
 }

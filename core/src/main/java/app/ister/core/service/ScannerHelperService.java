@@ -12,12 +12,15 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
+import app.ister.core.repository.MediaFileRepository;
+import app.ister.core.entity.MediaFileEntity;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class ScannerHelperService {
     private final MovieRepository movieRepository;
+    private final MediaFileRepository mediaFileRepository;
     private final ShowRepository showRepository;
     private final SeasonRepository seasonRepository;
     private final EpisodeRepository episodeRepository;
@@ -39,6 +42,7 @@ public class ScannerHelperService {
      */
     public MovieEntity getOrCreateMovie(LibraryEntity libraryEntity, String movieName, int releaseYear) {
         return movieRepository.findByLibraryEntityAndNameAndReleaseYear(libraryEntity, movieName, releaseYear)
+                .or(() -> findMergedMovie(libraryEntity, movieName, releaseYear))
                 .orElseGet(() -> {
                     MovieEntity movieEntity = MovieEntity.builder()
                             .libraryEntity(libraryEntity)
@@ -48,6 +52,17 @@ public class ScannerHelperService {
                     serverEventService.createMovieFoundEvent(movieEntity.getId());
                     return movieEntity;
                 });
+    }
+
+    /**
+     * A title that {@link MovieMergeService} folded into its TMDB twin has no row of its own any
+     * more, but its files still carry {@code "Name (year)"} in their path and point at the twin.
+     * Without this a rescan would recreate the duplicate on every pass.
+     */
+    private Optional<MovieEntity> findMergedMovie(LibraryEntity libraryEntity, String movieName, int releaseYear) {
+        return mediaFileRepository
+                .findFirstByMovieEntityLibraryEntityAndPathContaining(libraryEntity, movieName + " (" + releaseYear + ")")
+                .map(MediaFileEntity::getMovieEntity);
     }
 
 

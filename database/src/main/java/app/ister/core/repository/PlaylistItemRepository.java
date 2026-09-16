@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.Modifying;
 
 public interface PlaylistItemRepository extends JpaRepository<PlaylistItemEntity, UUID> {
 
@@ -35,4 +36,9 @@ public interface PlaylistItemRepository extends JpaRepository<PlaylistItemEntity
     long countByPlaylistEntityId(UUID playlistId);
 
     List<PlaylistItemEntity> findByTrackEntityId(UUID trackEntityId);
+
+
+    @Modifying
+    @Query("UPDATE PlaylistItemEntity p SET p.movieEntityId = :target WHERE p.movieEntityId = :source")
+    int moveMovie(@Param("source") UUID source, @Param("target") UUID target);
 }

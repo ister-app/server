@@ -13,6 +13,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.Modifying;
 
 public interface MovieRepository extends JpaRepository<MovieEntity, UUID> {
     Optional<MovieEntity> findByLibraryEntityAndNameAndReleaseYear(LibraryEntity libraryEntity, String name, int releaseYear);
@@ -99,4 +100,13 @@ public interface MovieRepository extends JpaRepository<MovieEntity, UUID> {
             "WHERE (m IS NULL OR mv.tmdbId IS NULL) " +
             "AND (:libraryId IS NULL OR mv.libraryEntity.id = :libraryId)")
     List<UUID> findIdsOfMoviesNeedingMetadata(@Param("libraryId") UUID libraryId);
+
+
+    /** Another movie of the library already matched to this TMDB id: the merge target for a duplicate. */
+    Optional<MovieEntity> findFirstByLibraryEntityAndTmdbIdAndIdNot(LibraryEntity libraryEntity, Integer tmdbId, UUID id);
+
+    /** Deletes the row only; the dependents were moved or deleted by {@code MovieMergeService} first. */
+    @Modifying
+    @Query("DELETE FROM MovieEntity m WHERE m.id = :id")
+    void deleteRowById(@Param("id") UUID id);
 }
