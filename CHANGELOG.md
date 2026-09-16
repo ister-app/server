@@ -1,5 +1,45 @@
 # Changelog
 
+## server v4.1.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `4.1.0` |
+| `ghcr.io/ister-app/migrations` | `4.1.0` |
+
+### Features
+
+- feat(worker): merge duplicate movies on their TMDB id ([`f09b353`](https://github.com/ister-app/server/commit/f09b353))
+- feat(api): deadLetterCount query and replayDeadLetters mutation ([`5565c31`](https://github.com/ister-app/server/commit/5565c31))
+- feat(disk): clean up orphaned tracks and albums after a scan ([`6a81f54`](https://github.com/ister-app/server/commit/6a81f54))
+- feat(disk): accept webm, m4v, flv and avi as video containers ([`e1555b3`](https://github.com/ister-app/server/commit/e1555b3))
+
+### Fixes
+
+- fix(disk): never take a year-like fragment in a file name for a show ([`8f9c551`](https://github.com/ister-app/server/commit/8f9c551))
+- fix(disk): resolve the ffmpeg input inside a session ([`9449371`](https://github.com/ister-app/server/commit/9449371))
+- fix(disk): widen the ffprobe probe window for PGS subtitle streams ([`9e9648c`](https://github.com/ister-app/server/commit/9e9648c))
+- fix(core): dead-letter deterministic handler failures without retrying ([`3b2685c`](https://github.com/ister-app/server/commit/3b2685c))
+- fix(worker): TMDB revenue and budget as int64 ([`0673cac`](https://github.com/ister-app/server/commit/0673cac))
+- fix(disk): tolerate streams without a codec name ([`d12aec3`](https://github.com/ister-app/server/commit/d12aec3))
+
+### Other
+
+- refactor(core): drop the four events that never had a queue or consumer ([`d4569d4`](https://github.com/ister-app/server/commit/d4569d4))
+- chore(disk): log only twenty examples per dry-run cache sweep ([`c98cb28`](https://github.com/ister-app/server/commit/c98cb28))
+- perf(disk): analyse audio files outside the database transaction ([`22a2fc6`](https://github.com/ister-app/server/commit/22a2fc6))
+- chore(core): silence Jaffree's per-line ffmpeg output in the log ([`8d5bd17`](https://github.com/ister-app/server/commit/8d5bd17))
+- perf(disk): analyse media files outside the database transaction ([`e6ea0cd`](https://github.com/ister-app/server/commit/e6ea0cd))
+- chore: resolve all open SonarCloud issues ([`b515d76`](https://github.com/ister-app/server/commit/b515d76))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:4.1.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v4.0.0...v4.1.0
+
 ## server v4.0.0
 
 | Image | Tag |
