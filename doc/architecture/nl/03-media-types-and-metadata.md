@@ -36,6 +36,16 @@ herleidt een samengevoegde titel via de verhuisde bestanden, zodat een herscan h
 aanmaakt. Twee kopieën in dezelfde scanronde kunnen er nog doorheen glippen als beide handlers
 draaien voordat een van beide het TMDB-id zet; de eerstvolgende `refreshMetadata` voegt ze samen.
 
+**Matching** (`TmdbSearchService` + `TmdbResultSelector`): het jaar in een mapnaam zit er vaak één of
+twee naast en het jaarfilter van TMDB is strikt, dus een verkeerd jaar levert niets of ongerelateerde
+titels op. De zoektocht wordt daarom stap voor stap verbreed en stopt bij de eerste treffer: zoeken
+mét jaar en een exacte (genormaliseerde) titelmatch nemen; hetzelfde in elke andere geconfigureerde
+taal, zodat een Nederlandse mapnaam de Nederlandse TMDB-titel treft; zoeken zónder jaar en een exacte
+titel nemen die binnen twee jaar van het mapjaar is uitgebracht; en pas daarna terugvallen op de
+populariteitsvolgorde van TMDB binnen de jaargefilterde resultaten, beperkt tot titels die minstens
+de helft van de woorden uit de zoekterm delen. Een titel die zo nergens op past blijft zonder
+metadata in plaats van verkeerde te krijgen; hernoem de map en draai `refreshMetadata`.
+
 TMDB kent geen "onvertaald"-signaal: gevraagd om een taal waarin het geen vertaling heeft, geeft
 het de originele titel terug (Japans voor de meeste anime) met een lege overview.
 `TmdbLanguageFallback` herkent dat (gelokaliseerde titel gelijk aan de originele terwijl de

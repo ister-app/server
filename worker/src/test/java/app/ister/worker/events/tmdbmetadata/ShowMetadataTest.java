@@ -20,6 +20,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
+import app.ister.core.config.LanguageProperties;
 
 @ExtendWith(MockitoExtension.class)
 class ShowMetadataTest {
@@ -37,7 +38,7 @@ class ShowMetadataTest {
 
     @BeforeEach
     void setUp() {
-        subject = new ShowMetadata(tmdbClientMock, new TmdbResultSelector(), new TmdbImageBase("https://image.tmdb.org/t/p/original"));
+        subject = new ShowMetadata(tmdbClientMock, new TmdbSearchService(tmdbClientMock, new TmdbResultSelector(), new LanguageProperties()), new TmdbImageBase("https://image.tmdb.org/t/p/original"));
     }
 
     @Test

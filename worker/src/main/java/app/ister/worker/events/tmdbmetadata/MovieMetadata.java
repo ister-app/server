@@ -4,7 +4,6 @@ import app.ister.tmdbapi.model.MovieDetails200Response;
 import app.ister.tmdbapi.model.MovieDetails200ResponseGenresInner;
 import app.ister.tmdbapi.model.MovieDetails200ResponseProductionCompaniesInner;
 import app.ister.tmdbapi.model.MovieDetails200ResponseProductionCountriesInner;
-import app.ister.tmdbapi.model.SearchMovie200Response;
 import app.ister.tmdbapi.model.SearchMovie200ResponseResultsInner;
 import app.ister.worker.clients.TmdbClient;
 import feign.FeignException;
@@ -29,17 +28,13 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class MovieMetadata {
     private final TmdbClient tmdbClient;
-    private final TmdbResultSelector resultSelector;
+    private final TmdbSearchService searchService;
     private final TmdbImageBase tmdbImageBase;
 
     public Optional<TMDBResult> getMetadata(String name, int releaseYear, String language) {
         log.debug("Starting task executing.");
-        SearchMovie200Response tvSeriesResultsPage = tmdbClient._searchMovie(name, null, null, String.valueOf(releaseYear), null, null, null).getBody();
-        if (tvSeriesResultsPage != null) {
-            return resultSelector.selectMovie(tvSeriesResultsPage.getResults(), name)
-                    .flatMap(result -> getInfoForShow(result, language));
-        }
-        return Optional.empty();
+        return searchService.findMovie(name, releaseYear)
+                .flatMap(result -> getInfoForShow(result, language));
     }
 
     private Optional<TMDBResult> getInfoForShow(@Valid SearchMovie200ResponseResultsInner movieResultsPage, String language) throws FeignException {

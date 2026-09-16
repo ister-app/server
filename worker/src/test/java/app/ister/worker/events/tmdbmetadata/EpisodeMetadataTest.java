@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import app.ister.core.config.LanguageProperties;
 
 @ExtendWith(MockitoExtension.class)
 class EpisodeMetadataTest {
@@ -36,7 +37,7 @@ class EpisodeMetadataTest {
 
     @BeforeEach
     void setUp() {
-        subject = new EpisodeMetadata(tmdbClientMock, new TmdbResultSelector(), new TmdbImageBase("https://image.tmdb.org/t/p/original"));
+        subject = new EpisodeMetadata(tmdbClientMock, new TmdbSearchService(tmdbClientMock, new TmdbResultSelector(), new LanguageProperties()), new TmdbImageBase("https://image.tmdb.org/t/p/original"));
     }
 
     @Test

@@ -24,7 +24,7 @@ import java.util.Optional;
 @Component
 public class EpisodeMetadata {
     private final TmdbClient tmdbClient;
-    private final TmdbResultSelector resultSelector;
+    private final TmdbSearchService searchService;
     private final TmdbImageBase tmdbImageBase;
 
     /**
@@ -35,21 +35,16 @@ public class EpisodeMetadata {
             "en", "Episode %d",
             "nl", "Aflevering %d");
 
-    public EpisodeMetadata(TmdbClient tmdbClient, TmdbResultSelector resultSelector, TmdbImageBase tmdbImageBase) {
+    public EpisodeMetadata(TmdbClient tmdbClient, TmdbSearchService searchService, TmdbImageBase tmdbImageBase) {
         this.tmdbClient = tmdbClient;
-        this.resultSelector = resultSelector;
+        this.searchService = searchService;
         this.tmdbImageBase = tmdbImageBase;
     }
 
     public Optional<TMDBResult> getMetadata(String showName, int releaseYear, int seasonNumber, int episodeNumber, String language) throws FeignException {
         log.debug("Getting metadate from tmdb for showName: {}, releaseYear: {}, seasonNumber: {}, episodeNumber: {}, language: {}", showName, releaseYear, seasonNumber, episodeNumber, language);
-        SearchTv200Response tvSeriesResultsPage = tmdbClient._searchTv(showName, null, null, null, null, releaseYear).getBody();
-        if (tvSeriesResultsPage != null) {
-            return resultSelector.selectTv(tvSeriesResultsPage.getResults(), showName)
-                    .flatMap(result -> getMetadataForEpisode(result, seasonNumber, episodeNumber, language));
-        } else {
-            return Optional.empty();
-        }
+        return searchService.findSeries(showName, releaseYear)
+                .flatMap(result -> getMetadataForEpisode(result, seasonNumber, episodeNumber, language));
     }
 
     private Optional<TMDBResult> getMetadataForEpisode(@Valid SearchTv200ResponseResultsInner tvSeriesResultsPage, int seasonNumber, int episodeNumber, String language) throws FeignException {

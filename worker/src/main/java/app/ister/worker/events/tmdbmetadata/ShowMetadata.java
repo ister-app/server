@@ -1,6 +1,5 @@
 package app.ister.worker.events.tmdbmetadata;
 
-import app.ister.tmdbapi.model.SearchTv200Response;
 import app.ister.tmdbapi.model.SearchTv200ResponseResultsInner;
 import app.ister.tmdbapi.model.TvSeriesDetails200Response;
 import app.ister.tmdbapi.model.TvSeriesDetails200ResponseGenresInner;
@@ -28,17 +27,13 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ShowMetadata {
     private final TmdbClient tmdbClient;
-    private final TmdbResultSelector resultSelector;
+    private final TmdbSearchService searchService;
     private final TmdbImageBase tmdbImageBase;
 
     public Optional<TMDBResult> getMetadata(String name, int releaseYear, String language) {
         log.debug("Starting task executing.");
-        SearchTv200Response tvSeriesResultsPage = tmdbClient._searchTv(name, null, null, null, null, releaseYear).getBody();
-        if (tvSeriesResultsPage != null) {
-            return resultSelector.selectTv(tvSeriesResultsPage.getResults(), name)
-                    .flatMap(result -> getInfoForShow(result, language));
-        }
-        return Optional.empty();
+        return searchService.findSeries(name, releaseYear)
+                .flatMap(result -> getInfoForShow(result, language));
     }
 
     private Optional<TMDBResult> getInfoForShow(@Valid SearchTv200ResponseResultsInner tvSeriesResultsPage, String language) throws FeignException {

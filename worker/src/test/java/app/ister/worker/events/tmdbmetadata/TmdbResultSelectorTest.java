@@ -66,12 +66,49 @@ class TmdbResultSelectorTest {
     }
 
     @Test
-    void fallsBackToMostPopularWhenNoExactMatch() {
+    void fallsBackToMostPopularSimilarTitleWhenNoExactMatch() {
+        SearchMovie200ResponseResultsInner unrelated = movie(1, "Rob-B-Hood", 9.0);
+        SearchMovie200ResponseResultsInner similar = movie(2, "DuckTales: The Movie - Treasure of the Lost Lamp", 3.0);
+        SearchMovie200ResponseResultsInner alsoSimilar = movie(3, "Treasure of the Lost Lamp: Making Of", 1.0);
+
+        assertThat(subject.selectMovie(List.of(unrelated, similar, alsoSimilar), "The Movie Treasure of the Lost Lamp"))
+                .hasValueSatisfying(r -> assertThat(r.getId()).isEqualTo(2));
+    }
+
+    /** A wrong directory year makes TMDB return random titles; those must not be picked by popularity. */
+    @Test
+    void rejectsUnrelatedResultsWhenNoExactMatch() {
         SearchTv200ResponseResultsInner a = tv(1, "Some Show", 3.0);
         SearchTv200ResponseResultsInner b = tv(2, "Another Show", 7.0);
 
-        assertThat(subject.selectTv(List.of(a, b), "Totally Different"))
+        assertThat(subject.selectTv(List.of(a, b), "Totally Different")).isEmpty();
+        assertThat(subject.selectMovie(List.of(movie(1, "Home Movies 300-1", 5.0), movie(2, "Video 3000", 4.0)), "300")).isEmpty();
+    }
+
+    @Test
+    void exactSelectionIgnoresSimilarTitles() {
+        SearchMovie200ResponseResultsInner similar = movie(1, "Kingsman: The Secret Service Revealed", 9.0);
+        SearchMovie200ResponseResultsInner exact = movie(2, "Kingsman: The Secret Service", 8.0);
+
+        assertThat(subject.selectMovieExact(List.of(similar, exact), "Kingsman: The Secret Service"))
                 .hasValueSatisfying(r -> assertThat(r.getId()).isEqualTo(2));
+        assertThat(subject.selectMovieExact(List.of(similar), "Kingsman: The Secret Service")).isEmpty();
+    }
+
+    @Test
+    void nearYearSelectionKeepsOnlyExactTitlesReleasedCloseToTheYear() {
+        SearchMovie200ResponseResultsInner original = movie(1, "Life Is Beautiful", 9.0);
+        original.setReleaseDate("1997-12-20");
+        SearchMovie200ResponseResultsInner remake = movie(2, "Life Is Beautiful", 3.0);
+        remake.setReleaseDate("2013-05-01");
+        SearchMovie200ResponseResultsInner undated = movie(3, "Life Is Beautiful", 30.0);
+
+        assertThat(subject.selectMovieNearYear(List.of(original, remake, undated), "Life Is Beautiful", 1998))
+                .hasValueSatisfying(r -> assertThat(r.getId()).isEqualTo(1));
+        assertThat(subject.selectMovieNearYear(List.of(original, remake, undated), "Life Is Beautiful", 2005)).isEmpty();
+        assertThat(TmdbResultSelector.nearYear("2007-03-07", 2006)).isTrue();
+        assertThat(TmdbResultSelector.nearYear("1994-02-03", 2000)).isFalse();
+        assertThat(TmdbResultSelector.nearYear("", 2000)).isFalse();
     }
 
     @Test

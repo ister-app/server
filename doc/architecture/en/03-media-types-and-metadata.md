@@ -36,6 +36,16 @@ title through the moved files, so a rescan does not recreate it. Two copies scan
 pass can still slip through when both handlers run before either sets the TMDB id; the next
 `refreshMetadata` merges them.
 
+**Matching** (`TmdbSearchService` + `TmdbResultSelector`): the year in a directory name is often one
+or two off and TMDB's year filter is strict, so a wrong year returns nothing or unrelated titles. The
+lookup therefore widens step by step and stops at the first hit: search with the year and take an
+exact (normalized) title match; repeat that in every other configured language so a Dutch directory
+name matches the Dutch TMDB title; search without the year and take an exact title released within
+two years of the directory year; and only then fall back to TMDB's popularity order among the
+year-filtered results, restricted to titles that share at least half of the query's words. A title
+that matches nothing this way stays without metadata rather than getting a wrong one; fix the
+directory name and run `refreshMetadata`.
+
 TMDB has no "untranslated" signal: asked for a language it has no translation in, it echoes the
 original title (Japanese for most anime) with an empty overview. `TmdbLanguageFallback` detects
 that (localized title equals the original title while the original language is neither the

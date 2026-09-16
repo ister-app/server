@@ -21,6 +21,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
+import app.ister.core.config.LanguageProperties;
 
 @ExtendWith(MockitoExtension.class)
 class MovieMetadataTest {
@@ -38,7 +39,7 @@ class MovieMetadataTest {
 
     @BeforeEach
     void setUp() {
-        subject = new MovieMetadata(tmdbClientMock, new TmdbResultSelector(), new TmdbImageBase("https://image.tmdb.org/t/p/original"));
+        subject = new MovieMetadata(tmdbClientMock, new TmdbSearchService(tmdbClientMock, new TmdbResultSelector(), new LanguageProperties()), new TmdbImageBase("https://image.tmdb.org/t/p/original"));
     }
 
     @Test
@@ -209,5 +210,81 @@ class MovieMetadataTest {
         assertEquals("nld", result.get().getLanguage());
         assertEquals("Your Name.", result.get().getTitle());
         assertEquals("Two strangers swap bodies.", result.get().getDescription());
+    }
+
+
+    /** "V for Vendetta (2005)": the year filter finds nothing, the year-less search does, one year off. */
+    @Test
+    void findsAMovieWhoseDirectoryYearIsOffByOne() {
+        SearchMovie200Response anyYearResponse = org.mockito.Mockito.mock(SearchMovie200Response.class);
+        SearchMovie200ResponseResultsInner film = new SearchMovie200ResponseResultsInner();
+        film.setId(752); film.setTitle("V for Vendetta"); film.setReleaseDate("2006-02-23"); film.setPopularity(new BigDecimal("40"));
+        SearchMovie200ResponseResultsInner extra = new SearchMovie200ResponseResultsInner();
+        extra.setId(753); extra.setTitle("V for Vendetta: Unmasked"); extra.setReleaseDate("2006-05-01"); extra.setPopularity(new BigDecimal("50"));
+        when(tmdbClientMock._searchMovie("V for Vendetta", null, null, "2005", null, null, null))
+                .thenReturn(ResponseEntity.ok(searchResponseMock));
+        when(searchResponseMock.getResults()).thenReturn(List.of());
+        when(tmdbClientMock._searchMovie("V for Vendetta", null, "nl", "2005", null, null, null))
+                .thenReturn(ResponseEntity.ok(null));
+        when(tmdbClientMock._searchMovie("V for Vendetta", null, null, null, null, null, null))
+                .thenReturn(ResponseEntity.ok(anyYearResponse));
+        when(anyYearResponse.getResults()).thenReturn(List.of(film, extra));
+        when(tmdbClientMock._movieDetails(752, "", "en")).thenReturn(ResponseEntity.ok(movieDetailsMock));
+        when(movieDetailsMock.getReleaseDate()).thenReturn("2006-02-23");
+        when(movieDetailsMock.getOverview()).thenReturn("Remember, remember.");
+        when(movieDetailsMock.getTitle()).thenReturn("V for Vendetta");
+        when(movieDetailsMock.getId()).thenReturn(752);
+
+        Optional<TMDBResult> result = subject.getMetadata("V for Vendetta", 2005, "en");
+
+        assertEquals(752, result.orElseThrow().getTmdbId());
+    }
+
+    /** "300 (2006)": the year filter returns unrelated titles; without an exact match nearby, no metadata. */
+    @Test
+    void doesNotPickAnUnrelatedTitleForAWrongYear() {
+        SearchMovie200Response anyYearResponse = org.mockito.Mockito.mock(SearchMovie200Response.class);
+        SearchMovie200ResponseResultsInner junk1 = new SearchMovie200ResponseResultsInner();
+        junk1.setId(1); junk1.setTitle("Home Movies 300-1"); junk1.setPopularity(new BigDecimal("2"));
+        SearchMovie200ResponseResultsInner junk2 = new SearchMovie200ResponseResultsInner();
+        junk2.setId(2); junk2.setTitle("Rob-B-Hood"); junk2.setPopularity(new BigDecimal("9"));
+        SearchMovie200ResponseResultsInner farOff = new SearchMovie200ResponseResultsInner();
+        farOff.setId(3); farOff.setTitle("300"); farOff.setReleaseDate("1962-01-01"); farOff.setPopularity(new BigDecimal("9"));
+        when(tmdbClientMock._searchMovie("300", null, null, "2006", null, null, null))
+                .thenReturn(ResponseEntity.ok(searchResponseMock));
+        when(searchResponseMock.getResults()).thenReturn(List.of(junk1, junk2));
+        when(tmdbClientMock._searchMovie("300", null, "nl", "2006", null, null, null))
+                .thenReturn(ResponseEntity.ok(null));
+        when(tmdbClientMock._searchMovie("300", null, null, null, null, null, null))
+                .thenReturn(ResponseEntity.ok(anyYearResponse));
+        when(anyYearResponse.getResults()).thenReturn(List.of(farOff));
+
+        assertTrue(subject.getMetadata("300", 2006, "en").isEmpty());
+        org.mockito.Mockito.verify(tmdbClientMock, org.mockito.Mockito.never())._movieDetails(org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    /** "De Smurfen (2011)": no English match, but the Dutch search has the exact title. */
+    @Test
+    void matchesADirectoryNamedInAConfiguredLanguage() {
+        SearchMovie200Response dutchResponse = org.mockito.Mockito.mock(SearchMovie200Response.class);
+        SearchMovie200ResponseResultsInner film = new SearchMovie200ResponseResultsInner();
+        film.setId(41513); film.setTitle("De Smurfen"); film.setOriginalTitle("The Smurfs"); film.setPopularity(new BigDecimal("30"));
+        SearchMovie200ResponseResultsInner english = new SearchMovie200ResponseResultsInner();
+        english.setId(41513); english.setTitle("The Smurfs"); english.setOriginalTitle("The Smurfs"); english.setPopularity(new BigDecimal("30"));
+        SearchMovie200ResponseResultsInner other = new SearchMovie200ResponseResultsInner();
+        other.setId(5); other.setTitle("Smurfs: The Lost Village"); other.setPopularity(new BigDecimal("31"));
+        when(tmdbClientMock._searchMovie("De Smurfen", null, null, "2011", null, null, null))
+                .thenReturn(ResponseEntity.ok(searchResponseMock));
+        when(searchResponseMock.getResults()).thenReturn(List.of(english, other));
+        when(tmdbClientMock._searchMovie("De Smurfen", null, "nl", "2011", null, null, null))
+                .thenReturn(ResponseEntity.ok(dutchResponse));
+        when(dutchResponse.getResults()).thenReturn(List.of(film, other));
+        when(tmdbClientMock._movieDetails(41513, "", "en")).thenReturn(ResponseEntity.ok(movieDetailsMock));
+        when(movieDetailsMock.getReleaseDate()).thenReturn("2011-07-29");
+        when(movieDetailsMock.getOverview()).thenReturn("Blue.");
+        when(movieDetailsMock.getTitle()).thenReturn("The Smurfs");
+        when(movieDetailsMock.getId()).thenReturn(41513);
+
+        assertEquals(41513, subject.getMetadata("De Smurfen", 2011, "en").orElseThrow().getTmdbId());
     }
 }
