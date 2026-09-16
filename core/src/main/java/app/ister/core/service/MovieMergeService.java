@@ -68,9 +68,12 @@ public class MovieMergeService {
                 ratingRepository.save(rating);
             }
         }
-        creditRepository.deleteByMovieEntityId(source.getId());
+        creditRepository.deleteRowsByMovieId(source.getId());
         imageRepository.deleteByMovieId(source.getId());
         metadataRepository.deleteByMovieId(source.getId());
+        // The moved watch statuses and ratings are still pending in the persistence context; the
+        // bulk delete below does not auto-flush them, and the row must not go while they point at it.
+        watchStatusRepository.flush();
         movieRepository.deleteRowById(source.getId());
         serverEventService.createSearchDeleteEvent(SearchEntityType.MOVIE, source.getId());
         serverEventService.createSearchIndexEvent(SearchEntityType.MOVIE, target.getId());

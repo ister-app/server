@@ -75,15 +75,16 @@ class MovieMergeServiceTest {
     void movesFilesQueuesAndPlaylistsThenDropsTheSourceRow() {
         subject.mergeInto(source, target);
 
-        InOrder order = inOrder(mediaFileRepository, playQueueItemRepository, playlistItemRepository,
+        InOrder order = inOrder(mediaFileRepository, playQueueItemRepository, playlistItemRepository, watchStatusRepository,
                 continueWatchingRepository, creditRepository, imageRepository, metadataRepository, movieRepository, serverEventService);
         order.verify(mediaFileRepository).moveToMovie(source, target);
         order.verify(playQueueItemRepository).moveMovie(source.getId(), target.getId());
         order.verify(playlistItemRepository).moveMovie(source.getId(), target.getId());
         order.verify(continueWatchingRepository).deleteByMovieId(source.getId());
-        order.verify(creditRepository).deleteByMovieEntityId(source.getId());
+        order.verify(creditRepository).deleteRowsByMovieId(source.getId());
         order.verify(imageRepository).deleteByMovieId(source.getId());
         order.verify(metadataRepository).deleteByMovieId(source.getId());
+        order.verify(watchStatusRepository).flush();
         order.verify(movieRepository).deleteRowById(source.getId());
         order.verify(serverEventService).createSearchDeleteEvent(SearchEntityType.MOVIE, source.getId());
         order.verify(serverEventService).createSearchIndexEvent(SearchEntityType.MOVIE, target.getId());
