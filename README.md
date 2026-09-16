@@ -107,7 +107,10 @@ by two subsystems:
 
 - **Metadata fetching (worker).** For every configured tag, TMDB details are fetched in that
   language, producing one `MetadataEntity` row per language per media item (title, description,
-  genre, release date). The first tag is the primary/fallback language.
+  genre, release date). The first tag is the primary/fallback language. When TMDB has no
+  translation in a language it echoes the original title (Japanese for anime) with an empty
+  overview; the worker detects that and stores the English title and texts in that language's row
+  instead, so a Dutch listing never shows a Japanese title.
 - **Search (Typesense).** The collection schema and the search query are generated from the same
   list: each language gets its own `title_<tag>` / `description_<tag>` / `genre_<tag>` fields, each
   carrying the matching Typesense `locale` so tokenization is language-aware. A search queries across

@@ -155,4 +155,50 @@ class ShowMetadataTest {
 
         assertTrue(subject.getMetadata("Show", 2024, "en").isEmpty());
     }
+
+
+    @Test
+    void fallsBackToEnglishTextsWhenTheLanguageHasNoTranslation() {
+        TvSeriesDetails200Response englishDetails = org.mockito.Mockito.mock(TvSeriesDetails200Response.class);
+        when(tmdbClientMock._searchTv("Death Note", null, null, null, null, 2006))
+                .thenReturn(ResponseEntity.ok(searchResponseMock));
+        when(searchResponseMock.getResults()).thenReturn(List.of(resultInnerMock));
+        when(resultInnerMock.getId()).thenReturn(13916);
+        when(tmdbClientMock._tvSeriesDetails(13916, "", "nl")).thenReturn(ResponseEntity.ok(tvSeriesDetailsMock));
+        when(tvSeriesDetailsMock.getName()).thenReturn("デスノート");
+        when(tvSeriesDetailsMock.getOriginalName()).thenReturn("デスノート");
+        when(tvSeriesDetailsMock.getOriginalLanguage()).thenReturn("ja");
+        when(tvSeriesDetailsMock.getOverview()).thenReturn("");
+        when(tvSeriesDetailsMock.getFirstAirDate()).thenReturn("2006-10-04");
+        when(tvSeriesDetailsMock.getId()).thenReturn(13916);
+        when(tmdbClientMock._tvSeriesDetails(13916, "", "en")).thenReturn(ResponseEntity.ok(englishDetails));
+        when(englishDetails.getName()).thenReturn("Death Note");
+        when(englishDetails.getOverview()).thenReturn("A notebook that kills.");
+
+        Optional<TMDBResult> result = subject.getMetadata("Death Note", 2006, "nl");
+
+        assertTrue(result.isPresent());
+        assertEquals("nld", result.get().getLanguage());
+        assertEquals("Death Note", result.get().getTitle());
+        assertEquals("A notebook that kills.", result.get().getDescription());
+    }
+
+    @Test
+    void keepsATranslatedTitleWithoutASecondCall() {
+        when(tmdbClientMock._searchTv("Show", null, null, null, null, 2024))
+                .thenReturn(ResponseEntity.ok(searchResponseMock));
+        when(searchResponseMock.getResults()).thenReturn(List.of(resultInnerMock));
+        when(resultInnerMock.getId()).thenReturn(42);
+        when(tmdbClientMock._tvSeriesDetails(42, "", "nl")).thenReturn(ResponseEntity.ok(tvSeriesDetailsMock));
+        when(tvSeriesDetailsMock.getName()).thenReturn("De Serie");
+        when(tvSeriesDetailsMock.getOriginalName()).thenReturn("The Show");
+        when(tvSeriesDetailsMock.getOverview()).thenReturn("Een geweldige serie");
+        when(tvSeriesDetailsMock.getFirstAirDate()).thenReturn("2024-03-01");
+        when(tvSeriesDetailsMock.getId()).thenReturn(42);
+
+        Optional<TMDBResult> result = subject.getMetadata("Show", 2024, "nl");
+
+        assertEquals("De Serie", result.orElseThrow().getTitle());
+        org.mockito.Mockito.verify(tmdbClientMock, org.mockito.Mockito.never())._tvSeriesDetails(42, "", "en");
+    }
 }

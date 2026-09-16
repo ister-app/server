@@ -36,6 +36,14 @@ title through the moved files, so a rescan does not recreate it. Two copies scan
 pass can still slip through when both handlers run before either sets the TMDB id; the next
 `refreshMetadata` merges them.
 
+TMDB has no "untranslated" signal: asked for a language it has no translation in, it echoes the
+original title (Japanese for most anime) with an empty overview. `TmdbLanguageFallback` detects
+that (localized title equals the original title while the original language is neither the
+requested nor the fallback language `en`) and the show/movie handlers then fetch the English
+details and use its title, and its overview and tagline where the localized ones are blank, for
+that language's metadata row. The row keeps the requested language, so the player and the search
+index need no special case.
+
 The details response is mined for more than title/overview. **Per language** the metadata row also
 carries the localized `genre` list (comma-separated names — this is what lights up the GENRE filter
 and the `genre_<tag>` search fields for video) and the `tagline`. **Language-independent** facts are

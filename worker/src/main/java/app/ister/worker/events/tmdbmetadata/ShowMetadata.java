@@ -43,17 +43,34 @@ public class ShowMetadata {
 
     private Optional<TMDBResult> getInfoForShow(@Valid SearchTv200ResponseResultsInner tvSeriesResultsPage, String language) throws FeignException {
         TvSeriesDetails200Response tvSeries1 = tmdbClient._tvSeriesDetails(tvSeriesResultsPage.getId(), "", language).getBody();
-        if (tvSeries1 != null && tvSeries1.getFirstAirDate() != null && tvSeries1.getOverview() != null) {
+        if (tvSeries1 == null) {
+            log.debug("Couldn't find Show {} {} {}", tvSeriesResultsPage.getName(), tvSeriesResultsPage.getFirstAirDate(), language);
+            return Optional.empty();
+        }
+        // No translation in this language: TMDB echoes the original (e.g. Japanese) name with an
+        // empty overview. Take the English texts for this language's row instead.
+        String title = tvSeries1.getName();
+        String overview = tvSeries1.getOverview();
+        String tagline = tvSeries1.getTagline();
+        if (TmdbLanguageFallback.needsFallback(language, title, tvSeries1.getOriginalName(), tvSeries1.getOriginalLanguage())) {
+            TvSeriesDetails200Response english = tmdbClient._tvSeriesDetails(tvSeriesResultsPage.getId(), "", TmdbLanguageFallback.FALLBACK_LANGUAGE).getBody();
+            if (english != null) {
+                title = TmdbLanguageFallback.pick(english.getName(), title);
+                overview = TmdbLanguageFallback.pick(overview, english.getOverview());
+                tagline = TmdbLanguageFallback.pick(tagline, english.getTagline());
+            }
+        }
+        if (tvSeries1.getFirstAirDate() != null && overview != null) {
             return Optional.of(TMDBResult.builder()
                     .language(Locale.forLanguageTag(language).getISO3Language())
-                    .title(tvSeries1.getName())
+                    .title(title)
                     .released(LocalDate.parse(tvSeries1.getFirstAirDate()))
                     .sourceUri("TMDB://" + tvSeries1.getId())
                     .tmdbId(tvSeries1.getId())
-                    .description(tvSeries1.getOverview().trim().isEmpty() ? null : tvSeries1.getOverview())
+                    .description(TmdbFieldUtil.blankToNull(overview))
                     .posterUrl(tvSeries1.getPosterPath() == null ? null : tmdbImageBase.url(tvSeries1.getPosterPath()))
                     .backgroundUrl(tvSeries1.getBackdropPath() == null ? null : tmdbImageBase.url(tvSeries1.getBackdropPath()))
-                    .tagline(TmdbFieldUtil.blankToNull(tvSeries1.getTagline()))
+                    .tagline(TmdbFieldUtil.blankToNull(tagline))
                     .genres(TmdbFieldUtil.joinNonBlank(tvSeries1.getGenres(), TvSeriesDetails200ResponseGenresInner::getName))
                     .voteAverage(TmdbFieldUtil.withVotes(tvSeries1.getVoteCount(), tvSeries1.getVoteAverage()))
                     .voteCount(TmdbFieldUtil.positiveOrNull(tvSeries1.getVoteCount()))

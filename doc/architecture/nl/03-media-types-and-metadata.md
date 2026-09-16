@@ -36,6 +36,14 @@ herleidt een samengevoegde titel via de verhuisde bestanden, zodat een herscan h
 aanmaakt. Twee kopieën in dezelfde scanronde kunnen er nog doorheen glippen als beide handlers
 draaien voordat een van beide het TMDB-id zet; de eerstvolgende `refreshMetadata` voegt ze samen.
 
+TMDB kent geen "onvertaald"-signaal: gevraagd om een taal waarin het geen vertaling heeft, geeft
+het de originele titel terug (Japans voor de meeste anime) met een lege overview.
+`TmdbLanguageFallback` herkent dat (gelokaliseerde titel gelijk aan de originele terwijl de
+originele taal noch de gevraagde noch de terugvaltaal `en` is), waarna de show-/filmhandlers de
+Engelse details ophalen en de titel daarvan, plus overview en tagline waar de gelokaliseerde leeg
+zijn, in de metadata-rij van die taal zetten. De rij houdt de gevraagde taal, dus speler en
+zoekindex hoeven niets bijzonders te doen.
+
 Uit de details-response wordt meer gehaald dan titel/overview. **Per taal** krijgt de metadata-rij
 ook de gelokaliseerde `genre`-lijst (kommagescheiden namen — dit activeert het GENRE-filter en de
 `genre_<tag>`-zoekvelden voor video) en de `tagline`. **Taalonafhankelijke** feiten zijn kolommen op

@@ -183,4 +183,31 @@ class MovieMetadataTest {
 
         assertTrue(subject.getMetadata("Movie", 2024, "en").isEmpty());
     }
+
+
+    @Test
+    void fallsBackToEnglishTextsWhenTheLanguageHasNoTranslation() {
+        MovieDetails200Response englishDetails = org.mockito.Mockito.mock(MovieDetails200Response.class);
+        when(tmdbClientMock._searchMovie("Your Name", null, null, "2016", null, null, null))
+                .thenReturn(ResponseEntity.ok(searchResponseMock));
+        when(searchResponseMock.getResults()).thenReturn(List.of(resultInnerMock));
+        when(resultInnerMock.getId()).thenReturn(372058);
+        when(tmdbClientMock._movieDetails(372058, "", "nl")).thenReturn(ResponseEntity.ok(movieDetailsMock));
+        when(movieDetailsMock.getTitle()).thenReturn("君の名は。");
+        when(movieDetailsMock.getOriginalTitle()).thenReturn("君の名は。");
+        when(movieDetailsMock.getOriginalLanguage()).thenReturn("ja");
+        when(movieDetailsMock.getOverview()).thenReturn("");
+        when(movieDetailsMock.getReleaseDate()).thenReturn("2016-08-26");
+        when(movieDetailsMock.getId()).thenReturn(372058);
+        when(tmdbClientMock._movieDetails(372058, "", "en")).thenReturn(ResponseEntity.ok(englishDetails));
+        when(englishDetails.getTitle()).thenReturn("Your Name.");
+        when(englishDetails.getOverview()).thenReturn("Two strangers swap bodies.");
+
+        Optional<TMDBResult> result = subject.getMetadata("Your Name", 2016, "nl");
+
+        assertTrue(result.isPresent());
+        assertEquals("nld", result.get().getLanguage());
+        assertEquals("Your Name.", result.get().getTitle());
+        assertEquals("Two strangers swap bodies.", result.get().getDescription());
+    }
 }

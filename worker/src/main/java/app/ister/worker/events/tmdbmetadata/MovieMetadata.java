@@ -44,17 +44,34 @@ public class MovieMetadata {
 
     private Optional<TMDBResult> getInfoForShow(@Valid SearchMovie200ResponseResultsInner movieResultsPage, String language) throws FeignException {
         MovieDetails200Response movieDb = tmdbClient._movieDetails(movieResultsPage.getId(), "", language).getBody();
-        if (movieDb != null && movieDb.getReleaseDate() != null && movieDb.getOverview() != null) {
+        if (movieDb == null) {
+            log.debug("Couldn't find Movie {} {} {}", movieResultsPage.getTitle(), movieResultsPage.getReleaseDate(), language);
+            return Optional.empty();
+        }
+        // No translation in this language: TMDB echoes the original title with an empty overview.
+        // Take the English texts for this language's row instead.
+        String title = movieDb.getTitle();
+        String overview = movieDb.getOverview();
+        String tagline = movieDb.getTagline();
+        if (TmdbLanguageFallback.needsFallback(language, title, movieDb.getOriginalTitle(), movieDb.getOriginalLanguage())) {
+            MovieDetails200Response english = tmdbClient._movieDetails(movieResultsPage.getId(), "", TmdbLanguageFallback.FALLBACK_LANGUAGE).getBody();
+            if (english != null) {
+                title = TmdbLanguageFallback.pick(english.getTitle(), title);
+                overview = TmdbLanguageFallback.pick(overview, english.getOverview());
+                tagline = TmdbLanguageFallback.pick(tagline, english.getTagline());
+            }
+        }
+        if (movieDb.getReleaseDate() != null && overview != null) {
             return Optional.of(TMDBResult.builder()
                     .language(Locale.forLanguageTag(language).getISO3Language())
-                    .title(movieDb.getTitle())
+                    .title(title)
                     .released(LocalDate.parse(movieDb.getReleaseDate()))
                     .sourceUri("TMDB://" + movieDb.getId())
                     .tmdbId(movieDb.getId())
-                    .description(movieDb.getOverview().trim().isEmpty() ? null : movieDb.getOverview())
+                    .description(TmdbFieldUtil.blankToNull(overview))
                     .posterUrl(movieDb.getPosterPath() == null ? null : tmdbImageBase.url(movieDb.getPosterPath()))
                     .backgroundUrl(movieDb.getBackdropPath() == null ? null : tmdbImageBase.url(movieDb.getBackdropPath()))
-                    .tagline(TmdbFieldUtil.blankToNull(movieDb.getTagline()))
+                    .tagline(TmdbFieldUtil.blankToNull(tagline))
                     .genres(TmdbFieldUtil.joinNonBlank(movieDb.getGenres(), MovieDetails200ResponseGenresInner::getName))
                     .runtime(TmdbFieldUtil.positiveOrNull(movieDb.getRuntime()))
                     .voteAverage(TmdbFieldUtil.withVotes(movieDb.getVoteCount(), movieDb.getVoteAverage()))
