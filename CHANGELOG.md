@@ -1,5 +1,30 @@
 # Changelog
 
+## server v4.2.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `4.2.0` |
+| `ghcr.io/ister-app/migrations` | `4.2.0` |
+
+### Features
+
+- feat(worker): fall back to English texts when TMDB has no translation ([`fa9d2b0`](https://github.com/ister-app/server/commit/fa9d2b0))
+
+### Fixes
+
+- fix(disk): time-box and downscale the blur-hash chunks ([`25d379f`](https://github.com/ister-app/server/commit/25d379f))
+- fix(worker): match TMDB titles despite a wrong directory year ([`d470419`](https://github.com/ister-app/server/commit/d470419))
+- fix(core): delete a merged movie's credits before its row ([`f5aa746`](https://github.com/ister-app/server/commit/f5aa746))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:4.2.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v4.1.0...v4.2.0
+
 ## server v4.1.0
 
 | Image | Tag |
