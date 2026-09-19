@@ -115,7 +115,11 @@ Grease_ Soundtrack (1991)/        # plat: geen artiestenmap
   `[FLAC]`, …) en een leidende `{Artiest} - `-prefix worden weggehaald, dus
   `The Beatles - Abbey Road (1969) [FLAC]` en `Abbey Road (1969)` zijn hetzelfde album.
 - Een **plat album** direct onder de library-root (zonder artiestenmap) mag; de artiest komt dan
-  uit de `album_artist`-tag in de bestanden.
+  uit de `album_artist`-tag in de bestanden. Zo'n map is één album, dus de `album`-tag wordt alleen
+  als albumtitel gebruikt als hij de map zelf benoemt (ongeacht hoofdletters, een `(JJJJ)` aan het
+  eind en de tekens die een map niet kan bevatten: `200 KM/H …` bij een map `200 KM_H …`). Een map
+  met losse, ongerelateerde singles houdt dus de mapnaam en wordt niet vernoemd naar de single die
+  het eerst gescand werd.
 - Tags bepalen wie wat uitvoert: `album_artist` identificeert het album, `artist` de uitvoerder van
   het losse nummer — op een verzamelalbum bestaat de echte artiest alleen in die tag per track. Een
   `feat.`/`ft.`/`featuring`-gast mag in de `artist`-tag blijven staan: de server crediteert de

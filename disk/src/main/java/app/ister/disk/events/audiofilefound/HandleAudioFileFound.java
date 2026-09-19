@@ -12,6 +12,7 @@ import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.TrackCreditEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.EventType;
+import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.SearchEntityType;
 import app.ister.core.enums.SubtitleFormat;
@@ -34,6 +35,7 @@ import app.ister.core.storage.CacheDirectoryResolver;
 import app.ister.core.storage.TmpStoreProvider;
 import app.ister.core.storage.CacheStore;
 import app.ister.core.storage.PathStrings;
+import app.ister.core.storage.ObjectRef;
 import app.ister.core.storage.SourceUris;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
@@ -42,6 +44,7 @@ import app.ister.core.utils.Jaffree;
 import app.ister.disk.events.mediafilefound.MediaFileFoundCheckForStreams;
 import app.ister.disk.events.mediafilefound.MediaFileFoundGetDuration;
 import app.ister.disk.scanner.ArtistTagParser;
+import app.ister.disk.scanner.MusicPathObject;
 import com.github.kokorin.jaffree.ffprobe.Format;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -58,12 +61,15 @@ import java.time.LocalDate;
 import java.time.Month;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Comparator;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -218,7 +224,8 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                         s.getCodecName(), s.getCodecType().name(), s.getHeight(), s.getLanguage(),
                         freshEntity.getId(), s.getPath(), s.getStreamIndex(), s.getTitle(), s.getWidth())));
 
-        saveTrackMetadataFromTags(messageData.getTrackEntityUUID(), freshEntity, format);
+        saveTrackMetadataFromTags(messageData.getTrackEntityUUID(), freshEntity, format,
+                isFlatAlbumStructure(freshDirectory, messageData.getPath()));
         saveChapterMetadataFromTags(messageData.getChapterEntityUUID(), freshEntity, format);
         requestPlaylistPreGenerationAfterCommit(freshEntity.getId(), freshDirectory.getName());
 
@@ -258,7 +265,20 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                 .build(), directoryName);
     }
 
-    private void saveTrackMetadataFromTags(UUID trackEntityUUID, MediaFileEntity mediaFile, Format format) {
+    /**
+     * Whether the file sits directly in the artist folder ({@code Artist/01 - Title.mp3}) instead of in an
+     * album folder. The path then names no album, so every loose single of that artist ends up on one
+     * container album named after the artist.
+     */
+    private boolean isFlatAlbumStructure(DirectoryEntity directory, String path) {
+        if (directory.getLibraryEntity() == null || directory.getLibraryEntity().getLibraryType() != LibraryType.MUSIC) {
+            return false;
+        }
+        return new MusicPathObject(directory.getPath(), path, false).isFlatAlbumStructure();
+    }
+
+    private void saveTrackMetadataFromTags(UUID trackEntityUUID, MediaFileEntity mediaFile, Format format,
+                                           boolean flatAlbumStructure) {
         if (trackEntityUUID == null || format == null) return;
         Optional<TrackEntity> trackOpt = trackRepository.findById(trackEntityUUID);
         if (trackOpt.isEmpty()) return;
@@ -286,7 +306,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
             serverEventService.createSearchIndexEvent(SearchEntityType.TRACK, track.getId());
         }
 
-        saveAlbumMetadataFromTags(track, mediaFile, format);
+        saveAlbumMetadataFromTags(track, mediaFile, format, flatAlbumStructure);
     }
 
     /**
@@ -374,20 +394,28 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
      * the entity itself — correcting the entity would strand the cover and NFO scanners, which look the
      * album up by its path-derived name and year.
      */
-    private void saveAlbumMetadataFromTags(TrackEntity track, MediaFileEntity mediaFile, Format format) {
+    private void saveAlbumMetadataFromTags(TrackEntity track, MediaFileEntity mediaFile, Format format,
+                                           boolean flatAlbumStructure) {
         AlbumEntity album = track.getAlbumEntity();
         if (album == null) return;
-        // Tracks of one album are consumed concurrently; without the lock two of them both see no
-        // metadata and both insert a row.
-        if (albumRepository.findByIdForUpdate(album.getId()).isEmpty()) return;
-        if (!metadataRepository.findByAlbumEntityId(album.getId()).isEmpty()) return;
 
         String albumTitle = extractAlbumTitle(format);
         LocalDate released = extractReleaseDate(format);
         String genre = extractGenreTag(format);
 
         if (albumTitle == null && released == null && genre == null) return;
+        // One folder without an artist level is read as one album, but it is just as often an artist
+        // folder holding loose singles. There the album tag describes a single and not the folder, and
+        // titling the folder after it makes two unrelated albums show the same name in the clients — so
+        // the tag is only believed when it names the folder itself.
+        if (flatAlbumStructure && !namesTheSameAlbum(albumTitle, album.getName())) return;
+        // Tracks of one album are consumed concurrently; without the lock two of them both see no
+        // metadata and both insert a row.
+        if (albumRepository.findByIdForUpdate(album.getId()).isEmpty()) return;
+        List<MetadataEntity> existing = metadataRepository.findByAlbumEntityId(album.getId());
+        if (!existing.isEmpty() && !allRowsAreOrphanedLocalFiles(album, existing)) return;
 
+        metadataRepository.deleteAll(existing);
         metadataRepository.save(MetadataEntity.builder()
                 .title(albumTitle)
                 .released(released)
@@ -396,6 +424,43 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                 .sourceUri(SourceUris.of(mediaFile.getPath()))
                 .build());
         serverEventService.createSearchIndexEvent(SearchEntityType.ALBUM, album.getId());
+    }
+
+    /**
+     * Whether a tag title and a folder-derived album name are the same name. A folder cannot hold every
+     * character a title can ("200 KM/H …" becomes "200 KM_H …"), so the comparison ignores the
+     * separators a rename tends to replace, plus case and a trailing "(YYYY)".
+     */
+    private static boolean namesTheSameAlbum(String tagTitle, String albumName) {
+        return tagTitle != null && albumName != null
+                && normalizeAlbumName(tagTitle).equals(normalizeAlbumName(albumName));
+    }
+
+    private static String normalizeAlbumName(String name) {
+        return name.replaceAll("\\s*\\(\\d{4}\\)\\s*$", "")
+                .replaceAll("[\\p{Punct}]+", " ")
+                .replaceAll("\\s+", " ")
+                .strip()
+                .toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * True when every metadata row of the album was read from a local file that is no longer one of the
+     * album's files (moved out of the folder, or deleted). Such a row can otherwise never heal — the
+     * first writer wins — and keeps titling the album after a track that left; a re-scan replaces it.
+     * Rows from an NFO or an online provider are richer than tags and are left alone.
+     */
+    private boolean allRowsAreOrphanedLocalFiles(AlbumEntity album, List<MetadataEntity> existing) {
+        Set<String> albumFiles = mediaFileRepository.findByTrackEntity_AlbumEntityId(album.getId()).stream()
+                .map(mf -> SourceUris.of(mf.getPath()))
+                .collect(Collectors.toSet());
+        return existing.stream().allMatch(m -> isFileDerived(m.getSourceUri())
+                && !albumFiles.contains(m.getSourceUri()));
+    }
+
+    /** A {@code sourceUri} written by this handler: a media file's own path, local or on S3. */
+    private static boolean isFileDerived(String sourceUri) {
+        return sourceUri != null && (sourceUri.startsWith("file://") || ObjectRef.isS3Uri(sourceUri));
     }
 
     private UUID correctTrackNumberFromTags(MediaFileEntity mediaFile, TrackEntity currentTrack, Format format) {

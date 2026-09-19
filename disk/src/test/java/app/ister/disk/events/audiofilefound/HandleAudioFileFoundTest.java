@@ -1225,6 +1225,197 @@ class HandleAudioFileFoundTest {
         org.junit.jupiter.api.Assertions.assertNull(captor.getValue().getPreTranscode());
     }
 
+    @Test
+    void handleSkipsAlbumMetadataForALooseSingleInTheArtistFolder() {
+        String loosePath = "/music/Artist/01 - Numb.mp3";
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
+        DirectoryEntity directory = DirectoryEntity.builder().path("/music").libraryEntity(library).build();
+        ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
+
+        UUID mediaFileId = UUID.randomUUID();
+        MediaFileEntity mediaFile = MediaFileEntity.builder().path(loosePath).size(1000L).build();
+        ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
+
+        UUID albumId = UUID.randomUUID();
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("Artist").build();
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Artist").releaseYear(0).build();
+        ReflectionTestUtils.setField(album, "id", albumId);
+        TrackEntity track = TrackEntity.builder().personEntity(artist).albumEntity(album).number(1).discNumber(1)
+                .metadataEntities(new ArrayList<>()).build();
+
+        FFprobe ffprobe = mock(FFprobe.class, RETURNS_SELF);
+        FFprobeResult result = mock(FFprobeResult.class);
+        Format format = mock(Format.class);
+
+        when(jaffreeMock.getFFPROBE()).thenReturn(ffprobe);
+        when(ffprobe.execute()).thenReturn(result);
+        when(result.getFormat()).thenReturn(format);
+        when(format.getTag("artist")).thenReturn(null);
+        when(format.getTag("ARTIST")).thenReturn(null);
+        when(format.getTag("track")).thenReturn("1");
+        when(format.getTag("disc")).thenReturn("1");
+        when(format.getTag("title")).thenReturn("Numb");
+        when(format.getTag("comment")).thenReturn(null);
+        when(format.getTag("COMMENT")).thenReturn(null);
+        when(format.getTag("album")).thenReturn("Numb");
+        when(format.getTag("date")).thenReturn("2018");
+        when(format.getTag("genre")).thenReturn(null);
+        when(format.getTag("GENRE")).thenReturn(null);
+
+        when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, loosePath)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, loosePath)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
+        when(trackRepositoryMock.findById(TRACK_ID)).thenReturn(Optional.of(track));
+
+        var data = AudioFileFoundData.builder()
+                .eventType(EventType.AUDIO_FILE_FOUND)
+                .directoryEntityUUID(DIRECTORY_ID)
+                .trackEntityUUID(TRACK_ID)
+                .path(loosePath).build();
+
+        subject.handle(data);
+
+        // The container album holds every loose single of the artist, so one single's album tag must not
+        // title it: only the track's own metadata row is written.
+        MetadataEntity saved = savedMetadata();
+        assertEquals("Numb", saved.getTitle());
+        assertEquals(track, saved.getTrackEntity());
+        assertNull(saved.getAlbumEntity());
+        verify(albumRepositoryMock, never()).findByIdForUpdate(any());
+    }
+
+    @Test
+    void handleWritesAlbumMetadataForAFlatAlbumWhoseTagNamesTheFolder() {
+        String flatPath = "/music/200 KM_H In The Wrong Lane/01 - A Simple Motion.mp3";
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
+        DirectoryEntity directory = DirectoryEntity.builder().path("/music").libraryEntity(library).build();
+        ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
+
+        UUID mediaFileId = UUID.randomUUID();
+        MediaFileEntity mediaFile = MediaFileEntity.builder().path(flatPath).size(1000L).build();
+        ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
+
+        UUID albumId = UUID.randomUUID();
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("t.A.T.u.").build();
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist)
+                .name("200 KM_H In The Wrong Lane").releaseYear(0).build();
+        ReflectionTestUtils.setField(album, "id", albumId);
+        TrackEntity track = TrackEntity.builder().personEntity(artist).albumEntity(album).number(1).discNumber(1)
+                .metadataEntities(new ArrayList<>()).build();
+
+        FFprobe ffprobe = mock(FFprobe.class, RETURNS_SELF);
+        FFprobeResult result = mock(FFprobeResult.class);
+        Format format = mock(Format.class);
+
+        when(jaffreeMock.getFFPROBE()).thenReturn(ffprobe);
+        when(ffprobe.execute()).thenReturn(result);
+        when(result.getFormat()).thenReturn(format);
+        when(format.getTag("artist")).thenReturn(null);
+        when(format.getTag("ARTIST")).thenReturn(null);
+        when(format.getTag("track")).thenReturn("1");
+        when(format.getTag("disc")).thenReturn("1");
+        when(format.getTag("title")).thenReturn("A Simple Motion");
+        when(format.getTag("comment")).thenReturn(null);
+        when(format.getTag("COMMENT")).thenReturn(null);
+        when(format.getTag("album")).thenReturn("200 KM/H In The Wrong Lane");
+        when(format.getTag("date")).thenReturn("2003");
+        when(format.getTag("genre")).thenReturn(null);
+        when(format.getTag("GENRE")).thenReturn(null);
+
+        when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, flatPath)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, flatPath)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
+        when(trackRepositoryMock.findById(TRACK_ID)).thenReturn(Optional.of(track));
+        when(albumRepositoryMock.findByIdForUpdate(albumId)).thenReturn(Optional.of(album));
+        when(metadataRepositoryMock.findByAlbumEntityId(albumId)).thenReturn(List.of());
+
+        var data = AudioFileFoundData.builder()
+                .eventType(EventType.AUDIO_FILE_FOUND)
+                .directoryEntityUUID(DIRECTORY_ID)
+                .trackEntityUUID(TRACK_ID)
+                .path(flatPath).build();
+
+        subject.handle(data);
+
+        // The tag names the folder, only with the "/" a folder cannot hold: it is the album's real title.
+        ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
+        verify(metadataRepositoryMock, times(2)).save(captor.capture());
+        MetadataEntity albumMetadata = captor.getAllValues().getLast();
+        assertEquals("200 KM/H In The Wrong Lane", albumMetadata.getTitle());
+        assertEquals(album, albumMetadata.getAlbumEntity());
+    }
+
+    @Test
+    void handleReplacesAlbumMetadataLeftBehindByAFileThatIsGone() {
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
+        DirectoryEntity directory = DirectoryEntity.builder().path("/music").libraryEntity(library).build();
+        ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
+
+        UUID mediaFileId = UUID.randomUUID();
+        MediaFileEntity mediaFile = MediaFileEntity.builder().path(PATH).size(1000L).build();
+        ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
+
+        UUID albumId = UUID.randomUUID();
+        PersonEntity artist = PersonEntity.builder().libraryEntity(library).name("Artist").build();
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(artist).name("Album").releaseYear(0).build();
+        ReflectionTestUtils.setField(album, "id", albumId);
+        TrackEntity track = TrackEntity.builder().personEntity(artist).albumEntity(album).number(1).discNumber(1)
+                .metadataEntities(new ArrayList<>()).build();
+
+        FFprobe ffprobe = mock(FFprobe.class, RETURNS_SELF);
+        FFprobeResult result = mock(FFprobeResult.class);
+        Format format = mock(Format.class);
+
+        when(jaffreeMock.getFFPROBE()).thenReturn(ffprobe);
+        when(ffprobe.execute()).thenReturn(result);
+        when(result.getFormat()).thenReturn(format);
+        when(format.getTag("artist")).thenReturn(null);
+        when(format.getTag("ARTIST")).thenReturn(null);
+        when(format.getTag("track")).thenReturn("1");
+        when(format.getTag("disc")).thenReturn("1");
+        when(format.getTag("title")).thenReturn("Track Title");
+        when(format.getTag("comment")).thenReturn(null);
+        when(format.getTag("COMMENT")).thenReturn(null);
+        when(format.getTag("album")).thenReturn("Album");
+        when(format.getTag("date")).thenReturn("2010");
+        when(format.getTag("genre")).thenReturn(null);
+        when(format.getTag("GENRE")).thenReturn(null);
+
+        MetadataEntity orphaned = MetadataEntity.builder().albumEntity(album).title("Numb")
+                .sourceUri("file:///music/Artist/01 - Numb.mp3").build();
+
+        when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findByTrackEntity_AlbumEntityId(albumId)).thenReturn(List.of(mediaFile));
+        when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
+        when(trackRepositoryMock.findById(TRACK_ID)).thenReturn(Optional.of(track));
+        when(albumRepositoryMock.findByIdForUpdate(albumId)).thenReturn(Optional.of(album));
+        when(metadataRepositoryMock.findByAlbumEntityId(albumId)).thenReturn(List.of(orphaned));
+
+        var data = AudioFileFoundData.builder()
+                .eventType(EventType.AUDIO_FILE_FOUND)
+                .directoryEntityUUID(DIRECTORY_ID)
+                .trackEntityUUID(TRACK_ID)
+                .path(PATH).build();
+
+        subject.handle(data);
+
+        // The row named the album after a track that no longer lives in it: it is replaced, not kept.
+        verify(metadataRepositoryMock).deleteAll(List.of(orphaned));
+        ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);
+        verify(metadataRepositoryMock, times(2)).save(captor.capture());
+        MetadataEntity albumMetadata = captor.getAllValues().getLast();
+        assertEquals("Album", albumMetadata.getTitle());
+        assertEquals(album, albumMetadata.getAlbumEntity());
+        assertEquals("file://" + PATH, albumMetadata.getSourceUri());
+    }
+
     /** The single MetadataEntity row the handler persisted. */
     private MetadataEntity savedMetadata() {
         ArgumentCaptor<MetadataEntity> captor = ArgumentCaptor.forClass(MetadataEntity.class);

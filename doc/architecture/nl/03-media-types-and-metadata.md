@@ -98,7 +98,7 @@ alleen de detailpagina van een show vraagt het op, voor één show tegelijk.
 
 Artiest-directories worden `PersonEntity`-rijen (`PERSON_FOUND`), albums `AlbumEntity`
 (`ALBUM_FOUND`), tracks lopen via `AUDIO_FILE_FOUND` (ffprobe + ID3-tags + embedded cover).
-Album-identiteit komt uit het **pad**, nooit uit tags. De artiest van een track komt juist wél uit
+Album-identiteit komt uit het **pad**, nooit uit tags; de tag-titel van het album belandt in `MetadataEntity`, en een rij die uit een bestand kwam dat het album inmiddels verlaten heeft wordt bij de volgende scan vervangen in plaats van voor altijd te blijven staan. De artiest van een track komt juist wél uit
 de `artist`-**tag** (met de pad-artiest als fallback): op verzamelalbums bestaat de uitvoerende per
 track alleen daar, terwijl het album de pad-afgeleide albumartiest houdt. De worker-`HandleAlbumFound` bevraagt
 MusicBrainz en downloadt de release-group-cover; de disk-kant

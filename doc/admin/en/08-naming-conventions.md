@@ -109,7 +109,11 @@ Grease_ Soundtrack (1991)/        # flat: no artist folder
   a leading `{Artist} - ` prefix are stripped, so `The Beatles - Abbey Road (1969) [FLAC]` and
   `Abbey Road (1969)` are the same album.
 - A **flat album** directly under the library root (no artist folder) is allowed; the artist then
-  comes from the `album_artist` tag in the files.
+  comes from the `album_artist` tag in the files. Such a folder is one album, so its `album` tag is
+  only used as the album's title when it names the folder itself (ignoring case, a trailing
+  `(YYYY)` and the punctuation a folder cannot hold: `200 KM/H …` for a `200 KM_H …` folder). A
+  folder of unrelated singles therefore keeps the folder name instead of being titled after
+  whichever single was scanned first.
 - Tags decide who performs what: `album_artist` identifies the album, `artist` the performer of the
   individual track — on a compilation that per-track tag is the only place the real artist exists.
   A `feat.`/`ft.`/`featuring` guest may stay in the `artist` tag: the server credits the primary
