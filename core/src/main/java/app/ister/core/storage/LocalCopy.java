@@ -103,6 +103,27 @@ public class LocalCopy {
         }
     }
 
+    /**
+     * Forgets the copy of one object, because the object was replaced: copies are keyed on the path
+     * alone, so the next reader would otherwise get the old bytes. A copy somebody is reading right
+     * now stays until the sweep takes it; that reader opened the old file and finishes on it.
+     */
+    public void evict(String path) {
+        if (!ObjectRef.isS3Uri(path)) {
+            return;
+        }
+        Path target = scratchDir.resolve(sha256(path)).resolve(ObjectRef.parse(path).fileName());
+        if (inUse.containsKey(target)) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(target);
+            Files.deleteIfExists(target.getParent());
+        } catch (IOException e) {
+            log.debug("Cannot evict {}: {}", target, e.getMessage());
+        }
+    }
+
     /** Drops the least recently used copies until the scratch dir fits the cap. Pinned files stay. */
     @Scheduled(fixedDelayString = "${app.ister.s3.local-copy-sweep-interval:PT10M}")
     public void sweep() {
