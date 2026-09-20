@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +37,10 @@ public class MediaFileEpisodeService {
                 mediaFileRepository.findById(link.getMediaFileEntityId()).ifPresent(result::add);
             }
         }
+        // Same order as the database's ORDER BY id (bytewise, which for a uuid is its string form;
+        // UUID.compareTo compares signed longs and disagrees). Direct and linked files are mixed
+        // here, and callers take the first one.
+        result.sort(Comparator.comparing(file -> file.getId().toString()));
         return result;
     }
 

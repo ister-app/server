@@ -45,7 +45,7 @@ class PlaybackStatusServiceTest {
                 mediaId, "Title", 1000L, artworkId, 500L, playState,
                 RemoteControlScope.ALLOWLIST, java.util.List.of(UUID.randomUUID()),
                 deviceId, "Woonkamer",
-                480L, 1_760_000_000_000L, RepeatMode.ALL);
+                480L, 1_760_000_000_000L, RepeatMode.ALL, null);
 
         ArgumentCaptor<PlaybackStatusData> captor = ArgumentCaptor.forClass(PlaybackStatusData.class);
         verify(messageSender).sendStatus(captor.capture());

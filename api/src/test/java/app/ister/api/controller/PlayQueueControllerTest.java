@@ -252,9 +252,9 @@ class PlayQueueControllerTest {
         UUID id = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
         PlayQueueEntity queue = buildQueueWithUser();
-        StreamSettingsInput input = new StreamSettingsInput(true, false, SubtitleFormat.SRT);
+        StreamSettingsInput input = new StreamSettingsInput(true, false, SubtitleFormat.SRT, null);
         when(playQueueService.updatePlayQueue(id, 5000L, itemId,
-                new PlayQueueService.StreamSettings(true, false, SubtitleFormat.SRT), Set.of(), authentication))
+                new PlayQueueService.StreamSettings(true, false, SubtitleFormat.SRT, null), Set.of(), authentication))
                 .thenReturn(Optional.of(queue));
 
         Optional<PlayQueueEntity> result = subject.updatePlayQueue(new PlayQueueController.UpdatePlayQueueArguments(id, 5000L, itemId, input, null, null, null, null, null), authentication);
@@ -273,7 +273,7 @@ class PlayQueueControllerTest {
 
         verify(playbackStatusService).publishHeartbeat(queue.getId(), itemId,
                 queue.getUserEntity().getId(), "sub-123", "test-user", null, null, null, null, null, 5000L, PlayState.PAUSED,
-                null, java.util.List.of(), null, null, null, null, null);
+                null, java.util.List.of(), null, null, null, null, null, null);
     }
 
     @Test
@@ -289,7 +289,7 @@ class PlayQueueControllerTest {
 
         verify(playbackStatusService).publishHeartbeat(queue.getId(), itemId,
                 queue.getUserEntity().getId(), "sub-123", "test-user", null, null, null, null, null,
-                5000L, null, null, java.util.List.of(), null, null, null, null, RepeatMode.ALL);
+                5000L, null, null, java.util.List.of(), null, null, null, null, RepeatMode.ALL, null);
     }
 
     @Test
@@ -311,7 +311,7 @@ class PlayQueueControllerTest {
 
         // The now-playing feed still gets the fresh progress/state, from registry data.
         verify(playbackStatusService).publishHeartbeat(id, itemId, userId, "sub-123", "test-user",
-                MediaType.EPISODE, null, null, null, null, 7000L, PlayState.PAUSED, null, null, null, null, null, null, null);
+                MediaType.EPISODE, null, null, null, null, 7000L, PlayState.PAUSED, null, null, null, null, null, null, null, null);
         verifyNoInteractions(playQueuePrefetchService);
     }
 
@@ -589,7 +589,37 @@ class PlayQueueControllerTest {
     }
 
     @Test
-    void heartbeatForAMovieCarriesTitleLongestDurationAndCoverImage() {
+    void heartbeatCarriesTheFileTheClientOpenedAndItsDuration() {
+        MovieEntity movie = MovieEntity.builder().name("Heat").releaseYear(1995).build();
+        movie.setId(UUID.randomUUID());
+        PlayQueueItemEntity item = identified(PlayQueueItemEntity.builder()
+                .type(MediaType.MOVIE).position(BigDecimal.ZERO).build());
+        item.setMovieEntity(movie);
+        MediaFileEntity theatrical = MediaFileEntity.builder().durationInMilliseconds(90_000L).build();
+        theatrical.setId(UUID.randomUUID());
+        MediaFileEntity extended = MediaFileEntity.builder().durationInMilliseconds(120_000L).build();
+        extended.setId(UUID.randomUUID());
+        when(mediaFileRepository.findByMovieEntityId(movie.getId())).thenReturn(List.of(theatrical, extended));
+
+        UUID id = UUID.randomUUID();
+        PlayQueueEntity queue = buildQueueWithUser();
+        queue.setItems(new ArrayList<>(List.of(item)));
+        queue.setCurrentItem(item.getId());
+        queue.setCurrentMediaFileId(extended.getId());
+        when(playQueueService.updatePlayQueue(id, 1000L, item.getId(), null, Set.of(), authentication))
+                .thenReturn(Optional.of(queue));
+
+        subject.updatePlayQueue(new PlayQueueController.UpdatePlayQueueArguments(
+                id, 1000L, item.getId(), null, PlayState.PLAYING, null, null, null, null), authentication);
+
+        verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), any(), any(),
+                eq(MediaType.MOVIE), eq(movie.getId()), eq("Heat"), eq(120_000L), any(), eq(1000L),
+                eq(PlayState.PLAYING), isNull(), eq(java.util.List.of()), isNull(), isNull(), isNull(), isNull(),
+                isNull(), eq(extended.getId()));
+    }
+
+    @Test
+    void heartbeatForAMovieCarriesTitleFirstAnalysedDurationAndCoverImage() {
         MovieEntity movie = MovieEntity.builder().name("Heat").releaseYear(1995).build();
         movie.setId(UUID.randomUUID());
         PlayQueueItemEntity item = identified(PlayQueueItemEntity.builder()
@@ -609,8 +639,8 @@ class PlayQueueControllerTest {
         updateWith(item);
 
         verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
-                eq("test-user"), eq(MediaType.MOVIE), eq(movie.getId()), eq("Heat"), eq(120_000L),
-                eq(cover.getId()), eq(1000L), eq(PlayState.PLAYING), isNull(), eq(java.util.List.of()), isNull(), isNull(), isNull(), isNull(), isNull());
+                eq("test-user"), eq(MediaType.MOVIE), eq(movie.getId()), eq("Heat"), eq(90_000L),
+                eq(cover.getId()), eq(1000L), eq(PlayState.PLAYING), isNull(), eq(java.util.List.of()), isNull(), isNull(), isNull(), isNull(), isNull(), isNull());
     }
 
     /** An episode without a still of its own borrows the show's image. */
@@ -636,7 +666,7 @@ class PlayQueueControllerTest {
         // No COVER among the images, so the first image is used.
         verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
                 eq("test-user"), eq(MediaType.EPISODE), eq(episode.getId()), eq("The Wire S01E02"),
-                isNull(), eq(showImage.getId()), eq(1000L), eq(PlayState.PLAYING), isNull(), eq(java.util.List.of()), isNull(), isNull(), isNull(), isNull(), isNull());
+                isNull(), eq(showImage.getId()), eq(1000L), eq(PlayState.PLAYING), isNull(), eq(java.util.List.of()), isNull(), isNull(), isNull(), isNull(), isNull(), isNull());
     }
 
     @Test
@@ -661,7 +691,7 @@ class PlayQueueControllerTest {
 
         verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
                 eq("test-user"), eq(MediaType.TRACK), eq(track.getId()), eq("Idioteque"), eq(240_000L),
-                eq(cover.getId()), eq(1000L), eq(PlayState.PLAYING), isNull(), eq(java.util.List.of()), isNull(), isNull(), isNull(), isNull(), isNull());
+                eq(cover.getId()), eq(1000L), eq(PlayState.PLAYING), isNull(), eq(java.util.List.of()), isNull(), isNull(), isNull(), isNull(), isNull(), isNull());
     }
 
     /**
@@ -696,7 +726,7 @@ class PlayQueueControllerTest {
 
         verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
                 eq("test-user"), eq(MediaType.TRACK), eq(track.getId()), eq("brutal"), eq(150_000L),
-                eq(local.getId()), eq(1000L), eq(PlayState.PLAYING), isNull(), eq(java.util.List.of()), isNull(), isNull(), isNull(), isNull(), isNull());
+                eq(local.getId()), eq(1000L), eq(PlayState.PLAYING), isNull(), eq(java.util.List.of()), isNull(), isNull(), isNull(), isNull(), isNull(), isNull());
     }
 
     /** A chapter without metadata is named after its book. */
@@ -720,7 +750,7 @@ class PlayQueueControllerTest {
         verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
                 eq("test-user"), eq(MediaType.CHAPTER), eq(chapter.getId()),
                 eq("Dit zijn de namen – chapter 4"), isNull(), isNull(), eq(1000L), eq(PlayState.PLAYING),
-                isNull(), eq(java.util.List.of()), isNull(), isNull(), isNull(), isNull(), isNull());
+                isNull(), eq(java.util.List.of()), isNull(), isNull(), isNull(), isNull(), isNull(), isNull());
     }
 
     /** An episode the feed gave no image gets the podcast cover, and its title falls back to the podcast. */
@@ -749,7 +779,7 @@ class PlayQueueControllerTest {
         verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
                 eq("test-user"), eq(MediaType.PODCAST_EPISODE), eq(episode.getId()), eq("Serial"),
                 eq(3_600_000L), eq(podcastCover.getId()), eq(1000L), eq(PlayState.PLAYING),
-                isNull(), eq(java.util.List.of()), isNull(), isNull(), isNull(), isNull(), isNull());
+                isNull(), eq(java.util.List.of()), isNull(), isNull(), isNull(), isNull(), isNull(), isNull());
     }
 
     /** An epub is not playable, so it carries no media id, title, duration or artwork. */
@@ -762,7 +792,7 @@ class PlayQueueControllerTest {
 
         verify(playbackStatusService).publishHeartbeat(any(), eq(item.getId()), any(), eq("sub-123"),
                 eq("test-user"), eq(MediaType.BOOK), isNull(), isNull(), isNull(), isNull(),
-                eq(1000L), eq(PlayState.PLAYING), isNull(), eq(java.util.List.of()), isNull(), isNull(), isNull(), isNull(), isNull());
+                eq(1000L), eq(PlayState.PLAYING), isNull(), eq(java.util.List.of()), isNull(), isNull(), isNull(), isNull(), isNull(), isNull());
         verifyNoInteractions(mediaFileRepository, imageRepository);
     }
 
@@ -780,7 +810,7 @@ class PlayQueueControllerTest {
 
         verify(playbackStatusService).publishHeartbeat(queue.getId(), itemId, queue.getUserEntity().getId(),
                 "sub-123", "test-user", null, null, null, null, null, 1000L, PlayState.PLAYING,
-                null, java.util.List.of(), null, null, null, null, null);
+                null, java.util.List.of(), null, null, null, null, null, null);
     }
 
     // --- PlayQueueItem schema mappings for the audio types ---

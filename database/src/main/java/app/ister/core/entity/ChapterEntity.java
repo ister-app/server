@@ -29,6 +29,7 @@ public class ChapterEntity extends BaseEntity {
     private int number;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "chapterEntity")
+    @OrderBy("id ASC")
     private List<MediaFileEntity> mediaFileEntities;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "chapterEntity")

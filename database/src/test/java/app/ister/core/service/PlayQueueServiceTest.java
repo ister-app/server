@@ -970,6 +970,106 @@ class PlayQueueServiceTest {
         verify(watchStatusRepository).save(watchStatus);
     }
 
+    // --- several media files (versions) of one item ---
+
+    /** A short and a long cut of one movie; ids in their stable (first = short) order. */
+    private MovieEntity movieWithTwoCuts(UUID movieId, MediaFileEntity shortCut, MediaFileEntity longCut) {
+        return MovieEntity.builder().id(movieId).mediaFileEntities(List.of(shortCut, longCut)).build();
+    }
+
+    private MediaFileEntity fileOf(long durationInMilliseconds) {
+        MediaFileEntity file = MediaFileEntity.builder().durationInMilliseconds(durationInMilliseconds).build();
+        file.setId(UUID.randomUUID());
+        return file;
+    }
+
+    @Test
+    void updatePlayQueueRecordsTheReportedFileWhenItBelongsToTheItem() {
+        mockUser();
+        UUID movieId = UUID.randomUUID();
+        PlayQueueItemEntity item = buildItem(MediaType.MOVIE, movieId, "1000");
+        PlayQueueEntity queue = ownedQueue(List.of(item));
+        MediaFileEntity shortCut = fileOf(7_200_000L);
+        MediaFileEntity longCut = fileOf(10_800_000L);
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        when(movieRepository.findById(movieId)).thenReturn(Optional.of(movieWithTwoCuts(movieId, shortCut, longCut)));
+
+        subject.updatePlayQueue(queue.getId(), 1000L, item.getId(),
+                new PlayQueueService.StreamSettings(true, false, null, longCut.getId()), Set.of(), authentication);
+
+        assertEquals(longCut.getId(), queue.getCurrentMediaFileId());
+    }
+
+    @Test
+    void updatePlayQueueRejectsAFileOfAnotherItem() {
+        mockUser();
+        UUID movieId = UUID.randomUUID();
+        PlayQueueItemEntity item = buildItem(MediaType.MOVIE, movieId, "1000");
+        PlayQueueEntity queue = ownedQueue(List.of(item));
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        when(movieRepository.findById(movieId))
+                .thenReturn(Optional.of(movieWithTwoCuts(movieId, fileOf(1000L), fileOf(2000L))));
+
+        subject.updatePlayQueue(queue.getId(), 1000L, item.getId(),
+                new PlayQueueService.StreamSettings(true, false, null, UUID.randomUUID()), Set.of(), authentication);
+
+        assertNull(queue.getCurrentMediaFileId());
+    }
+
+    @Test
+    void aHeartbeatWithoutAFileKeepsTheChoiceForTheSameItemAndDropsItForAnother() {
+        mockUser();
+        PlayQueueItemEntity first = buildItem(MediaType.EPISODE, UUID.randomUUID(), "1000");
+        PlayQueueItemEntity second = buildItem(MediaType.EPISODE, UUID.randomUUID(), "2000");
+        PlayQueueEntity queue = ownedQueue(List.of(first, second));
+        UUID chosen = UUID.randomUUID();
+        queue.setCurrentItem(first.getId());
+        queue.setCurrentMediaFileId(chosen);
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+
+        subject.updatePlayQueue(queue.getId(), 1000L, first.getId(), null, Set.of(), authentication);
+        assertEquals(chosen, queue.getCurrentMediaFileId());
+
+        subject.updatePlayQueue(queue.getId(), 1000L, second.getId(), null, Set.of(), authentication);
+        assertNull(queue.getCurrentMediaFileId());
+    }
+
+    @Test
+    void theWatchedBoundaryFollowsThePlayingFileNotTheFirstOne() {
+        mockUser();
+        UUID movieId = UUID.randomUUID();
+        PlayQueueItemEntity item = buildItem(MediaType.MOVIE, movieId, "1000");
+        PlayQueueEntity queue = ownedQueue(List.of(item));
+        item.setPlayQueueEntity(queue);
+        MediaFileEntity shortCut = fileOf(7_200_000L);
+        MediaFileEntity longCut = fileOf(10_800_000L);
+        MovieEntity movie = movieWithTwoCuts(movieId, shortCut, longCut);
+        WatchStatusEntity watchStatus = WatchStatusEntity.builder().watched(false).build();
+        when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        when(movieRepository.findById(movieId)).thenReturn(Optional.of(movie));
+        when(watchStatusService.getOrCreate(user, item.getId(), null, movie)).thenReturn(watchStatus);
+
+        // The end of the short cut, an hour before the end of the long one that is playing.
+        subject.updatePlayQueue(queue.getId(), 7_190_000L, item.getId(),
+                new PlayQueueService.StreamSettings(true, false, null, longCut.getId()), Set.of(), authentication);
+        assertFalse(watchStatus.isWatched());
+
+        subject.updatePlayQueue(queue.getId(), 10_790_000L, item.getId(),
+                new PlayQueueService.StreamSettings(true, false, null, longCut.getId()), Set.of(), authentication);
+        assertTrue(watchStatus.isWatched());
+    }
+
+    @Test
+    void playingFileFallsBackToTheFirstFile() {
+        MediaFileEntity first = fileOf(1000L);
+        MediaFileEntity second = fileOf(2000L);
+
+        assertEquals(first, PlayQueueService.playingFile(List.of(first, second), null).orElseThrow());
+        assertEquals(first, PlayQueueService.playingFile(List.of(first, second), UUID.randomUUID()).orElseThrow());
+        assertEquals(second, PlayQueueService.playingFile(List.of(first, second), second.getId()).orElseThrow());
+        assertTrue(PlayQueueService.playingFile(List.of(), second.getId()).isEmpty());
+    }
+
     // --- movePlayQueueItem ---
 
     @Test
@@ -1553,7 +1653,7 @@ class PlayQueueServiceTest {
         when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
 
         subject.updatePlayQueue(queue.getId(), 1000L, item.getId(),
-                new PlayQueueService.StreamSettings(true, false, SubtitleFormat.WEBVTT), Set.of(), authentication);
+                new PlayQueueService.StreamSettings(true, false, SubtitleFormat.WEBVTT, null), Set.of(), authentication);
 
         assertTrue(queue.getStreamDirect());
         assertFalse(queue.getStreamTranscode());
@@ -1569,7 +1669,7 @@ class PlayQueueServiceTest {
         when(playQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
 
         subject.updatePlayQueue(queue.getId(), 1000L, item.getId(),
-                new PlayQueueService.StreamSettings(null, null, null), Set.of(), authentication);
+                new PlayQueueService.StreamSettings(null, null, null, null), Set.of(), authentication);
 
         assertTrue(queue.getStreamDirect());
         assertNull(queue.getStreamTranscode());

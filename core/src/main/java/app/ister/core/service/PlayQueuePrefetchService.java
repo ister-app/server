@@ -92,7 +92,7 @@ public class PlayQueuePrefetchService {
             return;
         }
         PlayQueueItemEntity current = items.get(currentIndex);
-        long durationMs = durationOf(current);
+        long durationMs = durationOf(queue, current);
         if (durationMs <= 0) {
             return;
         }
@@ -114,9 +114,14 @@ public class PlayQueuePrefetchService {
         }
     }
 
-    private long durationOf(PlayQueueItemEntity item) {
-        return mediaFilesOf(item).stream()
+    /** Of the file the client reported for the current item, else the first (versions can differ in length). */
+    private long durationOf(PlayQueueEntity queue, PlayQueueItemEntity item) {
+        List<MediaFileEntity> files = mediaFilesOf(item);
+        UUID chosen = item.getId().equals(queue.getCurrentItem()) ? queue.getCurrentMediaFileId() : null;
+        return files.stream()
+                .filter(file -> chosen != null && chosen.equals(file.getId()))
                 .findFirst()
+                .or(() -> files.stream().findFirst())
                 .map(MediaFileEntity::getDurationInMilliseconds)
                 .orElse(0L);
     }

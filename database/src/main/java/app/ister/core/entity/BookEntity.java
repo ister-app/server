@@ -79,6 +79,7 @@ public class BookEntity extends BaseEntity {
     private List<ChapterEntity> chapterEntities;
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "bookEntity")
+    @OrderBy("id ASC")
     private List<MediaFileEntity> mediaFileEntities;
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "bookEntity")

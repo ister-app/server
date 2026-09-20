@@ -35,7 +35,9 @@ public record PlaybackSession(
         /** Server-clock instant the anchor was sampled at (epoch ms, Float on the wire); null without one. */
         Double anchorServerTimeMs,
         /** Repeat mode of the playing client; null for clients that don't report one. */
-        RepeatMode repeatMode) {
+        RepeatMode repeatMode,
+        /** The media file the playing client opened; null when it doesn't report one. */
+        UUID mediaFileId) {
 
     public static PlaybackSession from(PlaybackStatusData data, boolean controllable, int followerCount) {
         return new PlaybackSession(data.getPlayQueueId(), data.getPlayQueueItemId(), data.getUserId(),
@@ -46,6 +48,6 @@ public record PlaybackSession(
                 data.getDeviceId(), data.getDeviceName(),
                 data.getAnchorPositionMs(),
                 data.getAnchorServerTimeMs() == null ? null : data.getAnchorServerTimeMs().doubleValue(),
-                data.getRepeatMode());
+                data.getRepeatMode(), data.getMediaFileId());
     }
 }

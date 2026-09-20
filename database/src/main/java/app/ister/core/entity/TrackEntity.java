@@ -30,6 +30,7 @@ public class TrackEntity extends BaseEntity {
     private int discNumber;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "trackEntity")
+    @OrderBy("id ASC")
     private List<MediaFileEntity> mediaFileEntities;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "trackEntity")

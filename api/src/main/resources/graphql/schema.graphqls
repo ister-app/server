@@ -604,6 +604,8 @@ type PlaybackSession {
     title: String
     "Total duration of the playing media file, when known."
     durationInMilliseconds: Int
+    "The media file the playing client opened; null when it doesn't report one. A follower opens the same file, so both share one timeline."
+    mediaFileId: ID
     "Cover art (movie/show poster or album cover); fetch via GET /images/{id}/download."
     artworkImageId: ID
     progressInMilliseconds: Int!
@@ -930,6 +932,8 @@ input StreamSettingsInput {
     "Include the re-encoded (720p/480p) quality variants."
     transcode: Boolean!
     subtitleFormat: SubtitleFormat
+    "Which media file of the item the client opened, for an item with several (versions). Ignored unless it belongs to the reported item; omitted means the first file."
+    mediaFileId: ID
 }
 
 """
@@ -1253,6 +1257,8 @@ type PlayQueue {
     currentItem: PlayQueueItem
     "Last progress within the current item, as reported via updatePlayQueue."
     progressInMilliseconds: Int!
+    "The media file of the current item the playing client opened; null when it never said (the first file then). A device taking the queue over opens this one."
+    currentMediaFileId: ID
     shuffle: Boolean!
     sourceType: PlayQueueSourceType
     "True when the source has no more items to append; the visible queue is the whole queue."

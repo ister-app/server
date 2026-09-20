@@ -25,7 +25,10 @@ public class MovieEntity extends BaseEntity {
     @Column(nullable = false)
     private int releaseYear;
 
+    // Stable on purpose: clients and the watched/duration maths take the *first* file of an item
+    // with several versions, and unordered this was heap order — it changed with any UPDATE.
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "movieEntity")
+    @OrderBy("id ASC")
     private List<MediaFileEntity> mediaFileEntities;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "movieEntity")

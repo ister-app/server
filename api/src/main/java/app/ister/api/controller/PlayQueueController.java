@@ -145,7 +145,8 @@ public class PlayQueueController {
         PlayState playState = args.playState();
         StreamSettingsInput streamSettings = args.streamSettings();
         PlayQueueService.StreamSettings settings = streamSettings == null ? null
-                : new PlayQueueService.StreamSettings(streamSettings.direct(), streamSettings.transcode(), streamSettings.subtitleFormat());
+                : new PlayQueueService.StreamSettings(streamSettings.direct(), streamSettings.transcode(),
+                        streamSettings.subtitleFormat(), streamSettings.mediaFileId());
         // Epoch ms exceeds GraphQL Int, so the wire type is Float; internally it is a Long.
         Long anchorPosition = args.anchorPositionMs() == null ? null : args.anchorPositionMs().longValue();
         Long anchorServerTime = args.anchorServerTimeMs() == null ? null : (long) (double) args.anchorServerTimeMs();
@@ -194,7 +195,8 @@ public class PlayQueueController {
                         state.progressInMilliseconds(), state.playState(),
                         last.getControlScopeOverride(), last.getControlAllowedUserIds(),
                         last.getDeviceId(), last.getDeviceName(),
-                        state.anchorPositionMs(), state.anchorServerTimeMs(), state.repeatMode()));
+                        state.anchorPositionMs(), state.anchorServerTimeMs(), state.repeatMode(),
+                        last.getMediaFileId()));
     }
 
     /**
@@ -213,6 +215,9 @@ public class PlayQueueController {
         List<UUID> controlAllowedUserIds = controlScopeOverride == RemoteControlScope.ALLOWLIST
                 ? playQueueControlGrantRepository.findGranteeIdsByPlayQueueId(queue.getId())
                 : List.of();
+        // Only meaningful for the item it was reported for (the service clears it on an item change).
+        UUID currentFile = playQueueItemId != null && playQueueItemId.equals(queue.getCurrentItem())
+                ? queue.getCurrentMediaFileId() : null;
         playbackStatusService.publishHeartbeat(
                 queue.getId(),
                 playQueueItemId,
@@ -222,7 +227,7 @@ public class PlayQueueController {
                 item.map(PlayQueueItemEntity::getType).orElse(null),
                 item.map(PlayQueueController::mediaIdOf).orElse(null),
                 item.map(this::titleOf).orElse(null),
-                item.map(this::durationOf).orElse(null),
+                item.map(candidate -> durationOf(candidate, currentFile)).orElse(null),
                 item.map(this::artworkOf).orElse(null),
                 state.progressInMilliseconds(),
                 state.playState(),
@@ -232,7 +237,8 @@ public class PlayQueueController {
                 deviceNameOf(queue.getUserEntity().getId(), deviceId),
                 state.anchorPositionMs(),
                 state.anchorServerTimeMs(),
-                state.repeatMode());
+                state.repeatMode(),
+                currentFile);
     }
 
     /** Cached lookup of the owner's device name; null for clients that report no device id. */
@@ -250,8 +256,12 @@ public class PlayQueueController {
         return name;
     }
 
-    /** Duration of the playing item's media file; the longest one wins if there are several. */
-    private Long durationOf(PlayQueueItemEntity item) {
+    /**
+     * Duration of the playing item's media file: the one the client reported when the item has
+     * several (versions of one film can differ in length), else the first analysed one in their
+     * stable order.
+     */
+    private Long durationOf(PlayQueueItemEntity item, UUID chosenMediaFileId) {
         UUID mediaId = mediaIdOf(item);
         if (mediaId == null) {
             return null;
@@ -264,10 +274,16 @@ public class PlayQueueController {
             case PODCAST_EPISODE -> mediaFileRepository.findByPodcastEpisodeEntityId(mediaId);
             case BOOK, COMIC -> List.of();
         };
+        // A file that was not analysed yet has no duration; skip it rather than report none.
         return files.stream()
+                .filter(file -> chosenMediaFileId != null && chosenMediaFileId.equals(file.getId()))
                 .map(file -> effectiveDuration(item, mediaId, file))
                 .filter(duration -> duration > 0)
-                .max(Long::compare)
+                .findFirst()
+                .or(() -> files.stream()
+                        .map(file -> effectiveDuration(item, mediaId, file))
+                        .filter(duration -> duration > 0)
+                        .findFirst())
                 .orElse(null);
     }
 

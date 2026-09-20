@@ -43,6 +43,9 @@ public class PlaybackStatusData {
     private Instant timestamp;
     /** Repeat mode of the playing client; null for clients that don't report one. */
     private RepeatMode repeatMode;
+    /** The media file of the item the playing client opened (an item can have several versions);
+     * null when it doesn't report one. Followers open the same file to share one timeline. */
+    private UUID mediaFileId;
     /** Per-session remote-control override; null = use the owner's account-level control scope.
      * Embedded on the heartbeat path (which has DB access) so the now-playing resolver can compute
      * the per-viewer {@code controllable} flag without touching the database on listener threads. */

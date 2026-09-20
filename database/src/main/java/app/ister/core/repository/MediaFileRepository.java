@@ -30,9 +30,12 @@ public interface MediaFileRepository extends CrudRepository<MediaFileEntity, UUI
 
     List<MediaFileEntity> findByTrackEntity_AlbumEntityId(UUID albumId);
 
-    List<MediaFileEntity> findByEpisodeEntityId(UUID episodeId);
+    /** Ordered like the entity collections: "the first file" of an item with several versions must be stable. */
+    @Query("SELECT m FROM MediaFileEntity m WHERE m.episodeEntity.id = :episodeId ORDER BY m.id ASC")
+    List<MediaFileEntity> findByEpisodeEntityId(@Param("episodeId") UUID episodeId);
 
-    List<MediaFileEntity> findByMovieEntityId(UUID movieId);
+    @Query("SELECT m FROM MediaFileEntity m WHERE m.movieEntity.id = :movieId ORDER BY m.id ASC")
+    List<MediaFileEntity> findByMovieEntityId(@Param("movieId") UUID movieId);
 
     List<MediaFileEntity> findByTrackEntityId(UUID trackId);
 

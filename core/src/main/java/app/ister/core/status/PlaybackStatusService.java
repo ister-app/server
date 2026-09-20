@@ -37,7 +37,8 @@ public class PlaybackStatusService {
                                  long progressInMilliseconds, PlayState playState,
                                  RemoteControlScope controlScopeOverride, List<UUID> controlAllowedUserIds,
                                  UUID deviceId, String deviceName,
-                                 Long anchorPositionMs, Long anchorServerTimeMs, RepeatMode repeatMode) {
+                                 Long anchorPositionMs, Long anchorServerTimeMs, RepeatMode repeatMode,
+                                 UUID mediaFileId) {
         messageSender.sendStatus(PlaybackStatusData.builder()
                 .deviceId(deviceId)
                 .deviceName(deviceName)
@@ -60,6 +61,7 @@ public class PlaybackStatusService {
                 .controlScopeOverride(controlScopeOverride)
                 .controlAllowedUserIds(controlAllowedUserIds)
                 .repeatMode(repeatMode)
+                .mediaFileId(mediaFileId)
                 .build());
     }
 }

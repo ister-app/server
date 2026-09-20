@@ -76,6 +76,11 @@ public class PlayQueueEntity extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private SubtitleFormat streamSubtitleFormat;
 
+    // The media file of the current item the client opened, for an item with several files
+    // (versions). Validated against the item when reported and cleared when the item changes;
+    // null means the first file.
+    private UUID currentMediaFileId;
+
     @OneToMany(cascade = {CascadeType.ALL}, mappedBy = "playQueueEntity", orphanRemoval = true)
     @OrderBy("position ASC")
     private List<PlayQueueItemEntity> items;

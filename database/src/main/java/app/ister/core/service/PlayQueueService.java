@@ -2,6 +2,8 @@ package app.ister.core.service;
 
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.MovieEntity;
+import app.ister.core.entity.PodcastEpisodeEntity;
 import app.ister.core.entity.PlayQueueEntity;
 import app.ister.core.entity.PlayQueueItemEntity;
 import app.ister.core.entity.TrackEntity;
@@ -93,7 +95,8 @@ public class PlayQueueService {
     private final PodcastPreferenceService podcastPreferenceService;
 
     /** Stream settings a client reports via updatePlayQueue; used to prefetch the next item in the same format. */
-    public record StreamSettings(Boolean direct, Boolean transcode, SubtitleFormat subtitleFormat) {
+    /** {@code mediaFileId}: the file of the reported item the client opened; null when it doesn't say. */
+    public record StreamSettings(Boolean direct, Boolean transcode, SubtitleFormat subtitleFormat, UUID mediaFileId) {
     }
 
     private static final BigDecimal GAP = GapPositions.GAP;
@@ -368,6 +371,7 @@ public class PlayQueueService {
         playQueueEntityOptional.ifPresent(playQueueEntity -> {
             checkOwnership(playQueueEntity, authentication);
             applyStreamSettings(playQueueEntity, streamSettings);
+            applyCurrentMediaFile(playQueueEntity, playQueueItemId, streamSettings == null ? null : streamSettings.mediaFileId());
             updatePlayQueueItemWithProgress(progressInMilliseconds, playQueueItemId, listeners(authentication, followerUserIds), playQueueEntity);
         });
         return playQueueEntityOptional;
@@ -403,6 +407,55 @@ public class PlayQueueService {
         if (streamSettings.subtitleFormat() != null) {
             queue.setStreamSubtitleFormat(streamSettings.subtitleFormat());
         }
+    }
+
+    /**
+     * Records which file of the reported item the client opened. Only a file that really belongs
+     * to that item is accepted — the id then steers the watched boundary, the session duration
+     * and the prefetch, and a stale one (the client moved on, the file was rescanned away) must
+     * not. A heartbeat that names no file keeps the choice while the item stays the same and
+     * drops it when the item changes, so an older client never inherits another item's file.
+     */
+    private void applyCurrentMediaFile(PlayQueueEntity queue, UUID playQueueItemId, UUID mediaFileId) {
+        if (mediaFileId == null) {
+            if (queue.getCurrentItem() == null || !queue.getCurrentItem().equals(playQueueItemId)) {
+                queue.setCurrentMediaFileId(null);
+            }
+            return;
+        }
+        boolean belongs = queue.getItems().stream()
+                .filter(item -> item.getId().equals(playQueueItemId))
+                .findAny()
+                .map(item -> filesOf(item).stream().anyMatch(file -> file.getId().equals(mediaFileId)))
+                .orElse(false);
+        queue.setCurrentMediaFileId(belongs ? mediaFileId : null);
+    }
+
+    /** The media files of a queue item, in their stable order. */
+    private List<MediaFileEntity> filesOf(PlayQueueItemEntity item) {
+        return switch (item.getType()) {
+            case MOVIE -> movieRepository.findById(item.getMovieEntityId())
+                    .map(MovieEntity::getMediaFileEntities).orElse(List.of());
+            case EPISODE -> mediaFileEpisodeService.filesForEpisode(item.getEpisodeEntityId());
+            case TRACK -> trackRepository.findById(item.getTrackEntityId())
+                    .map(TrackEntity::getMediaFileEntities).orElse(List.of());
+            case CHAPTER -> chapterRepository.findById(item.getChapterEntityId())
+                    .map(ChapterEntity::getMediaFileEntities).orElse(List.of());
+            case PODCAST_EPISODE -> podcastEpisodeRepository.findById(item.getPodcastEpisodeEntityId())
+                    .map(PodcastEpisodeEntity::getMediaFileEntities).orElse(List.of());
+            case BOOK, COMIC -> List.of();
+        };
+    }
+
+    /** The file the client said it opened, else the first: what "the item's file" means everywhere below. */
+    static Optional<MediaFileEntity> playingFile(List<MediaFileEntity> files, UUID chosenMediaFileId) {
+        if (files == null || files.isEmpty()) {
+            return Optional.empty();
+        }
+        return files.stream()
+                .filter(file -> chosenMediaFileId != null && chosenMediaFileId.equals(file.getId()))
+                .findFirst()
+                .or(() -> Optional.of(files.get(0)));
     }
 
     /**
@@ -462,6 +515,7 @@ public class PlayQueueService {
                 newCurrent = null;
             }
             queue.setCurrentItem(newCurrent != null ? newCurrent.getId() : null);
+            queue.setCurrentMediaFileId(null);
             queue.setProgressInMilliseconds(0);
         }
         items.remove(index); // orphanRemoval deletes the row
@@ -1110,8 +1164,9 @@ public class PlayQueueService {
             // Progress is absolute within the file. For an episode inside a multi-episode file
             // (s04e06-e07.mkv) the episode ends at its slice boundary, not at the file's end —
             // otherwise only the last episode of the file could ever become watched.
+            // Of the file that is playing: another version of the episode can be cut differently.
             List<MediaFileEntity> files = mediaFileEpisodeService.filesForEpisode(episodeEntity.getId());
-            long endOfEpisode = files.stream().findFirst()
+            long endOfEpisode = playingFile(files, chosenFileOf(playQueueItemEntity))
                     .map(file -> mediaFileEpisodeService.segmentFor(file.getId(), episodeEntity.getId())
                             .filter(segment -> segment.getDurationInMilliseconds() > 0)
                             .map(segment -> segment.getStartInMilliseconds() + segment.getDurationInMilliseconds())
@@ -1124,8 +1179,16 @@ public class PlayQueueService {
     private void updateMovieWatchStatus(long progressInMilliseconds, UUID playQueueItemId, UserEntity listener, PlayQueueItemEntity playQueueItemEntity) {
         movieRepository.findById(playQueueItemEntity.getMovieEntityId()).ifPresent(movieEntity -> {
             WatchStatusEntity watchStatusEntity = watchStatusService.getOrCreate(listener, playQueueItemId, null, movieEntity);
-            updateWatchStatus(progressInMilliseconds, watchStatusEntity, movieEntity.getMediaFileEntities());
+            long endOfMovie = playingFile(movieEntity.getMediaFileEntities(), chosenFileOf(playQueueItemEntity))
+                    .map(MediaFileEntity::getDurationInMilliseconds).orElse(0L);
+            updateWatchStatus(progressInMilliseconds, watchStatusEntity, endOfMovie);
         });
+    }
+
+    /** The file the playing client reported for this item; null when it is not the current item or none was reported. */
+    private static UUID chosenFileOf(PlayQueueItemEntity item) {
+        PlayQueueEntity queue = item.getPlayQueueEntity();
+        return queue != null && item.getId().equals(queue.getCurrentItem()) ? queue.getCurrentMediaFileId() : null;
     }
 
     private void updateChapterWatchStatus(long progressInMilliseconds, UserEntity listener, PlayQueueItemEntity playQueueItemEntity) {

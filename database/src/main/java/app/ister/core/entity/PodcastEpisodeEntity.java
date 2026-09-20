@@ -45,6 +45,7 @@ public class PodcastEpisodeEntity extends BaseEntity {
     private Integer seasonNumber;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "podcastEpisodeEntity")
+    @OrderBy("id ASC")
     private List<MediaFileEntity> mediaFileEntities;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "podcastEpisodeEntity")
