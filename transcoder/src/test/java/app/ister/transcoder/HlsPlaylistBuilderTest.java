@@ -224,6 +224,38 @@ class HlsPlaylistBuilderTest {
     }
 
     @Test
+    void buildMasterPlaylistNumbersRenditionsSharingNameAndLanguage() {
+        // A DVD rip: main mix and commentary are both "AC3 Stereo" / eng.
+        MediaFileEntity mediaFile = mediaFile(videoStream(0, 720, 576),
+                audioStream(1, "eng", "AC3 Stereo"),
+                audioStream(2, "fre", "AC3 Stereo"),
+                audioStream(3, "eng", "AC3 Stereo"));
+
+        String result = builder.buildMasterPlaylist(mediaFile, true, true, SubtitleFormat.WEBVTT);
+
+        // Same number in both groups, pointing at the same source stream.
+        assertEquals(2, countOccurrences(result, "LANGUAGE=\"eng\",NAME=\"AC3 Stereo 1\""));
+        assertEquals(2, countOccurrences(result, "LANGUAGE=\"eng\",NAME=\"AC3 Stereo 2\""));
+        assertTrue(result.contains("NAME=\"AC3 Stereo 2\",DEFAULT=NO,AUTOSELECT=YES,URI=\"stream_audio_3_copy"));
+        // Unique within its language: left alone.
+        assertTrue(result.contains("LANGUAGE=\"fre\",NAME=\"AC3 Stereo\""));
+    }
+
+    @Test
+    void buildMasterPlaylistNumbersUntitledSubtitlesOfOneLanguage() {
+        MediaFileEntity mediaFile = mediaFile(videoStream(0, 1920, 1080), audioStream(1, "eng", null),
+                subtitleStream(UUID.randomUUID(), 2, "eng", null, "subrip", StreamCodecType.SUBTITLE),
+                subtitleStream(UUID.randomUUID(), 3, "eng", null, "subrip", StreamCodecType.SUBTITLE),
+                subtitleStream(UUID.randomUUID(), 4, "nld", null, "subrip", StreamCodecType.SUBTITLE));
+
+        String result = builder.buildMasterPlaylist(mediaFile, true, false, SubtitleFormat.WEBVTT);
+
+        assertTrue(result.contains("LANGUAGE=\"eng\",NAME=\"eng 1\""));
+        assertTrue(result.contains("LANGUAGE=\"eng\",NAME=\"eng 2\""));
+        assertTrue(result.contains("LANGUAGE=\"nld\",NAME=\"nld\""));
+    }
+
+    @Test
     void buildMasterPlaylistFirstSubtitleIsAutoselect() {
         UUID sub1 = UUID.randomUUID();
         UUID sub2 = UUID.randomUUID();

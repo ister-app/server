@@ -6,8 +6,12 @@ import app.ister.core.enums.StreamCodecType;
 import app.ister.core.enums.SubtitleFormat;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -156,10 +160,11 @@ public class HlsPlaylistBuilder {
     private void appendAudioGroupEntries(StringBuilder sb, String groupId,
                                           List<MediaFileStreamEntity> audioStreams,
                                           AudioQuality emitAq, boolean firstGroup) {
+        List<String> names = renditionNames(audioStreams);
         for (int ai = 0; ai < audioStreams.size(); ai++) {
             MediaFileStreamEntity as = audioStreams.get(ai);
             String lang = as.getLanguage() != null ? as.getLanguage() : "und";
-            String name = as.getTitle() != null ? as.getTitle() : lang;
+            String name = names.get(ai);
             boolean isDefault = firstGroup && (ai == 0);
             sb.append(String.format(
                     "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"%s\",LANGUAGE=\"%s\",NAME=\"%s\",DEFAULT=%s,AUTOSELECT=YES,URI=\"stream_audio_%d_%s" + EXT_M3U8 + "\"%n",
@@ -168,16 +173,42 @@ public class HlsPlaylistBuilder {
         }
     }
 
+    /**
+     * The NAME of each rendition: its title, or its language when it has none. Renditions that
+     * would share both name and language get a running number ("AC3 Stereo 1", "AC3 Stereo 2"):
+     * a DVD rip carries the main mix and the commentary as two "AC3 Stereo" English tracks, which
+     * no menu can tell apart and which hls.js matches by name + language when it re-selects a
+     * track after an audio-group switch. The number follows the list order, so it is the same in
+     * every group and across master rebuilds.
+     */
+    static List<String> renditionNames(List<MediaFileStreamEntity> streams) {
+        List<String> keys = streams.stream()
+                .map(s -> {
+                    String lang = s.getLanguage() != null ? s.getLanguage() : "und";
+                    return (s.getTitle() != null ? s.getTitle() : lang) + "\u0000" + lang;
+                })
+                .toList();
+        Map<String, Integer> seen = new HashMap<>();
+        List<String> names = new ArrayList<>(streams.size());
+        for (String key : keys) {
+            String base = key.substring(0, key.indexOf('\u0000'));
+            int nth = seen.merge(key, 1, Integer::sum);
+            names.add(Collections.frequency(keys, key) > 1 ? base + " " + nth : base);
+        }
+        return names;
+    }
+
     private void appendSubtitleMediaEntries(StringBuilder sb, List<MediaFileStreamEntity> subtitleStreams,
                                              SubtitleFormat subtitleFormat) {
         // Subtitle tracks (text-based only — image-based subtitles are skipped)
         if (subtitleStreams.isEmpty()) return;
         String formatLabel = subtitleFormat.name().toLowerCase();
         sb.append("\n");
+        List<String> names = renditionNames(subtitleStreams);
         for (int i = 0; i < subtitleStreams.size(); i++) {
             MediaFileStreamEntity ss = subtitleStreams.get(i);
             String lang = ss.getLanguage() != null ? ss.getLanguage() : "und";
-            String name = ss.getTitle() != null ? ss.getTitle() : lang;
+            String name = names.get(i);
             String subPlaylist = PREFIX_STREAM_SUB + ss.getId() + "_" + formatLabel + EXT_M3U8;
             sb.append(String.format(
                     "#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID=\"subs\",LANGUAGE=\"%s\",NAME=\"%s\",DEFAULT=NO,AUTOSELECT=%s,FORCED=NO,URI=\"%s\"%n",
