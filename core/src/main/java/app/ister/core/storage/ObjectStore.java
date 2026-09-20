@@ -39,6 +39,33 @@ public interface ObjectStore {
 
     void put(String key, InputStream body, long length, String contentType) throws IOException;
 
+    /**
+     * Starts assembling {@code key} from parts: the way to write an object whose total size exceeds
+     * a single put (5 GB) or that arrives in pieces over time. Nothing is visible under {@code key}
+     * until {@link #completeMultipartUpload}.
+     *
+     * @return the upload id the other multipart calls need
+     */
+    String createMultipartUpload(String key, String contentType) throws IOException;
+
+    /**
+     * Stores part {@code partNumber} (1-based); sending a number again replaces that part. Every part
+     * but the last must be at least 5 MiB. The body is streamed, so a failed call cannot be retried
+     * by the store itself: the caller sends the part again.
+     *
+     * @return the part's ETag, needed to complete the upload
+     */
+    String uploadPart(String key, String uploadId, int partNumber, InputStream body, long length) throws IOException;
+
+    void completeMultipartUpload(String key, String uploadId, List<UploadedPart> parts) throws IOException;
+
+    /**
+     * Discards the upload and its stored parts; a no-op when it is already gone. Whoever starts an
+     * upload must remember its key and id to be able to do this: listing pending uploads is no
+     * substitute, MinIO for one only answers that for an exact object key.
+     */
+    void abortMultipartUpload(String key, String uploadId) throws IOException;
+
     /** @return whether an object was deleted */
     boolean delete(String key) throws IOException;
 
@@ -53,4 +80,8 @@ public interface ObjectStore {
 
     record Listing(List<ObjectStat> objects, List<String> childPrefixes) {
     }
+
+    record UploadedPart(int partNumber, String etag) {
+    }
+
 }

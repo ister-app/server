@@ -17,6 +17,11 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.AbortMultipartUploadRequest;
+import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadRequest;
+import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload;
+import software.amazon.awssdk.services.s3.model.CompletedPart;
+import software.amazon.awssdk.services.s3.model.CreateMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
@@ -25,9 +30,11 @@ import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.NoSuchUploadException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.S3Object;
+import software.amazon.awssdk.services.s3.model.UploadPartRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
@@ -38,6 +45,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -235,6 +243,60 @@ public class S3ObjectStore implements ObjectStore {
             client.putObject(request.build(), RequestBody.fromInputStream(body, length));
         } catch (SdkException e) {
             throw new IOException("S3 put failed for " + uri(key), e);
+        }
+    }
+
+    @Override
+    public String createMultipartUpload(String key, String contentType) throws IOException {
+        try {
+            CreateMultipartUploadRequest.Builder request = CreateMultipartUploadRequest.builder().bucket(bucket).key(key);
+            if (contentType != null) {
+                request.contentType(contentType);
+            }
+            return client.createMultipartUpload(request.build()).uploadId();
+        } catch (SdkException e) {
+            throw new IOException("S3 multipart create failed for " + uri(key), e);
+        }
+    }
+
+    @Override
+    public String uploadPart(String key, String uploadId, int partNumber, InputStream body, long length)
+            throws IOException {
+        try {
+            UploadPartRequest request = UploadPartRequest.builder()
+                    .bucket(bucket).key(key).uploadId(uploadId).partNumber(partNumber).contentLength(length).build();
+            return client.uploadPart(request, RequestBody.fromInputStream(body, length)).eTag();
+        } catch (SdkException e) {
+            throw new IOException("S3 part " + partNumber + " failed for " + uri(key), e);
+        }
+    }
+
+    @Override
+    public void completeMultipartUpload(String key, String uploadId, List<UploadedPart> parts) throws IOException {
+        try {
+            // S3 rejects a part list that is not in ascending order.
+            List<CompletedPart> completed = parts.stream()
+                    .sorted(Comparator.comparingInt(UploadedPart::partNumber))
+                    .map(p -> CompletedPart.builder().partNumber(p.partNumber()).eTag(p.etag()).build())
+                    .toList();
+            client.completeMultipartUpload(CompleteMultipartUploadRequest.builder()
+                    .bucket(bucket).key(key).uploadId(uploadId)
+                    .multipartUpload(CompletedMultipartUpload.builder().parts(completed).build())
+                    .build());
+        } catch (SdkException e) {
+            throw new IOException("S3 multipart complete failed for " + uri(key), e);
+        }
+    }
+
+    @Override
+    public void abortMultipartUpload(String key, String uploadId) throws IOException {
+        try {
+            client.abortMultipartUpload(AbortMultipartUploadRequest.builder()
+                    .bucket(bucket).key(key).uploadId(uploadId).build());
+        } catch (NoSuchUploadException _) {
+            // already completed or aborted
+        } catch (SdkException e) {
+            throw new IOException("S3 multipart abort failed for " + uri(key), e);
         }
     }
 

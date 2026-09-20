@@ -5,6 +5,7 @@ import app.ister.core.storage.ObjectStore;
 import app.ister.core.storage.RangedObject;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 /** In-memory {@link ObjectStore} for unit tests: a sorted key → bytes map with S3's listing semantics. */
@@ -26,6 +28,9 @@ public class FakeObjectStore implements ObjectStore {
     private final String bucket;
     private final Map<String, byte[]> objects = new TreeMap<>();
     private final Map<String, Instant> modified = new TreeMap<>();
+    /** uploadId → key, and uploadId → (part number → bytes). */
+    private final Map<String, String> multipartKeys = new TreeMap<>();
+    private final Map<String, Map<Integer, byte[]>> multipartParts = new TreeMap<>();
 
     public FakeObjectStore(String bucket) {
         this.bucket = bucket;
@@ -116,6 +121,50 @@ public class FakeObjectStore implements ObjectStore {
     @Override
     public void put(String key, InputStream body, long length, String contentType) throws IOException {
         put(key, body.readAllBytes());
+    }
+
+    @Override
+    public String createMultipartUpload(String key, String contentType) {
+        String uploadId = UUID.randomUUID().toString();
+        multipartKeys.put(uploadId, key);
+        multipartParts.put(uploadId, new TreeMap<>());
+        return uploadId;
+    }
+
+    @Override
+    public String uploadPart(String key, String uploadId, int partNumber, InputStream body, long length)
+            throws IOException {
+        Map<Integer, byte[]> parts = multipartParts.get(uploadId);
+        if (parts == null) {
+            throw new IOException("No such upload: " + uploadId);
+        }
+        byte[] bytes = body.readNBytes((int) length);
+        parts.put(partNumber, bytes);
+        return "\"part-" + partNumber + "-" + Arrays.hashCode(bytes) + "\"";
+    }
+
+    @Override
+    public void completeMultipartUpload(String key, String uploadId, List<UploadedPart> parts) throws IOException {
+        Map<Integer, byte[]> stored = multipartParts.remove(uploadId);
+        multipartKeys.remove(uploadId);
+        if (stored == null) {
+            throw new IOException("No such upload: " + uploadId);
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        for (UploadedPart part : parts.stream().sorted(java.util.Comparator.comparingInt(UploadedPart::partNumber)).toList()) {
+            byte[] bytes = stored.get(part.partNumber());
+            if (bytes == null) {
+                throw new IOException("Missing part " + part.partNumber());
+            }
+            out.writeBytes(bytes);
+        }
+        put(key, out.toByteArray());
+    }
+
+    @Override
+    public void abortMultipartUpload(String key, String uploadId) {
+        multipartParts.remove(uploadId);
+        multipartKeys.remove(uploadId);
     }
 
     @Override

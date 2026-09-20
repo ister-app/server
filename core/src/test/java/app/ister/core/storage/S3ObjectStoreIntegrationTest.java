@@ -152,4 +152,41 @@ class S3ObjectStoreIntegrationTest {
         store.put("art/from-file.txt", local, "text/plain");
         assertThat(store.stat("art/from-file.txt")).isPresent();
     }
+
+    @Test
+    void multipartUploadAssemblesPartsAndSurvivesAReplacedPart() throws Exception {
+        String key = "upload/Show (2024)/Season 01/s01e02.mkv";
+        byte[] first = new byte[5 * 1024 * 1024]; // the minimum size of every part but the last
+        java.util.Arrays.fill(first, (byte) 'a');
+        byte[] last = "tail".getBytes(StandardCharsets.UTF_8);
+
+        String uploadId = store.createMultipartUpload(key, "video/x-matroska");
+        assertThat(store.stat(key)).as("nothing is visible before completion").isEmpty();
+
+        store.uploadPart(key, uploadId, 1, new ByteArrayInputStream(new byte[5 * 1024 * 1024]), first.length);
+        // a client retrying a chunk sends the part number again: the later one wins
+        String etag1 = store.uploadPart(key, uploadId, 1, new ByteArrayInputStream(first), first.length);
+        String etag2 = store.uploadPart(key, uploadId, 2, new ByteArrayInputStream(last), last.length);
+
+        // handed over out of order on purpose
+        store.completeMultipartUpload(key, uploadId, List.of(
+                new ObjectStore.UploadedPart(2, etag2), new ObjectStore.UploadedPart(1, etag1)));
+
+        assertThat(store.stat(key)).get().extracting(ObjectStat::size).isEqualTo((long) first.length + last.length);
+        try (RangedObject range = store.openRange(key, first.length - 1L, -1)) {
+            assertThat(new String(range.body().readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("atail");
+        }
+    }
+
+    @Test
+    void abortedMultipartUploadLeavesNothingBehind() throws IOException {
+        String key = "upload/aborted.mkv";
+        String uploadId = store.createMultipartUpload(key, null);
+        store.uploadPart(key, uploadId, 1, new ByteArrayInputStream("x".getBytes(StandardCharsets.UTF_8)), 1);
+
+        store.abortMultipartUpload(key, uploadId);
+        store.abortMultipartUpload(key, uploadId); // a second abort is a no-op
+
+        assertThat(store.stat(key)).isEmpty();
+    }
 }
