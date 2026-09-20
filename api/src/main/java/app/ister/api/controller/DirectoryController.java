@@ -9,6 +9,7 @@ import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.StorageKind;
 import app.ister.core.repository.DirectoryRepository;
+import app.ister.core.storage.LibraryWriteStoreResolver;
 import lombok.RequiredArgsConstructor;
 
 import java.util.List;
@@ -20,7 +21,7 @@ import org.springframework.stereotype.Controller;
 public class DirectoryController {
 
     private final DirectoryRepository directoryRepository;
-    private final app.ister.core.service.NodeService nodeService;
+    private final LibraryWriteStoreResolver libraryWriteStoreResolver;
 
     @SchemaMapping(typeName = "Image", field = "directory")
     public DirectoryEntity directory(ImageEntity imageEntity) {
@@ -44,14 +45,7 @@ public class DirectoryController {
      */
     @SchemaMapping(typeName = "Directory", field = "servingNode")
     public NodeEntity servingNode(DirectoryEntity directoryEntity) {
-        if (directoryEntity.getNodeEntity() != null) {
-            return directoryEntity.getNodeEntity();
-        }
-        NodeEntity self = nodeService.getOrCreateNodeEntityForThisNode();
-        List<NodeEntity> attached = directoryRepository.findAttachedNodes(directoryEntity.getId());
-        return attached.stream().filter(n -> n.getId().equals(self.getId())).findFirst()
-                .or(() -> attached.stream().findFirst())
-                .orElse(self);
+        return libraryWriteStoreResolver.servingNode(directoryEntity);
     }
 
     @SchemaMapping(typeName = "Directory", field = "storageKind")
