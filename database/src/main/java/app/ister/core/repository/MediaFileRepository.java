@@ -57,6 +57,11 @@ public interface MediaFileRepository extends CrudRepository<MediaFileEntity, UUI
     @Query("SELECT m.path FROM MediaFileEntity m WHERE m.directoryEntityId = :directoryEntityId")
     List<String> findPathsByDirectoryEntityId(@Param("directoryEntityId") UUID directoryEntityId);
 
+    /** Which of the given paths are already known in a directory (upload preview: "exists" check). */
+    @Query("SELECT m.path FROM MediaFileEntity m WHERE m.directoryEntityId = :directoryEntityId AND m.path IN :paths")
+    List<String> findPathsByDirectoryEntityIdAndPathIn(@Param("directoryEntityId") UUID directoryEntityId,
+                                                       @Param("paths") Collection<String> paths);
+
     /** Downloaded podcast episodes in a directory, oldest first (retention sweep). */
     List<MediaFileEntity> findByDirectoryEntityIdAndPodcastEpisodeEntityIsNotNullOrderByDateCreatedAsc(UUID directoryEntityId);
 

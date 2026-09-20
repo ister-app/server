@@ -30,6 +30,11 @@ public interface ImageRepository extends CrudRepository<ImageEntity, UUID> {
     @Query("select i.path from ImageEntity i where i.directoryEntityId = :directoryEntityId and i.path is not null")
     List<String> findPathsByDirectoryEntityId(@Param("directoryEntityId") UUID directoryEntityId);
 
+    /** Which of the given paths are already known in a directory (upload preview: "exists" check). */
+    @Query("select i.path from ImageEntity i where i.directoryEntityId = :directoryEntityId and i.path in :paths")
+    List<String> findPathsByDirectoryEntityIdAndPathIn(@Param("directoryEntityId") UUID directoryEntityId,
+                                                       @Param("paths") Collection<String> paths);
+
     List<ImageEntity> findByDirectoryEntity(DirectoryEntity directoryEntity);
 
     /**
