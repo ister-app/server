@@ -193,6 +193,25 @@ class HlsControllerTest {
         assertEquals(Files.size(srtFile), ((Resource) response.getBody()).contentLength());
     }
 
+    // ========== getBitmapSubtitleFile ==========
+
+    @Test
+    void getBitmapSubtitleFileServesIndexAsJsonAndSheetsAsPng() throws IOException {
+        UUID subId = UUID.randomUUID();
+        String index = "bsub_" + subId + ".json";
+        String sheet = "bsub_" + subId + "_00.png";
+        Path indexFile = Files.writeString(tempDir.resolve(index), "{}");
+        Path sheetFile = Files.write(tempDir.resolve(sheet), new byte[]{1, 2, 3});
+        when(hlsService.getBitmapSubtitleFile(mediaFileId, index)).thenReturn(indexFile);
+        when(hlsService.getBitmapSubtitleFile(mediaFileId, sheet)).thenReturn(sheetFile);
+
+        assertEquals("application/json",
+                controller.getBitmapSubtitleFile(mediaFileId, index).getHeaders().getFirst("Content-Type"));
+        ResponseEntity<Resource> png = controller.getBitmapSubtitleFile(mediaFileId, sheet);
+        assertEquals("image/png", png.getHeaders().getFirst("Content-Type"));
+        assertEquals(3, png.getBody().contentLength());
+    }
+
     // ========== appendTokenToUris edge cases ==========
 
     @Test

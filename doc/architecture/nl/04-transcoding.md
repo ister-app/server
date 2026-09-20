@@ -122,6 +122,43 @@ masterplaylist zouden per variant herrekend moeten worden. De bekende beperking 
 client-side ontwerp is de webplayer, die geen mpv heeft en de balken toont — de enige plek waar
 een serverside crop ooit iets zou toevoegen.
 
+## Bitmap-ondertitels
+
+Ondertitels van blu-ray (PGS) en dvd (VobSub) zijn plaatjes, geen tekst. Ze worden nooit
+ingebrand en nooit ge-OCR'd: de server geeft de plaatjes zelf aan de player, die ze in een
+overlay boven de video tekent. Een ondertitel wisselen of wijzigen raakt dus nooit een
+getranscodeerd segment, en de kijker ziet precies wat er op de disc stond.
+
+`HlsBitmapSubtitleService` maakt per bitmapstream een cue-index plus een paar sprite-sheets in
+de transcode-tmp-dir van het bestand:
+
+- `bsub_{streamId}.json` — `{version, width, height, sheets[], cues[]}`; een cue is
+  `{s, e, x, y, w, h, sheet, sx, sy, forced}`: begin/eind in milliseconden, positie en maat op
+  het ondertitelcanvas van `width`×`height`, en de hoek van de sprite binnen sheet nummer `sheet`.
+- `bsub_{streamId}_{NN}.png` — RGBA-sheets, in weergavevolgorde op planken gepakt (hoogte
+  maximaal 2048 px), zodat een player alleen de sheet rond de afspeelpositie nodig heeft.
+- `bsub_{streamId}.gen` — generatiemarker (`BITMAP_GENERATION`); verhoog hem als de parsers of
+  het formaat wijzigen en verouderde artefacten worden bij het volgende verzoek opnieuw gemaakt.
+
+Het genereren is **lazy en goedkoop**. FFmpeg decodeert niets: één run kopieert de pakketten
+van *alle* bitmapstreams van het bestand eruit (`-c:s copy`, PGS als `.sup`, VobSub als `.mks`
+→ `mkvextract` → `.idx`/`.sub`), en de pure-Java `PgsParser`/`VobSubParser` in
+`transcoder/.../bitmapsub/` doen de rest — een paar seconden voor een blu-ray-aflevering van
+40 minuten, vooral bepaald door het één keer lezen van de container. `PngEncoder` schrijft de
+sheets met de hand (`Deflater` + CRC32): de PNG-writer van ImageIO heeft geen JNI-hints in de
+native image, en niets hier heeft AWT nodig. Het genereren start op de achtergrond (een virtual
+thread, geen transcode-slot) zodra de playlists van een bestand vooraf worden gemaakt, en de
+`GET /hls/{mediaFileId}/bsub_…`-endpoints genereren bij een miss, onder een lock per bestand.
+Met een gedeelde tmp-store worden de artefacten daar gepubliceerd en net als segmenten
+doorgelezen. Omdat ze in de tmp-dir staan, verlopen ze samen met de rest van de
+transcode-cache — geen databaserij, geen bestand in de cache-directory.
+
+Cue-tijden zijn **ruw**: ze liggen op dezelfde bij nul beginnende tijdlijn als de positie van
+de player, omdat de pakketkopie net als de transcode-passes naar de start van de container
+herbaseert. De `SUBTITLE_OFFSET_MS`-verschuiving van de WebVTT/SRT-renditions compenseert een
+detail van de MPEG-TS-muxer en geldt hier niet. Voor `dvb_subtitle` bestaat geen parser; die
+wordt niet geserveerd.
+
 ## Retentie
 
 Twee losse sweeps schonen de transcode-cache op, gestuurd door verschillende properties:

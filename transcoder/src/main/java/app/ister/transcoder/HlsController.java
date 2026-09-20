@@ -119,6 +119,21 @@ public class HlsController {
     }
 
     /**
+     * Bitmap subtitles (PGS/VobSub) for the player's own overlay: the cue index
+     * {@code bsub_{streamId}.json} and the sprite sheets it names.
+     */
+    @GetMapping("/hls/{mediaFileId}/{filename:bsub_.+\\.(?:json|png)}")
+    public ResponseEntity<Resource> getBitmapSubtitleFile(
+            @PathVariable UUID mediaFileId,
+            @PathVariable String filename) throws IOException {
+        Path filePath = hlsService.getBitmapSubtitleFile(mediaFileId, SafeFilename.require(filename));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_TYPE, filename.endsWith(".png") ? "image/png" : "application/json")
+                .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_2H)
+                .body(new FileSystemResource(filePath));
+    }
+
+    /**
      * Appends {@code ?token=<token>} to every URI in an M3U8 playlist:
      * - Standalone URI lines (segment filenames)
      * - {@code URI="..."} attributes embedded in #EXT-X-MEDIA tags

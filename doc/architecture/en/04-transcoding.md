@@ -115,6 +115,41 @@ twice; and the advertised `RESOLUTION` values in the master playlist would have 
 per variant. The known limitation of the client-side design is the web player, which has no mpv
 and shows the bars — the only place a server-side crop would ever add value.
 
+## Bitmap subtitles
+
+Blu-ray (PGS) and DVD (VobSub) subtitles are pictures, not text. They are never burned in and
+never OCR'd: the server hands the pictures themselves to the player, which draws them in an
+overlay above the video. Switching or changing a subtitle therefore never touches a transcoded
+segment, and what the viewer sees is exactly what the disc shipped.
+
+`HlsBitmapSubtitleService` produces, per bitmap stream, a cue index plus a few sprite sheets in
+the file's transcode tmp dir:
+
+- `bsub_{streamId}.json` — `{version, width, height, sheets[], cues[]}`; a cue is
+  `{s, e, x, y, w, h, sheet, sx, sy, forced}`: start/end in milliseconds, position and size on
+  the `width`×`height` subtitle canvas, and the sprite's corner inside sheet number `sheet`.
+- `bsub_{streamId}_{NN}.png` — RGBA sheets, shelf-packed in display order (height capped at
+  2048 px), so a player only ever needs the sheet around the playhead.
+- `bsub_{streamId}.gen` — generation marker (`BITMAP_GENERATION`); bump it when the parsers or
+  the format change and stale artifacts are regenerated on the next request.
+
+Generation is **lazy and cheap**. FFmpeg decodes nothing: one run copies the packets of *all*
+bitmap streams of the file out (`-c:s copy`, PGS as `.sup`, VobSub as `.mks` → `mkvextract` →
+`.idx`/`.sub`), and the pure-Java `PgsParser`/`VobSubParser` in `transcoder/.../bitmapsub/` do
+the rest — a few seconds for a 40-minute Blu-ray episode, dominated by reading the container
+once. `PngEncoder` writes the sheets by hand (`Deflater` + CRC32): ImageIO's PNG writer has no
+JNI hints in the native image, and nothing here needs AWT. Generation is kicked off in the
+background (a virtual thread, not a transcode slot) when the playlists of a file are
+pre-generated, and the `GET /hls/{mediaFileId}/bsub_…` endpoints generate on a miss, under a
+per-file lock. With a shared tmp store the artifacts are published there and read through like
+segments. Because they live in the tmp dir they age out with the rest of the transcode cache —
+no database row, no cache-directory file.
+
+Cue times are **raw**: they sit on the same zero-based timeline as the player's position, since
+the packet copy rebases to the container start just like the transcode passes do. The
+`SUBTITLE_OFFSET_MS` shift of the WebVTT/SRT renditions compensates an MPEG-TS muxer detail and
+does not apply here. `dvb_subtitle` has no parser and is not served.
+
 ## Retention
 
 Two separate sweeps clean the transcode cache, steered by different properties:

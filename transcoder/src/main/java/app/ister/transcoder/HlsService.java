@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -74,6 +75,7 @@ public class HlsService {
 
     private final HlsPlaylistBuilder playlistBuilder;
     private final HlsSubtitleService subtitleService;
+    private final HlsBitmapSubtitleService bitmapSubtitleService;
     private final HlsTranscodeService transcodeService;
     private final MediaFileRepository mediaFileRepository;
     private final MediaFileStreamRepository mediaFileStreamRepository;
@@ -102,6 +104,7 @@ public class HlsService {
 
     @SuppressWarnings("java:S107") // wiring, one collaborator per concern
     public HlsService(HlsPlaylistBuilder playlistBuilder, HlsSubtitleService subtitleService,
+                      HlsBitmapSubtitleService bitmapSubtitleService,
                       HlsTranscodeService transcodeService, MediaFileRepository mediaFileRepository,
                       MediaFileStreamRepository mediaFileStreamRepository, MessageSender messageSender,
                       RemoteNodeClient remoteNodeClient, MediaFileInputResolver inputResolver,
@@ -110,6 +113,7 @@ public class HlsService {
         this.amqpAdmin = amqpAdmin;
         this.playlistBuilder = playlistBuilder;
         this.subtitleService = subtitleService;
+        this.bitmapSubtitleService = bitmapSubtitleService;
         this.transcodeService = transcodeService;
         this.mediaFileRepository = mediaFileRepository;
         this.mediaFileStreamRepository = mediaFileStreamRepository;
@@ -764,6 +768,85 @@ public class HlsService {
         return offsetPath;
     }
 
+    /**
+     * Returns a (cached) bitmap subtitle artifact: the cue index {@code bsub_{streamId}.json}
+     * or one of its sprite sheets {@code bsub_{streamId}_{NN}.png}. The first miss generates
+     * the artifacts of <em>every</em> bitmap stream of the file — reading the container once
+     * is the whole cost, so the next language is free.
+     */
+    public Path getBitmapSubtitleFile(UUID mediaFileId, String fileName) throws IOException {
+        UUID streamId = HlsBitmapSubtitleService.streamIdOf(fileName);
+        Path file = cacheDir(mediaFileId).resolve(fileName);
+        if (!bitmapSubtitleReady(mediaFileId, streamId, file)) {
+            generateBitmapSubtitles(mediaFileId);
+        }
+        if (!Files.exists(file)) {
+            throw new NoSuchElementException("No bitmap subtitle file " + fileName);
+        }
+        Files.setLastModifiedTime(file, FileTime.fromMillis(System.currentTimeMillis()));
+        return file;
+    }
+
+    /** Local first, then the shared tmp store: another node may have generated them already. */
+    private boolean bitmapSubtitleReady(UUID mediaFileId, UUID streamId, Path file) {
+        Path dir = cacheDir(mediaFileId);
+        syncFromShared(mediaFileId, HlsBitmapSubtitleService.generationMarker(dir, streamId));
+        return bitmapSubtitleService.isGenerationCurrent(dir, streamId) && syncFromShared(mediaFileId, file);
+    }
+
+    private void generateBitmapSubtitles(UUID mediaFileId) throws IOException {
+        // Streams are fully loaded here; generation only reads their basic fields.
+        BitmapSubtitleContext ctx = readOnlyTransaction.execute(status -> {
+            MediaFileEntity mediaFile = mediaFileRepository.findById(mediaFileId).orElseThrow();
+            List<MediaFileStreamEntity> streams = mediaFile.getMediaFileStreamEntity().stream()
+                    .filter(HlsBitmapSubtitleService::isSupported)
+                    .toList();
+            return new BitmapSubtitleContext(resolveInputPath(mediaFile), streams);
+        });
+        if (ctx.streams().isEmpty()) {
+            return;
+        }
+        Path dir = cacheDir(mediaFileId);
+        Object lock = subtitleLocks.computeIfAbsent(mediaFileId + "_bsub", k -> new Object());
+        synchronized (lock) {
+            List<MediaFileStreamEntity> missing = ctx.streams().stream()
+                    .filter(s -> {
+                        syncFromShared(mediaFileId, HlsBitmapSubtitleService.generationMarker(dir, s.getId()));
+                        return !bitmapSubtitleService.isGenerationCurrent(dir, s.getId());
+                    })
+                    .toList();
+            if (missing.isEmpty()) {
+                return;
+            }
+            List<Path> written = bitmapSubtitleService.generate(ctx.mediaFilePath(), missing, dir);
+            Optional<TmpStore> shared = tmpStoreProvider.shared();
+            if (shared.isPresent()) {
+                // markers come after their files in the list, so a reader never sees a marker without them
+                for (Path file : written) {
+                    shared.get().put(mediaFileId, file);
+                }
+            }
+        }
+    }
+
+    /**
+     * Starts the bitmap subtitle generation in the background while playback is being set up,
+     * so the index is usually there by the time a viewer picks the track. On a virtual thread,
+     * not the transcode executor: it is I/O bound and must not cost a transcode slot.
+     */
+    private void warmBitmapSubtitles(UUID mediaFileId, List<MediaFileStreamEntity> streams) {
+        if (streams.stream().noneMatch(HlsBitmapSubtitleService::isSupported)) {
+            return;
+        }
+        Thread.ofVirtual().name("bsub-warm-" + mediaFileId).start(() -> {
+            try {
+                generateBitmapSubtitles(mediaFileId);
+            } catch (IOException | RuntimeException e) {
+                log.warn("Could not pre-generate bitmap subtitles for {}: {}", mediaFileId, e.toString());
+            }
+        });
+    }
+
     // ========== Stream playlist pre-generation ==========
 
     private void preGenerateStreamPlaylists(MediaFileEntity mediaFile, UUID mediaFileId,
@@ -817,6 +900,7 @@ public class HlsService {
 
         preGenerateAudioPlaylists(mediaFileId, filePath, audioStreams, audioQualities, includeVideo);
         preGenerateSubtitlePlaylists(mediaFileId, filePath, subtitleStreams, subtitleFormat, totalDuration);
+        warmBitmapSubtitles(mediaFileId, streams);
     }
 
     private void preGenerateAudioPlaylists(UUID mediaFileId, String filePath,
@@ -1336,6 +1420,9 @@ public class HlsService {
      * @param externalSrtUrl tokenized download URL of an {@code EXTERNAL_SUBTITLE} stream when the
      *                       media file lives on another node; null when local or not external.
      */
+    private record BitmapSubtitleContext(String mediaFilePath, List<MediaFileStreamEntity> streams) {
+    }
+
     private record SubtitleContext(MediaFileStreamEntity subtitleStream, String mediaFilePath, String externalSrtUrl,
                                    ObjectStore externalSrtStore) {
     }

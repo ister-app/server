@@ -136,6 +136,11 @@ playlist-URI's die hij genereert, zodat de speler het nooit expliciet hoeft te h
 `StreamTokenService` ruimt verlopen tokens op via een schedule. In multi-node-opstellingen ververst
 `NodeTokenManager` de tokens tussen nodes.
 
+De enige `/hls/`-resource die de player wél met de hand ophaalt is het bitmap-ondertitelpaar —
+`GET /hls/{mediaFileId}/bsub_{streamId}.json` (cue-index) en de `bsub_{streamId}_{NN}.png`-
+sprite-sheets die daarin genoemd worden ([hoofdstuk 4](04-transcoding.md#bitmap-ondertitels)).
+Ze horen bij geen enkele playlist, dus de player plakt zijn stream-token er zelf achter.
+
 ### Autorisatie per library op media-URL's
 
 Authenticatie alleen bepaalt niet wat een gebruiker mag ophalen: `MediaAccessEnforcementFilter`

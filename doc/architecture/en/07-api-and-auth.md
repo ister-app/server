@@ -127,6 +127,11 @@ segment requests may authenticate with a short-lived `?token=` query parameter
 generates, so the player never handles it explicitly. `StreamTokenService` sweeps expired tokens on
 a schedule. In multi-node setups, `NodeTokenManager` refreshes the inter-node tokens.
 
+The one `/hls/` resource the player does fetch by hand is the bitmap subtitle pair —
+`GET /hls/{mediaFileId}/bsub_{streamId}.json` (cue index) and the `bsub_{streamId}_{NN}.png`
+sprite sheets it names ([chapter 4](04-transcoding.md#bitmap-subtitles)). They are not part of
+any playlist, so the player appends its stream token itself.
+
 ### Per-library authorization on media URLs
 
 Authentication alone does not decide what a user may fetch: `MediaAccessEnforcementFilter` (core)

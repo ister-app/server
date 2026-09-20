@@ -96,7 +96,8 @@ class HlsServiceTest {
         ReflectionTestUtils.setField(transcodeService, "concurrentFileSlots", new Semaphore(10));
         // By default the transcode queue for the media file's directory exists.
         lenient().when(amqpAdmin.getQueueProperties(anyString())).thenReturn(new java.util.Properties());
-        hlsService = new HlsService(playlistBuilder, subtitleService, transcodeService,
+        hlsService = new HlsService(playlistBuilder, subtitleService,
+                new HlsBitmapSubtitleService(jaffree, "/usr/bin/mkvextract"), transcodeService,
                 mediaFileRepository, mediaFileStreamRepository, messageSender,
                 remoteNodeClient, new MediaFileInputResolver(nodeTokenManager, objectStoreRegistry, new app.ister.core.config.S3Properties(),
                         directoryRepository, LOCAL_NODE_NAME, "http://127.0.0.1:8080"),
@@ -635,6 +636,29 @@ class HlsServiceTest {
     }
 
     // ========== SRT subtitle ==========
+
+    @Test
+    void getBitmapSubtitleFileServesTheCacheWithoutTouchingTheDatabase() throws Exception {
+        UUID mediaFileId = UUID.randomUUID();
+        UUID streamId = UUID.randomUUID();
+        Path dir = Files.createDirectories(tempDir.resolve(mediaFileId.toString()));
+        Path index = Files.writeString(dir.resolve("bsub_" + streamId + ".json"), "{}");
+        Files.writeString(dir.resolve("bsub_" + streamId + ".gen"),
+                String.valueOf(HlsBitmapSubtitleService.BITMAP_GENERATION));
+
+        assertEquals(index, hlsService.getBitmapSubtitleFile(mediaFileId, "bsub_" + streamId + ".json"));
+
+        verifyNoInteractions(mediaFileRepository);
+    }
+
+    @Test
+    void getBitmapSubtitleFileIsNotFoundForAFileWithoutBitmapStreams() throws Exception {
+        UUID mediaFileId = UUID.randomUUID();
+        when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
+
+        assertThrows(java.util.NoSuchElementException.class,
+                () -> hlsService.getBitmapSubtitleFile(mediaFileId, "bsub_" + UUID.randomUUID() + ".json"));
+    }
 
     @Test
     void getSrtSubtitleExternalReturnsOffsetFile() throws Exception {
