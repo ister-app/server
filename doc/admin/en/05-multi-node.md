@@ -1,5 +1,5 @@
 ---
-description: "Run Ister as a multi-node self-hosted media server cluster: shared database and broker, directory-scoped work routing and helper nodes for transcoding, intro detection and subtitle OCR."
+description: "Run Ister as a multi-node self-hosted media server cluster: shared database and broker, directory-scoped work routing and helper nodes for transcoding, intro detection and subtitle extraction."
 ---
 
 # Multi-node
@@ -54,7 +54,7 @@ Every node stays responsible for its own directories. On top of that, a powerful
 | --- | --- |
 | `TRANSCODE` | HLS (pre)transcoding |
 | `DETECT_SEGMENTS` | intro/outro detection (audio fingerprinting) |
-| `SUBTITLES` | extraction of embedded subtitles, including OCR of DVD/Blu-ray bitmap subtitles |
+| `SUBTITLES` | extraction of embedded text subtitles to SRT (DVD/Blu-ray bitmap subtitles need no job: they are served as pictures at playback time) |
 
 List the directory names the helper should serve, and optionally which jobs:
 
@@ -72,7 +72,7 @@ helper reads the source file over HTTP from the owner (a tokenized download with
 seeking stays cheap); intro detection writes only database rows, and an extracted subtitle is
 uploaded into the owner's cache directory, where the owner serves it as if it had made it itself.
 Nothing beyond correct `app.ister.server.url` values is needed for that, but the helper needs the
-same tools as any node (ffmpeg, mkvextract, subtile-ocr) — use the same image.
+same tools as any node (ffmpeg, mkvextract) — use the same image.
 
 An owner that should not spend its own CPU on a job family at all can hand it off entirely:
 
@@ -117,7 +117,7 @@ one database and broker:
 - **server-1** — owns six directories (shows, movies and music over two disks)
 - **server-2** — a second full node with its own disks
 - **helper-1** — no directories, only `app.ister.helper.disks[n]` entries naming server-1's
-  disks: it transcodes for server-1 and does its intro detection and subtitle OCR, which server-1
+  disks: it transcodes for server-1 and does its intro detection and subtitle extraction, which server-1
   offloads entirely (`APP_ISTER_HELPER_OFFLOAD_JOBS`)
 
 All three nodes have VAAPI hardware acceleration enabled in the example — transcoding can land on

@@ -76,7 +76,7 @@ never from the filename.
 are tolerated.
 
 In SHOW and MOVIE libraries the recognised video containers are `mkv`, `mp4`, `webm`, `m4v`, `flv` and `avi`; subtitles: `.srt`
-next to the video (image subtitles inside mkv are extracted and OCR'd); local artwork: `jpg`/`png`;
+next to the video (picture-based subtitles inside the container — Blu-ray PGS, DVD VobSub — are shown as they are, no conversion); local artwork: `jpg`/`png`;
 `.nfo` files are read for metadata hints. Other library types accept their own extension lists —
 see the naming reference.
 

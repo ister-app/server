@@ -34,7 +34,7 @@ import java.util.UUID;
  * Extracts one embedded subtitle stream to an SRT in the owning node's cache directory.
  *
  * <p>Three stages, deliberately not one transaction: a short read to build an immutable job, the
- * extraction (ffmpeg, mkvextract, subtile-ocr — minutes, no database session), and a short write.
+ * extraction (an ffmpeg remux that reads the whole container, no database session), and a short write.
  * A helper node runs the same code for another node's file: it reads the source through the
  * owner's download URL, writes the SRT to its own tmp directory, uploads it into the owner's
  * cache directory and records the owner-local path on the row, so the owner (and any other
@@ -102,7 +102,7 @@ public class SubtitleExtractionProcessor {
         ActivityContext.report(job.subject());
         // Per stream, not per file: the file's streams are extracted concurrently (listener
         // concurrency) and each one cleans up after itself, so a shared directory would be
-        // deleted from under a sibling still running mkvextract or waiting to upload.
+        // deleted from under a sibling still running ffmpeg or waiting to upload.
         // Always extracted into a scratch dir: the cache may be a bucket, and the tools need a
         // local file anyway. The result is then uploaded to the owner (remote) or written into
         // the cache store (local) under its file name.
@@ -111,7 +111,7 @@ public class SubtitleExtractionProcessor {
         try {
             Files.createDirectories(srtDir);
             ActivityContext.step("subtitles");
-            extracted = extractor.extractOne(job.input(), mediaFileId, job.streams(), job.stream(), job.subIdx(), srtDir, dirOfFFmpeg);
+            extracted = extractor.extractOne(job.input(), mediaFileId, job.stream(), job.subIdx(), srtDir, dirOfFFmpeg);
             if (extracted.isPresent()) {
                 if (job.remote()) {
                     ActivityContext.step("upload");

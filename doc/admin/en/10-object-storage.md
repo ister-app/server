@@ -71,7 +71,7 @@ Helper nodes ([Multi-node](05-multi-node.md)) are not needed for S3 directories:
 *is* the way to add capacity. A helper that lists an S3 directory under `app.ister.helper.disks`
 reads it through an attached node, like it does for a disk.
 
-Things that need a real file — epub and comic readers, PDF rendering, subtitle OCR — download the
+Things that need a real file — epub and comic readers, PDF rendering — download the
 object once into `app.ister.s3.local-copy-dir` (under the tmp dir by default) and keep it as an LRU
 cache capped by `app.ister.s3.local-copy-max-bytes` (2 GiB).
 

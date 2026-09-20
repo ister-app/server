@@ -56,9 +56,8 @@ The Wire (2002)/
   gelogd en behandeld als alleen de eerste aflevering.
 - Videocontainers: `.mkv`, `.mp4`, `.webm`, `.m4v`, `.flv`, `.avi`. Ondertitels: `.srt` naast de aflevering, gekoppeld op
   bestandsnaam-prefix; een taalcode tussen de laatste twee punten (`s01e01.en.srt`,
-  `s01e01.nld.srt`) bepaalt de ondertiteltaal. In de container ingebedde beeldondertitels worden
-  ge-OCR'd; streams zonder taaltag vallen terug op
-  `app.ister.server.subtitle-ocr-default-language` (standaard `eng`).
+  `s01e01.nld.srt`) bepaalt de ondertiteltaal. In de container ingebedde beeldondertitels
+  (blu-ray-PGS, dvd-VobSub) vragen niets: de player toont ze zoals ze op de disc staan.
 - NFO-bestanden: `tvshow.nfo` op serieniveau, `sNNeNN*.nfo` op afleveringsniveau.
 - Artwork: `.jpg`/`.png` met `cover`, `folder`, `poster` of `artist` (poster) dan wel
   `background`/`thumb` (achtergrond) in de naam — substring-matching, achtergrond wint bij

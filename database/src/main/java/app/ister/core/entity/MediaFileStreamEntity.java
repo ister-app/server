@@ -66,10 +66,9 @@ public class MediaFileStreamEntity extends BaseEntity {
 
     /**
      * True when extracting this subtitle stream to SRT was attempted during analysis
-     * but failed (OCR error, no usable OCR language, ffmpeg failure). Null = never
-     * attempted or not applicable. The scanner's re-extract backfill skips streams
-     * marked true, so a permanently failing extraction does not re-trigger a full
-     * re-analysis on every scan; a re-analysis rewrites the rows and retries anyway.
+     * but failed (ffmpeg failure). Null = never attempted or not applicable. The
+     * extraction skips streams marked true, so a redelivered event does not retry a
+     * permanently failing one; a re-analysis rewrites the rows and retries anyway.
      */
     @Setter
     private Boolean extractionFailed;

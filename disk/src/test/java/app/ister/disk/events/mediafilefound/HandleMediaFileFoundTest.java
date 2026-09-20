@@ -121,7 +121,10 @@ class HandleMediaFileFoundTest {
         verify(mediaFileRepositoryMock).save(mediaFileEntity);
     }
 
-    /** Subtitle extraction left the analysis: every extractable subtitle stream gets its own event. */
+    /**
+     * Subtitle extraction left the analysis: every text subtitle stream gets its own event. Bitmap
+     * streams get none — the transcoder serves those as sprite sheets at playback time.
+     */
     @Test
     void publishesOneSubtitleExtractEventPerExtractableStream() {
         DirectoryEntity directoryEntity = DirectoryEntity.builder().id(UUID.randomUUID()).name("disk1").build();
@@ -147,8 +150,8 @@ class HandleMediaFileFoundTest {
         subject.handle(mediaFileFoundData);
 
         ArgumentCaptor<SubtitleExtractRequestedData> events = ArgumentCaptor.forClass(SubtitleExtractRequestedData.class);
-        verify(messageSenderMock, times(2)).sendSubtitleExtractRequested(events.capture(), eq("disk1"));
-        assertEquals(List.of(subripId, pgsId), events.getAllValues().stream().map(SubtitleExtractRequestedData::getSubtitleStreamEntityUUID).toList());
+        verify(messageSenderMock, times(1)).sendSubtitleExtractRequested(events.capture(), eq("disk1"));
+        assertEquals(List.of(subripId), events.getAllValues().stream().map(SubtitleExtractRequestedData::getSubtitleStreamEntityUUID).toList());
         assertTrue(events.getAllValues().stream().allMatch(e -> mediaFileId.equals(e.getMediaFileEntityUUID())
                 && directoryEntity.getId().equals(e.getDirectoryEntityUUID())));
     }

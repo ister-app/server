@@ -29,7 +29,7 @@ flowchart TD
     DS --> DSH["HandleDetectSegments\n📦 disk (owner or helper)\nintro/outro detection\n(one chunk of episodes)"]
     DSH -->|"episodes remaining →\nnext chunk"| DS
     J -->|"after commit,\none per embedded subtitle stream"| SE["SUBTITLE_EXTRACT_REQUESTED\n.{dirName}"]
-    SE --> SEH["HandleSubtitleExtractRequested\n📦 disk (owner or helper)\nffmpeg / mkvextract / subtile-ocr\nSRT → owner's cache dir"]
+    SE --> SEH["HandleSubtitleExtractRequested\n📦 disk (owner or helper)\nffmpeg remux (text codecs)\nSRT → owner's cache dir"]
     SEH -->|"EXTERNAL_SUBTITLE row"| DB0[(Database)]
 
     F --> L["HandleAudioFileFound\n📦 disk"]

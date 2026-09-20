@@ -4,7 +4,6 @@ import app.ister.core.entity.*;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.DetectSegmentsData;
 import app.ister.core.eventdata.MediaFileFoundData;
-import app.ister.core.eventdata.SubtitleExtractRequestedData;
 import app.ister.core.enums.StreamCodecType;
 import app.ister.core.repository.MediaFileEpisodeRepository;
 import app.ister.core.repository.MediaFileRepository;
@@ -12,7 +11,6 @@ import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.disk.events.detectsegments.SegmentDetectionChunkProcessor;
-import app.ister.disk.events.subtitleextract.SubtitleExtractor;
 import app.ister.disk.scanner.PathObject;
 import app.ister.disk.scanner.enums.DirType;
 import app.ister.disk.scanner.enums.FileType;
@@ -29,7 +27,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 @Component
 @Slf4j
@@ -42,14 +39,7 @@ public class MediaFileScanner implements Scanner {
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final MessageSender messageSender;
 
-    /**
-     * Media files for which this run already requested a subtitle re-extract.
-     * A permanently failing OCR would otherwise re-trigger the (heavy) full
-     * re-analysis on every rescan; once per application run is enough.
-     */
-    private final Set<UUID> subtitleReextractRequested = ConcurrentHashMap.newKeySet();
-
-    /** Same once-per-run guard for the crop-detection backfill. */
+    /** Once-per-run guard for the crop-detection backfill: a failing detection must not re-fire every rescan. */
     private final Set<UUID> cropDetectRequested = ConcurrentHashMap.newKeySet();
 
     /** Same once-per-run guard for the intro/outro segment-detection backfill, per season. */
@@ -118,7 +108,7 @@ public class MediaFileScanner implements Scanner {
 
     /**
      * One backfill per file per rescan, in priority order, for files that predate a
-     * feature: multi-episode links, crop detection, intro/outro segments, subtitle OCR.
+     * feature: multi-episode links, crop detection, intro/outro segments.
      * Each branch is idempotent, so firing at most one of them per pass converges over
      * a few rescans without flooding the analyzer.
      */
@@ -157,22 +147,6 @@ public class MediaFileScanner implements Scanner {
                     .seasonEntityUUID(episodeEntity.get().getSeasonEntity().getId())
                     .directoryEntityUUID(directoryEntity.getId())
                     .build(), directoryEntity.getName());
-        } else if (!subtitleReextractRequested.contains(mediaFile.getId())) {
-            // Backfill for files whose image subtitles (DVD/PGS bitmaps) never produced an
-            // OCR'd SRT — scanned before OCR existed, or the OCR failed (e.g. an untagged
-            // language before the fallback). One extraction event per missing stream; the
-            // handler is idempotent (an existing row or SRT on disk is reused).
-            List<MediaFileStreamEntity> missing = subtitleStreamsToReextract(mediaFile.getId());
-            if (!missing.isEmpty()) {
-                subtitleReextractRequested.add(mediaFile.getId());
-                log.info("Re-extracting {} image subtitle(s) for {}", missing.size(), path);
-                missing.forEach(stream -> messageSender.sendSubtitleExtractRequested(SubtitleExtractRequestedData.builder()
-                        .eventType(EventType.SUBTITLE_EXTRACT_REQUESTED)
-                        .mediaFileEntityUUID(mediaFile.getId())
-                        .directoryEntityUUID(directoryEntity.getId())
-                        .subtitleStreamEntityUUID(stream.getId())
-                        .build(), directoryEntity.getName()));
-            }
         }
     }
 
@@ -206,34 +180,6 @@ public class MediaFileScanner implements Scanner {
         return mediaFile.getDurationInMilliseconds() > 0
                 && (mediaFile.getSegmentDetectorVersion() == null
                 || mediaFile.getSegmentDetectorVersion() < SegmentDetectionChunkProcessor.DETECTOR_VERSION);
-    }
-
-    /**
-     * The image-codec subtitle streams (DVD/PGS bitmaps) without an OCR'd counterpart at the
-     * same stream index. Streams whose extraction was already attempted and failed
-     * (extractionFailed) are skipped — retrying them every scan would loop forever on e.g. a
-     * bitmap subtitle OCR cannot read.
-     */
-    List<MediaFileStreamEntity> subtitleStreamsToReextract(UUID mediaFileId) {
-        var imageSubs = mediaFileStreamRepository
-                .findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.SUBTITLE).stream()
-                .filter(s -> s.getCodecName() != null
-                        && SubtitleExtractor.IMAGE_SUBTITLE_CODECS.contains(s.getCodecName().toLowerCase()))
-                .filter(s -> !Boolean.TRUE.equals(s.getExtractionFailed()))
-                .toList();
-        if (imageSubs.isEmpty()) {
-            return List.of();
-        }
-        var extractedIndexes = mediaFileStreamRepository
-                .findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE).stream()
-                .map(MediaFileStreamEntity::getStreamIndex)
-                .collect(Collectors.toSet());
-        return imageSubs.stream().filter(s -> !extractedIndexes.contains(s.getStreamIndex())).toList();
-    }
-
-    /** True when {@link #subtitleStreamsToReextract} would fire for the file. */
-    boolean needsSubtitleReextract(UUID mediaFileId) {
-        return !subtitleStreamsToReextract(mediaFileId).isEmpty();
     }
 
     private void createEpisodeLinks(MediaFileEntity mediaFile, List<UUID> episodeIds) {

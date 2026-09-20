@@ -40,9 +40,9 @@ public class HlsPlaylistBuilder {
     private static final String TAG_VERSION = "#EXT-X-VERSION:6\n";
     private static final String PREFIX_STREAM_VIDEO = "stream_video_";
 
-    // Keep in sync with SubtitleExtractor.IMAGE_SUBTITLE_CODECS
-    // (disk module): what OCR rescues at scan time is exactly what this
-    // builder may drop from the master playlist.
+    // Picture-based subtitles never get a rendition in the master playlist: they
+    // cannot become WebVTT/SRT. The player fetches PGS/VobSub as sprite sheets
+    // instead (HlsBitmapSubtitleService); DVB is not served at all.
     private static final Set<String> IMAGE_SUBTITLE_CODECS =
             Set.of("dvd_subtitle", "dvdsub", "hdmv_pgs_subtitle", "pgssub", "dvb_subtitle");
 

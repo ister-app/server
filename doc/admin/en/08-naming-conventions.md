@@ -53,8 +53,8 @@ The Wire (2002)/
   (backwards, or wider than three) is logged and treated as the single first episode.
 - Video containers: `.mkv`, `.mp4`, `.webm`, `.m4v`, `.flv`, `.avi`. Subtitles: `.srt` next to the episode, matched by filename
   prefix; a language code between the last two dots (`s01e01.en.srt`, `s01e01.nld.srt`) sets the
-  subtitle language. Image-based subtitles embedded in the container are OCRed; untagged streams
-  fall back to `app.ister.server.subtitle-ocr-default-language` (default `eng`).
+  subtitle language. Picture-based subtitles embedded in the container (Blu-ray PGS, DVD VobSub)
+  need nothing: the player shows them as they are on the disc.
 - NFO files: `tvshow.nfo` at show level, `sNNeNN*.nfo` at episode level.
 - Artwork: `.jpg`/`.png` whose name contains `cover`, `folder`, `poster` or `artist` (poster) or
   `background`/`thumb` (backdrop) — substring match, backdrop wins on mixed names.

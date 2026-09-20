@@ -211,8 +211,8 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
         if (analysis.parts().size() >= 2) {
             mediaFileEpisodeRepository.saveAll(analysis.parts());
         }
-        // Embedded subtitles become SRTs in their own event, one per stream: extraction and
-        // OCR take minutes and a helper node may do them. After commit, or the handler would
+        // Embedded text subtitles become SRTs in their own event, one per stream: the remux
+        // reads the whole container and a helper node may do it. After commit, or the handler would
         // not find the rows.
         analysis.streams().stream()
                 .filter(SubtitleExtractor::isExtractable)

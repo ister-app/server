@@ -1,5 +1,5 @@
 ---
-description: "Draai Ister als zelfgehoste mediaserver op meerdere nodes: gedeelde database en broker, werkrouting per directory en helper-nodes voor transcoderen, intro-detectie en ondertitel-OCR."
+description: "Draai Ister als zelfgehoste mediaserver op meerdere nodes: gedeelde database en broker, werkrouting per directory en helper-nodes voor transcoderen, intro-detectie en ondertitel-extractie."
 ---
 
 # Multi-node
@@ -56,7 +56,7 @@ te bezitten:
 | --- | --- |
 | `TRANSCODE` | HLS-(pre)transcoding |
 | `DETECT_SEGMENTS` | intro-/outro-detectie (audio-fingerprinting) |
-| `SUBTITLES` | extractie van ingebedde ondertitels, inclusief OCR van dvd-/blu-ray-bitmapondertitels |
+| `SUBTITLES` | extractie van ingebedde tekstondertitels naar SRT (dvd-/blu-ray-bitmapondertitels vragen geen job: die worden bij het afspelen als plaatjes geserveerd) |
 
 Som de directorynamen op die de helper moet bedienen, en optioneel welke jobs:
 
@@ -75,7 +75,7 @@ byte-ranges, zodat seeken goedkoop blijft); intro-detectie schrijft alleen datab
 geëxtraheerde ondertitel wordt geüpload naar de cache-directory van de eigenaar, die hem serveert
 alsof hij hem zelf gemaakt had. Daarvoor is niets nodig behalve correcte
 `app.ister.server.url`-waarden, maar de helper heeft dezelfde tools nodig als elke node (ffmpeg,
-mkvextract, subtile-ocr) — gebruik dezelfde image.
+mkvextract) — gebruik dezelfde image.
 
 Een eigenaar die zijn eigen CPU helemaal niet aan een jobfamilie wil besteden, kan die volledig
 uit handen geven:
@@ -124,7 +124,7 @@ tegen één database en broker:
 - **server-1** — bezit zes directories (series, films en muziek over twee schijven)
 - **server-2** — een tweede volwaardige node met eigen schijven
 - **helper-1** — geen directories, alleen `app.ister.helper.disks[n]`-regels met de schijven van
-  server-1: hij transcodeert voor server-1 en doet diens intro-detectie en ondertitel-OCR, die
+  server-1: hij transcodeert voor server-1 en doet diens intro-detectie en ondertitel-extractie, die
   server-1 volledig uit handen geeft (`APP_ISTER_HELPER_OFFLOAD_JOBS`)
 
 Alle drie de nodes hebben in het voorbeeld VAAPI-hardwareversnelling ingeschakeld — transcoderen

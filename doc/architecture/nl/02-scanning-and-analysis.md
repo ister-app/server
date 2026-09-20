@@ -80,7 +80,7 @@ omdat de scan van een S3-directory door elke gekoppelde node opgepakt kan worden
 Handlers raken `java.nio` nooit rechtstreeks aan op het pad van een rij. `core/.../storage` levert
 de naden: `ObjectStore` (één per `app.ister.s3.connections[n]`, beheerd door `ObjectStoreRegistry`),
 `FileAccess` (stat/open/delete op directory + pad), `LocalCopy` (een LRU-gecachte download voor
-zip-/PDF-/OCR-tools), `CacheStore` via `CacheDirectoryResolver` (elke schrijver van afgeleide
+zip-/PDF-tools), `CacheStore` via `CacheDirectoryResolver` (elke schrijver van afgeleide
 bestanden) en `TmpStoreProvider` (de gedeelde transcode-opslag, [hoofdstuk 4](04-transcoding.md)).
 `MediaFileInputResolver` bepaalt wat ffmpeg leest: een lokaal pad, de getokeniseerde download-URL
 van een andere node, of — voor een S3-bestand op een gekoppelde node — het eigen
@@ -127,16 +127,19 @@ balken bewust staan ([hoofdstuk 4](04-transcoding.md#crop-detectie-en-transcoder
 
 ### Ondertitel-extractie
 
-Ingebedde ondertitelstreams worden SRT-bestanden in de cache-directory van de eigenaar, één
-`SUBTITLE_EXTRACT_REQUESTED`-event per stream, verstuurd nadat de analyse van het bestand gecommit
-is (`HandleSubtitleExtractRequested` → `SubtitleExtractionProcessor` → `SubtitleExtractor`).
-Tekstcodecs zijn een simpele ffmpeg-remux; bitmapcodecs (dvd/PGS) gaan via ffmpeg → mkvextract →
-`subtile-ocr` (tesseract), wat minuten per stream kan duren — vandaar een apart, niet-transactioneel
-event in plaats van een stap binnen `MEDIA_FILE_FOUND`, en één bericht per stream zodat elk ruim
-onder de consumer-timeout van RabbitMQ blijft. Het resultaat is een `EXTERNAL_SUBTITLE`-rij waarvan
-`path` de eigenaar-lokale SRT is; een stream waarvan de tools falen krijgt de vlag
-`extractionFailed`, zodat de scanner-backfill (`subtitleStreamsToReextract`) hem niet blijft
-herhalen. De familie is helper-geschikt: een helper-node leest de bron via de download-URL van de
+Ingebedde **tekst**-ondertitelstreams (subrip, ass/ssa, mov_text, webvtt) worden SRT-bestanden in
+de cache-directory van de eigenaar, één `SUBTITLE_EXTRACT_REQUESTED`-event per stream, verstuurd
+nadat de analyse van het bestand gecommit is (`HandleSubtitleExtractRequested` →
+`SubtitleExtractionProcessor` → `SubtitleExtractor`). Het is een simpele ffmpeg-remux, maar wel
+een die de hele container leest — vandaar een apart, niet-transactioneel event in plaats van een
+stap binnen `MEDIA_FILE_FOUND`, en één bericht per stream zodat elk ruim onder de consumer-timeout
+van RabbitMQ blijft. Het resultaat is een `EXTERNAL_SUBTITLE`-rij waarvan `path` de
+eigenaar-lokale SRT is; een stream waarvan de extractie mislukt krijgt de vlag
+`extractionFailed`, zodat een opnieuw afgeleverd event hem niet herhaalt (een heranalyse
+herschrijft de streamrijen en doet dat wel). **Bitmap**-ondertitels (blu-ray-PGS, dvd-VobSub)
+krijgen geen event en geen rij: ze worden nooit tekst — de transcoder serveert hun plaatjes als
+sprite-sheets zodra het afspelen wordt opgezet, zie
+[hoofdstuk 4](04-transcoding.md#bitmap-ondertitels). De familie is helper-geschikt: een helper-node leest de bron via de download-URL van de
 eigenaar, extraheert in zijn eigen tmp-map, uploadt de SRT met `POST /cache/upload/{fileName}` en
 registreert het pad van de eigenaar, zodat de rij niet te onderscheiden is van een lokale
 extractie. Omdat de extractie nu ná de analyse klaar is, toont een tussentijds gegenereerde

@@ -77,7 +77,7 @@ nooit aan de bestandsnaam.
 worden getolereerd.
 
 In SHOW- en MOVIE-libraries zijn de herkende videocontainers `mkv`, `mp4`, `webm`, `m4v`, `flv` en `avi`; ondertitels: `.srt`
-naast de video (beeldondertitels in mkv worden geëxtraheerd en met OCR omgezet); lokale artwork:
+naast de video (beeldondertitels in de container — blu-ray-PGS, dvd-VobSub — worden getoond zoals ze zijn, zonder omzetting); lokale artwork:
 `jpg`/`png`; `.nfo`-bestanden worden gelezen voor metadata-hints. Andere librarytypes hebben hun
 eigen extensielijsten — zie de naamreferentie.
 

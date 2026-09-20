@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 /**
  * One embedded subtitle stream → one SRT in the owner's cache directory. Directory-scoped and
  * helper-capable: a node listing the directory under {@code app.ister.helper.disks} consumes the
- * same queue and does the OCR for the owner. Not {@code @Transactional}: the extraction runs for
+ * same queue and does the extraction for the owner. Not {@code @Transactional}: the extraction runs for
  * minutes and must not hold a database session, see {@link SubtitleExtractionProcessor}.
  */
 @Service

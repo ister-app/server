@@ -67,7 +67,7 @@ Everything is env-overridable; the most important settings:
 | TMDB | `app.ister.server.TMDB.apikey` | API read access token; metadata is skipped without it |
 | Languages | `ISTER_LANGUAGES` (`app.ister.languages`) | app-wide list of ISO-639-1 tags (default `en,nl`); drives both which languages TMDB metadata is fetched in and which languages search indexes — see [Languages](#languages) |
 | Typesense | `TYPESENSE_ENABLED`, `TYPESENSE_HOST`, `TYPESENSE_PORT`, `TYPESENSE_API_KEY` | optional full-text search (GraphQL `search` query); run the `rebuildSearchIndex` mutation once after enabling to build the initial index |
-| FFmpeg | `FFMPEG_DIR`, `MKVEXTRACT`, `SUBTILE_OCR` | binary locations |
+| FFmpeg | `FFMPEG_DIR`, `MKVEXTRACT` | binary locations |
 | Cache/tmp | `CACHE_DIR`, `TMP_DIR` | HLS segments and image cache |
 | Object storage (S3) | `app.ister.s3.connections[n].*`, `app.ister.disk.directories[n].s3-connection` / `.prefix`, `CACHE_S3_CONNECTION`, `TMP_S3_CONNECTION` | libraries in an S3-compatible bucket (AWS, MinIO, Garage, Ceph), attached to several nodes at once; optionally the cluster-shared cache and HLS transcode store — see the [object storage chapter](doc/admin/en/10-object-storage.md) |
 | Node identity | `app.ister.server.name`, `app.ister.server.url`, `app.ister.cluster.name` | unique per node |
@@ -75,7 +75,6 @@ Everything is env-overridable; the most important settings:
 | Transcoder | `app.ister.transcoder.hls.*` | hwaccel (`vaapi`/`nvdec`), concurrency, timeouts |
 | Analysis backfills | `app.ister.server.crop-detect-backfill`, `app.ister.server.segment-detect-backfill` | both default `true`: the first scan after an upgrade re-analyzes every pre-existing file (crop) and fingerprints every episode (intro/outro) — set `false` to defer on very large libraries |
 | Segment detection | `app.ister.server.segment-detect.chunk-size` (4), `app.ister.server.blur-hash.chunk-size` (500) | chunked processing, sized against the RabbitMQ consumer timeout |
-| Subtitle OCR | `app.ister.server.subtitle-ocr-default-language`, `app.ister.server.subtitle-ocr-dictionaries` | ISO-639-3, default `eng`; hunspell dictionaries for the post-OCR cleanup (default `eng=en_US,nld=nl_NL`) |
 | Continue watching | `CONTINUE_WATCHING_HISTORY_DAYS`, `CONTINUE_WATCHING_REBUILD_CRON` | how far back the continue-watching list looks (default 150 days), and when the nightly rebuild of that list runs. It also drives what pre-transcoding keeps warm. |
 | External metadata endpoints | `spring.cloud.openfeign.client.config.tmdb.url`, `app.ister.worker.tmdb.image-base`, `app.ister.worker.musicbrainz.base` / `.coverart-release-base` / `.coverart-release-group-base` / `.commons-filepath-base`, `app.ister.worker.openlibrary.base` / `.covers-base` / `.author-photo-base`, `app.ister.worker.wikidata.entity-base` / `.api-base`, `app.ister.worker.wikipedia.summary-template`, `app.ister.api.podcast.itunes-base` | every external source the workers call; defaults are the real services. The chart's CI points them all at one WireMock pod (`chart/ci/mock-external.yaml`) so e2e runs offline and deterministically |
 
@@ -86,7 +85,7 @@ owns. Heavy queues are directory-scoped (`app.ister.server.TranscodeRequested.<d
 work is picked up by the node that holds the source file; produced segments are pushed to the
 requesting node via `POST /transcode/upload/{id}/{fileName}`, authenticated with short-lived node
 tokens. A powerful **helper node** can additionally serve other nodes' directories for
-transcoding, intro/outro detection and subtitle extraction/OCR (`app.ister.helper.disks[n].name`,
+transcoding, intro/outro detection and subtitle extraction (`app.ister.helper.disks[n].name`,
 `.jobs`), reading the source over HTTP; an owner can hand a job family off entirely with
 `app.ister.helper.offload-jobs`. See the [multi-node chapter](doc/admin/en/05-multi-node.md).
 An S3 directory has no owner: every node that configures it is attached and shares its queues

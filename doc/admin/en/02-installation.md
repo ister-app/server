@@ -80,7 +80,7 @@ Two images are published to GHCR, always tagged **in lockstep**:
 
 | Image | Purpose |
 | --- | --- |
-| `ghcr.io/ister-app/server` | The server itself (GraalVM native image, Fedora base with FFmpeg, mkvtoolnix and subtile-ocr included) |
+| `ghcr.io/ister-app/server` | The server itself (GraalVM native image, Fedora base with FFmpeg and mkvtoolnix included) |
 | `ghcr.io/ister-app/migrations` | A Flyway image carrying the database migrations |
 
 Releases get clean semver tags (`2.0.0`); every push to `main` is additionally tagged with the
@@ -143,7 +143,7 @@ docker build -f Dockerfile.migrations -t ister-migrations .
 
 `./gradlew bootBuildImage` builds a JVM-based image via buildpacks — fine for testing, but the
 native image is what production runs. `Dockerfile.native` also bakes in FFmpeg with VAAPI
-drivers and Tesseract language packs for subtitle OCR, so prefer it.
+drivers and mkvtoolnix, so prefer it.
 
 ## Where to next
 

@@ -11,6 +11,6 @@ public enum HelperJob {
     TRANSCODE,
     /** Intro/outro fingerprinting: {@code DetectSegments}. */
     DETECT_SEGMENTS,
-    /** Embedded subtitle extraction and OCR: {@code SubtitleExtractRequested}. */
+    /** Extraction of embedded text subtitles to SRT: {@code SubtitleExtractRequested}. */
     SUBTITLES
 }

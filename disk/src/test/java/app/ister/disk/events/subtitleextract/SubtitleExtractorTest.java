@@ -113,8 +113,8 @@ class SubtitleExtractorTest {
     @Test
     void failedExtractionMarksStreamAsExtractionFailed() {
         // Nonexistent ffmpeg dir: the attempt fails, and the persisted marker must be set
-        // so the scanner's backfill stops re-firing a full re-analysis for this stream.
-        for (String codec : List.of("subrip", "dvd_subtitle")) {
+        // so a redelivered event does not retry this stream.
+        for (String codec : List.of("subrip", "ass")) {
             MediaFileStreamEntity stream = MediaFileStreamEntity.builder()
                     .codecType(StreamCodecType.SUBTITLE)
                     .codecName(codec)
@@ -205,8 +205,9 @@ class SubtitleExtractorTest {
     }
 
     @Test
-    void extractSubtitlesCallsImageExtractionForAllImageCodecs() {
-        for (String codec : List.of("dvdsub", "hdmv_pgs_subtitle", "pgssub")) {
+    void imageCodecsAreNeitherExtractedNorFlaggedAsFailed() {
+        // Bitmap subtitles are served as sprite sheets by the transcoder; nothing to do here.
+        for (String codec : List.of("dvd_subtitle", "dvdsub", "hdmv_pgs_subtitle", "pgssub", "dvb_subtitle")) {
             MediaFileStreamEntity stream = MediaFileStreamEntity.builder()
                     .codecType(StreamCodecType.SUBTITLE)
                     .codecName(codec)
@@ -214,44 +215,10 @@ class SubtitleExtractorTest {
                     .language("eng")
                     .build();
 
-            List<MediaFileStreamEntity> result = extractAll(
-                    mediaFile, List.of(stream), cacheDirEntity, "/nonexistent/ffmpeg/dir");
-
-            assertTrue(result.isEmpty(), "Expected empty result for codec: " + codec);
+            assertFalse(SubtitleExtractor.isExtractable(stream), codec);
+            assertTrue(extractAll(mediaFile, List.of(stream), cacheDirEntity, "/nonexistent/ffmpeg/dir").isEmpty(), codec);
+            assertNull(stream.getExtractionFailed(), codec);
         }
-    }
-
-    @Test
-    void resolveOcrLanguagePrefersStreamTag() {
-        assertEquals("nld", subject.resolveOcrLanguage("nld", List.of()));
-    }
-
-    @Test
-    void resolveOcrLanguageFallsBackToFirstTaggedAudioLanguage() {
-        MediaFileStreamEntity untaggedAudio = MediaFileStreamEntity.builder()
-                .codecType(StreamCodecType.AUDIO)
-                .streamIndex(0)
-                .build();
-        MediaFileStreamEntity taggedAudio = MediaFileStreamEntity.builder()
-                .codecType(StreamCodecType.AUDIO)
-                .streamIndex(1)
-                .language("ger")
-                .build();
-
-        // "ger" (639-2/B) normalizes to "deu"; untagged audio is skipped.
-        assertEquals("deu", subject.resolveOcrLanguage("und", List.of(untaggedAudio, taggedAudio)));
-    }
-
-    @Test
-    void resolveOcrLanguageFallsBackToConfiguredDefault() {
-        org.springframework.test.util.ReflectionTestUtils.setField(subject, "ocrDefaultLanguage", "nld");
-        assertEquals("nld", subject.resolveOcrLanguage("und", List.of()));
-    }
-
-    @Test
-    void resolveOcrLanguageReturnsNullWhenDefaultBlank() {
-        org.springframework.test.util.ReflectionTestUtils.setField(subject, "ocrDefaultLanguage", "");
-        assertNull(subject.resolveOcrLanguage("und", List.of()));
     }
 
     @Test
@@ -322,32 +289,6 @@ class SubtitleExtractorTest {
         assertEquals(2, result.size());
     }
 
-    @Test
-    void ocrCommandCarriesTuningOptionsAndBlacklist() {
-        List<String> cmd = subject.ocrCommand("eng", Path.of("/tmp/x.idx"), Path.of("/tmp/x.srt"));
-
-        assertEquals(List.of("/usr/bin/subtile-ocr", "-l", "eng", "--dpi", "300", "--threshold", "0.60", "--border", "10",
-                "-c", "tessedit_char_blacklist=|\\/`_~", "-o", "/tmp/x.srt", "/tmp/x.idx"), cmd);
-    }
-
-    @Test
-    void ocrCommandUsesTessdataDirOnlyWhenEveryModelIsPresent() throws IOException {
-        Path tessdata = Files.createDirectory(cacheDir.resolve("best"));
-        Files.writeString(tessdata.resolve("eng.traineddata"), "x");
-        org.springframework.test.util.ReflectionTestUtils.setField(subject, "ocrTessdataDir", tessdata.toString());
-        org.springframework.test.util.ReflectionTestUtils.setField(subject, "ocrCharBlacklist", "");
-
-        List<String> eng = subject.ocrCommand("eng", Path.of("/tmp/x.idx"), Path.of("/tmp/x.srt"));
-        List<String> nld = subject.ocrCommand("nld", Path.of("/tmp/x.idx"), Path.of("/tmp/x.srt"));
-        List<String> both = subject.ocrCommand("eng+nld", Path.of("/tmp/x.idx"), Path.of("/tmp/x.srt"));
-
-        assertTrue(eng.contains("--tessdata-dir"));
-        assertEquals(tessdata.toString(), eng.get(eng.indexOf("--tessdata-dir") + 1));
-        assertFalse(nld.contains("--tessdata-dir"));
-        assertFalse(both.contains("--tessdata-dir"));
-        assertFalse(eng.contains("-c"));
-    }
-
     /** The pre-split "all streams of one local file" shape, so the cases above read as before. */
     private List<MediaFileStreamEntity> extractAll(MediaFileEntity file, List<MediaFileStreamEntity> streams,
                                                    DirectoryEntity cacheDirectory, String ffmpegDir) {
@@ -357,7 +298,7 @@ class SubtitleExtractorTest {
             if (stream.getCodecType() != StreamCodecType.SUBTITLE) {
                 continue;
             }
-            subject.extractOne(file.getPath(), file.getId(), streams, stream, subIdx, Path.of(cacheDirectory.getPath()), ffmpegDir)
+            subject.extractOne(file.getPath(), file.getId(), stream, subIdx, Path.of(cacheDirectory.getPath()), ffmpegDir)
                     .map(extracted -> SubtitleExtractor.toEntity(file, stream, extracted, extracted.srtFile().toString()))
                     .ifPresent(result::add);
             subIdx++;

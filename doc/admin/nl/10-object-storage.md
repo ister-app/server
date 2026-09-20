@@ -74,7 +74,7 @@ Helper-nodes ([Multi-node](05-multi-node.md)) zijn voor S3-directories niet nodi
 koppelen *is* de manier om capaciteit toe te voegen. Een helper die een S3-directory onder
 `app.ister.helper.disks` opsomt leest hem via een gekoppelde node, zoals bij een schijf.
 
-Alles wat een echt bestand nodig heeft — de epub- en comic-lezer, PDF-rendering, ondertitel-OCR —
+Alles wat een echt bestand nodig heeft — de epub- en comic-lezer, PDF-rendering —
 downloadt het object eenmalig naar `app.ister.s3.local-copy-dir` (standaard onder de tmp-map) en
 houdt het als LRU-cache, begrensd door `app.ister.s3.local-copy-max-bytes` (2 GiB).
 

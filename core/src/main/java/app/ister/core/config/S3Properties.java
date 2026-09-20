@@ -34,7 +34,7 @@ public class S3Properties {
     /** Lifetime of presigned URLs; must exceed the longest transcode pass. */
     private Duration presignTtl = Duration.ofHours(2);
 
-    /** Scratch directory for objects that must be read as a local file (epub/cbz/pdf, OCR). */
+    /** Scratch directory for objects that must be read as a local file (epub/cbz/pdf). */
     private String localCopyDir;
 
     /** Size cap of that scratch directory; the least recently used copies go first. */

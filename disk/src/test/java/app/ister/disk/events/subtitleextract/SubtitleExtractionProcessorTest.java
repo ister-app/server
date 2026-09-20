@@ -98,9 +98,9 @@ class SubtitleExtractionProcessorTest {
 
     /** Writes the SRT wherever the processor asked for it, as the real extractor would. */
     private void extractorProduces(String fileName) {
-        when(extractor.extractOne(anyString(), eq(mediaFileId), anyList(), eq(subtitleStream), eq(1), any(Path.class), eq("/usr/bin")))
+        when(extractor.extractOne(anyString(), eq(mediaFileId), eq(subtitleStream), eq(1), any(Path.class), eq("/usr/bin")))
                 .thenAnswer(inv -> {
-                    Path dir = inv.getArgument(5);
+                    Path dir = inv.getArgument(4);
                     Path srt = dir.resolve(fileName);
                     Files.writeString(srt, "1\n");
                     return Optional.of(new SubtitleExtractor.ExtractedSubtitle(srt, "eng"));
@@ -131,7 +131,7 @@ class SubtitleExtractionProcessorTest {
 
         subject.process(mediaFileId, streamId);
 
-        verify(extractor).extractOne(anyString(), eq(mediaFileId), anyList(), eq(subtitleStream), eq(1), any(Path.class), anyString());
+        verify(extractor).extractOne(anyString(), eq(mediaFileId), eq(subtitleStream), eq(1), any(Path.class), anyString());
     }
 
     @Test
@@ -182,7 +182,7 @@ class SubtitleExtractionProcessorTest {
     @Test
     void toolFailureFlagsTheSourceRow() {
         local();
-        when(extractor.extractOne(anyString(), eq(mediaFileId), anyList(), eq(subtitleStream), anyInt(), any(Path.class), anyString()))
+        when(extractor.extractOne(anyString(), eq(mediaFileId), eq(subtitleStream), anyInt(), any(Path.class), anyString()))
                 .thenAnswer(inv -> {
                     subtitleStream.setExtractionFailed(true);
                     return Optional.empty();
@@ -214,7 +214,7 @@ class SubtitleExtractionProcessorTest {
         verifyNoInteractions(extractor);
     }
 
-    /** A re-analysis rewrote the rows while the OCR ran: the result belongs to nothing any more. */
+    /** A re-analysis rewrote the rows while the extraction ran: the result belongs to nothing any more. */
     @Test
     void dropsTheResultWhenTheSourceRowIsGone() {
         local();

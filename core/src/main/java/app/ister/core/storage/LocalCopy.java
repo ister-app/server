@@ -25,8 +25,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 /**
- * A local file for code that cannot read a stream: {@code ZipFile} (epub/cbz), PDFBox, and the
- * subtitle OCR tools. For a LOCAL directory the entity's own path is handed back untouched; for
+ * A local file for code that cannot read a stream: {@code ZipFile} (epub/cbz) and PDFBox.
+ * For a LOCAL directory the entity's own path is handed back untouched; for
  * S3 the object is downloaded once into {@code app.ister.s3.local-copy-dir} and kept as an LRU
  * cache (size cap {@code local-copy-max-bytes}), so an epub the reader keeps paging through is
  * fetched once, not per request.
