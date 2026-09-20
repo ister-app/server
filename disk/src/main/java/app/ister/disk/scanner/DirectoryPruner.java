@@ -12,12 +12,12 @@ import java.util.List;
  * artist/album, author/book, series). Shared by the filesystem walk and the S3 listing so both
  * prune identically.
  */
-final class DirectoryPruner {
+public final class DirectoryPruner {
 
     private DirectoryPruner() {
     }
 
-    static boolean shouldDescend(app.ister.core.entity.DirectoryEntity directoryEntity, String dirPath) {
+    public static boolean shouldDescend(app.ister.core.entity.DirectoryEntity directoryEntity, String dirPath) {
         String root = directoryEntity.getPath();
         if (dirPath.equals(root) || (root.endsWith("/") && dirPath.equals(root.substring(0, root.length() - 1)))) {
             return true;
