@@ -98,6 +98,11 @@ public class NodeActivityStatusData {
         /** Null when the path is not mounted / cannot be stat'ed. */
         private Long totalBytes;
         private Long freeBytes;
+        /**
+         * Whether the node can create files here; null when unknown (S3, not mounted, or a node from
+         * before this field). Media mounts are often read-only, which an upload has to know up front.
+         */
+        private Boolean writable;
     }
 
     @Data

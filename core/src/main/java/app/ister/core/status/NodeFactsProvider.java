@@ -91,12 +91,13 @@ public class NodeFactsProvider {
     static DirectoryFact directoryFact(DirectoryEntity directory) {
         Long total = null;
         Long free = null;
+        Boolean writable = null;
         if (directory.isS3()) {
             // no filesystem to stat; buckets have no meaningful capacity
             String library = directory.getLibraryEntity() == null ? null : directory.getLibraryEntity().getName();
             return new DirectoryFact(directory.getName(), directory.getPath(),
                     directory.getDirectoryType() == null ? null : directory.getDirectoryType().name(),
-                    library, null, null);
+                    library, null, null, null);
         }
         try {
             Path path = Path.of(directory.getPath());
@@ -104,6 +105,7 @@ public class NodeFactsProvider {
                 FileStore store = Files.getFileStore(path);
                 total = store.getTotalSpace();
                 free = store.getUsableSpace();
+                writable = Files.isWritable(path);
             }
         } catch (IOException | RuntimeException e) {
             log.debug("Cannot stat {}", directory.getPath(), e);
@@ -111,7 +113,7 @@ public class NodeFactsProvider {
         String library = directory.getLibraryEntity() == null ? null : directory.getLibraryEntity().getName();
         return new DirectoryFact(directory.getName(), directory.getPath(),
                 directory.getDirectoryType() == null ? null : directory.getDirectoryType().name(),
-                library, total, free);
+                library, total, free, writable);
     }
 
     private static String resolveHostname() {

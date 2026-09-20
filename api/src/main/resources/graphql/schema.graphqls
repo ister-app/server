@@ -554,6 +554,8 @@ type NodeDirectory {
     "Null when the path is not mounted on the node."
     totalBytes: Float
     freeBytes: Float
+    "Whether the node can create files here (media mounts are often read-only, which rules out uploads). Null when unknown: S3, not mounted, or a node that predates this field."
+    writable: Boolean
 }
 
 type HelperDisk {

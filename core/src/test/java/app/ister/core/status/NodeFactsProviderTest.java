@@ -77,10 +77,12 @@ class NodeFactsProviderTest {
         assertEquals("Series", disk1.getLibrary());
         assertTrue(disk1.getTotalBytes() > 0);
         assertTrue(disk1.getFreeBytes() >= 0);
+        assertEquals(Boolean.TRUE, disk1.getWritable(), "a temp dir is writable");
         var cache = facts.getDirectories().get(1);
         assertEquals("CACHE", cache.getType());
         assertNull(cache.getLibrary());
         assertNull(cache.getTotalBytes(), "an unmounted path has no space figures");
+        assertNull(cache.getWritable(), "unknown, not \"read-only\": nothing is mounted to ask");
         assertEquals(List.of("disk9"), facts.getHelperDisks().stream().map(d -> d.getName()).toList());
         assertEquals(List.of("TRANSCODE"), facts.getHelperDisks().getFirst().getJobs());
         assertEquals(List.of("TRANSCODE"), facts.getOffloadJobs());

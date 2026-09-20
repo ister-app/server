@@ -57,11 +57,12 @@ public record ServerActivityEvent(
 
     /** Byte counts travel as GraphQL Float: Int is 32-bit and disks are not. */
     public record NodeDirectory(String name, String path, String type, String library, Double totalBytes,
-                                Double freeBytes) {
+                                Double freeBytes, Boolean writable) {
         static NodeDirectory from(NodeActivityStatusData.DirectoryFact fact) {
             return new NodeDirectory(fact.getName(), fact.getPath(), fact.getType(), fact.getLibrary(),
                     fact.getTotalBytes() == null ? null : fact.getTotalBytes().doubleValue(),
-                    fact.getFreeBytes() == null ? null : fact.getFreeBytes().doubleValue());
+                    fact.getFreeBytes() == null ? null : fact.getFreeBytes().doubleValue(),
+                    fact.getWritable());
         }
     }
 
