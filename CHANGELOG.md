@@ -1,5 +1,28 @@
 # Changelog
 
+## server v4.2.1
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `4.2.1` |
+| `ghcr.io/ister-app/migrations` | `4.2.1` |
+
+### Fixes
+
+- fix(disk): stop one single from titling a whole album folder ([`3a33a3d`](https://github.com/ister-app/server/commit/3a33a3d))
+
+### Dependency updates
+
+- fix(deps): update hibernate, graalvm, aws sdk and the flyway image ([`a526eab`](https://github.com/ister-app/server/commit/a526eab))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:4.2.1
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v4.2.0...v4.2.1
+
 ## server v4.2.0
 
 | Image | Tag |
