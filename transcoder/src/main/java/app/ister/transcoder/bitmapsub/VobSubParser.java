@@ -91,22 +91,22 @@ public final class VobSubParser {
                 palette = parsePalette(line.substring("palette:".length()));
             }
         }
-    }
 
-    private static int[] parsePalette(String value) {
-        String[] parts = value.split(",");
-        if (parts.length < 16) {
-            return new int[0];
-        }
-        int[] palette = new int[16];
-        try {
-            for (int i = 0; i < 16; i++) {
-                palette[i] = Integer.parseInt(parts[i].strip(), 16) & 0xFFFFFF;
+        private static int[] parsePalette(String value) {
+            String[] parts = value.split(",");
+            if (parts.length < 16) {
+                return new int[0];
             }
-        } catch (NumberFormatException _) {
-            return new int[0];
+            int[] colors = new int[16];
+            try {
+                for (int i = 0; i < 16; i++) {
+                    colors[i] = Integer.parseInt(parts[i].strip(), 16) & 0xFFFFFF;
+                }
+            } catch (NumberFormatException _) {
+                return new int[0];
+            }
+            return colors;
         }
-        return palette;
     }
 
     private static List<BitmapCue> closeOpenCues(List<BitmapCue> cues) {
@@ -174,11 +174,11 @@ public final class VobSubParser {
             filled += n;
             return true;
         }
-    }
 
-    /** The stream id of the {@code 00 00 01 xx} start code at {@code pos}, or -1. */
-    private static int startCode(byte[] buf, int pos) {
-        return buf[pos] == 0 && buf[pos + 1] == 0 && buf[pos + 2] == 1 ? buf[pos + 3] & 0xFF : -1;
+        /** The stream id of the {@code 00 00 01 xx} start code at {@code pos}, or -1. */
+        private static int startCode(byte[] buf, int pos) {
+            return buf[pos] == 0 && buf[pos + 1] == 0 && buf[pos + 2] == 1 ? buf[pos + 3] & 0xFF : -1;
+        }
     }
 
     private static int u16(byte[] buf, int pos) {
@@ -276,16 +276,16 @@ public final class VobSubParser {
                 }
             }
         }
+
+        /** Four 4-bit values packed high-to-low; index 0 is the background. */
+        private static int[] nibbles(byte[] spu, int p) {
+            return new int[]{spu[p + 1] & 0x0F, (spu[p + 1] & 0xFF) >> 4, spu[p] & 0x0F, (spu[p] & 0xFF) >> 4};
+        }
     }
 
     /** Control-sequence delays count in units of 1024/90000 s. */
     private static long delayMs(int delay) {
         return delay * 1024L / 90;
-    }
-
-    /** Four 4-bit values packed high-to-low; index 0 is the background. */
-    private static int[] nibbles(byte[] spu, int p) {
-        return new int[]{spu[p + 1] & 0x0F, (spu[p + 1] & 0xFF) >> 4, spu[p] & 0x0F, (spu[p] & 0xFF) >> 4};
     }
 
     /**
@@ -376,13 +376,13 @@ public final class VobSubParser {
             nibble++;
             return value;
         }
-    }
 
-    private static int nibbleAt(byte[] spu, int nibble) {
-        int index = nibble >> 1;
-        if (index >= spu.length) {
-            return 0;
+        private static int nibbleAt(byte[] spu, int position) {
+            int index = position >> 1;
+            if (index >= spu.length) {
+                return 0;
+            }
+            return (position & 1) == 0 ? (spu[index] & 0xFF) >> 4 : spu[index] & 0x0F;
         }
-        return (nibble & 1) == 0 ? (spu[index] & 0xFF) >> 4 : spu[index] & 0x0F;
     }
 }

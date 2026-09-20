@@ -12,10 +12,11 @@ public record BitmapCue(long startMs, long endMs, int x, int y, int w, int h, bo
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof BitmapCue other
-                && startMs == other.startMs && endMs == other.endMs
-                && x == other.x && y == other.y && w == other.w && h == other.h
-                && forced == other.forced && Arrays.equals(argb, other.argb);
+        return o instanceof BitmapCue(long otherStart, long otherEnd, int otherX, int otherY, int otherW, int otherH,
+                                      boolean otherForced, int[] otherArgb)
+                && startMs == otherStart && endMs == otherEnd
+                && x == otherX && y == otherY && w == otherW && h == otherH
+                && forced == otherForced && Arrays.equals(argb, otherArgb);
     }
 
     @Override
