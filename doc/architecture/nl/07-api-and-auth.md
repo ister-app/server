@@ -20,6 +20,7 @@ Controllers staan onder `api/.../controller/` (met een paar bestandsserverende c
 | Zoeken & overig | zoeken (`SearchController`), huidige gebruiker (`MeController`), serverklok (`TimeController`) |
 | Server | serverinfo, serverstatus, `.well-known` |
 | Bestanden serveren (disk-module) | epub-resources (`EpubResourceController`-gebied), strippagina's (`ComicResourceController`: `/comic/{mediaFileId}/manifest`, `/page/{index}`, `/file`), image-downloads + mediabestand-download + transcode-segment-upload (`FileController`, zie hieronder) |
+| Admin-upload (disk-module) | `LibraryUploadController` — `/library-upload/**`: directory-kiezer, preview op basis van de scanner, hervatbare upload-sessies in chunks. Alleen admin en **alleen bearer-JWT** (geen stream-tokens: een URL-token dat in een library kan schrijven is een erger lek dan een dat een segment leest); alleen GET/POST, omdat de CORS-instelling waar de web-player van afhangt niets anders toestaat. Zie [hoofdstuk 2](02-scanning-and-analysis.md#admin-upload) |
 
 Fouten worden centraal gemapt in `api/.../error/` — `RestExceptionHandler` voor REST,
 `GraphQlExceptionResolver` voor GraphQL.

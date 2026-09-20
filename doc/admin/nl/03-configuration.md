@@ -143,6 +143,19 @@ onderliggende properties zijn inconsistent gebonden (`…rebuild.enabled` met ee
 | `app.ister.worker.podcast.refresh-cron` | `0 10 * * * *` | feeds elk uur verversen |
 | `app.ister.worker.podcast.refresh-min-interval-minutes` | `30` | een feed wordt binnen dit venster niet opnieuw opgehaald, ook al vuurt de cron |
 
+## Media-upload
+
+Zie [Media uploaden](11-uploading-media.md) voor waar deze tegen beschermen.
+
+| Instelling | Standaard | Opmerkingen |
+| --- | --- | --- |
+| `UPLOAD_ENABLED` | `true` | zet de admin-upload-endpoints helemaal uit |
+| `UPLOAD_CHUNK_SIZE` | `16MB` | één chunk-request; moet binnen de body-limiet van de reverse proxy passen, minimaal 5 MB |
+| `UPLOAD_MAX_ACTIVE_SESSIONS` / `UPLOAD_MAX_FILES_PER_SESSION` | `2` / `20000` | uploads tegelijk (clusterbreed), bestanden per upload |
+| `UPLOAD_MAX_CONCURRENT_CHUNKS` | `4` | chunk-requests die één node tegelijk afhandelt |
+| `UPLOAD_SESSION_IDLE_TIMEOUT` / `UPLOAD_CLEANUP_INTERVAL` | `24h` / `PT1H` | wanneer een verlaten upload verloopt, en hoe vaak dat gecontroleerd wordt |
+| `UPLOAD_MIN_FREE_SPACE` | `5GB` | ruimte die een lokale directory na een upload vrijhoudt |
+
 ## Externe metadata-endpoints
 
 Elke externe service die de server aanroept is een property met de echte service als standaard,

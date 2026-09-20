@@ -70,6 +70,7 @@ Everything is env-overridable; the most important settings:
 | FFmpeg | `FFMPEG_DIR`, `MKVEXTRACT` | binary locations |
 | Cache/tmp | `CACHE_DIR`, `TMP_DIR` | HLS segments and image cache |
 | Object storage (S3) | `app.ister.s3.connections[n].*`, `app.ister.disk.directories[n].s3-connection` / `.prefix`, `CACHE_S3_CONNECTION`, `TMP_S3_CONNECTION` | libraries in an S3-compatible bucket (AWS, MinIO, Garage, Ceph), attached to several nodes at once; optionally the cluster-shared cache and HLS transcode store — see the [object storage chapter](doc/admin/en/10-object-storage.md) |
+| Media upload | `UPLOAD_ENABLED`, `UPLOAD_CHUNK_SIZE`, `UPLOAD_MAX_ACTIVE_SESSIONS`, `UPLOAD_SESSION_IDLE_TIMEOUT`, `UPLOAD_MIN_FREE_SPACE` | admins upload media from the player into a chosen library directory (local disk or S3): scanner-backed preview, resumable chunks — see the [uploading media chapter](doc/admin/en/11-uploading-media.md) |
 | Node identity | `app.ister.server.name`, `app.ister.server.url`, `app.ister.cluster.name` | unique per node |
 | Libraries | `app.ister.disk.libraries[n].*`, `app.ister.disk.directories[n].*` | see `disk/src/main/resources/disk.properties` |
 | Transcoder | `app.ister.transcoder.hls.*` | hwaccel (`vaapi`/`nvdec`), concurrency, timeouts |

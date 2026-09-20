@@ -216,6 +216,50 @@ multi-episode-bestand nooit over een chunkgrens vallen), en publiceert `HandleDe
 ná die commit een opvolgerbericht voor hetzelfde seizoen. De versiekolom is de cursor en wordt ook
 bij een mislukte decode gestempeld, dus de keten termineert altijd.
 
+## Admin-upload
+
+Zie het [upload-flow-diagram](../diagrams/upload-flow.md). `LibraryUploadController` (disk-module,
+`/library-upload/**`, alleen admin, alleen bearer-JWT) laat de player bestanden ÍN een
+library-directory schrijven. Hij staat in `disk` omdat de pad-parsers daar staan, en het is REST
+omdat geen enkele module buiten `api` GraphQL host.
+
+- **Eén beslissing, drie aanroepers.** `Scanners.forLibrary` / `analyzableBy` is de enige plek die
+  weet welke scanners naar een librarytype kijken en hoe elke scanner bevraagd wordt. De scan-walk
+  (`ScanEntryDispatcher`), de `FILE_SCAN_REQUESTED`-handler en `UploadPreviewService` gebruiken hem
+  alle drie, en de preview past daarnaast `DirectoryPruner.shouldDescend` toe op elke bovenliggende
+  map. Een bestand dat de preview herkend noemt, is dus een bestand dat de scan oppikt. De
+  geparste details die de admin ziet komen uit de expliciete drie-argument-constructors van de
+  pad-objecten (de `directory`-vlag): de punt-heuristiek van de twee-argument-vorm leest `R.E.M.`
+  en `J.K. Rowling` verkeerd.
+- **Paden.** `LibraryPathValidator` vervangt hier `SafeFilename` (echte medianamen bevatten
+  spaties, haakjes en unicode): hij weigert op regels — traversal, scheidingstekens,
+  control-tekens, segmenten die met een punt beginnen (de scan slaat ze over, en het houdt
+  `.ister-upload` buiten bereik), gereserveerde namen — normaliseert naar NFC en controleert
+  insluiting met `PathStrings.isUnder`. `LocalLibraryWriteStore` resolvet daarnaast het echte pad
+  van de dichtstbijzijnde bestaande bovenliggende map vóórdat er iets wordt aangemaakt, zodat een
+  gesymlinkte map geen schrijfactie de library uit kan dragen.
+- **Opslag-seam.** `LibraryWriteStore` (`core/.../storage/`) is de schrijf-tegenhanger van
+  `FileAccess`. LOCAL voegt chunks toe aan `<root>/.ister-upload/<sessie>/<bestand>.part` en rondt
+  af met een atomic move op hetzelfde bestandssysteem. S3 maakt van een bestand één
+  multipart-upload en van een chunk één part; de upload-id en de part-ETags staan in
+  `upload_file` / `upload_part`, omdat niet elke S3-server openstaande multipart-uploads op prefix
+  kan opsommen (MinIO antwoordt alleen voor een exacte key). `complete` is veilig te herhalen.
+- **Transacties.** Een chunk is "korte transactie, streamen, korte transactie"
+  (`UploadSessionService`, expliciete `TransactionTemplate`): niets houdt een databasetransactie
+  open terwijl er bytes over een trage uplink binnenkomen. Een semafoor begrenst de chunk-requests
+  per node (elk ervan houdt via open-in-view nog steeds een connectie vast), en een lock per
+  bestand houdt twee schrijvers van één part-bestand af.
+- **De pipeline in.** `UploadedFilePublisher` publiceert na de commit. Een nieuw bestand is één
+  `FILE_SCAN_REQUESTED` op `<base>.<directoryName>` — wat de scan-walk ook gestuurd zou hebben. Een
+  vervangen bestand kan die weg niet nemen (de scanners zien een rij en stoppen), dus het
+  analyse-event wordt rechtstreeks gepubliceerd, nadat is weggegooid wat van de oude bytes was
+  afgeleid (de HLS-tmp-map, de entry in de gedeelde tmp-opslag, de `LocalCopy` van een S3-object).
+- **Multi-node.** Er wordt niets doorgestuurd: de client stuurt chunks naar
+  `Directory.servingNode` (`LibraryWriteStoreResolver.servingNode`, waar het GraphQL-veld naar
+  delegeert), en een request dat een node bereikt die de directory niet kan schrijven krijgt `421`.
+- **Opruimen.** `UploadCleanupScheduler` (elk uur, elke node) laat idle sessies verlopen waarvan
+  hij de opslag kan bereiken en verwijdert staging-mappen zonder actieve sessie.
+
 ## Metadata-backfill
 
 Zie het [refresh-flow-diagram](../diagrams/analyze-flow.md). `refreshMetadata(MISSING)` stuurt één

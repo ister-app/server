@@ -142,6 +142,19 @@ env vars hide.
 | `app.ister.worker.podcast.refresh-cron` | `0 10 * * * *` | hourly feed refresh |
 | `app.ister.worker.podcast.refresh-min-interval-minutes` | `30` | a feed is not re-fetched again within this window, even if the cron fires |
 
+## Media upload
+
+See [Uploading media](11-uploading-media.md) for what these protect against.
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| `UPLOAD_ENABLED` | `true` | switches the admin upload endpoints off entirely |
+| `UPLOAD_CHUNK_SIZE` | `16MB` | one chunk request; must fit the reverse proxy's body limit, minimum 5 MB |
+| `UPLOAD_MAX_ACTIVE_SESSIONS` / `UPLOAD_MAX_FILES_PER_SESSION` | `2` / `20000` | uploads at once (cluster-wide), files per upload |
+| `UPLOAD_MAX_CONCURRENT_CHUNKS` | `4` | chunk requests one node handles at once |
+| `UPLOAD_SESSION_IDLE_TIMEOUT` / `UPLOAD_CLEANUP_INTERVAL` | `24h` / `PT1H` | when an abandoned upload expires, and how often that is checked |
+| `UPLOAD_MIN_FREE_SPACE` | `5GB` | space a local directory keeps free after an upload |
+
 ## External metadata endpoints
 
 Every external service the server calls is a property whose default is the real service, so you

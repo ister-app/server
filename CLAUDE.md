@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Documentation (`doc/`)
 
 Structured documentation lives under `doc/`, mirroring the player repo's setup: `doc/admin/{en,nl}/`
-(operator guide, 10 numbered chapters) and `doc/architecture/{en,nl}/` (developer docs, 10 numbered
+(operator guide, numbered chapters) and `doc/architecture/{en,nl}/` (developer docs, 10 numbered
 chapters), plus `doc/architecture/diagrams/` (hand-authored mermaid, English only, shared by both
 locales). Root `EVENT_FLOWS.md` is only a pointer stub to it now.
 
@@ -131,6 +131,13 @@ parsers and `(directory, path)` uniqueness are unchanged. Rules:
   with `app.ister.server.cache-s3-connection` set that is the cluster-shared `<cluster>-s3-cache`
   directory, otherwise the node's `<node>-cache-directory`. Stored paths are always
   `directory.path + "/" + key` for both kinds.
+- **Writing INTO a library directory goes through `LibraryWriteStore`** (`LibraryWriteStoreResolver`,
+  the write counterpart of `FileAccess`): LOCAL stages chunks in `<root>/.ister-upload/<session>/`
+  (dot-prefixed, so both scan walkers skip it) and completes with an atomic move; S3 is one
+  multipart upload per file, a part per chunk. Only the node that owns the directory (LOCAL) or
+  has its connection (S3) gets a store; `servingNode(dir)` names the node a client must talk to.
+  Client-supplied library paths go through `LibraryPathValidator`, never `SafeFilename` (which
+  rejects spaces and parentheses).
 - Queue subscription stays **config-derived** (`OwnDirectoriesProperties` names): listing an S3
   directory in `app.ister.disk.directories[n]` (with `s3-connection` + `prefix`, no `path`) is
   what attaches a node. `StartupTasks` creates the directory or attaches to it; a mismatching
@@ -212,6 +219,8 @@ Roughly a dozen `@Scheduled` beans; the ones with operational consequences:
 - `CacheCleanupScheduler` (disk) + `TmpTranscodeCleanupScheduler` (transcoder) — daily zombie sweep of the
   image cache and transcode tmp dirs, deleting files no DB row references (and expiring podcast downloads).
   **`app.ister.server.cache-cleanup.dry-run` defaults to `true`**, so it only logs until switched off.
+- `UploadCleanupScheduler` (disk, hourly) — expires admin uploads that received nothing for
+  `app.ister.upload.session-idle-timeout` (24h) and removes their staged bytes / multipart uploads.
 - `PreTranscodeScheduler` (every 15 min) and `ContinueWatchingRebuildScheduler` (nightly) — see above.
 - `PodcastRefreshScheduler` (hourly), `StreamTokenService` (expiry sweep), `NodeTokenManager` (multi-node
   token refresh).
@@ -266,6 +275,16 @@ Config is bound through `@ConfigurationProperties` classes, not scattered `@Valu
   podcasts, credits, scanner, libraries/directories, play queue, watch status, reading progress, per-user
   ratings (`RatingController`), user settings, stream tokens, server info/status. Errors are mapped centrally
   in `api/.../error/` (`RestExceptionHandler`, `GraphQlExceptionResolver`).
+- **Admin upload** (`disk/.../upload/`, REST `/library-upload/**`): directory picker → preview →
+  resumable chunked session. It is REST in `disk` on purpose: the path parsers live there, `api` does
+  not depend on `disk`, and no module but `api` hosts GraphQL. The preview asks the REAL scanners
+  (`Scanners.analyzableBy`, shared with `ScanEntryDispatcher` and `FileScanRequestedHandle`) plus
+  `DirectoryPruner`, so it cannot drift from the scan. Chunks are "short tx → stream → short tx",
+  never a transaction across the transfer. A finished new file is one `FILE_SCAN_REQUESTED`; a
+  REPLACED file gets its `*_FILE_FOUND` event published directly (`UploadedFilePublisher`), because
+  the scanners stop at an existing row. Bearer JWT + `hasRole('admin')` only, never stream tokens;
+  GET/POST only (`MvcConfig` CORS allows nothing else, the web player is cross-origin). See
+  `doc/admin/en/11-uploading-media.md`.
 - **GraphQL**: Schema at `api/src/main/resources/graphql/schema.graphqls`; GraphQL IDE enabled in dev.
   Queries/mutations **and** the websocket subscriptions described above.
 - **Auth**: OAuth2 JWT via Spring Security Resource Server (Keycloak-compatible OIDC). HLS segment/playlist

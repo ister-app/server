@@ -70,3 +70,4 @@ een fractie van een seconde en bevat geen JVM. Normaal gesproken pull je gewoon
 8. [Naamconventies](08-naming-conventions.md) — de exacte map- en bestandsnaamregels per librarytype
 9. [Gebruikers, delen en toegang](09-users-sharing-and-access.md) — admins, zichtbaarheid per library, playback-sessies delen
 10. [Objectopslag (S3)](10-object-storage.md) — libraries in een bucket, gekoppeld aan meerdere nodes; de gedeelde cache- en transcode-opslag
+11. [Media uploaden](11-uploading-media.md) — admin-upload vanuit de player: preview, hervatbare overdracht, eisen aan proxy en mount

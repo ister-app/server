@@ -20,6 +20,7 @@ areas:
 | Search & misc | search (`SearchController`), current user (`MeController`), server clock (`TimeController`) |
 | Server | server info, server status, `.well-known` |
 | File serving (disk module) | epub resources (`EpubResourceController` area), comic pages (`ComicResourceController`: `/comic/{mediaFileId}/manifest`, `/page/{index}`, `/file`), image downloads + media-file download + transcode segment upload (`FileController`, see below) |
+| Admin upload (disk module) | `LibraryUploadController` — `/library-upload/**`: directory picker, scanner-backed preview, resumable chunked upload sessions. Admin only and **bearer JWT only** (no stream tokens: a URL token that can write into a library is a worse leak than one that reads a segment); GET/POST only, because the CORS setup the web player depends on allows nothing else. See [chapter 2](02-scanning-and-analysis.md#admin-upload) |
 
 Errors are mapped centrally in `api/.../error/` — `RestExceptionHandler` for REST,
 `GraphQlExceptionResolver` for GraphQL.

@@ -199,6 +199,49 @@ multi-episode file never straddle a chunk boundary), and `HandleDetectSegments` 
 successor message for the same season only after that commit. The version column is the cursor,
 and it is stamped even when decoding fails, so the chain always terminates.
 
+## Admin upload
+
+See the [upload-flow diagram](../diagrams/upload-flow.md). `LibraryUploadController` (disk module,
+`/library-upload/**`, admin only, bearer JWT only) lets the player write files INTO a library
+directory. It lives in `disk` because the path parsers do, and it is REST because no module but
+`api` hosts GraphQL.
+
+- **One decision, three callers.** `Scanners.forLibrary` / `analyzableBy` is the single place that
+  knows which scanners look at a library type and how each is asked. The scan walk
+  (`ScanEntryDispatcher`), the `FILE_SCAN_REQUESTED` handler and `UploadPreviewService` all use it,
+  and the preview additionally applies `DirectoryPruner.shouldDescend` to every ancestor folder. A
+  file the preview calls recognised is therefore a file the scan picks up. The parsed details
+  shown to the admin come from the path objects' explicit three-argument constructors (the
+  `directory` flag): the dot heuristic of the two-argument form misreads `R.E.M.` and
+  `J.K. Rowling`.
+- **Paths.** `LibraryPathValidator` replaces `SafeFilename` here (real media names have spaces,
+  parentheses and unicode): it rejects by rule — traversal, separators, control characters,
+  dot-prefixed segments (the scan skips them, and it keeps `.ister-upload` out of reach), reserved
+  names — NFC-normalizes, and asserts containment with `PathStrings.isUnder`.
+  `LocalLibraryWriteStore` additionally resolves the real path of the nearest existing parent
+  before creating anything, so a symlinked folder cannot carry a write out of the library.
+- **Storage seam.** `LibraryWriteStore` (`core/.../storage/`) is the write counterpart of
+  `FileAccess`. LOCAL appends chunks to `<root>/.ister-upload/<session>/<file>.part` and completes
+  with an atomic move on the same filesystem. S3 maps a file to one multipart upload and a chunk to
+  one part; the upload id and the part ETags live in `upload_file` / `upload_part`, because
+  listing pending multipart uploads by prefix is not something every S3 server does (MinIO only
+  answers for an exact key). `complete` is safe to repeat.
+- **Transactions.** A chunk is "short transaction, stream, short transaction"
+  (`UploadSessionService`, explicit `TransactionTemplate`): nothing holds a database transaction
+  while bytes come in over a slow uplink. A semaphore bounds the chunk requests per node (each one
+  still pins a connection through open-in-view), and a per-file lock keeps two writers off one part
+  file.
+- **Into the pipeline.** `UploadedFilePublisher` publishes after commit. A new file is one
+  `FILE_SCAN_REQUESTED` on `<base>.<directoryName>` — what the scan walk would have sent. A replaced
+  file cannot go that way (the scanners see a row and stop), so its analysis event is published
+  directly, after dropping what was derived from the old bytes (the HLS tmp dir, the shared tmp
+  store entry, the `LocalCopy` of an S3 object).
+- **Multi-node.** Nothing is forwarded: the client sends chunks to `Directory.servingNode`
+  (`LibraryWriteStoreResolver.servingNode`, which the GraphQL field delegates to), and a request
+  that reaches a node that cannot write the directory gets `421`.
+- **Cleanup.** `UploadCleanupScheduler` (hourly, every node) expires idle sessions whose storage it
+  can reach and removes staging folders without an active session.
+
 ## Metadata backfill
 
 See the [refresh-flow diagram](../diagrams/analyze-flow.md). `refreshMetadata(MISSING)` sends one
