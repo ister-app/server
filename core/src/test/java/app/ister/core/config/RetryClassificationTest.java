@@ -1,7 +1,7 @@
 package app.ister.core.config;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.amqp.rabbit.support.ListenerExecutionFailedException;
+import org.springframework.amqp.listener.ListenerExecutionFailedException;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;

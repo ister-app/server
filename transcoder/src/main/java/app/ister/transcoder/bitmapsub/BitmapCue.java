@@ -1,11 +1,34 @@
 package app.ister.transcoder.bitmapsub;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 /**
  * One subtitle picture: when it is on screen, where it sits on the subtitle
  * canvas, and its pixels as non-premultiplied ARGB ({@code w * h} entries,
  * row-major). Times are milliseconds on the source file's own timeline.
  */
 public record BitmapCue(long startMs, long endMs, int x, int y, int w, int h, boolean forced, int[] argb) {
+
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof BitmapCue other
+                && startMs == other.startMs && endMs == other.endMs
+                && x == other.x && y == other.y && w == other.w && h == other.h
+                && forced == other.forced && Arrays.equals(argb, other.argb);
+    }
+
+    @Override
+    public int hashCode() {
+        return 31 * Objects.hash(startMs, endMs, x, y, w, h, forced) + Arrays.hashCode(argb);
+    }
+
+    /** Without the pixels: a cue is tens of thousands of them. */
+    @Override
+    public String toString() {
+        return "BitmapCue[" + startMs + "-" + endMs + " ms, " + w + "x" + h + " @" + x + "," + y
+                + (forced ? ", forced]" : "]");
+    }
 
     BitmapCue withEnd(long newEndMs) {
         return new BitmapCue(startMs, newEndMs, x, y, w, h, forced, argb);

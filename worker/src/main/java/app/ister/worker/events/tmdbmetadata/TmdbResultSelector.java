@@ -119,7 +119,7 @@ public class TmdbResultSelector {
         }
         try {
             return Math.abs(Integer.parseInt(date.substring(0, 4)) - year) <= YEAR_TOLERANCE;
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return false;
         }
     }

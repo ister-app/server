@@ -47,27 +47,34 @@ public final class PgsParser {
         State state = new State();
         ByteBuffer buf = ByteBuffer.wrap(data);
         try {
-            while (buf.remaining() >= HEADER_SIZE) {
-                if (buf.get() != 'P' || buf.get() != 'G') {
-                    log.warn("PGS stream lost sync at byte {}, keeping {} cues", buf.position() - 2, state.cues.size());
-                    break;
-                }
-                long pts = buf.getInt() & 0xFFFFFFFFL;
-                buf.getInt(); // DTS
-                int type = buf.get() & 0xFF;
-                int size = buf.getShort() & 0xFFFF;
-                if (size > buf.remaining()) {
-                    break; // truncated tail
-                }
-                ByteBuffer segment = buf.slice(buf.position(), size);
-                buf.position(buf.position() + size);
-                state.accept(type, pts / 90, segment);
+            boolean more = true;
+            while (more && buf.remaining() >= HEADER_SIZE) {
+                more = readSegment(buf, state);
             }
         } catch (RuntimeException e) {
             log.warn("PGS stream is malformed, keeping {} cues: {}", state.cues.size(), e.toString());
         }
         state.closeOpenCues(-1);
         return new BitmapSubtitle(state.width, state.height, state.cues);
+    }
+
+    /** Feeds the next segment to {@code state}; false when the stream ends here (lost sync, truncated tail). */
+    private static boolean readSegment(ByteBuffer buf, State state) {
+        if (buf.get() != 'P' || buf.get() != 'G') {
+            log.warn("PGS stream lost sync at byte {}, keeping {} cues", buf.position() - 2, state.cues.size());
+            return false;
+        }
+        long pts = buf.getInt() & 0xFFFFFFFFL;
+        buf.getInt(); // DTS
+        int type = buf.get() & 0xFF;
+        int size = buf.getShort() & 0xFFFF;
+        if (size > buf.remaining()) {
+            return false;
+        }
+        ByteBuffer segment = buf.slice(buf.position(), size);
+        buf.position(buf.position() + size);
+        state.accept(type, pts / 90, segment);
+        return true;
     }
 
     private record ObjectRef(int objectId, int x, int y, boolean forced,
@@ -82,6 +89,37 @@ public final class PgsParser {
         int h;
         byte[] rle;
         int filled;
+    }
+
+    /** Byte cursor over an object's RLE data; reads past the end yield 0, which ends the line. */
+    private static final class RleReader {
+        private final byte[] data;
+        private final int length;
+        private int pos;
+
+        RleReader(byte[] data, int length) {
+            this.data = data;
+            this.length = length;
+        }
+
+        boolean hasNext() {
+            return pos < length;
+        }
+
+        int next() {
+            return pos < length ? data[pos++] & 0xFF : 0;
+        }
+
+        /** 6-bit length, or 14-bit when flag 0x40 says a second length byte follows. */
+        int runLength(int flags) {
+            int run = flags & 0x3F;
+            return (flags & 0x40) != 0 ? (run << 8) | next() : run;
+        }
+
+        /** The colour byte when flag 0x80 says one follows; colour 0 otherwise. */
+        int runColor(int flags) {
+            return (flags & 0x80) != 0 ? next() : 0;
+        }
     }
 
     private static final class State {
@@ -231,44 +269,35 @@ public final class PgsParser {
          * {@code 00 00} ends the line.
          */
         private static void decodeRle(byte[] rle, int length, int w, int h, int[] palette, int[] out) {
-            int i = 0;
+            RleReader in = new RleReader(rle, length);
             int x = 0;
             int y = 0;
-            while (i < length && y < h) {
-                int b = rle[i++] & 0xFF;
+            while (in.hasNext() && y < h) {
+                int b = in.next();
                 if (b != 0) {
-                    if (x < w) {
-                        out[y * w + x] = palette[b];
-                    }
-                    x++;
-                    continue;
-                }
-                if (i >= length) {
-                    break;
-                }
-                int flags = rle[i++] & 0xFF;
-                if (flags == 0) {
-                    x = 0;
-                    y++;
-                    continue;
-                }
-                int run = flags & 0x3F;
-                if ((flags & 0x40) != 0 && i < length) {
-                    run = (run << 8) | (rle[i++] & 0xFF);
-                }
-                int color = 0;
-                if ((flags & 0x80) != 0 && i < length) {
-                    color = rle[i++] & 0xFF;
-                }
-                int end = Math.min(w, x + run);
-                int pixel = palette[color];
-                if (pixel != 0) {
-                    for (int col = x; col < end; col++) {
-                        out[y * w + col] = pixel;
+                    x = fill(out, w, x, y, 1, palette[b]);
+                } else {
+                    int flags = in.next();
+                    if (flags == 0) { // end of line (or of the data)
+                        x = 0;
+                        y++;
+                    } else {
+                        int run = in.runLength(flags);
+                        x = fill(out, w, x, y, run, palette[in.runColor(flags)]);
                     }
                 }
-                x += run;
             }
+        }
+
+        /** Paints {@code run} pixels of row {@code y} from {@code x}, clipped to the row; returns the new x. */
+        private static int fill(int[] out, int w, int x, int y, int run, int pixel) {
+            if (pixel != 0) {
+                int end = Math.min(w, x + run);
+                for (int col = x; col < end; col++) {
+                    out[y * w + col] = pixel;
+                }
+            }
+            return x + run;
         }
 
         /** Limited-range YCbCr to ARGB; BT.709 for HD canvases, BT.601 below that. */
@@ -295,7 +324,7 @@ public final class PgsParser {
         }
 
         private static int clamp(double v) {
-            return (int) Math.max(0, Math.min(255, Math.round(v)));
+            return (int) Math.clamp(Math.round(v), 0L, 255L);
         }
     }
 }

@@ -67,33 +67,46 @@ public class MovieFoundHandle implements Handle<MovieFoundData> {
             }
             var movieEntity = found.get();
             ActivityContext.report(ActivitySubjects.describe(movieEntity, ActivitySubjects.empty()).withTitle(movieEntity.getName()));
-            Integer tmdbMovieId = null;
-            for (String language : languageProperties.tags()) {
-                Optional<TMDBResult> tmdbResult = movieMetadata.getMetadata(movieEntity.getName(), movieEntity.getReleaseYear(), language);
-                if (tmdbResult.isPresent()) {
-                    if (tmdbMovieId == null) {
-                        tmdbMovieId = tmdbResult.get().getTmdbId();
-                        Optional<app.ister.core.entity.MovieEntity> twin = tmdbMovieId == null ? Optional.empty()
-                                : movieRepository.findFirstByLibraryEntityAndTmdbIdAndIdNot(movieEntity.getLibraryEntity(), tmdbMovieId, movieEntity.getId());
-                        if (twin.isPresent()) {
-                            // Same film under another directory title: fold this row into the enriched one.
-                            movieMergeService.mergeInto(movieEntity, twin.get());
-                            return;
-                        }
-                        applyDetails(tmdbResult.get(), movieEntity);
-                    }
-                    metaDataSave.save(tmdbResult.get(), movieEntity, null, null);
-                    saveImages(tmdbResult.get(), movieEntity);
-                }
-            }
-            // Credits and extras are language independent: fetch once.
-            if (tmdbMovieId != null) {
-                creditsService.fetchForMovie(movieEntity, tmdbMovieId);
-                tmdbExtrasService.fetchForMovie(movieEntity, tmdbMovieId);
-            }
+            enrich(movieEntity);
         } catch (IOException e) {
             throw new EventHandlingException("Download and saving image failed", e);
         }
+    }
+
+    /** One TMDB lookup per configured language; the first hit decides the TMDB id, a possible merge and the details. */
+    private void enrich(app.ister.core.entity.MovieEntity movieEntity) throws IOException {
+        Integer tmdbMovieId = null;
+        for (String language : languageProperties.tags()) {
+            Optional<TMDBResult> tmdbResult = movieMetadata.getMetadata(movieEntity.getName(), movieEntity.getReleaseYear(), language);
+            if (tmdbResult.isEmpty()) {
+                continue;
+            }
+            if (tmdbMovieId == null) {
+                tmdbMovieId = tmdbResult.get().getTmdbId();
+                if (mergedIntoTwin(movieEntity, tmdbMovieId)) {
+                    return;
+                }
+                applyDetails(tmdbResult.get(), movieEntity);
+            }
+            metaDataSave.save(tmdbResult.get(), movieEntity, null, null);
+            saveImages(tmdbResult.get(), movieEntity);
+        }
+        // Credits and extras are language independent: fetch once.
+        if (tmdbMovieId != null) {
+            creditsService.fetchForMovie(movieEntity, tmdbMovieId);
+            tmdbExtrasService.fetchForMovie(movieEntity, tmdbMovieId);
+        }
+    }
+
+    /** Same film under another directory title: fold this row into the one that already carries the TMDB id. */
+    private boolean mergedIntoTwin(app.ister.core.entity.MovieEntity movieEntity, Integer tmdbMovieId) {
+        if (tmdbMovieId == null) {
+            return false;
+        }
+        Optional<app.ister.core.entity.MovieEntity> twin = movieRepository.findFirstByLibraryEntityAndTmdbIdAndIdNot(
+                movieEntity.getLibraryEntity(), tmdbMovieId, movieEntity.getId());
+        twin.ifPresent(target -> movieMergeService.mergeInto(movieEntity, target));
+        return twin.isPresent();
     }
 
     /** Language-independent details fields, applied once (first successful language). */

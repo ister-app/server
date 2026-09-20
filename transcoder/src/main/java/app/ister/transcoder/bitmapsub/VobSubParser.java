@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -41,44 +42,61 @@ public final class VobSubParser {
     }
 
     static BitmapSubtitle parse(List<String> idxLines, byte[] sub) {
-        int width = 720;
-        int height = 576;
-        int[] palette = null;
-        List<long[]> entries = new ArrayList<>(); // {timestampMs, filepos}
-        for (String raw : idxLines) {
-            String line = raw.strip();
-            Matcher m = TIMESTAMP.matcher(line);
-            if (m.find()) {
-                long ms = ((Long.parseLong(m.group(1)) * 60 + Long.parseLong(m.group(2))) * 60
-                        + Long.parseLong(m.group(3))) * 1000 + Long.parseLong(m.group(4));
-                entries.add(new long[]{ms, Long.parseLong(m.group(5), 16)});
-            } else if ((m = SIZE.matcher(line)).find()) {
-                width = Integer.parseInt(m.group(1));
-                height = Integer.parseInt(m.group(2));
-            } else if (line.startsWith("palette:")) {
-                palette = parsePalette(line.substring("palette:".length()));
-            }
-        }
-
-        List<BitmapCue> cues = new ArrayList<>(entries.size());
-        for (long[] entry : entries) {
+        Index index = Index.read(idxLines);
+        List<BitmapCue> cues = new ArrayList<>(index.entries.size());
+        for (Entry entry : index.entries) {
             try {
-                byte[] spu = readSpu(sub, (int) entry[1]);
-                BitmapCue cue = spu == null ? null : decode(spu, entry[0], palette);
+                byte[] spu = readSpu(sub, entry.filePos());
+                BitmapCue cue = spu.length == 0 ? null : decode(spu, entry.timestampMs(), index.palette);
                 if (cue != null) {
                     cues.add(cue);
                 }
             } catch (RuntimeException e) {
-                log.debug("Skipping undecodable VobSub cue at {} ms: {}", entry[0], e.toString());
+                log.debug("Skipping undecodable VobSub cue at {} ms: {}", entry.timestampMs(), e.toString());
             }
         }
-        return new BitmapSubtitle(width, height, closeOpenCues(cues));
+        return new BitmapSubtitle(index.width, index.height, closeOpenCues(cues));
+    }
+
+    /** One {@code timestamp: …, filepos: …} line of the index. */
+    private record Entry(long timestampMs, int filePos) {
+    }
+
+    /** What the {@code .idx} says: canvas, disc palette (empty when absent) and the cue entries. */
+    private static final class Index {
+        int width = 720;
+        int height = 576;
+        int[] palette = new int[0];
+        final List<Entry> entries = new ArrayList<>();
+
+        static Index read(List<String> lines) {
+            Index index = new Index();
+            for (String raw : lines) {
+                index.readLine(raw.strip());
+            }
+            return index;
+        }
+
+        private void readLine(String line) {
+            Matcher timestamp = TIMESTAMP.matcher(line);
+            Matcher size = SIZE.matcher(line);
+            if (timestamp.find()) {
+                long ms = ((Long.parseLong(timestamp.group(1)) * 60 + Long.parseLong(timestamp.group(2))) * 60
+                        + Long.parseLong(timestamp.group(3))) * 1000 + Long.parseLong(timestamp.group(4));
+                entries.add(new Entry(ms, (int) Long.parseLong(timestamp.group(5), 16)));
+            } else if (size.find()) {
+                width = Integer.parseInt(size.group(1));
+                height = Integer.parseInt(size.group(2));
+            } else if (line.startsWith("palette:")) {
+                palette = parsePalette(line.substring("palette:".length()));
+            }
+        }
     }
 
     private static int[] parsePalette(String value) {
         String[] parts = value.split(",");
         if (parts.length < 16) {
-            return null;
+            return new int[0];
         }
         int[] palette = new int[16];
         try {
@@ -86,7 +104,7 @@ public final class VobSubParser {
                 palette[i] = Integer.parseInt(parts[i].strip(), 16) & 0xFFFFFF;
             }
         } catch (NumberFormatException _) {
-            return null;
+            return new int[0];
         }
         return palette;
     }
@@ -97,7 +115,8 @@ public final class VobSubParser {
             BitmapCue cue = cues.get(i);
             long next = i + 1 < cues.size() ? cues.get(i + 1).startMs() : Long.MAX_VALUE;
             long end = cue.endMs() > cue.startMs() ? cue.endMs() : cue.startMs() + MAX_OPEN_CUE_MS;
-            closed.add(cue.withEnd(Math.min(end, Math.max(next, cue.startMs() + 1))));
+            long latest = Math.max(next, cue.startMs() + 1);
+            closed.add(cue.withEnd(Math.min(end, latest)));
         }
         return closed;
     }
@@ -105,44 +124,56 @@ public final class VobSubParser {
     /**
      * Collects one SPU starting at a pack header. An SPU larger than one PES
      * packet continues in the packs that follow; its first two bytes say how
-     * long it is in total.
+     * long it is in total. Empty when the stream ran out before it was complete.
      */
-    private static byte[] readSpu(byte[] buf, int pos) {
-        byte[] spu = null;
-        int filled = 0;
-        while (pos + 4 <= buf.length && startCode(buf, pos) >= 0) {
+    private static byte[] readSpu(byte[] buf, int start) {
+        SpuAssembler spu = new SpuAssembler();
+        int pos = start;
+        while (pos >= 0 && !spu.complete()) {
+            pos = spu.consume(buf, pos);
+        }
+        return spu.complete() ? spu.data : new byte[0];
+    }
+
+    private static final class SpuAssembler {
+        byte[] data;
+        int filled;
+
+        boolean complete() {
+            return data != null && filled >= data.length;
+        }
+
+        /** Handles the pack header or PES packet at {@code pos}; returns the next position, or -1 to stop. */
+        int consume(byte[] buf, int pos) {
+            if (pos + 6 > buf.length || startCode(buf, pos) < 0) {
+                return -1;
+            }
             int code = startCode(buf, pos);
             if (code == 0xBA) { // pack header: 14 bytes + stuffing
-                if (pos + 14 > buf.length) {
-                    break;
-                }
-                pos += 14 + (buf[pos + 13] & 0x07);
-                continue;
+                return pos + 14 <= buf.length ? pos + 14 + (buf[pos + 13] & 0x07) : -1;
             }
-            if (pos + 6 > buf.length) {
-                break;
+            int next = pos + 6 + u16(buf, pos + 4);
+            boolean subpicture = code == 0xBD && next <= buf.length; // private stream 1
+            // payload starts after the PES header data and the substream id
+            if (subpicture && !append(buf, pos + 9 + (buf[pos + 8] & 0xFF) + 1, next)) {
+                return -1;
             }
-            int pesLength = u16(buf, pos + 4);
-            int next = pos + 6 + pesLength;
-            if (code == 0xBD && next <= buf.length) { // private stream 1
-                int payload = pos + 9 + (buf[pos + 8] & 0xFF) + 1; // + PES header data + substream id
-                if (spu == null) {
-                    int total = u16(buf, payload);
-                    if (total < 4) {
-                        return null;
-                    }
-                    spu = new byte[total];
-                }
-                int n = Math.min(next - payload, spu.length - filled);
-                System.arraycopy(buf, payload, spu, filled, n);
-                filled += n;
-                if (filled >= spu.length) {
-                    return spu;
-                }
-            }
-            pos = next;
+            return next;
         }
-        return null; // ran out of stream before the SPU was complete
+
+        private boolean append(byte[] buf, int payload, int end) {
+            if (data == null) {
+                int total = u16(buf, payload);
+                if (total < 4) {
+                    return false;
+                }
+                data = new byte[total];
+            }
+            int n = Math.min(end - payload, data.length - filled);
+            System.arraycopy(buf, payload, data, filled, n);
+            filled += n;
+            return true;
+        }
     }
 
     /** The stream id of the {@code 00 00 01 xx} start code at {@code pos}, or -1. */
@@ -155,75 +186,96 @@ public final class VobSubParser {
     }
 
     private static BitmapCue decode(byte[] spu, long timestampMs, int[] discPalette) {
+        SpuControl control = SpuControl.read(spu);
+        int w = control.x2 - control.x1 + 1;
+        int h = control.y2 - control.y1 + 1;
+        if (w <= 0 || h <= 0 || w > 4096 || h > 4096) {
+            return null;
+        }
+        int[] lut = lookupTable(control.colors, control.alpha, discPalette);
+        int[] argb = new int[w * h];
+        decodeField(spu, control.evenOffset, 0, w, h, lut, argb);
+        decodeField(spu, control.oddOffset, 1, w, h, lut, argb);
+
+        long start = timestampMs + delayMs(Math.max(control.startDelay, 0));
+        long stop = control.stopDelay > 0 ? timestampMs + delayMs(control.stopDelay) : start;
+        return BitmapCue.cropped(start, stop, control.x1, control.y1, w, h, control.forced, argb);
+    }
+
+    /** What an SPU's control sequences say: colours, alpha, position, field offsets and delays. */
+    private static final class SpuControl {
         int[] colors = {0, 1, 2, 3};
         int[] alpha = {0, 15, 15, 15};
-        int x1 = 0;
-        int x2 = 0;
-        int y1 = 0;
-        int y2 = 0;
+        int x1;
+        int x2;
+        int y1;
+        int y2;
         int evenOffset = 4;
         int oddOffset = 4;
         int startDelay = -1;
         int stopDelay = -1;
-        boolean forced = false;
+        boolean forced;
 
-        int sequence = u16(spu, 2);
-        while (true) {
-            int delay = u16(spu, sequence);
-            int nextSequence = u16(spu, sequence + 2);
-            int p = sequence + 4;
-            boolean end = false;
-            while (!end && p < spu.length) {
-                int command = spu[p++] & 0xFF;
-                switch (command) {
-                    case 0x00 -> {
-                        forced = true;
-                        startDelay = delay;
-                    }
-                    case 0x01 -> startDelay = delay;
-                    case 0x02 -> stopDelay = delay;
-                    case 0x03 -> {
-                        colors = nibbles(spu, p);
-                        p += 2;
-                    }
-                    case 0x04 -> {
-                        alpha = nibbles(spu, p);
-                        p += 2;
-                    }
-                    case 0x05 -> {
-                        x1 = ((spu[p] & 0xFF) << 4) | ((spu[p + 1] & 0xFF) >> 4);
-                        x2 = ((spu[p + 1] & 0x0F) << 8) | (spu[p + 2] & 0xFF);
-                        y1 = ((spu[p + 3] & 0xFF) << 4) | ((spu[p + 4] & 0xFF) >> 4);
-                        y2 = ((spu[p + 4] & 0x0F) << 8) | (spu[p + 5] & 0xFF);
-                        p += 6;
-                    }
-                    case 0x06 -> {
-                        evenOffset = u16(spu, p);
-                        oddOffset = u16(spu, p + 2);
-                        p += 4;
-                    }
-                    default -> end = true; // 0xFF, or something we don't know the length of
+        /** Walks the chain of control sequences; the last one points at itself. */
+        static SpuControl read(byte[] spu) {
+            SpuControl control = new SpuControl();
+            int sequence = u16(spu, 2);
+            boolean last = false;
+            while (!last) {
+                int delay = u16(spu, sequence);
+                int next = u16(spu, sequence + 2);
+                int p = sequence + 4;
+                while (p >= 0 && p < spu.length) {
+                    p = control.apply(spu, p, delay);
+                }
+                last = next == sequence || next + 4 > spu.length;
+                sequence = next;
+            }
+            return control;
+        }
+
+        /** Applies the command at {@code p}; returns the position after it, or -1 at the end of the sequence. */
+        private int apply(byte[] spu, int p, int delay) {
+            int args = p + 1;
+            switch (spu[p] & 0xFF) {
+                case 0x00 -> {
+                    forced = true;
+                    startDelay = delay;
+                    return args;
+                }
+                case 0x01 -> {
+                    startDelay = delay;
+                    return args;
+                }
+                case 0x02 -> {
+                    stopDelay = delay;
+                    return args;
+                }
+                case 0x03 -> {
+                    colors = nibbles(spu, args);
+                    return args + 2;
+                }
+                case 0x04 -> {
+                    alpha = nibbles(spu, args);
+                    return args + 2;
+                }
+                case 0x05 -> {
+                    x1 = ((spu[args] & 0xFF) << 4) | ((spu[args + 1] & 0xFF) >> 4);
+                    x2 = ((spu[args + 1] & 0x0F) << 8) | (spu[args + 2] & 0xFF);
+                    y1 = ((spu[args + 3] & 0xFF) << 4) | ((spu[args + 4] & 0xFF) >> 4);
+                    y2 = ((spu[args + 4] & 0x0F) << 8) | (spu[args + 5] & 0xFF);
+                    return args + 6;
+                }
+                case 0x06 -> {
+                    evenOffset = u16(spu, args);
+                    oddOffset = u16(spu, args + 2);
+                    return args + 4;
+                }
+                default -> {
+                    return -1; // 0xFF, or something we don't know the length of
                 }
             }
-            if (nextSequence == sequence || nextSequence + 4 > spu.length) {
-                break;
-            }
-            sequence = nextSequence;
         }
-
-        int w = x2 - x1 + 1;
-        int h = y2 - y1 + 1;
-        if (w <= 0 || h <= 0 || w > 4096 || h > 4096) {
-            return null;
-        }
-        int[] lut = lookupTable(colors, alpha, discPalette);
-        int[] argb = new int[w * h];
-        decodeField(spu, evenOffset, 0, w, h, lut, argb);
-        decodeField(spu, oddOffset, 1, w, h, lut, argb);
-
-        long start = timestampMs + delayMs(Math.max(startDelay, 0));
-        long stop = stopDelay > 0 ? timestampMs + delayMs(stopDelay) : start;
-        return BitmapCue.cropped(start, stop, x1, y1, w, h, forced, argb);
     }
 
     /** Control-sequence delays count in units of 1024/90000 s. */
@@ -256,7 +308,7 @@ public final class VobSubParser {
                 continue;
             }
             int rgb;
-            if (discPalette != null) {
+            if (discPalette.length == 16) {
                 rgb = discPalette[colors[i]];
             } else {
                 rgb = level * 0x010101;
@@ -273,34 +325,56 @@ public final class VobSubParser {
      * line". Every line starts byte-aligned.
      */
     private static void decodeField(byte[] spu, int offset, int firstRow, int w, int h, int[] lut, int[] out) {
-        int nibble = offset * 2;
-        int limit = spu.length * 2;
+        NibbleReader in = new NibbleReader(spu, offset);
         for (int y = firstRow; y < h; y += 2) {
             int x = 0;
-            while (x < w && nibble < limit) {
-                int v = nibbleAt(spu, nibble++);
-                if (v < 0x4) {
-                    v = (v << 4) | nibbleAt(spu, nibble++);
-                    if (v < 0x10) {
-                        v = (v << 4) | nibbleAt(spu, nibble++);
-                        if (v < 0x40) {
-                            v = (v << 4) | nibbleAt(spu, nibble++);
-                        }
-                    }
-                }
+            while (x < w && in.hasNext()) {
+                int v = in.nextRun();
                 int run = v >> 2;
                 if (run == 0 || run > w - x) {
                     run = w - x;
                 }
                 int pixel = lut[v & 3];
                 if (pixel != 0) {
-                    for (int col = x; col < x + run; col++) {
-                        out[y * w + col] = pixel;
-                    }
+                    Arrays.fill(out, y * w + x, y * w + x + run, pixel);
                 }
                 x += run;
             }
+            in.alignToByte();
+        }
+    }
+
+    /** Nibble cursor over the picture data; reads past the end yield 0. */
+    private static final class NibbleReader {
+        private final byte[] data;
+        private int nibble;
+
+        NibbleReader(byte[] data, int byteOffset) {
+            this.data = data;
+            this.nibble = byteOffset * 2;
+        }
+
+        boolean hasNext() {
+            return nibble < data.length * 2;
+        }
+
+        void alignToByte() {
             nibble += nibble & 1;
+        }
+
+        /** The next run value: it grows by a nibble while it is too small to hold a length. */
+        int nextRun() {
+            int v = next();
+            for (int limit = 0x4; limit <= 0x40 && v < limit; limit <<= 2) {
+                v = (v << 4) | next();
+            }
+            return v;
+        }
+
+        private int next() {
+            int value = nibbleAt(data, nibble);
+            nibble++;
+            return value;
         }
     }
 

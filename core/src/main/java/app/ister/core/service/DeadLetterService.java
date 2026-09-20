@@ -7,6 +7,8 @@ import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
+
 import static app.ister.core.config.RabbitReliabilityConfig.DEAD_LETTER_QUEUE;
 
 /**
@@ -26,8 +28,8 @@ public class DeadLetterService {
 
     /** @return how many messages are waiting in the dead-letter queue */
     public int count() {
-        Integer count = rabbitTemplate.execute(channel -> channel.queueDeclarePassive(DEAD_LETTER_QUEUE).getMessageCount());
-        return count == null ? 0 : count;
+        return Objects.requireNonNullElse(
+                rabbitTemplate.execute(channel -> channel.queueDeclarePassive(DEAD_LETTER_QUEUE).getMessageCount()), 0);
     }
 
     /**
@@ -43,19 +45,26 @@ public class DeadLetterService {
             if (message == null) {
                 break;
             }
-            MessageProperties properties = message.getMessageProperties();
-            String routingKey = properties.getHeader(ORIGINAL_ROUTING_KEY);
-            if (routingKey == null || routingKey.isBlank()) {
-                log.warn("Dead-lettered message without an original queue; leaving it in place");
-                rabbitTemplate.send("", DEAD_LETTER_QUEUE, message);
-                continue;
+            if (replayOne(message)) {
+                replayed++;
             }
-            String exchange = properties.getHeader(ORIGINAL_EXCHANGE);
-            properties.getHeaders().keySet().removeIf(key -> key.startsWith("x-exception-") || key.startsWith("x-original-"));
-            rabbitTemplate.send(exchange == null ? "" : exchange, routingKey, message);
-            replayed++;
         }
         log.info("Replayed {} of {} dead-lettered message(s)", replayed, waiting);
         return replayed;
+    }
+
+    /** Sends one message back to where it came from; false when it carries no origin and stays dead-lettered. */
+    private boolean replayOne(Message message) {
+        MessageProperties properties = message.getMessageProperties();
+        String routingKey = properties.getHeader(ORIGINAL_ROUTING_KEY);
+        if (routingKey == null || routingKey.isBlank()) {
+            log.warn("Dead-lettered message without an original queue; leaving it in place");
+            rabbitTemplate.send("", DEAD_LETTER_QUEUE, message);
+            return false;
+        }
+        String exchange = properties.getHeader(ORIGINAL_EXCHANGE);
+        properties.getHeaders().keySet().removeIf(key -> key.startsWith("x-exception-") || key.startsWith("x-original-"));
+        rabbitTemplate.send(exchange == null ? "" : exchange, routingKey, message);
+        return true;
     }
 }

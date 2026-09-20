@@ -437,7 +437,8 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
     }
 
     private static String normalizeAlbumName(String name) {
-        return name.replaceAll("\\s*\\(\\d{4}\\)\\s*$", "")
+        // Trailing whitespace is stripped first so the pattern is anchored and cannot backtrack.
+        return name.stripTrailing().replaceAll("\\(\\d{4}\\)$", "")
                 .replaceAll("[\\p{Punct}]+", " ")
                 .replaceAll("\\s+", " ")
                 .strip()

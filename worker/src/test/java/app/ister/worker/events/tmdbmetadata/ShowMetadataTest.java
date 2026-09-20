@@ -19,6 +19,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import app.ister.core.config.LanguageProperties;
 
@@ -160,7 +163,7 @@ class ShowMetadataTest {
 
     @Test
     void fallsBackToEnglishTextsWhenTheLanguageHasNoTranslation() {
-        TvSeriesDetails200Response englishDetails = org.mockito.Mockito.mock(TvSeriesDetails200Response.class);
+        TvSeriesDetails200Response englishDetails = mock(TvSeriesDetails200Response.class);
         when(tmdbClientMock._searchTv("Death Note", null, null, null, null, 2006))
                 .thenReturn(ResponseEntity.ok(searchResponseMock));
         when(searchResponseMock.getResults()).thenReturn(List.of(resultInnerMock));
@@ -200,6 +203,6 @@ class ShowMetadataTest {
         Optional<TMDBResult> result = subject.getMetadata("Show", 2024, "nl");
 
         assertEquals("De Serie", result.orElseThrow().getTitle());
-        org.mockito.Mockito.verify(tmdbClientMock, org.mockito.Mockito.never())._tvSeriesDetails(42, "", "en");
+        verify(tmdbClientMock, never())._tvSeriesDetails(42, "", "en");
     }
 }

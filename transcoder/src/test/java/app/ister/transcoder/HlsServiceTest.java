@@ -652,7 +652,7 @@ class HlsServiceTest {
     }
 
     @Test
-    void getBitmapSubtitleFileIsNotFoundForAFileWithoutBitmapStreams() throws Exception {
+    void getBitmapSubtitleFileIsNotFoundForAFileWithoutBitmapStreams() {
         UUID mediaFileId = UUID.randomUUID();
         when(mediaFileRepository.findById(mediaFileId)).thenReturn(Optional.of(mediaFileEntity("/test/video.mkv")));
 

@@ -9,7 +9,7 @@ import app.ister.worker.clients.TmdbClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
@@ -31,7 +31,7 @@ import java.util.function.Function;
  *       words with the query (see {@link TmdbResultSelector}).</li>
  * </ol>
  */
-@Component
+@Service
 @RequiredArgsConstructor
 @Slf4j
 public class TmdbSearchService {
@@ -43,30 +43,38 @@ public class TmdbSearchService {
         return find(name, year, "movie",
                 (language, withYear) -> movieResults(tmdbClient._searchMovie(name, null, language,
                         withYear ? String.valueOf(year) : null, null, null, null)),
-                selector::selectMovieExact,
-                (results, query) -> selector.selectMovieNearYear(results, query, year),
-                selector::selectMovie,
-                SearchMovie200ResponseResultsInner::getReleaseDate);
+                new Selection<>(selector::selectMovieExact,
+                        (results, query) -> selector.selectMovieNearYear(results, query, year),
+                        selector::selectMovie,
+                        SearchMovie200ResponseResultsInner::getReleaseDate));
     }
 
     public Optional<SearchTv200ResponseResultsInner> findSeries(String name, int year) {
         return find(name, year, "series",
                 (language, withYear) -> seriesResults(tmdbClient._searchTv(name, null, null, language, null,
                         withYear ? year : null)),
-                selector::selectTvExact,
-                (results, query) -> selector.selectTvNearYear(results, query, year),
-                selector::selectTv,
-                SearchTv200ResponseResultsInner::getFirstAirDate);
+                new Selection<>(selector::selectTvExact,
+                        (results, query) -> selector.selectTvNearYear(results, query, year),
+                        selector::selectTv,
+                        SearchTv200ResponseResultsInner::getFirstAirDate));
     }
 
-    private <T> Optional<T> find(String name, int year, String kind,
-                                 BiFunction<String, Boolean, List<T>> search,
-                                 BiFunction<List<T>, String, Optional<T>> exact,
-                                 BiFunction<List<T>, String, Optional<T>> nearYear,
-                                 BiFunction<List<T>, String, Optional<T>> fuzzy,
-                                 Function<T, String> date) {
+    /** One TMDB search: in {@code language} (null = TMDB's default), with or without the year filter. */
+    @FunctionalInterface
+    private interface Search<T> {
+        List<T> apply(String language, boolean withYear);
+    }
+
+    /** How to pick a result out of a list, from strictest to loosest, plus the result's date for the log. */
+    private record Selection<T>(BiFunction<List<T>, String, Optional<T>> exact,
+                                BiFunction<List<T>, String, Optional<T>> nearYear,
+                                BiFunction<List<T>, String, Optional<T>> fuzzy,
+                                Function<T, String> date) {
+    }
+
+    private <T> Optional<T> find(String name, int year, String kind, Search<T> search, Selection<T> select) {
         List<T> withYear = search.apply(null, true);
-        Optional<T> hit = exact.apply(withYear, name);
+        Optional<T> hit = select.exact().apply(withYear, name);
         if (hit.isPresent()) {
             return hit;
         }
@@ -74,18 +82,18 @@ public class TmdbSearchService {
             if (language.equalsIgnoreCase(TmdbLanguageFallback.FALLBACK_LANGUAGE)) {
                 continue;
             }
-            hit = exact.apply(search.apply(language, true), name);
+            hit = select.exact().apply(search.apply(language, true), name);
             if (hit.isPresent()) {
                 return hit;
             }
         }
-        hit = nearYear.apply(search.apply(null, false), name);
+        hit = select.nearYear().apply(search.apply(null, false), name);
         if (hit.isPresent()) {
             log.info("Matched {} '{}' ({}) by title to a TMDB release of {}: the directory year is off",
-                    kind, name, year, date.apply(hit.get()));
+                    kind, name, year, select.date().apply(hit.get()));
             return hit;
         }
-        return fuzzy.apply(withYear, name);
+        return select.fuzzy().apply(withYear, name);
     }
 
     private static List<SearchMovie200ResponseResultsInner> movieResults(ResponseEntity<SearchMovie200Response> response) {

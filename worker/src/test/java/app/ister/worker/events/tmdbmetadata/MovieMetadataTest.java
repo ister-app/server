@@ -20,6 +20,9 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import app.ister.core.config.LanguageProperties;
 
@@ -188,7 +191,7 @@ class MovieMetadataTest {
 
     @Test
     void fallsBackToEnglishTextsWhenTheLanguageHasNoTranslation() {
-        MovieDetails200Response englishDetails = org.mockito.Mockito.mock(MovieDetails200Response.class);
+        MovieDetails200Response englishDetails = mock(MovieDetails200Response.class);
         when(tmdbClientMock._searchMovie("Your Name", null, null, "2016", null, null, null))
                 .thenReturn(ResponseEntity.ok(searchResponseMock));
         when(searchResponseMock.getResults()).thenReturn(List.of(resultInnerMock));
@@ -216,7 +219,7 @@ class MovieMetadataTest {
     /** "V for Vendetta (2005)": the year filter finds nothing, the year-less search does, one year off. */
     @Test
     void findsAMovieWhoseDirectoryYearIsOffByOne() {
-        SearchMovie200Response anyYearResponse = org.mockito.Mockito.mock(SearchMovie200Response.class);
+        SearchMovie200Response anyYearResponse = mock(SearchMovie200Response.class);
         SearchMovie200ResponseResultsInner film = new SearchMovie200ResponseResultsInner();
         film.setId(752); film.setTitle("V for Vendetta"); film.setReleaseDate("2006-02-23"); film.setPopularity(new BigDecimal("40"));
         SearchMovie200ResponseResultsInner extra = new SearchMovie200ResponseResultsInner();
@@ -243,7 +246,7 @@ class MovieMetadataTest {
     /** "300 (2006)": the year filter returns unrelated titles; without an exact match nearby, no metadata. */
     @Test
     void doesNotPickAnUnrelatedTitleForAWrongYear() {
-        SearchMovie200Response anyYearResponse = org.mockito.Mockito.mock(SearchMovie200Response.class);
+        SearchMovie200Response anyYearResponse = mock(SearchMovie200Response.class);
         SearchMovie200ResponseResultsInner junk1 = new SearchMovie200ResponseResultsInner();
         junk1.setId(1); junk1.setTitle("Home Movies 300-1"); junk1.setPopularity(new BigDecimal("2"));
         SearchMovie200ResponseResultsInner junk2 = new SearchMovie200ResponseResultsInner();
@@ -260,13 +263,13 @@ class MovieMetadataTest {
         when(anyYearResponse.getResults()).thenReturn(List.of(farOff));
 
         assertTrue(subject.getMetadata("300", 2006, "en").isEmpty());
-        org.mockito.Mockito.verify(tmdbClientMock, org.mockito.Mockito.never())._movieDetails(org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+        verify(tmdbClientMock, never())._movieDetails(org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
     }
 
     /** "De Smurfen (2011)": no English match, but the Dutch search has the exact title. */
     @Test
     void matchesADirectoryNamedInAConfiguredLanguage() {
-        SearchMovie200Response dutchResponse = org.mockito.Mockito.mock(SearchMovie200Response.class);
+        SearchMovie200Response dutchResponse = mock(SearchMovie200Response.class);
         SearchMovie200ResponseResultsInner film = new SearchMovie200ResponseResultsInner();
         film.setId(41513); film.setTitle("De Smurfen"); film.setOriginalTitle("The Smurfs"); film.setPopularity(new BigDecimal("30"));
         SearchMovie200ResponseResultsInner english = new SearchMovie200ResponseResultsInner();

@@ -36,7 +36,6 @@ import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.verifyNoInteractions;
 import app.ister.core.service.MovieMergeService;
 import app.ister.core.entity.LibraryEntity;
-import org.mockito.Mockito;
 
 @ExtendWith(MockitoExtension.class)
 class MovieFoundHandleTest {
@@ -258,7 +257,7 @@ class MovieFoundHandleTest {
 
 
     @Test
-    void handleMergesIntoTheMovieThatAlreadyCarriesTheTmdbId() throws IOException {
+    void handleMergesIntoTheMovieThatAlreadyCarriesTheTmdbId() {
         ReflectionTestUtils.setField(subject, "apikey", "test-key");
         LibraryEntity library = LibraryEntity.builder().id(UUID.randomUUID()).build();
         UUID movieId = UUID.randomUUID();
@@ -285,6 +284,6 @@ class MovieFoundHandleTest {
         assertDoesNotThrow(() -> subject.handle(MovieFoundData.builder().eventType(EventType.MOVIE_FOUND).movieId(movieId).build()));
 
         verifyNoInteractions(movieMetadata, metaDataSave, movieMergeService);
-        Mockito.verify(movieRepository, Mockito.never()).findFirstByLibraryEntityAndTmdbIdAndIdNot(any(), any(), any());
+        verify(movieRepository, never()).findFirstByLibraryEntityAndTmdbIdAndIdNot(any(), any(), any());
     }
 }

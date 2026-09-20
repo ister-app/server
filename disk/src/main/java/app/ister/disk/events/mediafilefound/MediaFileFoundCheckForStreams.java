@@ -51,38 +51,49 @@ public class MediaFileFoundCheckForStreams {
                 .execute();
 
         for (com.github.kokorin.jaffree.ffprobe.Stream stream : mediaStreams.getStreams()) {
-            if (stream.getDuration() != null) {
-                durationList.add(Math.round(stream.getDuration().doubleValue() * 1000));
-            }
-            for (String tag : DURATION_TAGS) {
-                String tagValue = stream.getTag(tag);
-                if (tagValue != null) {
-                    durationList.add(LocalTime.parse(tagValue).getLong(ChronoField.MILLI_OF_DAY));
-                }
-            }
-
-            if (stream.getDisposition() != null
-                    && Boolean.TRUE.equals(stream.getDisposition().getAttachedPic())) {
+            collectDurations(stream, durationList);
+            if (isAttachedPicture(stream)) {
                 hasAttachedPic = true;
-                continue;
+            } else {
+                result.add(toEntity(mediaFileEntity, stream));
             }
-            MediaFileStreamEntity.MediaFileStreamEntityBuilder<?, ?> mediaFileStream = MediaFileStreamEntity.builder()
-                    .mediaFileEntity(mediaFileEntity)
-                    .streamIndex(stream.getIndex())
-                    // ffprobe reports "unknown" for e.g. the rtp hint tracks in an iTunes m4v; Jaffree
-                    // then hands us null, and codec_name is NOT NULL in the database.
-                    .codecName(stream.getCodecName() != null ? stream.getCodecName() : "unknown")
-                    .codecType(codecTypeToEnum(stream.getCodecType().toString()))
-                    .language(stream.getTag("language"))
-                    .title(stream.getTag("title"))
-                    .path(mediaFileEntity.getPath());
-            if (stream.getWidth() != null && stream.getHeight() != null) {
-                mediaFileStream.width(stream.getWidth())
-                        .height(stream.getHeight());
-            }
-            result.add(mediaFileStream.build());
         }
         long duration = durationList.isEmpty() ? 0L : Collections.max(durationList);
         return new CheckResult(result, hasAttachedPic, duration);
+    }
+
+    /** A stream's own duration plus the container's per-stream duration tags; the longest one wins. */
+    private static void collectDurations(com.github.kokorin.jaffree.ffprobe.Stream stream, List<Long> durations) {
+        if (stream.getDuration() != null) {
+            durations.add(Math.round(stream.getDuration().doubleValue() * 1000));
+        }
+        for (String tag : DURATION_TAGS) {
+            String tagValue = stream.getTag(tag);
+            if (tagValue != null) {
+                durations.add(LocalTime.parse(tagValue).getLong(ChronoField.MILLI_OF_DAY));
+            }
+        }
+    }
+
+    private static boolean isAttachedPicture(com.github.kokorin.jaffree.ffprobe.Stream stream) {
+        return stream.getDisposition() != null && Boolean.TRUE.equals(stream.getDisposition().getAttachedPic());
+    }
+
+    private static MediaFileStreamEntity toEntity(MediaFileEntity mediaFileEntity, com.github.kokorin.jaffree.ffprobe.Stream stream) {
+        MediaFileStreamEntity.MediaFileStreamEntityBuilder<?, ?> mediaFileStream = MediaFileStreamEntity.builder()
+                .mediaFileEntity(mediaFileEntity)
+                .streamIndex(stream.getIndex())
+                // ffprobe reports "unknown" for e.g. the rtp hint tracks in an iTunes m4v; Jaffree
+                // then hands us null, and codec_name is NOT NULL in the database.
+                .codecName(stream.getCodecName() != null ? stream.getCodecName() : "unknown")
+                .codecType(codecTypeToEnum(stream.getCodecType().toString()))
+                .language(stream.getTag("language"))
+                .title(stream.getTag("title"))
+                .path(mediaFileEntity.getPath());
+        if (stream.getWidth() != null && stream.getHeight() != null) {
+            mediaFileStream.width(stream.getWidth())
+                    .height(stream.getHeight());
+        }
+        return mediaFileStream.build();
     }
 }

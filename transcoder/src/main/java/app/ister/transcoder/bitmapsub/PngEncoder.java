@@ -42,8 +42,7 @@ final class PngEncoder {
         header.putInt(w).putInt(h).put((byte) 8).put((byte) 6).put((byte) 0).put((byte) 0).put((byte) 0);
         writeChunk(out, "IHDR", header.array(), 13);
 
-        Deflater deflater = new Deflater(Deflater.DEFAULT_COMPRESSION);
-        try {
+        try (Deflater deflater = new Deflater(Deflater.DEFAULT_COMPRESSION)) {
             deflater.setInput(raw);
             deflater.finish();
             ByteArrayOutputStream compressed = new ByteArrayOutputStream(raw.length / 8 + 64);
@@ -52,8 +51,6 @@ final class PngEncoder {
                 compressed.write(buffer, 0, deflater.deflate(buffer));
             }
             writeChunk(out, "IDAT", compressed.toByteArray(), compressed.size());
-        } finally {
-            deflater.end();
         }
         writeChunk(out, "IEND", new byte[0], 0);
         return out.toByteArray();

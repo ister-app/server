@@ -89,7 +89,14 @@ public class OrphanTrackCleanupService {
         return Optional.empty();
     }
 
+    /** Everything a user attached to the orphan moves to {@code target}, or goes when there is none. */
     private void moveHistory(TrackEntity orphan, TrackEntity target) {
+        moveWatchStatuses(orphan, target);
+        moveRatings(orphan, target);
+        moveQueueAndPlaylistItems(orphan, target);
+    }
+
+    private void moveWatchStatuses(TrackEntity orphan, TrackEntity target) {
         for (WatchStatusEntity status : watchStatusRepository.findByTrackEntity(orphan)) {
             boolean targetHasOne = target != null && watchStatusRepository
                     .findByUserEntityAndPlayQueueItemIdAndTrackEntity(status.getUserEntity(), status.getPlayQueueItemId(), target)
@@ -101,6 +108,9 @@ public class OrphanTrackCleanupService {
                 watchStatusRepository.save(status);
             }
         }
+    }
+
+    private void moveRatings(TrackEntity orphan, TrackEntity target) {
         for (RatingEntity rating : ratingRepository.findByTrackEntity(orphan)) {
             boolean targetHasOne = target != null
                     && ratingRepository.findByUserEntityAndTrackEntity(rating.getUserEntity(), target).isPresent();
@@ -111,6 +121,9 @@ public class OrphanTrackCleanupService {
                 ratingRepository.save(rating);
             }
         }
+    }
+
+    private void moveQueueAndPlaylistItems(TrackEntity orphan, TrackEntity target) {
         for (PlayQueueItemEntity item : playQueueItemRepository.findByTrackEntityId(orphan.getId())) {
             if (target == null) {
                 playQueueItemRepository.delete(item);
