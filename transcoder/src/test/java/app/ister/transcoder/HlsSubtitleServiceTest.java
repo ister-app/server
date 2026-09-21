@@ -263,6 +263,38 @@ class HlsSubtitleServiceTest {
         verifyNoInteractions(jaffree);
     }
 
+    // ========== cleanCueText ==========
+
+    @Test
+    void cleanCueTextStripsClosedCaptionMarkup() {
+        // What FFmpeg makes of an EIA-608 caption (iTunes): font wrapper, grid
+        // anchor and \h column padding — a browser showed all of it literally.
+        assertEquals("[ MAN SPEAKING INDISTINCTLY\nOVER P.A. ]", HlsSubtitleService.cleanCueText(
+                "<font face=\"Monospace\">{\\an7}[ MAN SPEAKING INDISTINCTLY\n\\h\\h\\h\\hOVER P.A. ]</font>"));
+        assertEquals("♪<i> LEAN ON ME...</i> ♪", HlsSubtitleService.cleanCueText(
+                "<font face=\"Monospace\">{\\an7}♪<i> LEAN ON ME...</i> ♪</font>"));
+    }
+
+    @Test
+    void cleanCueTextKeepsThePositionOfARealSubtitle() {
+        assertEquals("{\\an8}Sign at the top", HlsSubtitleService.cleanCueText("{\\an8}Sign at the top"));
+    }
+
+    @Test
+    void writeSrtWithOffsetWritesCleanedCaptions() throws IOException {
+        Path source = createSrtFile("""
+                1
+                00:00:01,000 --> 00:00:03,000
+                <font face="Monospace">{\\an7}Guard: MOVE IT.</font>
+
+                """);
+        Path output = tempDir.resolve("cc.srt");
+
+        subject.writeSrtWithOffset(source.toString(), output);
+
+        assertTrue(Files.readString(output).contains("\nGuard: MOVE IT.\n"));
+    }
+
     // ========== writeSrtWithOffset ==========
 
     @Test

@@ -43,7 +43,7 @@ public class HlsSubtitleService {
      * cached segment sets from an older generation are regenerated on the next
      * request instead of being served forever.
      */
-    static final int SUBTITLE_GENERATION = 4;
+    static final int SUBTITLE_GENERATION = 5;
 
     /** Marker recording the generation the cached segment set was written by. */
     private Path generationMarker(Path cacheDir, UUID subtitleId) {
@@ -203,10 +203,41 @@ public class HlsSubtitleService {
             text.append(lines[i]);
             i++;
         }
-        if (!text.isEmpty()) {
-            cues.add(new SrtCue(times[0], times[1], text.toString()));
+        String cleaned = cleanCueText(text.toString());
+        if (!cleaned.isEmpty()) {
+            cues.add(new SrtCue(times[0], times[1], cleaned));
         }
         return i;
+    }
+
+    private static final Pattern FONT_TAG = Pattern.compile("</?font[^>]*>", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MONOSPACE_FONT =
+            Pattern.compile("<font[^>]*face=\"Monospace\"", Pattern.CASE_INSENSITIVE);
+    /** An ASS override block: {@code {\an8}}, {@code {\pos(10,20)\b1}}. */
+    static final Pattern ASS_OVERRIDE = Pattern.compile("\\{\\\\[^}]*}");
+    private static final Pattern LEADING_SPACE = Pattern.compile("(?m)^[ \u00A0]+|[ \u00A0]+$");
+
+    /**
+     * Removes what FFmpeg's ASS-to-SRT conversion leaves behind and no player
+     * renders. EIA-608 closed captions (every iTunes purchase carries them) are
+     * the worst case: each cue arrives as
+     * {@code <font face="Monospace">{\an7}TEXT\h\h\hMORE</font>} — a font
+     * wrapper, the caption grid's top-left anchor, and {@code \h} hard spaces
+     * that pad a line to its column. A browser printed all of it literally.
+     * <p>
+     * The {@code {\an7}} goes only for such a caption cue: the grid position is
+     * meaningless once the padding is gone, while a real {@code {\an8}} in a
+     * subtitle file ("sign at the top") is something mpv honours. WebVTT has no
+     * such syntax, so {@link #writeVttSegments} strips what is left.
+     */
+    static String cleanCueText(String text) {
+        boolean closedCaption = MONOSPACE_FONT.matcher(text).find();
+        String cleaned = FONT_TAG.matcher(text).replaceAll("");
+        if (closedCaption) {
+            cleaned = ASS_OVERRIDE.matcher(cleaned).replaceAll("");
+        }
+        cleaned = cleaned.replace("\\h", " ").replace("\\N", "\n");
+        return LEADING_SPACE.matcher(cleaned).replaceAll("");
     }
 
     /** Parses a SRT timestamp line {@code HH:MM:SS,mmm --> HH:MM:SS,mmm} into [startMs, endMs]. */
@@ -270,7 +301,7 @@ public class HlsSubtitleService {
                             .append(" --> ")
                             .append(formatVttTime(cue.endMs() + SUBTITLE_OFFSET_MS))
                             .append("\n");
-                    vtt.append(cue.text()).append("\n");
+                    vtt.append(ASS_OVERRIDE.matcher(cue.text()).replaceAll("")).append("\n");
                 }
             }
 
