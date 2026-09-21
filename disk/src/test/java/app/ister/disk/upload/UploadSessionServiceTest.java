@@ -45,7 +45,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -213,7 +212,7 @@ class UploadSessionServiceTest {
 
         assertThat(service.complete(session.sessionId(), fileId).status()).isEqualTo(UploadFileStatus.COMPLETED);
         assertThat(Files.readString(root.resolve("Show (2019)/a.mkv"))).isEqualTo("new");
-        verify(publisher).published(eq(directory), eq(target("Show (2019)/a.mkv")), eq(3L));
+        verify(publisher).published(directory, target("Show (2019)/a.mkv"), 3L);
     }
 
     @Test

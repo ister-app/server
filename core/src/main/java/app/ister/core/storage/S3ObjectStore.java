@@ -19,7 +19,6 @@ import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.AbortMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadRequest;
-import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload;
 import software.amazon.awssdk.services.s3.model.CompletedPart;
 import software.amazon.awssdk.services.s3.model.CreateMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
@@ -281,7 +280,7 @@ public class S3ObjectStore implements ObjectStore {
                     .toList();
             client.completeMultipartUpload(CompleteMultipartUploadRequest.builder()
                     .bucket(bucket).key(key).uploadId(uploadId)
-                    .multipartUpload(CompletedMultipartUpload.builder().parts(completed).build())
+                    .multipartUpload(upload -> upload.parts(completed))
                     .build());
         } catch (SdkException e) {
             throw new IOException("S3 multipart complete failed for " + uri(key), e);

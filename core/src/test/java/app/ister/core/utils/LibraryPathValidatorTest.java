@@ -50,7 +50,8 @@ class LibraryPathValidatorTest {
 
     @Test
     void rejectsOverlongSegment() {
-        assertThrows(IllegalArgumentException.class, () -> LibraryPathValidator.requireSegment("é".repeat(128)));
+        String overlong = "é".repeat(128);
+        assertThrows(IllegalArgumentException.class, () -> LibraryPathValidator.requireSegment(overlong));
     }
 
     @Test

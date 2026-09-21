@@ -90,10 +90,8 @@ class UploadRepositoryIntegrationTest {
         assertEquals(List.of("/media/unique/a.mkv"),
                 fileRepository.findActiveTargetPathsIn(List.of("/media/unique/a.mkv", "/media/unique/b.mkv")));
         // a finished or failed attempt does not block a new one, a running one does
-        assertThrows(PersistenceException.class, () -> {
-            file(second, "/media/unique/a.mkv", 100, 0, UploadFileStatus.PENDING);
-            em.flush();
-        });
+        file(second, "/media/unique/a.mkv", 100, 0, UploadFileStatus.PENDING);
+        assertThrows(PersistenceException.class, em::flush);
     }
 
     @Test

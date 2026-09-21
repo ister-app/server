@@ -94,8 +94,10 @@ public class PlayQueueService {
 
     private final PodcastPreferenceService podcastPreferenceService;
 
-    /** Stream settings a client reports via updatePlayQueue; used to prefetch the next item in the same format. */
-    /** {@code mediaFileId}: the file of the reported item the client opened; null when it doesn't say. */
+    /**
+     * Stream settings a client reports via updatePlayQueue; used to prefetch the next item in the same format.
+     * {@code mediaFileId}: the file of the reported item the client opened; null when it doesn't say.
+     */
     public record StreamSettings(Boolean direct, Boolean transcode, SubtitleFormat subtitleFormat, UUID mediaFileId) {
     }
 

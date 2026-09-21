@@ -209,19 +209,21 @@ class UploadPreviewServiceTest {
     @Test
     void refusesPodcastLibrariesAndCacheDirectories() {
         DirectoryEntity podcasts = directory(LibraryType.PODCAST, "/media/podcasts");
-        assertThatThrownBy(() -> service.preview(podcasts, request(null, null, false)))
+        PlanRequest empty = request(null, null, false);
+        assertThatThrownBy(() -> service.preview(podcasts, empty))
                 .isInstanceOf(IllegalArgumentException.class);
 
         DirectoryEntity cache = DirectoryEntity.builder().name("cache").path("/cache")
                 .directoryType(DirectoryType.CACHE).build();
-        assertThatThrownBy(() -> service.preview(cache, request(null, null, false)))
+        assertThatThrownBy(() -> service.preview(cache, empty))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void refusesAnUnstorableRootName() {
         DirectoryEntity shows = directory(LibraryType.SHOW, "/media/shows");
-        assertThatThrownBy(() -> service.preview(shows, request(null, "../elsewhere", false, "a.mkv")))
+        PlanRequest escaping = request(null, "../elsewhere", false, "a.mkv");
+        assertThatThrownBy(() -> service.preview(shows, escaping))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

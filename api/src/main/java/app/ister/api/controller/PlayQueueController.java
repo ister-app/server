@@ -215,7 +215,7 @@ public class PlayQueueController {
         List<UUID> controlAllowedUserIds = controlScopeOverride == RemoteControlScope.ALLOWLIST
                 ? playQueueControlGrantRepository.findGranteeIdsByPlayQueueId(queue.getId())
                 : List.of();
-        // Only meaningful for the item it was reported for (the service clears it on an item change).
+        // Only meaningful for the item it was reported for: the service clears it on an item change
         UUID currentFile = playQueueItemId != null && playQueueItemId.equals(queue.getCurrentItem())
                 ? queue.getCurrentMediaFileId() : null;
         playbackStatusService.publishHeartbeat(

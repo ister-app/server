@@ -115,31 +115,14 @@ class LibraryUploadIntegrationTest {
         byte[] epub = epub("Night Flight", "Owl");
 
         // 1. the picker knows the directory, that it is writable and which node to talk to
-        HttpResponse<String> directories = http.send(request("/library-upload/directories").GET().build(),
-                HttpResponse.BodyHandlers.ofString());
-        assertEquals(200, directories.statusCode(), directories.body());
-        JsonNode directory = json(directories).get(0);
-        assertEquals("it-upload-disk", directory.get("name").asText());
-        assertEquals("BOOK", directory.get("libraryType").asText());
-        assertTrue(directory.get("writable").asBoolean());
-        assertTrue(directory.get("freeBytes").asLong() > 0);
-        assertFalse(directory.get("nodeUrl").asText().isBlank());
-        String directoryId = directory.get("id").asText();
+        String directoryId = pickWritableBookDirectory();
 
         // 2. the preview speaks for the scanner
         Map<String, Object> plan = Map.of("directoryId", directoryId, "targetParent", "", "rootName", "Owl (1950)",
                 "overwrite", false, "entries", List.of(
                         Map.of("relativePath", "Night Flight (2015).epub", "size", epub.length),
                         Map.of("relativePath", "notes.txt", "size", 3)));
-        HttpResponse<String> previewResponse = postJson("/library-upload/preview", plan);
-        assertEquals(200, previewResponse.statusCode(), previewResponse.body());
-        JsonNode preview = json(previewResponse);
-        assertEquals("ARTIST", preview.at("/roots/0/level").asText(), "an author folder is the book layout's artist level");
-        assertEquals("RECOGNISED", preview.at("/entries/0/status").asText());
-        assertEquals("Owl", preview.at("/entries/0/recognition/author").asText());
-        assertEquals("Night Flight", preview.at("/entries/0/recognition/book").asText());
-        assertEquals("IGNORED", preview.at("/entries/1/status").asText());
-        assertEquals(1, preview.get("uploadFiles").asInt());
+        assertPreviewRecognisesTheBook(plan);
 
         // 3. a session holds only what will be uploaded
         HttpResponse<String> sessionResponse = postJson("/library-upload/sessions", plan);
@@ -188,6 +171,31 @@ class LibraryUploadIntegrationTest {
         JsonNode again = json(postJson("/library-upload/preview", plan));
         assertEquals("EXISTS", again.at("/entries/0/status").asText());
         assertEquals(0, again.get("uploadFiles").asInt());
+    }
+
+    private String pickWritableBookDirectory() throws Exception {
+        HttpResponse<String> directories = http.send(request("/library-upload/directories").GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, directories.statusCode(), directories.body());
+        JsonNode directory = json(directories).get(0);
+        assertEquals("it-upload-disk", directory.get("name").asText());
+        assertEquals("BOOK", directory.get("libraryType").asText());
+        assertTrue(directory.get("writable").asBoolean());
+        assertTrue(directory.get("freeBytes").asLong() > 0);
+        assertFalse(directory.get("nodeUrl").asText().isBlank());
+        return directory.get("id").asText();
+    }
+
+    private void assertPreviewRecognisesTheBook(Map<String, Object> plan) throws Exception {
+        HttpResponse<String> previewResponse = postJson("/library-upload/preview", plan);
+        assertEquals(200, previewResponse.statusCode(), previewResponse.body());
+        JsonNode preview = json(previewResponse);
+        assertEquals("ARTIST", preview.at("/roots/0/level").asText(), "an author folder is the book layout's artist level");
+        assertEquals("RECOGNISED", preview.at("/entries/0/status").asText());
+        assertEquals("Owl", preview.at("/entries/0/recognition/author").asText());
+        assertEquals("Night Flight", preview.at("/entries/0/recognition/book").asText());
+        assertEquals("IGNORED", preview.at("/entries/1/status").asText());
+        assertEquals(1, preview.get("uploadFiles").asInt());
     }
 
     @Test

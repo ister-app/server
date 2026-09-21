@@ -83,40 +83,8 @@ public class UploadPreviewService {
         String[] targets = new String[entries.size()];
         PreviewEntry[] verdicts = new PreviewEntry[entries.size()];
 
-        // pass 1: where does everything go, and is that a storable, unique place
-        Set<String> seen = new HashSet<>();
-        for (int i = 0; i < entries.size(); i++) {
-            Entry entry = entries.get(i);
-            try {
-                String relativeTarget = PathStrings.join(base, LibraryPathValidator.requireRelative(entry.relativePath()));
-                String target = LibraryPathValidator.resolve(directory.getPath(), relativeTarget);
-                if (seen.add(target)) {
-                    targets[i] = target;
-                } else {
-                    verdicts[i] = verdict(entry, target, PreviewStatus.DUPLICATE, null, null, null);
-                }
-            } catch (IllegalArgumentException e) {
-                verdicts[i] = verdict(entry, null, PreviewStatus.INVALID, null, e.getMessage(), null);
-            }
-        }
-
-        // pass 2: would the scan pick it up
-        List<String> wanted = new ArrayList<>();
-        for (int i = 0; i < entries.size(); i++) {
-            if (targets[i] == null) {
-                continue;
-            }
-            Entry entry = entries.get(i);
-            Optional<String> prunedAt = firstPrunedAncestor(directory, targets[i]);
-            if (prunedAt.isPresent()) {
-                verdicts[i] = verdict(entry, targets[i], PreviewStatus.IGNORED, IgnoreReason.FOLDER_NOT_SCANNED,
-                        relativeTo(directory, prunedAt.get()), null);
-            } else if (scanners.analyzableBy(directory, targets[i], true, entry.size()).isEmpty()) {
-                verdicts[i] = verdict(entry, targets[i], PreviewStatus.IGNORED, IgnoreReason.UNSUPPORTED_FILE, null, null);
-            } else {
-                wanted.add(targets[i]);
-            }
-        }
+        placeEntries(directory, base, entries, targets, verdicts);
+        List<String> wanted = scannableTargets(directory, entries, targets, verdicts);
 
         // pass 3: is it already there, or on its way
         Set<String> existing = existingPaths(directory, wanted);
@@ -140,6 +108,48 @@ public class UploadPreviewService {
         List<String> placed = java.util.Arrays.stream(targets).filter(java.util.Objects::nonNull).toList();
         return new PreviewResponse(directory.getId(), libraryType, roots(directory, libraryType, base, placed),
                 List.of(verdicts), uploadBytes, uploadFiles);
+    }
+
+    /** Pass 1: where does everything go, and is that a storable, unique place. */
+    private static void placeEntries(DirectoryEntity directory, String base, List<Entry> entries,
+                                     String[] targets, PreviewEntry[] verdicts) {
+        Set<String> seen = new HashSet<>();
+        for (int i = 0; i < entries.size(); i++) {
+            Entry entry = entries.get(i);
+            try {
+                String relativeTarget = PathStrings.join(base, LibraryPathValidator.requireRelative(entry.relativePath()));
+                String target = LibraryPathValidator.resolve(directory.getPath(), relativeTarget);
+                if (seen.add(target)) {
+                    targets[i] = target;
+                } else {
+                    verdicts[i] = verdict(entry, target, PreviewStatus.DUPLICATE, null, null, null);
+                }
+            } catch (IllegalArgumentException e) {
+                verdicts[i] = verdict(entry, null, PreviewStatus.INVALID, null, e.getMessage(), null);
+            }
+        }
+    }
+
+    /** Pass 2: would the scan pick it up. Returns the targets it would; the others get their verdict here. */
+    private List<String> scannableTargets(DirectoryEntity directory, List<Entry> entries,
+                                          String[] targets, PreviewEntry[] verdicts) {
+        List<String> wanted = new ArrayList<>();
+        for (int i = 0; i < entries.size(); i++) {
+            if (targets[i] == null) {
+                continue;
+            }
+            Entry entry = entries.get(i);
+            Optional<String> prunedAt = firstPrunedAncestor(directory, targets[i]);
+            if (prunedAt.isPresent()) {
+                verdicts[i] = verdict(entry, targets[i], PreviewStatus.IGNORED, IgnoreReason.FOLDER_NOT_SCANNED,
+                        relativeTo(directory, prunedAt.get()), null);
+            } else if (scanners.analyzableBy(directory, targets[i], true, entry.size()).isEmpty()) {
+                verdicts[i] = verdict(entry, targets[i], PreviewStatus.IGNORED, IgnoreReason.UNSUPPORTED_FILE, null, null);
+            } else {
+                wanted.add(targets[i]);
+            }
+        }
+        return wanted;
     }
 
     private static PreviewStatus status(String target, Set<String> busy, Set<String> existing) {

@@ -90,23 +90,25 @@ public class UploadCleanupScheduler {
         List<DirectoryEntity> own = directoryRepository
                 .findByDirectoryTypeAndNodeEntity(DirectoryType.LIBRARY, nodeService.getOrCreateNodeEntityForThisNode());
         for (DirectoryEntity directory : own) {
-            if (directory.getStorageKind() == StorageKind.S3) {
-                continue;
+            if (directory.getStorageKind() != StorageKind.S3) {
+                sweepStaging(Path.of(directory.getPath(), LibraryWriteStore.STAGING_DIR), active);
             }
-            Path staging = Path.of(directory.getPath(), LibraryWriteStore.STAGING_DIR);
-            if (!Files.isDirectory(staging)) {
-                continue;
-            }
-            try (Stream<Path> sessions = Files.list(staging)) {
-                for (Path sessionDir : sessions.filter(Files::isDirectory).toList()) {
-                    if (!active.contains(sessionDir.getFileName().toString()) && !isActiveNow(sessionDir)) {
-                        log.info("Removing orphan upload staging {}", sessionDir);
-                        deleteRecursively(sessionDir);
-                    }
+        }
+    }
+
+    private void sweepStaging(Path staging, Set<String> active) {
+        if (!Files.isDirectory(staging)) {
+            return;
+        }
+        try (Stream<Path> sessions = Files.list(staging)) {
+            for (Path sessionDir : sessions.filter(Files::isDirectory).toList()) {
+                if (!active.contains(sessionDir.getFileName().toString()) && !isActiveNow(sessionDir)) {
+                    log.info("Removing orphan upload staging {}", sessionDir);
+                    deleteRecursively(sessionDir);
                 }
-            } catch (IOException e) {
-                log.warn("Could not sweep {}: {}", staging, e.getMessage());
             }
+        } catch (IOException e) {
+            log.warn("Could not sweep {}: {}", staging, e.getMessage());
         }
     }
 
