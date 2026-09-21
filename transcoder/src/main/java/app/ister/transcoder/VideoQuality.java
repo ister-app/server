@@ -23,6 +23,18 @@ public enum VideoQuality {
         this.height = height;
     }
 
+    /**
+     * The VBV ceiling ({@code -maxrate} and {@code -bufsize}): twice the target. Without
+     * one, {@code -b:v} is only an average — x264 spent 16 Mbit/s on the opening
+     * seconds of a "2000k" stream, eight times what the master playlist advertises,
+     * and a browser on a modest link stalls on exactly such a segment while hls.js'
+     * bandwidth estimate said the rendition would fit. Null for COPY.
+     */
+    public String getMaxRate() {
+        if (bitrate == null) return null;
+        return Integer.parseInt(bitrate.substring(0, bitrate.length() - 1)) * 2 + "k";
+    }
+
     public static VideoQuality fromLabel(String label) {
         for (VideoQuality q : values()) {
             if (q.label.equals(label)) return q;

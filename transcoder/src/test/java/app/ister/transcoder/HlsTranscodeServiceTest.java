@@ -824,6 +824,9 @@ class HlsTranscodeServiceTest {
         assertContainsSequence(args, "-c:v", "libx264");
         assertContainsSequence(args, "-vf", "scale=1280:720");
         assertContainsSequence(args, "-b:v", "2000k");
+        // A ceiling, so no segment blows through what the master advertises.
+        assertContainsSequence(args, "-maxrate", "4000k");
+        assertContainsSequence(args, "-bufsize", "4000k");
         assertContainsSequence(args, "-preset", "ultrafast");
     }
 

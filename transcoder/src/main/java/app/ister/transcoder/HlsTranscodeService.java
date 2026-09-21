@@ -691,7 +691,9 @@ public class HlsTranscodeService {
             String preset = hw.preset();
             output.addArguments("-c:v", codec)
                     .addArguments("-vf", hw.scaleFilter(quality.getScale()))
-                    .addArguments("-b:v", quality.getBitrate());
+                    .addArguments("-b:v", quality.getBitrate())
+                    .addArguments("-maxrate", quality.getMaxRate())
+                    .addArguments("-bufsize", quality.getMaxRate());
             if (preset != null) {
                 output.addArguments("-preset", preset);
             }
@@ -1039,7 +1041,9 @@ public class HlsTranscodeService {
             output.addArguments("-t", String.format(Locale.ROOT, "%.6f", duration))
                     .addArguments("-c:v", codec)
                     .addArguments("-vf", hw.scaleFilter(quality.getScale()))
-                    .addArguments("-b:v", quality.getBitrate());
+                    .addArguments("-b:v", quality.getBitrate())
+                    .addArguments("-maxrate", quality.getMaxRate())
+                    .addArguments("-bufsize", quality.getMaxRate());
             if (preset != null) {
                 output.addArguments("-preset", preset);
             }
