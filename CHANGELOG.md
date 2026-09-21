@@ -1,5 +1,49 @@
 # Changelog
 
+## server v5.0.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `5.0.0` |
+| `ghcr.io/ister-app/migrations` | `5.0.0` |
+
+### Breaking changes
+
+- feat(disk)!: drop the subtitle OCR pipeline ([`8f23213`](https://github.com/ister-app/server/commit/8f23213))
+
+### Features
+
+- feat(playqueue): stable media file order and the playing file on the queue ([`5863d7e`](https://github.com/ister-app/server/commit/5863d7e))
+- feat(disk): abandoned upload cleanup ([`f55f6d4`](https://github.com/ister-app/server/commit/f55f6d4))
+- feat(disk): resumable library upload endpoints ([`3f2894d`](https://github.com/ister-app/server/commit/3f2894d))
+- feat(disk): upload preview with real scanner parsers ([`60b9d0e`](https://github.com/ister-app/server/commit/60b9d0e))
+- feat(core): report directory writability ([`8aa938b`](https://github.com/ister-app/server/commit/8aa938b))
+- feat(core): LibraryWriteStore for local and S3 directories ([`8cf8c71`](https://github.com/ister-app/server/commit/8cf8c71))
+- feat(core): library path validator and multipart object store ([`a18fdcf`](https://github.com/ister-app/server/commit/a18fdcf))
+- feat(database): upload session tables (V50) ([`dd69e5b`](https://github.com/ister-app/server/commit/dd69e5b))
+- feat(transcoder): serve bitmap subtitles as sprite sheets ([`073a077`](https://github.com/ister-app/server/commit/073a077))
+
+### Fixes
+
+- fix(transcoder): number renditions that share a name and language ([`9d1baa3`](https://github.com/ister-app/server/commit/9d1baa3))
+
+### Other
+
+- test(disk): cover upload cleanup and replaced-file publishing ([`7890cd5`](https://github.com/ister-app/server/commit/7890cd5))
+- refactor: resolve sonarcloud issues in upload and playqueue code ([`b08c13f`](https://github.com/ister-app/server/commit/b08c13f))
+- docs: admin media upload (en+nl) ([`e029b54`](https://github.com/ister-app/server/commit/e029b54))
+- refactor(disk): share scanner selection between scan and handler ([`e78b469`](https://github.com/ister-app/server/commit/e78b469))
+- refactor(transcoder): keep the subtitle parser helpers with their only user ([`83904c9`](https://github.com/ister-app/server/commit/83904c9))
+- refactor: resolve the open SonarCloud issues ([`fb50283`](https://github.com/ister-app/server/commit/fb50283))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:5.0.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v4.2.1...v5.0.0
+
 ## server v4.2.1
 
 | Image | Tag |
