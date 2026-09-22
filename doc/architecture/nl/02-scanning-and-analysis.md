@@ -59,9 +59,13 @@ kleine letters, samengetrokken spaties — gespiegeld door de gegenereerde kolom
 artiest zijn. De lookup is **per library** gescoped, met een fallback naar een library-loze persoon
 (bijvoorbeeld een TMDB-acteur) die dan aan de library gehangen wordt — geen enkele globale lookup.
 De opgeslagen `name` houdt de eerst geziene schrijfwijze als weergavenaam.
-`ArtistTagParser` splitst een `feat.`/`ft.`/`featuring`-tag in de primaire artiest en haar gasten;
-op een ampersand wordt nooit gesplitst, want "Simon & Garfunkel" en "Mumford & Sons" zijn
-bandnamen.
+`ArtistTagParser` splitst een `feat.`/`ft.`/`featuring`-tag in de primaire artiest en haar gasten.
+Een samenwerking — "A & B", "A, B", "A / B", "A + B" of de "A;B" die ffprobe van een tag met
+meerdere waarden maakt — wordt alleen gesplitst als **elk** deel een persoon is die de server al
+kent (in de library, of library-loos zoals een TMDB-acteur) en de hele naam zelf geen
+albumartiest is: "Victoria Justice & Elizabeth Gillies" wordt twee credits, terwijl "Mumford & Sons"
+("Sons" is niemand) en "Selena Gomez & The Scene" (heeft albums) één act blijven. Het eerste deel
+wordt de trackartiest, de rest krijgt een featured-credit.
 
 ### Opslagsoorten en de S3-scan
 

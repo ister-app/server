@@ -21,6 +21,10 @@ public final class ArtistTagParser {
             Pattern.compile("\\b(?:featuring|feat|ft)\\b\\.?", Pattern.CASE_INSENSITIVE);
     private static final Pattern GUEST_SEPARATOR =
             Pattern.compile("[,&/+]|\\band\\b", Pattern.CASE_INSENSITIVE);
+    // The separators of a collaboration credit: "A & B", "A, B", "A / B", "A + B", and the ";"
+    // ffprobe joins a multi-valued artist tag with. "&" and "+" need spaces around them, so
+    // "R&B" or "Florence+the Machine" never come apart here.
+    private static final Pattern COLLABORATION_SEPARATOR = Pattern.compile("\\s&\\s|\\s\\+\\s|[,;/]");
 
     private ArtistTagParser() {
     }
@@ -59,6 +63,23 @@ public final class ArtistTagParser {
 
     private static boolean isSeparator(char c) {
         return Character.isWhitespace(c) || c == '(' || c == '[' || c == ')' || c == ']';
+    }
+
+    /**
+     * The performers a primary artist would stand for if it were a collaboration: "Victoria Justice
+     * &amp; Elizabeth Gillies" → both names. This only splits; whether the credit really is two
+     * people is the caller's call ("Mumford &amp; Sons" splits just the same here). A name without
+     * a separator, or with an empty part, comes back as the single name.
+     */
+    public static List<String> collaborators(String primary) {
+        if (primary == null || primary.isBlank()) return List.of();
+        List<String> parts = new ArrayList<>();
+        for (String part : COLLABORATION_SEPARATOR.split(primary, -1)) {
+            String name = part.strip();
+            if (name.isEmpty()) return List.of(primary.strip());
+            if (parts.stream().noneMatch(name::equalsIgnoreCase)) parts.add(name);
+        }
+        return List.copyOf(parts);
     }
 
     /** The primary artist of a tag, or null when the tag is empty. */

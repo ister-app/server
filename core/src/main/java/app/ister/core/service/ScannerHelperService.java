@@ -141,6 +141,16 @@ public class ScannerHelperService {
                 });
     }
 
+    /**
+     * The person {@link #getOrCreatePerson(LibraryEntity, String)} would return for this name, without
+     * creating one: the library's own artist, else a library-less person (a TMDB actor).
+     */
+    public Optional<PersonEntity> findPerson(LibraryEntity libraryEntity, String name) {
+        String normalized = PersonNames.normalize(name);
+        return personRepository.findFirstByLibraryEntityAndNameNormalizedOrderByDateCreatedAsc(libraryEntity, normalized)
+                .or(() -> personRepository.findFirstByNameNormalizedAndLibraryEntityIsNullOrderByDateCreatedAsc(normalized));
+    }
+
     private PersonEntity fillBirthYearIfMissing(PersonEntity person, Integer year) {
         if (year != null && person.getBirthYear() == null) {
             person.setBirthYear(year);

@@ -168,6 +168,28 @@ class ScannerHelperServiceTest {
     }
 
     @Test
+    void findPersonPrefersTheLibrarysOwnArtist() {
+        PersonEntity own = PersonEntity.builder().name("Victoria Justice").build();
+        when(personRepository.findFirstByLibraryEntityAndNameNormalizedOrderByDateCreatedAsc(library, "victoria justice"))
+                .thenReturn(Optional.of(own));
+
+        assertEquals(Optional.of(own), subject.findPerson(library, "Victoria  JUSTICE"));
+        verify(personRepository, never()).findFirstByNameNormalizedAndLibraryEntityIsNullOrderByDateCreatedAsc(any());
+    }
+
+    @Test
+    void findPersonFallsBackToALibrarylessPersonWithoutCreatingOne() {
+        PersonEntity actor = PersonEntity.builder().name("Elizabeth Gillies").build();
+        when(personRepository.findFirstByLibraryEntityAndNameNormalizedOrderByDateCreatedAsc(library, "elizabeth gillies"))
+                .thenReturn(Optional.empty());
+        when(personRepository.findFirstByNameNormalizedAndLibraryEntityIsNullOrderByDateCreatedAsc("elizabeth gillies"))
+                .thenReturn(Optional.of(actor));
+
+        assertEquals(Optional.of(actor), subject.findPerson(library, "Elizabeth Gillies"));
+        verify(personRepository, never()).save(any());
+    }
+
+    @Test
     void getOrCreatePersonReturnsExistingArtist() {
         PersonEntity existing = PersonEntity.builder().name("The Beatles").build();
         when(personRepository.findFirstByLibraryEntityAndNameNormalizedOrderByDateCreatedAsc(library, "the beatles"))

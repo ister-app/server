@@ -1422,4 +1422,112 @@ class HandleAudioFileFoundTest {
         verify(metadataRepositoryMock).save(captor.capture());
         return captor.getValue();
     }
+
+    /** Runs the handler over a track whose file carries [artistTag]; returns the credits it saved. */
+    private List<TrackCreditEntity> handleTrackWithArtistTag(TrackEntity track, String artistTag) {
+        DirectoryEntity directory = DirectoryEntity.builder().build();
+        ReflectionTestUtils.setField(directory, "id", DIRECTORY_ID);
+        UUID mediaFileId = UUID.randomUUID();
+        MediaFileEntity mediaFile = MediaFileEntity.builder().path(PATH).size(1000L).build();
+        ReflectionTestUtils.setField(mediaFile, "id", mediaFileId);
+        ReflectionTestUtils.setField(track, "id", TRACK_ID);
+
+        FFprobe ffprobe = mock(FFprobe.class, RETURNS_SELF);
+        FFprobeResult result = mock(FFprobeResult.class);
+        Format format = mock(Format.class);
+        when(jaffreeMock.getFFPROBE()).thenReturn(ffprobe);
+        when(ffprobe.execute()).thenReturn(result);
+        when(result.getFormat()).thenReturn(format);
+        when(format.getTag(anyString())).thenReturn(null);
+        when(format.getTag("track")).thenReturn("1");
+        when(format.getTag("disc")).thenReturn("1");
+        when(format.getTag("title")).thenReturn("Take A Hint");
+        when(format.getTag("artist")).thenReturn(artistTag);
+
+        when(directoryRepositoryMock.findById(DIRECTORY_ID)).thenReturn(Optional.of(directory));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPathForUpdate(directory, PATH)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directory, PATH)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileRepositoryMock.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
+        when(mediaFileFoundCheckForStreamsMock.checkForStreams(any(), any(), any()))
+                .thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 180000L));
+        when(trackRepositoryMock.findById(TRACK_ID)).thenReturn(Optional.of(track));
+
+        subject.handle(AudioFileFoundData.builder()
+                .eventType(EventType.AUDIO_FILE_FOUND)
+                .directoryEntityUUID(DIRECTORY_ID)
+                .trackEntityUUID(TRACK_ID)
+                .path(PATH).build());
+
+        ArgumentCaptor<TrackCreditEntity> credits = ArgumentCaptor.forClass(TrackCreditEntity.class);
+        verify(trackCreditRepositoryMock, atLeastOnce()).save(credits.capture());
+        return credits.getAllValues();
+    }
+
+    private static PersonEntity person(LibraryEntity library, String name) {
+        PersonEntity person = PersonEntity.builder().libraryEntity(library).name(name).build();
+        ReflectionTestUtils.setField(person, "id", UUID.randomUUID());
+        return person;
+    }
+
+    private static TrackEntity compilationTrack(LibraryEntity library, PersonEntity albumArtist) {
+        AlbumEntity album = AlbumEntity.builder().libraryEntity(library).personEntity(albumArtist)
+                .name("VICTORiOUS 2.0").releaseYear(2012).build();
+        return TrackEntity.builder().personEntity(albumArtist).albumEntity(album).number(1).discNumber(1)
+                .metadataEntities(new ArrayList<>()).build();
+    }
+
+    @Test
+    void handleSplitsADuetWhenBothSingersAreKnown() {
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
+        PersonEntity cast = person(library, "Victorious Cast");
+        PersonEntity victoria = person(library, "Victoria Justice");
+        // Known only as a TMDB actor: no library yet.
+        PersonEntity elizabeth = person(null, "Elizabeth Gillies");
+        TrackEntity track = compilationTrack(library, cast);
+        when(scannerHelperServiceMock.findPerson(library, "Victoria Justice & Elizabeth Gillies")).thenReturn(Optional.empty());
+        when(scannerHelperServiceMock.findPerson(library, "Victoria Justice")).thenReturn(Optional.of(victoria));
+        when(scannerHelperServiceMock.findPerson(library, "Elizabeth Gillies")).thenReturn(Optional.of(elizabeth));
+        when(scannerHelperServiceMock.getOrCreatePerson(library, "Victoria Justice")).thenReturn(victoria);
+        when(scannerHelperServiceMock.getOrCreatePerson(library, "Elizabeth Gillies")).thenReturn(elizabeth);
+
+        List<TrackCreditEntity> credits = handleTrackWithArtistTag(track, "Victoria Justice & Elizabeth Gillies");
+
+        assertEquals(victoria, track.getPersonEntity());
+        assertEquals(List.of(victoria, elizabeth), credits.stream().map(TrackCreditEntity::getPersonEntity).toList());
+        assertEquals(List.of(TrackCreditType.PRIMARY, TrackCreditType.FEATURED),
+                credits.stream().map(TrackCreditEntity::getCreditType).toList());
+        verify(scannerHelperServiceMock, never()).getOrCreatePerson(library, "Victoria Justice & Elizabeth Gillies");
+    }
+
+    @Test
+    void handleKeepsABandWhoseSecondHalfIsNobody() {
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
+        PersonEntity band = person(library, "Mumford & Sons");
+        PersonEntity mumford = person(library, "Mumford");
+        TrackEntity track = compilationTrack(library, person(library, "Various Artists"));
+        when(scannerHelperServiceMock.findPerson(library, "Mumford & Sons")).thenReturn(Optional.empty());
+        when(scannerHelperServiceMock.findPerson(library, "Mumford")).thenReturn(Optional.of(mumford));
+        when(scannerHelperServiceMock.findPerson(library, "Sons")).thenReturn(Optional.empty());
+        when(scannerHelperServiceMock.getOrCreatePerson(library, "Mumford & Sons")).thenReturn(band);
+
+        List<TrackCreditEntity> credits = handleTrackWithArtistTag(track, "Mumford & Sons");
+
+        assertEquals(band, track.getPersonEntity());
+        assertEquals(List.of(band), credits.stream().map(TrackCreditEntity::getPersonEntity).toList());
+    }
+
+    @Test
+    void handleKeepsAnActThatOwnsAlbumsWhole() {
+        LibraryEntity library = LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music").build();
+        PersonEntity act = person(library, "Selena Gomez & The Scene");
+        TrackEntity track = compilationTrack(library, person(library, "Various Artists"));
+        when(scannerHelperServiceMock.findPerson(library, "Selena Gomez & The Scene")).thenReturn(Optional.of(act));
+        when(albumRepositoryMock.existsByPersonEntity(act)).thenReturn(true);
+        when(scannerHelperServiceMock.getOrCreatePerson(library, "Selena Gomez & The Scene")).thenReturn(act);
+
+        List<TrackCreditEntity> credits = handleTrackWithArtistTag(track, "Selena Gomez & The Scene");
+
+        assertEquals(act, track.getPersonEntity());
+        assertEquals(List.of(act), credits.stream().map(TrackCreditEntity::getPersonEntity).toList());
+    }
 }

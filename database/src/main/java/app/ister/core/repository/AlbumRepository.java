@@ -45,6 +45,8 @@ public interface AlbumRepository extends JpaRepository<AlbumEntity, UUID> {
 
     List<AlbumEntity> findByPersonEntityId(UUID personId);
 
+    boolean existsByPersonEntity(PersonEntity personEntity);
+
     /**
      * Albums the artist appears on without owning them: at least one track is credited to the
      * artist while the album artist is someone else. Compilations and guest appearances, in other

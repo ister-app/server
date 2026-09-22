@@ -58,8 +58,12 @@ column), so "ABBA" on one album and "Abba" on the next are one artist. The looku
 library**, with a fallback to a library-less person (a TMDB actor, say) that is then attached to
 the library — not a single global lookup. The stored `name` keeps the
 spelling seen first, as the display value. `ArtistTagParser` splits a `feat.`/`ft.`/`featuring` tag
-into the primary artist and its guests; an ampersand is never split, because "Simon & Garfunkel"
-and "Mumford & Sons" are single acts.
+into the primary artist and its guests. A collaboration credit — "A & B", "A, B", "A / B", "A + B" or
+the "A;B" ffprobe makes of a multi-valued tag — is split only when **every** part is a person the
+server already knows (in the library, or library-less like a TMDB actor) and the whole name is not
+an album artist itself: "Victoria Justice & Elizabeth Gillies" becomes two credits, while "Mumford &
+Sons" ("Sons" is nobody) and "Selena Gomez & The Scene" (owns albums) stay one act. The first part
+becomes the track artist, the rest are credited as featured.
 
 ### Storage kinds and the S3 scan
 

@@ -5,6 +5,7 @@ import app.ister.core.status.ActivitySubjects;
 import app.ister.core.entity.AlbumEntity;
 import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.DirectoryEntity;
+import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MediaFileStreamEntity;
 import app.ister.core.entity.MetadataEntity;
@@ -69,6 +70,7 @@ import java.util.Comparator;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -340,19 +342,41 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         if (tagArtist == null) return;
         var library = track.getAlbumEntity().getLibraryEntity();
         ArtistTagParser.Credits credits = ArtistTagParser.parse(tagArtist);
+        List<String> performers = performersOf(library, credits.primary());
+        String primaryName = performers.getFirst();
 
-        PersonEntity primary = credits.primary().equals(track.getPersonEntity().getName())
+        PersonEntity primary = primaryName.equals(track.getPersonEntity().getName())
                 ? track.getPersonEntity()
-                : scannerHelperService.getOrCreatePerson(library, credits.primary());
+                : scannerHelperService.getOrCreatePerson(library, primaryName);
         if (!primary.equals(track.getPersonEntity())) {
             track.setPersonEntity(primary);
             trackRepository.save(track);
         }
 
-        List<PersonEntity> guests = credits.featured().stream()
+        List<PersonEntity> guests = Stream.concat(performers.stream().skip(1), credits.featured().stream())
                 .map(name -> scannerHelperService.getOrCreatePerson(library, name))
                 .toList();
         writeTrackCredits(track, primary, guests);
+    }
+
+    /**
+     * Splits a collaboration credit ("Victoria Justice &amp; Elizabeth Gillies") into its performers,
+     * but only when every part is a person the server already knows and the whole name is not an
+     * album artist itself. Nothing in the tag tells "Mumford &amp; Sons" or "Selena Gomez &amp; The
+     * Scene" apart from a duet — known people are the only evidence, and inventing an artist is worse
+     * than missing a credit. The first performer becomes the track artist, the others are credited
+     * as featured.
+     */
+    private List<String> performersOf(LibraryEntity library, String primary) {
+        List<String> parts = ArtistTagParser.collaborators(primary);
+        if (parts.size() < 2) return List.of(primary);
+        boolean isAnAct = scannerHelperService.findPerson(library, primary)
+                .filter(albumRepository::existsByPersonEntity)
+                .isPresent();
+        if (isAnAct) return List.of(primary);
+        boolean allKnown = parts.stream()
+                .allMatch(name -> scannerHelperService.findPerson(library, name).isPresent());
+        return allKnown ? parts : List.of(primary);
     }
 
     /**

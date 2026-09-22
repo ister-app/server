@@ -77,4 +77,23 @@ class ArtistTagParserTest {
     void primaryReturnsTheArtistWithoutGuests() {
         assertEquals("Mark Mancina", ArtistTagParser.primary("Mark Mancina feat. Phil Collins"));
     }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "Victoria Justice & Elizabeth Gillies|Victoria Justice,Elizabeth Gillies",
+            "Sean Paul & David Guetta & Becky G|Sean Paul,David Guetta,Becky G",
+            "Marco Borsato;Guus Meeuwis|Marco Borsato,Guus Meeuwis",
+            "Earth, Wind & Fire|Earth,Wind,Fire",
+            "Alan Walker / Ava Max|Alan Walker,Ava Max",
+            "Anouk + Anouk|Anouk",
+    })
+    void collaboratorsSplitsOnEveryCollaborationSeparator(String name, String expected) {
+        assertEquals(List.of(expected.split(",")), ArtistTagParser.collaborators(name));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Adele", "R&B Allstars", "Florence+the Machine", "AC/", ", Adele"})
+    void collaboratorsKeepsANameWithoutACleanSplitWhole(String name) {
+        assertEquals(List.of(name.strip()), ArtistTagParser.collaborators(name));
+    }
 }
