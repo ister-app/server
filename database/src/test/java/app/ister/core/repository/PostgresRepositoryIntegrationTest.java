@@ -1023,6 +1023,33 @@ class PostgresRepositoryIntegrationTest {
                 PageRequest.of(0, 10)).isEmpty(), "the compilation's own artist does not appear on it");
     }
 
+    @Test
+    void unusedMusicArtistsAreTheOnesNothingRefersTo() {
+        LibraryEntity music = em.persist(LibraryEntity.builder().libraryType(LibraryType.MUSIC).name("Music-unused").build());
+        LibraryEntity books = em.persist(LibraryEntity.builder().libraryType(LibraryType.BOOK).name("Books-unused").build());
+        PersonEntity albumArtist = em.persist(PersonEntity.builder().libraryEntity(music).name("Victorious Cast-unused").build());
+        PersonEntity trackArtist = em.persist(PersonEntity.builder().libraryEntity(music).name("Victoria Justice-unused").build());
+        PersonEntity guest = em.persist(PersonEntity.builder().libraryEntity(music).name("Elizabeth Gillies-unused").build());
+        PersonEntity leftover = em.persist(PersonEntity.builder().libraryEntity(music)
+                .name("Victoria Justice & Elizabeth Gillies-unused").build());
+        em.persist(PersonEntity.builder().libraryEntity(books).name("Author without books-unused").build());
+        em.persist(PersonEntity.builder().name("TMDB actor-unused").build());
+        AlbumEntity album = em.persist(AlbumEntity.builder().libraryEntity(music).personEntity(albumArtist)
+                .name("VICTORiOUS 2.0").releaseYear(2012).build());
+        TrackEntity track = em.persist(TrackEntity.builder().albumEntity(album).personEntity(trackArtist).number(1).discNumber(1).build());
+        em.persist(TrackCreditEntity.builder().trackEntity(track).personEntity(trackArtist)
+                .creditType(TrackCreditType.PRIMARY).position(0).build());
+        em.persist(TrackCreditEntity.builder().trackEntity(track).personEntity(guest)
+                .creditType(TrackCreditType.FEATURED).position(1).build());
+        em.flush();
+
+        assertEquals(List.of(leftover.getId()), personRepository.findUnusedInMusicLibrary(music.getId()).stream()
+                        .map(PersonEntity::getId).toList(),
+                "album, track and featured-only artists stay; only the music library's leftover goes");
+        assertTrue(personRepository.findUnusedInMusicLibrary(books.getId()).isEmpty(),
+                "a book library's authors are never swept");
+    }
+
     /** Same shape for episodes: metadata title/air date across every show of the library. */
     @Test
     void episodeBrowseSortsOnMetadataAcrossShows() {

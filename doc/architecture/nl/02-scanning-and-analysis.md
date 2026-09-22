@@ -26,8 +26,11 @@ wandeling worden de rijen van bestanden die niet meer gezien zijn verwijderd (`S
 voor een MUSIC-library ruimt `OrphanTrackCleanupService` daarna de tracks zonder mediabestand en de
 albums zonder tracks op. Een verplaatst of hernoemd bestand komt terug als een *nieuwe* track, dus
 voordat een wees verdwijnt gaan zijn kijkstatus, wachtrij- en playlist-items en rating over naar de
-track van dezelfde artiest met dezelfde titel die nog wel een bestand heeft; elke verwijderde track
-en elk verwijderd album krijgt een delete in de zoekindex.
+track van dezelfde artiest met dezelfde titel die nog wel een bestand heeft. Artiesten waar niets
+meer naar verwijst (geen album, track, track-credit, filmcredit, boek, hoofdstuk of serie) gaan ook
+weg — meestal een gesplitste samenwerking zoals "A & B". De credits worden herschreven door de
+analyse die op de scan volgt, dus zo'n artiest verdwijnt bij de *volgende* scan. Elke verwijderde
+track, elk album en elke artiest krijgt een delete in de zoekindex.
 
 `HandleMediaFileFound` doet zijn ffprobe-/ffmpeg-werk (streams, duur, cropdetectie, afleveringsgrenzen,
 de achtergrondstill) *buiten* elke transactie en slaat het resultaat op in één kort

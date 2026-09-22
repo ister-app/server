@@ -6,6 +6,8 @@ import app.ister.core.enums.LibraryType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -39,4 +41,20 @@ public interface PersonRepository extends JpaRepository<PersonEntity, UUID> {
     List<PersonEntity> findByNameAndBirthYearIsNull(String name);
 
     Optional<PersonEntity> findFirstByNameAndLibraryEntityIsNull(String name);
+
+    /**
+     * Artists of a music library that nothing refers to any more: no album, track or track credit,
+     * no film credit, book, audiobook chapter or series. Left behind when a re-scan credits a track
+     * to someone else — "A &amp; B" once stood for a duet that now credits A and B.
+     */
+    @Query("select p from PersonEntity p where p.libraryEntity.id = :libraryId"
+            + " and p.libraryEntity.libraryType = app.ister.core.enums.LibraryType.MUSIC"
+            + " and not exists (select a from AlbumEntity a where a.personEntity = p)"
+            + " and not exists (select t from TrackEntity t where t.personEntity = p)"
+            + " and not exists (select c from TrackCreditEntity c where c.personEntity = p)"
+            + " and not exists (select c from CreditEntity c where c.personEntity = p)"
+            + " and not exists (select b from BookEntity b where b.personEntity = p)"
+            + " and not exists (select c from ChapterEntity c where c.personEntity = p)"
+            + " and not exists (select s from SeriesEntity s where s.personEntity = p)")
+    List<PersonEntity> findUnusedInMusicLibrary(@Param("libraryId") UUID libraryId);
 }

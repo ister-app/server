@@ -13,6 +13,7 @@ import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.SearchEntityType;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.MetadataRepository;
+import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.PlayQueueItemRepository;
 import app.ister.core.repository.PlaylistItemRepository;
 import app.ister.core.repository.RatingRepository;
@@ -54,6 +55,8 @@ class OrphanTrackCleanupServiceTest {
     @Mock
     private RatingRepository ratingRepository;
     @Mock
+    private PersonRepository personRepository;
+    @Mock
     private ServerEventService serverEventService;
 
     private final LibraryEntity library = LibraryEntity.builder().id(UUID.randomUUID()).libraryType(LibraryType.MUSIC).build();
@@ -64,7 +67,7 @@ class OrphanTrackCleanupServiceTest {
     void nonMusicLibraryIsLeftAlone() {
         LibraryEntity shows = LibraryEntity.builder().id(UUID.randomUUID()).libraryType(LibraryType.SHOW).build();
         assertEquals(0, subject.cleanUp(shows));
-        verifyNoInteractions(trackRepository, albumRepository);
+        verifyNoInteractions(trackRepository, albumRepository, personRepository);
     }
 
     @Test
@@ -141,5 +144,18 @@ class OrphanTrackCleanupServiceTest {
         verify(ratingRepository).deleteAll(List.of(rating));
         verify(albumRepository).delete(album);
         verify(serverEventService).createSearchDeleteEvent(SearchEntityType.ALBUM, album.getId());
+    }
+
+    @Test
+    void artistsNothingRefersToAreDeletedWithTheirSearchDocuments() {
+        PersonEntity duet = PersonEntity.builder().id(UUID.randomUUID()).name("Victoria Justice & Elizabeth Gillies").build();
+        when(trackRepository.findOrphansInLibrary(library.getId())).thenReturn(List.of());
+        when(albumRepository.findEmptyInLibrary(library.getId())).thenReturn(List.of());
+        when(personRepository.findUnusedInMusicLibrary(library.getId())).thenReturn(List.of(duet));
+
+        subject.cleanUp(library);
+
+        verify(personRepository).delete(duet);
+        verify(serverEventService).createSearchDeleteEvent(SearchEntityType.PERSON, duet.getId());
     }
 }

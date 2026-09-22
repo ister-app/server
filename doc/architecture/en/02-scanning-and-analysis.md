@@ -25,8 +25,11 @@ After the walk the rows of files that were not seen again are deleted (`ScannedC
 MUSIC library `OrphanTrackCleanupService` then removes the tracks left without a media file and the
 albums left without tracks. A moved or renamed file comes back as a *new* track, so before an
 orphan is deleted its watch status, play-queue and playlist items and rating are handed over to the
-track by the same artist with the same title that still has a file; every removed track and album
-gets a delete in the search index.
+track by the same artist with the same title that still has a file. Artists nothing refers to any
+more (no album, track, track credit, film credit, book, chapter or series) are removed too —
+typically a split collaboration credit such as "A & B". The credits are rewritten by the analysis
+that follows the scan, so such an artist disappears on the *next* scan. Every removed track, album
+and artist gets a delete in the search index.
 
 `HandleMediaFileFound` does its ffprobe/ffmpeg work (streams, duration, crop detection, episode
 boundaries, the background still) *outside* any transaction and persists the result in one short

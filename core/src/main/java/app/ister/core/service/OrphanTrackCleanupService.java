@@ -3,6 +3,7 @@ package app.ister.core.service;
 import app.ister.core.entity.AlbumEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MetadataEntity;
+import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.PlayQueueItemEntity;
 import app.ister.core.entity.PlaylistItemEntity;
 import app.ister.core.entity.RatingEntity;
@@ -12,6 +13,7 @@ import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.SearchEntityType;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.MetadataRepository;
+import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.PlayQueueItemRepository;
 import app.ister.core.repository.PlaylistItemRepository;
 import app.ister.core.repository.RatingRepository;
@@ -32,7 +34,8 @@ import java.util.Set;
  * linger as empty rows: the album shows up twice, once without playable tracks. A moved or
  * renamed file comes back as a <em>new</em> track, so before an orphan is deleted its listening
  * history (watch status, play-queue and playlist items, rating) is handed over to the track by
- * the same artist with the same title that still has a file, if there is one.
+ * the same artist with the same title that still has a file, if there is one. Artists nothing
+ * refers to any more go too: they would otherwise stay in the library's artist list.
  */
 @Service
 @Slf4j
@@ -45,6 +48,7 @@ public class OrphanTrackCleanupService {
     private final PlayQueueItemRepository playQueueItemRepository;
     private final PlaylistItemRepository playlistItemRepository;
     private final RatingRepository ratingRepository;
+    private final PersonRepository personRepository;
     private final ServerEventService serverEventService;
 
     /** @return the number of orphaned tracks removed */
@@ -69,6 +73,13 @@ public class OrphanTrackCleanupService {
             ratingRepository.deleteAll(ratingRepository.findByAlbumEntity(album));
             albumRepository.delete(album);
             serverEventService.createSearchDeleteEvent(SearchEntityType.ALBUM, album.getId());
+        }
+        // Track credits are rewritten by the analysis that follows a scan, so an artist emptied
+        // there (a split "A & B" credit) is only seen here on the next scan.
+        for (PersonEntity person : personRepository.findUnusedInMusicLibrary(library.getId())) {
+            log.info("Artist {} ({}) has no albums, tracks or credits left; deleting it", person.getId(), person.getName());
+            personRepository.delete(person);
+            serverEventService.createSearchDeleteEvent(SearchEntityType.PERSON, person.getId());
         }
         return orphans.size();
     }
