@@ -1,5 +1,25 @@
 # Changelog
 
+## server v5.0.1
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `5.0.1` |
+| `ghcr.io/ister-app/migrations` | `5.0.1` |
+
+### Fixes
+
+- fix(transcoder): cap the bitrate of a transcoded video rendition ([`191e22e`](https://github.com/ister-app/server/commit/191e22e))
+- fix(transcoder): strip closed-caption markup from subtitle cues ([`86bcea7`](https://github.com/ister-app/server/commit/86bcea7))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:5.0.1
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v5.0.0...v5.0.1
+
 ## server v5.0.0
 
 | Image | Tag |
