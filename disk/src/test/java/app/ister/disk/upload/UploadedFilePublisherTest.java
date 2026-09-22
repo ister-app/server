@@ -42,6 +42,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -192,7 +193,7 @@ class UploadedFilePublisherTest {
         publisher.published(comics, comicEpub.getPath(), 5L);
 
         ArgumentCaptor<EpubFileFoundData> epubs = ArgumentCaptor.forClass(EpubFileFoundData.class);
-        verify(messageSender, org.mockito.Mockito.times(2)).sendEpubFileFound(epubs.capture(), eq("disk"));
+        verify(messageSender, times(2)).sendEpubFileFound(epubs.capture(), eq("disk"));
         assertThat(epubs.getAllValues()).extracting(EpubFileFoundData::getPath)
                 .containsExactly(epub.getPath(), comicEpub.getPath());
         ArgumentCaptor<ComicFileFoundData> comic = ArgumentCaptor.forClass(ComicFileFoundData.class);
