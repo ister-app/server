@@ -1,5 +1,30 @@
 # Changelog
 
+## server v5.1.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `5.1.0` |
+| `ghcr.io/ister-app/migrations` | `5.1.0` |
+
+### Features
+
+- feat(disk): remove music artists nothing refers to after a scan ([`c918e92`](https://github.com/ister-app/server/commit/c918e92))
+- feat(disk): split a collaboration artist tag when every performer is known ([`f926cb3`](https://github.com/ister-app/server/commit/f926cb3))
+
+### Other
+
+- refactor(transcoder): trim cue lines with two patterns instead of one alternation ([`2c254ab`](https://github.com/ister-app/server/commit/2c254ab))
+- refactor: resolve two SonarCloud findings ([`188af03`](https://github.com/ister-app/server/commit/188af03))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:5.1.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v5.0.1...v5.1.0
+
 ## server v5.0.1
 
 | Image | Tag |
