@@ -84,7 +84,7 @@ class MediaFileInputResolverTest {
 
     private static MediaFileEntity fileOnS3(UUID id, UUID directoryId) {
         DirectoryEntity dir = DirectoryEntity.builder().name("shows-s3").path("s3://bucket/media")
-                .storageKind(StorageKind.S3).s3Connection("minio").s3Bucket("bucket").s3Prefix("media").build();
+                .storageKind(StorageKind.S3).s3Connection("garage").s3Bucket("bucket").s3Prefix("media").build();
         ReflectionTestUtils.setField(dir, "id", directoryId);
         MediaFileEntity file = MediaFileEntity.builder().path("s3://bucket/media/a.mkv").directoryEntity(dir).build();
         ReflectionTestUtils.setField(file, "id", id);
@@ -96,7 +96,7 @@ class MediaFileInputResolverTest {
     void s3FileOnAnAttachedNodeResolvesToTheLoopbackProxy() {
         UUID id = UUID.randomUUID();
         when(tokens.getDownloadToken()).thenReturn("tok");
-        when(registry.byConnection("minio")).thenReturn(Optional.of(mock(ObjectStore.class)));
+        when(registry.byConnection("garage")).thenReturn(Optional.of(mock(ObjectStore.class)));
         MediaFileEntity file = fileOnS3(id, UUID.randomUUID());
 
         assertThat(resolver.isS3(file)).isTrue();
@@ -109,12 +109,12 @@ class MediaFileInputResolverTest {
     void s3FileResolvesToAPresignedUrlWhenFfmpegDirectIsOn() {
         UUID id = UUID.randomUUID();
         ObjectStore store = mock(ObjectStore.class);
-        when(registry.byConnection("minio")).thenReturn(Optional.of(store));
+        when(registry.byConnection("garage")).thenReturn(Optional.of(store));
         when(registry.forEntity(org.mockito.ArgumentMatchers.any())).thenReturn(store);
-        when(store.presignGet("media/a.mkv", s3Properties.getPresignTtl())).thenReturn("https://minio/bucket/media/a.mkv?X-Amz-Signature=x");
+        when(store.presignGet("media/a.mkv", s3Properties.getPresignTtl())).thenReturn("https://garage/bucket/media/a.mkv?X-Amz-Signature=x");
         s3Properties.setFfmpegDirect(true);
 
-        assertThat(resolver.resolve(fileOnS3(id, UUID.randomUUID()))).startsWith("https://minio/bucket/media/a.mkv?X-Amz-");
+        assertThat(resolver.resolve(fileOnS3(id, UUID.randomUUID()))).startsWith("https://garage/bucket/media/a.mkv?X-Amz-");
     }
 
     /** A node without the connection (a helper) reads through any attached node. */
@@ -123,7 +123,7 @@ class MediaFileInputResolverTest {
         UUID id = UUID.randomUUID();
         UUID directoryId = UUID.randomUUID();
         when(tokens.getDownloadToken()).thenReturn("tok");
-        when(registry.byConnection("minio")).thenReturn(Optional.empty());
+        when(registry.byConnection("garage")).thenReturn(Optional.empty());
         NodeEntity self = NodeEntity.builder().name("local").url("http://local:8080").build();
         NodeEntity other = NodeEntity.builder().name("other").url("http://other:8080").build();
         when(directoryRepository.findAttachedNodes(directoryId)).thenReturn(List.of(self, other));
@@ -136,8 +136,8 @@ class MediaFileInputResolverTest {
 
     @Test
     void stripTokenAlsoHidesPresignedSignatures() {
-        assertThat(MediaFileInputResolver.stripToken("https://minio/b/k?X-Amz-Algorithm=AWS4&X-Amz-Signature=s"))
-                .isEqualTo("https://minio/b/k");
+        assertThat(MediaFileInputResolver.stripToken("https://garage/b/k?X-Amz-Algorithm=AWS4&X-Amz-Signature=s"))
+                .isEqualTo("https://garage/b/k");
         assertThat(MediaFileInputResolver.stripToken("http://n/mediaFile/x/download?token=t")).isEqualTo("http://n/mediaFile/x/download");
     }
 }

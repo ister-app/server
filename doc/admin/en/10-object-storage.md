@@ -23,8 +23,8 @@ Three things are independent and each optional:
 Credentials and endpoints live in named connections, in config only — never in the database:
 
 ```properties
-app.ister.s3.connections[0].name=minio
-app.ister.s3.connections[0].endpoint=http://minio:9000   # empty = AWS
+app.ister.s3.connections[0].name=garage
+app.ister.s3.connections[0].endpoint=http://garage:3900  # empty = AWS
 app.ister.s3.connections[0].region=us-east-1
 app.ister.s3.connections[0].bucket=ister
 app.ister.s3.connections[0].path-style=true             # required by most self-hosted servers
@@ -43,7 +43,7 @@ Instead of a `path`, a directory names a connection and, optionally, a key prefi
 ```properties
 app.ister.disk.directories[1].name=shows-s3
 app.ister.disk.directories[1].library=shows
-app.ister.disk.directories[1].s3-connection=minio
+app.ister.disk.directories[1].s3-connection=garage
 app.ister.disk.directories[1].prefix=media/shows
 ```
 
@@ -78,7 +78,7 @@ cache capped by `app.ister.s3.local-copy-max-bytes` (2 GiB).
 ## Shared cache
 
 ```properties
-app.ister.server.cache-s3-connection=minio
+app.ister.server.cache-s3-connection=garage
 app.ister.server.cache-s3-prefix=cache
 ```
 
@@ -95,7 +95,7 @@ per run, decided by a database lock), honouring the same dry-run flag.
 ## Shared transcode store
 
 ```properties
-app.ister.server.tmp-s3-connection=minio
+app.ister.server.tmp-s3-connection=garage
 app.ister.server.tmp-s3-prefix=tmp
 ```
 

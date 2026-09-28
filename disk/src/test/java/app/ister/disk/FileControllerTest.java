@@ -424,7 +424,7 @@ class FileControllerTest {
     private MediaFileEntity s3MediaFile(UUID id, app.ister.disk.storage.FakeObjectStore store, String key) {
         app.ister.core.entity.DirectoryEntity dir = app.ister.core.entity.DirectoryEntity.builder()
                 .name("s3-dir").path("s3://" + store.bucket()).storageKind(app.ister.core.enums.StorageKind.S3)
-                .s3Connection("minio").s3Bucket(store.bucket()).build();
+                .s3Connection("garage").s3Bucket(store.bucket()).build();
         MediaFileEntity entity = MediaFileEntity.builder().path("s3://" + store.bucket() + "/" + key).directoryEntity(dir).build();
         ReflectionTestUtils.setField(entity, "id", id);
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(entity));
@@ -507,7 +507,7 @@ class FileControllerTest {
         app.ister.disk.storage.FakeObjectStore store = new app.ister.disk.storage.FakeObjectStore("bucket")
                 .put("tv/cover.jpg", Files.readAllBytes(source));
         app.ister.core.entity.DirectoryEntity dir = app.ister.core.entity.DirectoryEntity.builder()
-                .name("s3-dir").path("s3://bucket").storageKind(app.ister.core.enums.StorageKind.S3).s3Connection("minio").s3Bucket("bucket").build();
+                .name("s3-dir").path("s3://bucket").storageKind(app.ister.core.enums.StorageKind.S3).s3Connection("garage").s3Bucket("bucket").build();
         ImageEntity image = ImageEntity.builder().path("s3://bucket/tv/cover.jpg").directoryEntity(dir).build();
         ReflectionTestUtils.setField(image, "id", id);
         when(imageRepository.findById(id)).thenReturn(Optional.of(image));

@@ -37,7 +37,7 @@ See [Object storage](10-object-storage.md). Connections are indexed lists (`APP_
 | Setting | Env var | Default | Notes |
 | --- | --- | --- | --- |
 | `app.ister.s3.connections[n].name` | | | referenced by directories and the shared stores |
-| `app.ister.s3.connections[n].endpoint` | | empty | empty = AWS; `http://minio:9000` for a self-hosted server |
+| `app.ister.s3.connections[n].endpoint` | | empty | empty = AWS; `http://garage:3900` for a self-hosted server |
 | `app.ister.s3.connections[n].region` | | `us-east-1` | |
 | `app.ister.s3.connections[n].bucket` | | | one bucket per connection |
 | `app.ister.s3.connections[n].path-style` | | `true` | path-style addressing, needed by MinIO/Garage/Ceph |

@@ -49,7 +49,7 @@ class S3LibraryScannerTest {
         DirectoryEntity dir = DirectoryEntity.builder()
                 .name("shows-s3")
                 .path(prefix.isEmpty() ? "s3://bucket" : "s3://bucket/" + prefix)
-                .storageKind(StorageKind.S3).s3Connection("minio").s3Bucket("bucket").s3Prefix(prefix)
+                .storageKind(StorageKind.S3).s3Connection("garage").s3Bucket("bucket").s3Prefix(prefix)
                 .libraryEntity(LibraryEntity.builder().libraryType(LibraryType.SHOW).name("shows").build())
                 .directoryType(DirectoryType.LIBRARY).build();
         org.springframework.test.util.ReflectionTestUtils.setField(dir, "id", UUID.randomUUID());

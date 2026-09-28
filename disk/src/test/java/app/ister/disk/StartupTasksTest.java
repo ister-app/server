@@ -319,7 +319,7 @@ class StartupTasksTest {
         app.ister.core.config.S3Properties.Connection c = new app.ister.core.config.S3Properties.Connection();
         c.setName(name);
         c.setBucket(bucket);
-        c.setEndpoint("http://minio:9000");
+        c.setEndpoint("http://garage:3900");
         props.getConnections().add(c);
         ReflectionTestUtils.setField(startupTasks, "s3Properties", props);
     }
@@ -329,9 +329,9 @@ class StartupTasksTest {
         NodeEntity node = nodeWithId(UUID.randomUUID());
         when(nodeService.updateOrCreateNodeEntityForThisNode()).thenReturn(node);
         when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node)).thenReturn(List.of());
-        s3Connection("minio", "media");
+        s3Connection("garage", "media");
         LibraryEntity library = LibraryEntity.builder().name("Shows").build();
-        when(config.getDirectories()).thenReturn(List.of(s3DirectoryConfig("shows-s3", "minio", "/shows/", "Shows")));
+        when(config.getDirectories()).thenReturn(List.of(s3DirectoryConfig("shows-s3", "garage", "/shows/", "Shows")));
         when(directoryRepository.findByName("shows-s3")).thenReturn(Optional.empty());
         when(libraryRepository.findByName("Shows")).thenReturn(Optional.of(library));
 
@@ -346,7 +346,7 @@ class StartupTasksTest {
         assertEquals("s3://media/shows", saved.getPath());
         assertEquals("shows", saved.getS3Prefix());
         assertEquals("media", saved.getS3Bucket());
-        assertEquals("minio", saved.getS3Connection());
+        assertEquals("garage", saved.getS3Connection());
         assertTrue(saved.getAttachedNodes().contains(node));
     }
 
@@ -357,12 +357,12 @@ class StartupTasksTest {
         other.setName("other");
         when(nodeService.updateOrCreateNodeEntityForThisNode()).thenReturn(node);
         when(directoryRepository.findByDirectoryTypeAndNodeEntity(DirectoryType.CACHE, node)).thenReturn(List.of(existingCacheDir(node)));
-        s3Connection("minio", "media");
+        s3Connection("garage", "media");
         DirectoryEntity existing = DirectoryEntity.builder().name("shows-s3").path("s3://media/shows")
-                .storageKind(app.ister.core.enums.StorageKind.S3).s3Connection("minio").s3Bucket("media").s3Prefix("shows")
+                .storageKind(app.ister.core.enums.StorageKind.S3).s3Connection("garage").s3Bucket("media").s3Prefix("shows")
                 .directoryType(DirectoryType.LIBRARY).build();
         ReflectionTestUtils.setField(existing, "id", UUID.randomUUID());
-        when(config.getDirectories()).thenReturn(List.of(s3DirectoryConfig("shows-s3", "minio", "shows", "Shows")));
+        when(config.getDirectories()).thenReturn(List.of(s3DirectoryConfig("shows-s3", "garage", "shows", "Shows")));
         when(directoryRepository.findByName("shows-s3")).thenReturn(Optional.of(existing));
         when(directoryRepository.findAttachedNodes(existing.getId())).thenReturn(List.of(other));
 
@@ -376,11 +376,11 @@ class StartupTasksTest {
     void s3DirectoryPointedAtAnotherPrefixRefusesToStart() {
         NodeEntity node = nodeWithId(UUID.randomUUID());
         when(nodeService.updateOrCreateNodeEntityForThisNode()).thenReturn(node);
-        s3Connection("minio", "media");
+        s3Connection("garage", "media");
         DirectoryEntity existing = DirectoryEntity.builder().name("shows-s3").path("s3://media/shows")
-                .storageKind(app.ister.core.enums.StorageKind.S3).s3Connection("minio").s3Bucket("media").s3Prefix("shows")
+                .storageKind(app.ister.core.enums.StorageKind.S3).s3Connection("garage").s3Bucket("media").s3Prefix("shows")
                 .directoryType(DirectoryType.LIBRARY).build();
-        when(config.getDirectories()).thenReturn(List.of(s3DirectoryConfig("shows-s3", "minio", "other-shows", "Shows")));
+        when(config.getDirectories()).thenReturn(List.of(s3DirectoryConfig("shows-s3", "garage", "other-shows", "Shows")));
         when(directoryRepository.findByName("shows-s3")).thenReturn(Optional.of(existing));
 
         ContextRefreshedEvent event = rootEvent();
@@ -393,14 +393,14 @@ class StartupTasksTest {
         NodeEntity node = nodeWithId(UUID.randomUUID());
         when(nodeService.updateOrCreateNodeEntityForThisNode()).thenReturn(node);
         DirectoryEntity existing = DirectoryEntity.builder().name("shows-s3").path("s3://media/shows")
-                .storageKind(app.ister.core.enums.StorageKind.S3).s3Connection("minio").s3Bucket("media").s3Prefix("shows")
+                .storageKind(app.ister.core.enums.StorageKind.S3).s3Connection("garage").s3Bucket("media").s3Prefix("shows")
                 .directoryType(DirectoryType.LIBRARY).build();
         when(config.getDirectories()).thenReturn(List.of(directoryConfig("shows-s3", "/media/shows", "Shows")));
         when(directoryRepository.findByName("shows-s3")).thenReturn(Optional.of(existing));
         ContextRefreshedEvent event = rootEvent();
         assertThrows(IllegalStateException.class, () -> startupTasks.onApplicationEvent(event));
 
-        s3Connection("minio", "media");
+        s3Connection("garage", "media");
         when(config.getDirectories()).thenReturn(List.of(s3DirectoryConfig("shows-s3", "nope", "shows", "Shows")));
         assertThrows(IllegalStateException.class, () -> startupTasks.onApplicationEvent(event));
     }

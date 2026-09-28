@@ -25,8 +25,8 @@ Credentials en endpoints staan in benoemde connecties, alleen in de configuratie
 database:
 
 ```properties
-app.ister.s3.connections[0].name=minio
-app.ister.s3.connections[0].endpoint=http://minio:9000   # leeg = AWS
+app.ister.s3.connections[0].name=garage
+app.ister.s3.connections[0].endpoint=http://garage:3900  # leeg = AWS
 app.ister.s3.connections[0].region=us-east-1
 app.ister.s3.connections[0].bucket=ister
 app.ister.s3.connections[0].path-style=true             # vereist door de meeste zelfgehoste servers
@@ -46,7 +46,7 @@ In plaats van een `path` noemt een directory een connectie en, optioneel, een ke
 ```properties
 app.ister.disk.directories[1].name=shows-s3
 app.ister.disk.directories[1].library=shows
-app.ister.disk.directories[1].s3-connection=minio
+app.ister.disk.directories[1].s3-connection=garage
 app.ister.disk.directories[1].prefix=media/shows
 ```
 
@@ -81,7 +81,7 @@ houdt het als LRU-cache, begrensd door `app.ister.s3.local-copy-max-bytes` (2 Gi
 ## Gedeelde cache
 
 ```properties
-app.ister.server.cache-s3-connection=minio
+app.ister.server.cache-s3-connection=garage
 app.ister.server.cache-s3-prefix=cache
 ```
 
@@ -99,7 +99,7 @@ gedeelde cache (één node per run, bepaald door een databaselock), met dezelfde
 ## Gedeelde transcode-opslag
 
 ```properties
-app.ister.server.tmp-s3-connection=minio
+app.ister.server.tmp-s3-connection=garage
 app.ister.server.tmp-s3-prefix=tmp
 ```
 

@@ -38,7 +38,7 @@ Zie [Objectopslag](10-object-storage.md). Connecties zijn geïndexeerde lijsten 
 | Instelling | Env var | Standaard | Opmerkingen |
 | --- | --- | --- | --- |
 | `app.ister.s3.connections[n].name` | | | waar directories en de gedeelde opslag naar verwijzen |
-| `app.ister.s3.connections[n].endpoint` | | leeg | leeg = AWS; `http://minio:9000` voor een zelfgehoste server |
+| `app.ister.s3.connections[n].endpoint` | | leeg | leeg = AWS; `http://garage:3900` voor een zelfgehoste server |
 | `app.ister.s3.connections[n].region` | | `us-east-1` | |
 | `app.ister.s3.connections[n].bucket` | | | één bucket per connectie |
 | `app.ister.s3.connections[n].path-style` | | `true` | path-style-adressering, nodig voor MinIO/Garage/Ceph |

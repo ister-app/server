@@ -49,7 +49,7 @@ public class S3Properties {
     @ToString(exclude = {"accessKey", "secretKey"})
     public static class Connection {
         private String name;
-        /** Empty = AWS (region-based endpoint); otherwise e.g. {@code http://minio:9000}. */
+        /** Empty = AWS (region-based endpoint); otherwise e.g. {@code http://garage:3900}. */
         private String endpoint;
         private String region = "us-east-1";
         private String bucket;
