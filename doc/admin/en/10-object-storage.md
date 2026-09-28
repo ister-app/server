@@ -112,9 +112,17 @@ the window.
 
 ## Local development
 
-`docker-compose-local.yml` ships a MinIO (`minio`, console on port 9001, `minioadmin`/`minioadmin`)
-plus a one-shot that creates the `ister` bucket; the commented environment block on the `server`
-service points a library at it. The integration tests run the same server through Testcontainers.
+`docker-compose-local.yml` ships a single-node [Garage](https://garagehq.deuxfleurs.fr/) (`garage`,
+S3 API on port 3900) plus a `garage-init` one-shot: Garage has no root user, so `garage/init.sh`
+assigns the node its layout role over the admin API, imports the fixed access key
+`GK00000000000000000000000a` and creates the `ister` bucket for it. Its configuration is
+`garage/garage.toml`; the secrets in both files are public development values. The commented
+environment block on the `server` service points a library at it. The integration tests run Garage
+too, through Testcontainers.
+
+Garage (like several S3-compatible servers) rejects the AWS SDK's default aws-chunked checksum
+uploads over plain HTTP. Ister's own client only sends checksums when an operation requires them;
+keep that in mind when pointing another SDK-based tool at the same bucket.
 
 ## Where to next
 

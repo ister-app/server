@@ -117,10 +117,17 @@ venster niets meer voor gepubliceerd is.
 
 ## Lokaal ontwikkelen
 
-`docker-compose-local.yml` bevat een MinIO (`minio`, console op poort 9001,
-`minioadmin`/`minioadmin`) plus een one-shot die de bucket `ister` aanmaakt; het uitgecommentarieerde
-environment-blok op de `server`-service wijst er een library naartoe. De integratietests draaien
-dezelfde server via Testcontainers.
+`docker-compose-local.yml` bevat een single-node [Garage](https://garagehq.deuxfleurs.fr/)
+(`garage`, S3-API op poort 3900) plus een one-shot `garage-init`: Garage heeft geen root-gebruiker,
+dus `garage/init.sh` geeft de node via de admin-API zijn layout-rol, importeert de vaste access key
+`GK00000000000000000000000a` en maakt daarvoor de bucket `ister` aan. De configuratie staat in
+`garage/garage.toml`; de geheimen in beide bestanden zijn publieke ontwikkelwaarden. Het
+uitgecommentarieerde environment-blok op de `server`-service wijst er een library naartoe. Ook de
+integratietests draaien Garage, via Testcontainers.
+
+Garage weigert (net als meerdere S3-compatibele servers) de standaard aws-chunked checksum-uploads
+van de AWS SDK over plain HTTP. Ister's eigen client stuurt alleen checksums als een operatie ze
+vereist; houd daar rekening mee als je een ander SDK-gebaseerd hulpmiddel op dezelfde bucket richt.
 
 ## Verder lezen
 

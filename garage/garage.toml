@@ -1,0 +1,19 @@
+# Single-node Garage for LOCAL DEVELOPMENT only (docker-compose-local.yml): the rpc_secret and
+# admin_token are fixed, public values. garage/init.sh bootstraps the node over the admin API.
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+db_engine = "sqlite"
+replication_factor = 1
+rpc_bind_addr = "[::]:3901"
+rpc_public_addr = "127.0.0.1:3901"
+rpc_secret = "0000000000000000000000000000000000000000000000000000000000000000"
+
+[s3_api]
+# The AWS SDK's default region, so a client needs no region setting.
+s3_region = "us-east-1"
+api_bind_addr = "[::]:3900"
+root_domain = ".s3.garage.localhost"
+
+[admin]
+api_bind_addr = "[::]:3903"
+admin_token = "localdevtoken"

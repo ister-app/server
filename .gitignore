@@ -40,6 +40,7 @@ out/
 ### Database files
 db-data/
 db-data-1/
+garage-data/
 
 ### Quick-start volumes (docker-compose.yml)
 media/
