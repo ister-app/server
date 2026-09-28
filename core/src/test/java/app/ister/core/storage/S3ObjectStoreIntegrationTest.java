@@ -4,10 +4,8 @@ import app.ister.core.config.S3Properties;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.MinIOContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
@@ -32,16 +30,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * {@link S3ObjectStore} against a real MinIO: the S3-compatible path (endpoint override,
+ * {@link S3ObjectStore} against a real Garage: the S3-compatible path (endpoint override,
  * path-style, checksums only when required) that AWS-only code tends to get wrong.
  */
 @Testcontainers(disabledWithoutDocker = true)
 class S3ObjectStoreIntegrationTest {
 
     @Container
-    // MinIO no longer publishes to Docker Hub; the Quay image is the same server.
-    static final MinIOContainer MINIO = new MinIOContainer(DockerImageName
-            .parse("quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z").asCompatibleSubstituteFor("minio/minio"));
+    static final GarageContainer GARAGE = new GarageContainer();
 
     static S3ObjectStore store;
 
@@ -49,20 +45,20 @@ class S3ObjectStoreIntegrationTest {
     static void createBucket() {
         try (S3Client client = S3Client.builder()
                 .region(Region.US_EAST_1)
-                .endpointOverride(URI.create(MINIO.getS3URL()))
+                .endpointOverride(URI.create(GARAGE.getS3URL()))
                 .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(MINIO.getUserName(), MINIO.getPassword())))
+                        AwsBasicCredentials.create(GARAGE.getAccessKey(), GARAGE.getSecretKey())))
                 .forcePathStyle(true)
                 .httpClientBuilder(UrlConnectionHttpClient.builder())
                 .build()) {
             client.createBucket(CreateBucketRequest.builder().bucket("ister").build());
         }
         S3Properties.Connection connection = new S3Properties.Connection();
-        connection.setName("minio");
-        connection.setEndpoint(MINIO.getS3URL());
+        connection.setName("garage");
+        connection.setEndpoint(GARAGE.getS3URL());
         connection.setBucket("ister");
-        connection.setAccessKey(MINIO.getUserName());
-        connection.setSecretKey(MINIO.getPassword());
+        connection.setAccessKey(GARAGE.getAccessKey());
+        connection.setSecretKey(GARAGE.getSecretKey());
         store = new S3ObjectStore(connection);
     }
 

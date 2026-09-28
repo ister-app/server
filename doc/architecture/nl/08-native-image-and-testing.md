@@ -50,8 +50,11 @@ een migratie die ergens al toegepast is.
 - `jimfs` (in-memory filesystem) draagt de disk-/bestandspad-tests; `FakeObjectStore` (disk-tests) is
   de in-memory stand-in voor een S3-bucket, en `CacheStoreMocks` stubt de cache-store-naad in handler-tests.
 - `S3ObjectStoreIntegrationTest` (core) en `S3LibraryScanIntegrationTest` (server) draaien tegen een
-  echte MinIO via Testcontainers — MinIO publiceert niet meer naar Docker Hub, dus de tests halen
-  `quay.io/minio/minio`. De AWS SDK v2 (`software.amazon.awssdk:s3` + `url-connection-client`)
+  echte [Garage](https://garagehq.deuxfleurs.fr/) via Testcontainers (`GarageContainer`, een
+  test-fixture van core die de single-node-layout toewijst en een vaste access key importeert; MinIO
+  publiceert geen publieke images meer). Garage weigert de standaard aws-chunked checksum-uploads van
+  de SDK over plain HTTP, daarom gebruikt elke S3-client — productie en test — checksums
+  `WHEN_REQUIRED`. De AWS SDK v2 (`software.amazon.awssdk:s3` + `url-connection-client`)
   levert zijn eigen native-image-reachability-metadata; er waren geen handmatige hints voor nodig.
 - **ffmpeg moet op `PATH` staan** — de transcoder-tests shellen ernaar uit, en CI installeert het
   vóór de build.

@@ -152,9 +152,10 @@ parsers and `(directory, path)` uniqueness are unchanged. Rules:
   stays local; `HlsService` publishes stable segments/playlists/done markers to `tmp/{mediaFileId}/`
   and reads them through into the local tmp dir on a miss. Transcode DTOs carry `requestingNodeUrl`
   for the no-shared-tmp case (S3 file requested on node A, transcoded on node B → pushed to A).
-- Tests: `FakeObjectStore` + `CacheStoreMocks` (disk tests); MinIO via Testcontainers
-  (`quay.io/minio/minio`, Docker Hub no longer serves it) in `S3ObjectStoreIntegrationTest` and
-  `S3LibraryScanIntegrationTest`. `TmpStoreProvider` has two constructors: the Spring one is
+- Tests: `FakeObjectStore` + `CacheStoreMocks` (disk tests); Garage via Testcontainers
+  (`GarageContainer`, a core `testFixtures` class; MinIO no longer publishes public images) in
+  `S3ObjectStoreIntegrationTest` and `S3LibraryScanIntegrationTest`. Any S3 client talking to it
+  needs checksums `WHEN_REQUIRED`, as `S3ObjectStore` has. `TmpStoreProvider` has two constructors: the Spring one is
   `@Autowired` (AOT needs that). See `doc/admin/en/10-object-storage.md`.
 
 ## Architecture: HLS Transcoding (transcoder module)

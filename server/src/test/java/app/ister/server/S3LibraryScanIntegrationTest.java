@@ -14,6 +14,7 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.ShowRepository;
 import app.ister.core.service.MessageSender;
+import app.ister.core.storage.GarageContainer;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -28,14 +29,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.web.client.RestTemplate;
-import org.testcontainers.containers.MinIOContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
+import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
 import software.amazon.awssdk.regions.Region;
@@ -56,7 +57,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * End-to-end S3 flow against real PostgreSQL, RabbitMQ and MinIO: a SHOW library whose directory
+ * End-to-end S3 flow against real PostgreSQL, RabbitMQ and Garage: a SHOW library whose directory
  * is a bucket prefix. Startup registers the directory as an ownerless S3 directory attached to
  * this node, the scan lists the prefix, the media-file analysis reads the object through ffprobe,
  * and the node proxies the object with byte ranges for other nodes (and its own ffmpeg).
@@ -67,17 +68,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         "app.ister.disk.libraries[0].name=it-shows",
         "app.ister.disk.libraries[0].type=SHOW",
         "app.ister.disk.directories[0].name=it-shows-s3",
-        "app.ister.disk.directories[0].s3-connection=minio",
+        "app.ister.disk.directories[0].s3-connection=garage",
         "app.ister.disk.directories[0].prefix=/media/shows/",
         "app.ister.disk.directories[0].library=it-shows",
         // ffprobe reads a presigned URL here: the loopback proxy needs a fixed server.port,
         // which a RANDOM_PORT test does not have. The proxy itself is asserted over HTTP below.
         "app.ister.s3.ffmpeg-direct=true",
         // The cluster-shared S3 cache: derived files (the episode still) land in the bucket too.
-        "app.ister.server.cache-s3-connection=minio",
+        "app.ister.server.cache-s3-connection=garage",
         "app.ister.server.cache-s3-prefix=cache",
         // The cluster-shared HLS tmp store: playlists and segments are published to the bucket too.
-        "app.ister.server.tmp-s3-connection=minio",
+        "app.ister.server.tmp-s3-connection=garage",
         "app.ister.server.tmp-s3-prefix=tmp",
 })
 @Testcontainers(disabledWithoutDocker = true)
@@ -92,8 +93,7 @@ class S3LibraryScanIntegrationTest {
     static final RabbitMQContainer RABBIT = new RabbitMQContainer("rabbitmq:3-alpine");
 
     @Container
-    static final MinIOContainer MINIO = new MinIOContainer(DockerImageName
-            .parse("quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z").asCompatibleSubstituteFor("minio/minio"));
+    static final GarageContainer GARAGE = new GarageContainer();
 
     private static final String BUCKET = "ister";
     private static final String MKV_KEY = "media/shows/Show (2024)/Season 01/s01e01.mkv";
@@ -101,11 +101,11 @@ class S3LibraryScanIntegrationTest {
 
     @DynamicPropertySource
     static void s3Connection(DynamicPropertyRegistry registry) {
-        registry.add("app.ister.s3.connections[0].name", () -> "minio");
-        registry.add("app.ister.s3.connections[0].endpoint", MINIO::getS3URL);
+        registry.add("app.ister.s3.connections[0].name", () -> "garage");
+        registry.add("app.ister.s3.connections[0].endpoint", GARAGE::getS3URL);
         registry.add("app.ister.s3.connections[0].bucket", () -> BUCKET);
-        registry.add("app.ister.s3.connections[0].access-key", MINIO::getUserName);
-        registry.add("app.ister.s3.connections[0].secret-key", MINIO::getPassword);
+        registry.add("app.ister.s3.connections[0].access-key", GARAGE::getAccessKey);
+        registry.add("app.ister.s3.connections[0].secret-key", GARAGE::getSecretKey);
     }
 
     @Autowired private MessageSender messageSender;
@@ -237,10 +237,14 @@ class S3LibraryScanIntegrationTest {
     private static S3Client s3Client() {
         return S3Client.builder()
                 .region(Region.US_EAST_1)
-                .endpointOverride(URI.create(MINIO.getS3URL()))
+                .endpointOverride(URI.create(GARAGE.getS3URL()))
                 .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(MINIO.getUserName(), MINIO.getPassword())))
+                        AwsBasicCredentials.create(GARAGE.getAccessKey(), GARAGE.getSecretKey())))
                 .forcePathStyle(true)
+                // as S3ObjectStore does: the SDK's default flexible checksums make it sign plain-HTTP
+                // uploads as aws-chunked with a checksum trailer, which Garage rejects
+                .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
+                .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
                 .httpClientBuilder(UrlConnectionHttpClient.builder())
                 .build();
     }

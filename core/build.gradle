@@ -1,6 +1,7 @@
 
 plugins {
     id 'java-library'
+    id 'java-test-fixtures'
 }
 
 dependencies {
@@ -31,7 +32,8 @@ dependencies {
     // Testing Dependencies
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    // S3ObjectStore against a real MinIO (skipped when no container runtime)
+    // S3ObjectStore against a real Garage (skipped when no container runtime); GarageContainer is a
+    // test fixture so the server module's S3 integration test uses the same one
     testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
-    testImplementation 'org.testcontainers:testcontainers-minio'
+    testFixturesApi 'org.testcontainers:testcontainers'
 }

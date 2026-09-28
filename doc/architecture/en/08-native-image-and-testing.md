@@ -47,8 +47,10 @@ Never edit a migration that has been applied anywhere.
 - `jimfs` (in-memory filesystem) backs the disk/file-path tests; `FakeObjectStore` (disk tests) is the
   in-memory stand-in for an S3 bucket, and `CacheStoreMocks` stubs the cache-store seam in handler tests.
 - `S3ObjectStoreIntegrationTest` (core) and `S3LibraryScanIntegrationTest` (server) run against a
-  real MinIO through Testcontainers — MinIO no longer publishes to Docker Hub, so the tests pull
-  `quay.io/minio/minio`. The AWS SDK v2 (`software.amazon.awssdk:s3` + `url-connection-client`)
+  real [Garage](https://garagehq.deuxfleurs.fr/) through Testcontainers (`GarageContainer`, a core
+  test fixture that assigns the single-node layout and imports a fixed access key; MinIO no longer
+  publishes public images). Garage rejects the SDK's default aws-chunked checksum uploads over plain
+  HTTP, which is why every S3 client — production and test — uses checksums `WHEN_REQUIRED`. The AWS SDK v2 (`software.amazon.awssdk:s3` + `url-connection-client`)
   ships its own native-image reachability metadata; no hand-maintained hints were needed for it.
 - **ffmpeg must be on `PATH`** — the transcoder tests shell out to it, and CI installs it before the
   build.
