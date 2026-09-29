@@ -1,5 +1,31 @@
 # Changelog
 
+## server v5.1.1
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `5.1.1` |
+| `ghcr.io/ister-app/migrations` | `5.1.1` |
+
+### Dependency updates
+
+- fix(deps): update gradle 9.8.0, hibernate plugin 7.4.10, aws sdk 2.55.6, flyway 13.8.0 ([`9cb3032`](https://github.com/ister-app/server/commit/9cb3032))
+
+### Other
+
+- ci: build with GraalVM CE 25.4.4.1.1 (innovation 4) ([`b6f7a4e`](https://github.com/ister-app/server/commit/b6f7a4e))
+- docs: use Garage in the S3 configuration examples ([`0541180`](https://github.com/ister-app/server/commit/0541180))
+- chore: run Garage instead of MinIO as the local S3 server ([`824b528`](https://github.com/ister-app/server/commit/824b528))
+- test: run the S3 integration tests against Garage instead of MinIO ([`72e4a93`](https://github.com/ister-app/server/commit/72e4a93))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:5.1.1
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v5.1.0...v5.1.1
+
 ## server v5.1.0
 
 | Image | Tag |
