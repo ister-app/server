@@ -83,6 +83,8 @@ services:
       SPRING_RABBITMQ_USERNAME: user
       SPRING_RABBITMQ_PASSWORD: password
       OIDC_URL: http://keycloak:8060/realms/Ister
+      # Only tokens minted for the `ister` client are accepted (aud or azp).
+      OIDC_AUDIENCE: ister
       # API Read Access Token from https://www.themoviedb.org/settings/api.
       # Leave empty to skip metadata fetching (scanning still works).
       APP_ISTER_SERVER_TMDB_APIKEY: ""

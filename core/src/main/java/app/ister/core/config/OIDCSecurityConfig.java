@@ -12,6 +12,9 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
@@ -73,6 +76,25 @@ public class OIDCSecurityConfig {
         String path = URI.create(url).getPath();
         if (path == null || path.equals("/")) return "";
         return path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+    }
+
+    /**
+     * Opt-in audience check ({@code OIDC_AUDIENCE}). Spring Boot folds every
+     * {@code OAuth2TokenValidator<Jwt>} bean into the auto-configured {@code JwtDecoder}, so the
+     * check covers HTTP and the websocket {@code connection_init} alike without replacing the
+     * decoder. An empty property yields a pass-through validator: today's behaviour.
+     */
+    @Bean
+    public OAuth2TokenValidator<Jwt> audienceValidator(
+            @Value("${app.ister.server.oidc.audience:}") String audience) {
+        return audienceValidatorFor(audience);
+    }
+
+    static OAuth2TokenValidator<Jwt> audienceValidatorFor(String audience) {
+        if (audience == null || audience.isBlank()) {
+            return jwt -> OAuth2TokenValidatorResult.success();
+        }
+        return new AudienceOrAzpValidator(audience.trim());
     }
 
     @Bean

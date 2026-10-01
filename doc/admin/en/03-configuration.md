@@ -18,6 +18,7 @@ dedicated short env var, listed below. Defaults are sensible for a single-node h
 | Connection timeout (ms) | `DB_CONNECTION_TIMEOUT` | `10000` | how long a thread waits for a pooled connection before failing |
 | RabbitMQ | `SPRING_RABBITMQ_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` | `localhost`, `5672`, `user`/`password` | port defaults to the RabbitMQ default 5672 |
 | OIDC issuer | `OIDC_URL` | `http://keycloak:8060/realms/Ister` | Keycloak-compatible; the default matches the bundled dev Keycloak. Production: e.g. `https://keycloak.example.com/realms/Home` |
+| OIDC audience | `OIDC_AUDIENCE` | *(empty)* | Optional. When set, an access token must list it in `aud` or carry it as `azp` (the client id, e.g. `ister`). Empty = issuer and signature only, so tokens for other clients in the same realm are accepted too. |
 
 ## Identity and paths
 

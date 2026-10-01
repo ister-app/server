@@ -19,6 +19,7 @@ een single-node thuisopstelling.
 | Connectie-timeout (ms) | `DB_CONNECTION_TIMEOUT` | `10000` | hoe lang een thread op een poolverbinding wacht voordat het faalt |
 | RabbitMQ | `SPRING_RABBITMQ_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` | `localhost`, `5672`, `user`/`password` | poort valt terug op de RabbitMQ-standaard 5672 |
 | OIDC-issuer | `OIDC_URL` | `http://keycloak:8060/realms/Ister` | Keycloak-compatibel; de standaard matcht de meegeleverde dev-Keycloak. Productie: bijv. `https://keycloak.example.com/realms/Home` |
+| OIDC-audience | `OIDC_AUDIENCE` | *(leeg)* | Optioneel. Indien gezet moet een access-token de waarde in `aud` hebben of als `azp` dragen (de client-id, bijv. `ister`). Leeg = alleen issuer en handtekening, dus tokens voor andere clients in dezelfde realm worden ook geaccepteerd. |
 
 ## Identiteit en paden
 
