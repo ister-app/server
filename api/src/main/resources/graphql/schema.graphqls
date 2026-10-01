@@ -1,6 +1,11 @@
 type Query {
     "Admin only. Number of events whose handler kept failing and that wait in the dead-letter queue."
     deadLetterCount: Int!
+    """
+    Name, url and OIDC discovery url of this server, readable without a token (a player needs
+    them to start the login). The node list is only filled for an authenticated user; anonymous
+    callers get an empty list.
+    """
     getServerInfo: ServerInfo
     "Initial state for the serverActivity/nowPlaying subscriptions: last known cluster-wide status."
     serverActivitySnapshot: ServerActivitySnapshot!
