@@ -1,5 +1,28 @@
 # Changelog
 
+## server v5.2.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `5.2.0` |
+| `ghcr.io/ister-app/migrations` | `5.2.0` |
+
+### Features
+
+- feat(auth): optional audience check on access tokens (OIDC_AUDIENCE) ([`dfedf9a`](https://github.com/ister-app/server/commit/dfedf9a))
+
+### Fixes
+
+- fix(api): hide nodes from anonymous getServerInfo and guard root fields ([`29de6e4`](https://github.com/ister-app/server/commit/29de6e4))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:5.2.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v5.1.1...v5.2.0
+
 ## server v5.1.1
 
 | Image | Tag |
