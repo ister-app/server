@@ -1,5 +1,24 @@
 # Changelog
 
+## server v5.2.1
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `5.2.1` |
+| `ghcr.io/ister-app/migrations` | `5.2.1` |
+
+### Dependency updates
+
+- fix(deps): update gradle 9.8.1, aws sdk 2.55.14, openapi generator 7.26.0, feign 13.17, flyway image 13.10.0 ([`5fd6d57`](https://github.com/ister-app/server/commit/5fd6d57))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:5.2.1
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v5.2.0...v5.2.1
+
 ## server v5.2.0
 
 | Image | Tag |
