@@ -245,7 +245,10 @@ Hibernate/Feign/springdoc key segments stay verbatim; the env-var names inside t
 (`CACHE_DIR`, `DB_HOST`, `OIDC_URL`, …) are an interface used by the Helm chart and docker-compose — never
 rename them. `@TestPropertySource(locations=…)` cannot read YAML: tests that need a key set it inline with
 `properties = "…"`. The Helm chart (`../chart`, `server.config` in `values.yaml`) pins a copy of the tunable
-defaults: **when you change a default in a module YAML file, mirror it there.**
+defaults. Its `ci/config-sync.py` mirrors a changed default of an already pinned key automatically
+(nightly, after Renovate bumps the server tag) and CI there blocks on a key the server dropped; a
+**new** key is only reported there, so when you add a property decide in the chart whether it is a
+tunable (add to `server.config`) or chart-derived (env var in the templates + `CHART_MANAGED`).
 
 Essential runtime config:
 - PostgreSQL: `spring.datasource.url` (default: localhost/ister)
