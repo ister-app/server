@@ -49,8 +49,9 @@ Then run the application:
 ```
 
 Local dev credentials live in `docker-compose-local.yml` (DB `ister`/`ister`,
-RabbitMQ `user`/`password`). Machine-specific overrides go in `*-local.properties`
-files (gitignored), e.g. `core/src/main/resources/core-local.properties`. To run the whole
+RabbitMQ `user`/`password`). Machine-specific overrides go in `*-local.yaml`
+files (gitignored), e.g. `core/src/main/resources/core-local.yaml`, picked up as the `local`
+profile variant of the module's YAML file. To run the whole
 stack from images instead — including an OIDC provider (a development Keycloak with a
 pre-imported realm, `keycloak/Ister-realm.json`) — use the reference `docker-compose.yml`;
 the [quick start](doc/admin/en/01-quick-start.md) walks through it.
@@ -72,7 +73,7 @@ Everything is env-overridable; the most important settings:
 | Object storage (S3) | `app.ister.s3.connections[n].*`, `app.ister.disk.directories[n].s3-connection` / `.prefix`, `CACHE_S3_CONNECTION`, `TMP_S3_CONNECTION` | libraries in an S3-compatible bucket (AWS, MinIO, Garage, Ceph), attached to several nodes at once; optionally the cluster-shared cache and HLS transcode store — see the [object storage chapter](doc/admin/en/10-object-storage.md) |
 | Media upload | `UPLOAD_ENABLED`, `UPLOAD_CHUNK_SIZE`, `UPLOAD_MAX_ACTIVE_SESSIONS`, `UPLOAD_SESSION_IDLE_TIMEOUT`, `UPLOAD_MIN_FREE_SPACE` | admins upload media from the player into a chosen library directory (local disk or S3): scanner-backed preview, resumable chunks — see the [uploading media chapter](doc/admin/en/11-uploading-media.md) |
 | Node identity | `app.ister.server.name`, `app.ister.server.url`, `app.ister.cluster.name` | unique per node |
-| Libraries | `app.ister.disk.libraries[n].*`, `app.ister.disk.directories[n].*` | see `disk/src/main/resources/disk.properties` |
+| Libraries | `app.ister.disk.libraries[n].*`, `app.ister.disk.directories[n].*` | see `disk/src/main/resources/disk.yaml` |
 | Transcoder | `app.ister.transcoder.hls.*` | hwaccel (`vaapi`/`nvdec`), concurrency, timeouts |
 | Analysis backfills | `app.ister.server.crop-detect-backfill`, `app.ister.server.segment-detect-backfill` | both default `true`: the first scan after an upgrade re-analyzes every pre-existing file (crop) and fingerprints every episode (intro/outro) — set `false` to defer on very large libraries |
 | Segment detection | `app.ister.server.segment-detect.chunk-size` (4), `app.ister.server.blur-hash.chunk-size` (500) | chunked processing, sized against the RabbitMQ consumer timeout |
@@ -98,8 +99,11 @@ and HLS output are published to the bucket instead of pushed node-to-node.
 A single app-wide list of supported languages drives everything multilingual. It is configured as
 comma-separated **ISO-639-1 / BCP-47 tags** and defaults to `en,nl`:
 
-```properties
-app.ister.languages=${ISTER_LANGUAGES:en,nl}   # in core.properties
+```yaml
+# core.yaml
+app:
+  ister:
+    languages: "${ISTER_LANGUAGES:en,nl}"
 ```
 
 The list is exposed as `LanguageProperties` (`core/.../config/LanguageProperties.java`) and consumed

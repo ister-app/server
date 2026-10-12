@@ -12,7 +12,7 @@ updated — it is the canonical progress tracker for this effort.
 - **First action:** commit the current working-tree WIP (@BatchMapping N+1
   fixes, MessageSender dedup, HlsController filename validation) as a separate
   starting commit — it is finished and tested.
-- **TMDB token:** remove `core/src/main/resources/core-local.properties` from
+- **TMDB token:** remove `core/src/main/resources/core-local.yaml` from
   git tracking (keep the file on disk) and gitignore it. Gerben rotates the
   token himself at TMDB.
 - Verify with `./gradlew build` (or the affected module's tests) before each commit.
@@ -21,7 +21,7 @@ updated — it is the canonical progress tracker for this effort.
 ## Phase 0 — Baseline
 
 - [x] Commit current working-tree WIP as starting commit (c3f6ae4, docs in 1528db6)
-- [x] ~~Untrack `core-local.properties`~~ — **false positive**: the file was never
+- [x] ~~Untrack `core-local.yaml`~~ — **false positive**: the file was never
       tracked; the existing `**/*-local.*` gitignore pattern covers it and
       `git log --all` shows no history. No token rotation needed.
 
@@ -46,7 +46,7 @@ updated — it is the canonical progress tracker for this effort.
 - [x] `Handle.handle()` is now void; failure = throw (checked exceptions wrapped in
       new `EventHandlingException`). All 21 handlers converted, benign skips
       preserved as plain returns (6c9a7c5).
-- [x] Retry (3x, exponential backoff, core.properties) + `app.ister.server.dead-letter`
+- [x] Retry (3x, exponential backoff, core.yaml) + `app.ister.server.dead-letter`
       queue via `RepublishMessageRecoverer` in `core/.../RabbitReliabilityConfig` (6c9a7c5).
       Verified end-to-end in `server/.../IsterServerIntegrationTest` (828d101).
 - [ ] Recovery for poll timeouts in HlsService/HlsTranscodeService — picked up in

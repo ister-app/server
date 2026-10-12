@@ -40,7 +40,7 @@ its own directories.
 ## Retries and dead-lettering
 
 Failed listeners retry with exponential backoff (`spring.rabbitmq.listener.simple.retry.*` in
-`core.properties`: 3 attempts, 2s initial interval, multiplier 2). After the final failure a
+`core.yaml`: 3 attempts, 2s initial interval, multiplier 2). After the final failure a
 `RepublishMessageRecoverer` moves the message to the **`app.ister.server.dead-letter`** queue with
 the exception preserved in the message headers (`RabbitReliabilityConfig`). Failures that would
 look the same on the next attempt (a required column left null, a response the client cannot

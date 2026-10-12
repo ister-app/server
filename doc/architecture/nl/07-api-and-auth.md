@@ -26,14 +26,14 @@ Fouten worden centraal gemapt in `api/.../error/` — `RestExceptionHandler` voo
 `GraphQlExceptionResolver` voor GraphQL.
 
 De Spring Actuator draait op een aparte management-poort, **8081** (`management.server.port` in
-`core.properties`), zodat health/metrics niet op de publieke API-poort zitten. Zoeken in de
+`core.yaml`), zodat health/metrics niet op de publieke API-poort zitten. Zoeken in de
 podcastdirectory wordt geproxied via de gratis iTunes Search API (`ItunesSearchService`,
 api-module; de base-URL is een property, zoals elk extern endpoint).
 
 ## GraphQL
 
 Het schema staat in `api/src/main/resources/graphql/schema.graphqls`; de GraphQL-IDE (GraphiQL)
-staat **onvoorwaardelijk** aan — `spring.graphql.graphiql.enabled=true` in `core.properties` en
+staat **onvoorwaardelijk** aan — `spring.graphql.graphiql.enabled=true` in `core.yaml` en
 `/graphiql` is `permitAll` in `OIDCSecurityConfig` — niet alleen in dev. Naast queries en mutations
 zijn er vier websocket-subscriptions ([hoofdstuk 5](05-continue-watching-and-status.md)):
 

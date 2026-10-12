@@ -1,7 +1,7 @@
 {
   "resources": [
     {
-      "pattern": "disk.*\\.properties"
+      "pattern": "disk.*\\.yaml"
     },
     {
       "pattern": "iso-639-3\\.tab"

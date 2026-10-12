@@ -20,7 +20,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Failed event handling: listener retry is configured in core.properties
+ * Failed event handling: listener retry is configured in core.yaml
  * (spring.rabbitmq.listener.simple.retry.*); once retries are exhausted the message is
  * republished here instead of being dropped, with the exception preserved in the
  * x-exception-* headers. Messages in the dead-letter queue can be inspected and shoveled
@@ -61,7 +61,7 @@ public class RabbitReliabilityConfig {
         return true;
     }
 
-    /** Keeps the attempts/backoff from core.properties; only adds the classification above. */
+    /** Keeps the attempts/backoff from core.yaml; only adds the classification above. */
     @Bean
     public RabbitListenerRetrySettingsCustomizer skipRetriesForDeterministicFailures() {
         return settings -> settings.setExceptionPredicate(RabbitReliabilityConfig::isRetryable);

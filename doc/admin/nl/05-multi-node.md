@@ -60,12 +60,16 @@ te bezitten:
 
 Som de directorynamen op die de helper moet bedienen, en optioneel welke jobs:
 
-```properties
-app.ister.helper.disks[0].name=server-1-disk1-tv
-app.ister.helper.disks[1].name=server-1-disk1-movies
-app.ister.helper.disks[1].jobs=DETECT_SEGMENTS,SUBTITLES
-# standaard jobset voor schijven zonder eigen "jobs" (standaard: alle drie)
-app.ister.helper.jobs=TRANSCODE,DETECT_SEGMENTS,SUBTITLES
+```yaml
+app:
+  ister:
+    helper:
+      disks:
+        - name: server-1-disk1-tv
+        - name: server-1-disk1-movies
+          jobs: DETECT_SEGMENTS,SUBTITLES
+      # standaard jobset voor schijven zonder eigen "jobs" (standaard: alle drie)
+      jobs: TRANSCODE,DETECT_SEGMENTS,SUBTITLES
 ```
 
 De helper consumeert dan **dezelfde queues** als de eigenaar voor die directories, en RabbitMQ
@@ -80,9 +84,12 @@ mkvextract) — gebruik dezelfde image.
 Een eigenaar die zijn eigen CPU helemaal niet aan een jobfamilie wil besteden, kan die volledig
 uit handen geven:
 
-```properties
+```yaml
 # op de eigenaarsnode
-app.ister.helper.offload-jobs=DETECT_SEGMENTS,SUBTITLES
+app:
+  ister:
+    helper:
+      offload-jobs: DETECT_SEGMENTS,SUBTITLES
 ```
 
 Een helper leest ook de clusterbrede worker-queues mee (metadata, podcast-refresh,

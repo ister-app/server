@@ -1,0 +1,258 @@
+# core.yaml — shared server configuration, imported by server/src/main/resources/application.yaml.
+#
+# Conventions for every *.yaml config file in this repo:
+#   1. Every value containing ${...} is double-quoted: the defaults carry ':', '*' and spaces.
+#   2. An intentionally empty value is written as "" — a bare key is null, not empty.
+#   3. Map keys with dots (logger names) go in [brackets].
+#   4. Hibernate/Feign/springdoc key segments stay verbatim (default_batch_fetch_size,
+#      defaultRequestHeaders, clientId, oAuthFlow, TMDB): no relaxed-binding "normalisation".
+#   5. The env-var names inside the placeholders (CACHE_DIR, DB_HOST, OIDC_URL, ...) are an interface
+#      used by the Helm chart and docker-compose — never rename them.
+# Machine-local overrides go in the gitignored core-local.yaml (profile "local", which bootRun activates).
+
+logging:
+  group:
+    tomcat: app.ister.server
+  level:
+    "[app.ister.server.entitiy]": trace
+    tomcat: trace
+    # Jaffree logs every ffmpeg/ffprobe stderr line: metadata dumps, chapters, each cropdetect frame.
+    # During a library scan that is ~40k lines per 10 minutes, and the container log rotates away
+    # before anyone can read it. The handlers read what they need through OutputListeners, not the
+    # log, so only real ffmpeg errors are kept.
+    "[com.github.kokorin.jaffree.process.BaseStdReader]": ERROR
+    # "ProgressListener isn't set, progress won't be reported" on every ffmpeg run without one.
+    "[com.github.kokorin.jaffree.ffmpeg.FFmpeg]": ERROR
+
+springdoc:
+  swagger-ui:
+    # swagger-ui custom path
+    # path: /swagger-ui.html
+    oauth:
+      clientId: ister
+  oAuthFlow:
+    openIdConnectUrl: "${OIDC_URL:http://keycloak:8060/realms/Ister}/.well-known/openid-configuration"
+
+spring:
+  # Graphql
+  graphql:
+    graphiql:
+      enabled: true
+    # GraphQL subscriptions over websocket (graphql-transport-ws) on the same /graphql path.
+    # Auth happens via the connection_init payload, see GraphQlWebSocketAuthConfig (api module).
+    websocket:
+      path: /graphql
+      connection-init-timeout: 30s
+      keep-alive: 25s
+
+  # Spring security
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Default matches the development Keycloak bundled in docker-compose.yml (keycloak/Ister-realm.json).
+          issuer-uri: "${OIDC_URL:http://keycloak:8060/realms/Ister}"
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: true
+    properties:
+      hibernate:
+        # Load lazy associations in IN-batches instead of one query per entity (GraphQL
+        # resolvers touch many lazy collections per page of results).
+        default_batch_fetch_size: 50
+        bytecode:
+          provider: bytebuddy
+        auto_manage_bidirectional_associations: false
+
+  # Flyway migration settings
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
+
+  datasource:
+    url: "jdbc:postgresql://${DB_HOST:localhost}:${DB_PATH:5432}/${DB_NAME:ister}"
+    username: "${DB_USER:ister}"
+    password: "${DB_PASSWORD:ister}"
+    # Playback start (HLS playlist/segment requests + transcode orchestration + client
+    # heartbeats) fans out to many concurrent DB-touching requests; the Hikari default of
+    # 10 was exhausted in production, which starved the updatePlayQueue heartbeat for 30s
+    # per call. Fail faster instead: an interactive request that cannot get a connection
+    # within 10s is better retried (heartbeats fall back to the registry-based degraded
+    # publish) than queued for half a minute. Kept above a few seconds so batch RabbitMQ
+    # handlers ride out short bursts instead of burning retries.
+    hikari:
+      maximum-pool-size: "${DB_POOL_SIZE:20}"
+      connection-timeout: "${DB_CONNECTION_TIMEOUT:10000}"
+
+  rabbitmq:
+    host: localhost
+    username: user
+    password: password
+    listener:
+      simple:
+        # Prefetch=1: a consumer holds at most one unacknowledged message. The default (250)
+        # combined with slow per-message work (ffprobe) and RabbitMQ's 30-min consumer_timeout
+        # caused the oldest of a 250-message batch to time out, force-closing the channel and
+        # requeueing the whole batch -> the same files were re-processed (ffprobed) many times
+        # over. With prefetch=1 the timeout only ever applies to a single in-flight message.
+        prefetch: 1
+        # Process the per-directory backlogs in parallel. ffprobe/metadata work is I/O- and
+        # external-process-bound, so a few consumers per queue chew through the backlog far
+        # faster than one. A fixed concurrency (no max-concurrency) keeps this deterministic and
+        # avoids the listener's min<=max assert. Transcoding stays bounded by its own executor +
+        # concurrentFileSlots semaphore, so this does not oversubscribe the transcode passes.
+        concurrency: 3
+        # Failed listeners: retry with backoff, then RepublishMessageRecoverer moves the
+        # message to the dead-letter queue (see RabbitReliabilityConfig).
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 2s
+          multiplier: 2
+    # Publish with mandatory so the broker returns messages whose queue does not exist instead of
+    # dropping them; RabbitReliabilityConfig logs the return (see unroutableMessageLogger).
+    publisher-returns: true
+    template:
+      mandatory: true
+
+  cloud:
+    refresh:
+      enabled: false
+    openfeign:
+      lazy-attributes-resolution: false
+      client:
+        refresh-enabled: false
+        config:
+          # Tmdb settings
+          tmdb:
+            defaultRequestHeaders:
+              Authorization: "Bearer ${app.ister.server.TMDB.apikey}"
+            url: https://api.themoviedb.org
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  server:
+    port: 8081
+
+app:
+  ister:
+    # App-wide supported languages, ISO-639-1 / BCP-47 tags (comma-separated). First = primary.
+    # Drives both which languages TMDB metadata is fetched in and which languages search indexes.
+    languages: "${ISTER_LANGUAGES:en,nl}"
+
+    cluster:
+      # The name of the cluster.
+      name: "${app.ister.server.name}"
+
+    server:
+      # The name of the server this needs to be unique for every connected server.
+      name: Test server
+      # The url where the client and the other server can reach this server
+      url: http://localhost:8080
+      # Address the node reaches itself on for the S3 proxy (behind a gateway with request timeouts,
+      # keep this on the loopback address).
+      self-url: "${SELF_URL:http://127.0.0.1:${server.port:8080}}"
+
+      websocket:
+        # Extra origins allowed on the websocket handshake, on top of the public host derived from
+        # app.ister.server.url (see GraphQlWebSocketOriginConfig). Comma separated; "*" allows any origin.
+        allowed-origins: ""
+
+      oidc:
+        # Optional. When set, an access token must carry this value in `aud` or as `azp` (the client
+        # id the token was issued to; Keycloak always sets azp, `aud` needs an audience mapper).
+        # Empty = issuer and signature only, so a token minted for another client in the same realm
+        # is accepted too.
+        audience: "${OIDC_AUDIENCE:}"
+
+      ffmpeg-dir: "${FFMPEG_DIR:/usr/bin}"
+      tmp-dir: "${TMP_DIR:/tmp/ister/}"
+      cache-dir: "${CACHE_DIR:/cache/}"
+      # Unpacks DVD (VobSub) subtitle tracks for the bitmap-subtitle sprite sheets (HlsBitmapSubtitleService).
+      mkvextract: "${MKVEXTRACT:/usr/bin/mkvextract}"
+
+      # Daily zombie-cleanup of the image cache and transcode tmp dirs (see CacheCleanupScheduler /
+      # TmpTranscodeCleanupScheduler). Starts in dry-run so the first deploy only logs what it would
+      # remove; flip CACHE_CLEANUP_DRY_RUN=false once the log is verified.
+      cache-cleanup:
+        enabled: "${CACHE_CLEANUP_ENABLED:true}"
+        dry-run: "${CACHE_CLEANUP_DRY_RUN:true}"
+        cron: "${CACHE_CLEANUP_CRON:0 30 4 * * *}"
+        min-age: "${CACHE_CLEANUP_MIN_AGE:24h}"
+
+      # Downscaled artwork (ImageThumbnailCache) is regenerated on demand for one decode, and every
+      # cache hit touches the file, so it gets a longer idle window than the zombie sweep above: a
+      # thumbnail is only dropped when nobody has looked at that artwork in a month.
+      image-thumbnail:
+        max-idle: "${IMAGE_THUMBNAIL_MAX_IDLE:30d}"
+
+      # The precomputed continue-watching list (ContinueWatchingService). It is maintained incrementally
+      # by the playback heartbeat; the nightly rebuild is the repair for anything that wrote a watch
+      # status outside that path. history-days is how far back the list looks.
+      continue-watching:
+        history-days: "${CONTINUE_WATCHING_HISTORY_DAYS:150}"
+        rebuild:
+          enabled: "${CONTINUE_WATCHING_REBUILD_ENABLED:true}"
+        rebuild-cron: "${CONTINUE_WATCHING_REBUILD_CRON:0 30 3 * * *}"
+
+      TMDB:
+        # If you want to get metadata from the movie db set here you'r api read access token.
+        # apikey: API Read Access Token
+        # TMDB allows roughly 40 requests per second; stay safely below that.
+        max-requests-per-second: 30
+
+    # Admin media upload (POST /library-upload/**). chunk-size must fit the reverse proxy's request body limit.
+    upload:
+      enabled: "${UPLOAD_ENABLED:true}"
+      chunk-size: "${UPLOAD_CHUNK_SIZE:16MB}"
+      max-active-sessions: "${UPLOAD_MAX_ACTIVE_SESSIONS:2}"
+      max-files-per-session: "${UPLOAD_MAX_FILES_PER_SESSION:20000}"
+      max-concurrent-chunks: "${UPLOAD_MAX_CONCURRENT_CHUNKS:4}"
+      session-idle-timeout: "${UPLOAD_SESSION_IDLE_TIMEOUT:24h}"
+      cleanup-interval: "${UPLOAD_CLEANUP_INTERVAL:PT1H}"
+      min-free-space: "${UPLOAD_MIN_FREE_SPACE:5GB}"
+
+    # S3 object storage (see doc/admin: Object storage). Named connections; a directory refers to one
+    # by name (disk.yaml: app.ister.disk.directories[n].s3-connection). Works with AWS (leave the
+    # endpoint empty) and with any S3-compatible server (MinIO, Garage, Ceph RGW: set the endpoint,
+    # path-style stays on). Credentials live only here, never in the database.
+    s3:
+      # connections:
+      #   - name: garage
+      #     endpoint: "${S3_ENDPOINT:}"
+      #     region: "${S3_REGION:us-east-1}"
+      #     bucket: "${S3_BUCKET:}"
+      #     path-style: "${S3_PATH_STYLE:true}"
+      #     access-key: "${S3_ACCESS_KEY:}"
+      #     secret-key: "${S3_SECRET_KEY:}"
+      # ffmpeg reads S3 files through this node's own /mediaFile/{id}/download over the loopback address
+      # by default, so S3 needs to be reachable from the nodes only. Switch to presigned S3 URLs when the
+      # double hop through the node matters more than that isolation.
+      ffmpeg-direct: "${S3_FFMPEG_DIRECT:false}"
+      presign-ttl: "${S3_PRESIGN_TTL:2h}"
+      # Objects that must be read as a local file (epub/cbz/pdf) are cached here, LRU.
+      local-copy-dir: "${S3_LOCAL_COPY_DIR:${app.ister.server.tmp-dir}s3-scratch/}"
+      local-copy-max-bytes: "${S3_LOCAL_COPY_MAX_BYTES:2147483648}"
+
+    # Helper nodes (see doc/admin: Multi-node). A node always serves its own directories; on top of
+    # that it can help other nodes with the heavy job families TRANSCODE, DETECT_SEGMENTS and
+    # SUBTITLES for the directories listed here. It reads the source over HTTP from the owning node.
+    helper:
+      # disks:
+      #   - name: server-1-disk1-tv
+      #     jobs: DETECT_SEGMENTS,SUBTITLES
+      # Default job set for helper disks without their own "jobs" (default: all three).
+      # jobs: TRANSCODE,DETECT_SEGMENTS,SUBTITLES
+      # Owner side: job families this node does NOT run for its own directories; the messages wait
+      # on the queue until a helper picks them up.
+      # offload-jobs: ""
+      # Listener concurrency of the heavy disk handlers (intro detection, subtitle extraction).
+      concurrency: "${spring.rabbitmq.listener.simple.concurrency}"

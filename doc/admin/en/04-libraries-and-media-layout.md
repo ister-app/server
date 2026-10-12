@@ -11,21 +11,25 @@ on-disk layout matters.
 
 ## Configuring libraries and directories
 
-Indexed properties, from `disk/src/main/resources/disk.properties` (as env vars:
+Indexed properties, from `disk/src/main/resources/disk.yaml` (as env vars:
 `APP_ISTER_DISK_LIBRARIES_0_NAME` etc.):
 
-```properties
-app.ister.disk.libraries[0].name=shows
-app.ister.disk.libraries[0].type=SHOW
-app.ister.disk.libraries[1].name=books
-app.ister.disk.libraries[1].type=BOOK
-
-app.ister.disk.directories[0].name=disk1
-app.ister.disk.directories[0].path=/disk1
-app.ister.disk.directories[0].library=shows
-app.ister.disk.directories[1].name=disk2
-app.ister.disk.directories[1].path=/disk2
-app.ister.disk.directories[1].library=shows
+```yaml
+app:
+  ister:
+    disk:
+      libraries:
+        - name: shows
+          type: SHOW
+        - name: books
+          type: BOOK
+      directories:
+        - name: disk1
+          path: /disk1
+          library: shows
+        - name: disk2
+          path: /disk2
+          library: shows
 ```
 
 Directory **names must be unique across the whole cluster** — they name the per-directory work

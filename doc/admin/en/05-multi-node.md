@@ -58,12 +58,16 @@ Every node stays responsible for its own directories. On top of that, a powerful
 
 List the directory names the helper should serve, and optionally which jobs:
 
-```properties
-app.ister.helper.disks[0].name=server-1-disk1-tv
-app.ister.helper.disks[1].name=server-1-disk1-movies
-app.ister.helper.disks[1].jobs=DETECT_SEGMENTS,SUBTITLES
-# default job set for disks without their own "jobs" (default: all three)
-app.ister.helper.jobs=TRANSCODE,DETECT_SEGMENTS,SUBTITLES
+```yaml
+app:
+  ister:
+    helper:
+      disks:
+        - name: server-1-disk1-tv
+        - name: server-1-disk1-movies
+          jobs: DETECT_SEGMENTS,SUBTITLES
+      # default job set for disks without their own "jobs" (default: all three)
+      jobs: TRANSCODE,DETECT_SEGMENTS,SUBTITLES
 ```
 
 The helper then consumes the **same queues** as the owner for those directories, and RabbitMQ
@@ -76,9 +80,12 @@ same tools as any node (ffmpeg, mkvextract) — use the same image.
 
 An owner that should not spend its own CPU on a job family at all can hand it off entirely:
 
-```properties
+```yaml
 # on the owning node
-app.ister.helper.offload-jobs=DETECT_SEGMENTS,SUBTITLES
+app:
+  ister:
+    helper:
+      offload-jobs: DETECT_SEGMENTS,SUBTITLES
 ```
 
 A helper also consumes the cluster-wide worker queues (metadata, podcast refresh, search

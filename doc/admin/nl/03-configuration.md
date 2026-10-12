@@ -196,6 +196,6 @@ bescherming — de actuator-endpoints zelf zijn niet-geauthenticeerd — dus pub
 ## Lokale overrides (ontwikkeling)
 
 Draai je vanuit de broncode, dan gaan machinespecifieke instellingen in gegitignorede
-`*-local.properties`-bestanden naast het properties-bestand van de module (bijv.
-`core/src/main/resources/core-local.properties`); `./gradlew bootRun` activeert automatisch het
+`*-local.yaml`-bestanden naast het YAML-bestand van de module (bijv.
+`core/src/main/resources/core-local.yaml`); `./gradlew bootRun` activeert automatisch het
 `local`-profiel. Containerdeployments gebruiken in plaats daarvan omgevingsvariabelen.

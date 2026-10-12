@@ -193,7 +193,7 @@ actuator endpoints themselves are unauthenticated — so never publish or proxy 
 
 ## Local overrides (development)
 
-When running from source, machine-specific settings go in gitignored `*-local.properties` files
-next to the module's properties file (e.g. `core/src/main/resources/core-local.properties`);
+When running from source, machine-specific settings go in gitignored `*-local.yaml` files
+next to the module's YAML file (e.g. `core/src/main/resources/core-local.yaml`);
 `./gradlew bootRun` activates the `local` profile automatically. Container deployments should use
 environment variables instead.

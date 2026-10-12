@@ -146,8 +146,8 @@ andere wordt genegeerd. Zie [Naamconventies](08-naming-conventions.md).
 **Een handler blijft dezelfde bestanden herverwerken** — de klassieke interactie met RabbitMQ's
 `consumer_timeout`: een bericht waarvan het werk langer duurt dan de 30-minuten-consumer-timeout
 van de broker wordt opnieuw in de queue gezet en begint opnieuw, eindeloos. De standaardwaarden
-beschermen hiertegen (`prefetch=1`, sweeps in chunks — zie de commentaren in `core.properties` en
-`disk.properties`); heb je een chunkgrootte verhoogd of de broker-timeout verlaagd, zet dat dan
+beschermen hiertegen (`prefetch=1`, sweeps in chunks — zie de commentaren in `core.yaml` en
+`disk.yaml`); heb je een chunkgrootte verhoogd of de broker-timeout verlaagd, zet dat dan
 terug.
 
 **Geen skip-intro-knop op sommige afleveringen** — intro-/outro-detectie vergelijkt afleveringen

@@ -1,0 +1,11 @@
+# search.yaml — Typesense full-text search, imported by server/src/main/resources/application.yaml.
+# Same conventions as core.yaml. The enabled flag is checked at runtime inside the handlers (native image).
+app:
+  ister:
+    typesense:
+      enabled: "${TYPESENSE_ENABLED:false}"
+      host: "${TYPESENSE_HOST:localhost}"
+      port: "${TYPESENSE_PORT:8108}"
+      protocol: "${TYPESENSE_PROTOCOL:http}"
+      api-key: "${TYPESENSE_API_KEY:}"
+      collection: "${TYPESENSE_COLLECTION:media}"

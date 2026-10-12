@@ -40,7 +40,7 @@ beluistert alleen de queues van zijn eigen directories.
 ## Retries en dead-lettering
 
 Mislukte listeners proberen het opnieuw met exponentiële backoff
-(`spring.rabbitmq.listener.simple.retry.*` in `core.properties`: 3 pogingen, 2s beginInterval,
+(`spring.rabbitmq.listener.simple.retry.*` in `core.yaml`: 3 pogingen, 2s beginInterval,
 multiplier 2). Na de laatste mislukking verplaatst een `RepublishMessageRecoverer` het bericht naar
 de **`app.ister.server.dead-letter`**-queue, met de exceptie bewaard in de message-headers
 (`RabbitReliabilityConfig`). Mislukkingen die er bij een volgende poging precies zo uitzien (een

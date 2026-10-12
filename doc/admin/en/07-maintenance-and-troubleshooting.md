@@ -136,7 +136,7 @@ See [Naming conventions](08-naming-conventions.md).
 **A handler keeps re-processing the same files** — classic RabbitMQ `consumer_timeout`
 interaction: a message whose work outlives the broker's 30-minute consumer timeout is requeued
 and starts over, forever. The defaults guard against this (`prefetch=1`, chunked sweeps — see the
-comments in `core.properties` and `disk.properties`); if you raised a chunk size or lowered the
+comments in `core.yaml` and `disk.yaml`); if you raised a chunk size or lowered the
 broker timeout, put it back.
 
 **No skip-intro button on some episodes** — intro/outro detection compares episodes within a

@@ -22,14 +22,18 @@ Three things are independent and each optional:
 
 Credentials and endpoints live in named connections, in config only — never in the database:
 
-```properties
-app.ister.s3.connections[0].name=garage
-app.ister.s3.connections[0].endpoint=http://garage:3900  # empty = AWS
-app.ister.s3.connections[0].region=us-east-1
-app.ister.s3.connections[0].bucket=ister
-app.ister.s3.connections[0].path-style=true             # required by most self-hosted servers
-app.ister.s3.connections[0].access-key=…
-app.ister.s3.connections[0].secret-key=…
+```yaml
+app:
+  ister:
+    s3:
+      connections:
+        - name: garage
+          endpoint: http://garage:3900   # empty = AWS
+          region: us-east-1
+          bucket: ister
+          path-style: true              # required by most self-hosted servers
+          access-key: …
+          secret-key: …
 ```
 
 Environment variables work as usual (`APP_ISTER_S3_CONNECTIONS_0_NAME`, …). One connection is one
@@ -40,11 +44,15 @@ regular credential chain (instance profile, env vars, `~/.aws`) is used when the
 
 Instead of a `path`, a directory names a connection and, optionally, a key prefix:
 
-```properties
-app.ister.disk.directories[1].name=shows-s3
-app.ister.disk.directories[1].library=shows
-app.ister.disk.directories[1].s3-connection=garage
-app.ister.disk.directories[1].prefix=media/shows
+```yaml
+app:
+  ister:
+    disk:
+      directories:
+        - name: shows-s3
+          library: shows
+          s3-connection: garage
+          prefix: media/shows
 ```
 
 The objects under the prefix follow the same layout rules as a disk ([Libraries and media
@@ -77,9 +85,12 @@ cache capped by `app.ister.s3.local-copy-max-bytes` (2 GiB).
 
 ## Shared cache
 
-```properties
-app.ister.server.cache-s3-connection=garage
-app.ister.server.cache-s3-prefix=cache
+```yaml
+app:
+  ister:
+    server:
+      cache-s3-connection: garage
+      cache-s3-prefix: cache
 ```
 
 With this set, the node writes every derived file into `s3://bucket/cache/…` instead of its
@@ -94,9 +105,12 @@ per run, decided by a database lock), honouring the same dry-run flag.
 
 ## Shared transcode store
 
-```properties
-app.ister.server.tmp-s3-connection=garage
-app.ister.server.tmp-s3-prefix=tmp
+```yaml
+app:
+  ister:
+    server:
+      tmp-s3-connection: garage
+      tmp-s3-prefix: tmp
 ```
 
 Encoding still happens on the local `TMP_DIR` of the node running the pass — ffmpeg's segment

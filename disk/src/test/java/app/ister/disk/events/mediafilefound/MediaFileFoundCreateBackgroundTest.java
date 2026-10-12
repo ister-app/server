@@ -15,10 +15,8 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(SpringExtension.class)
-@TestPropertySource(locations = {
-        "classpath:core.properties",
-//        "classpath:core-local.properties"
-})
+// @TestPropertySource cannot load core.yaml; this is the one key the test needs, same default.
+@TestPropertySource(properties = "app.ister.server.ffmpeg-dir=${FFMPEG_DIR:/usr/bin}")
 class MediaFileFoundCreateBackgroundTest {
     @Value("${app.ister.server.ffmpeg-dir}")
     private String dirOfFFmpeg;

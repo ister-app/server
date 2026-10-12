@@ -1,7 +1,7 @@
 {
   "resources": [
     {
-      "pattern": "transcoder.*\\.properties"
+      "pattern": "transcoder.*\\.yaml"
     }
   ]
 }

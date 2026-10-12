@@ -112,7 +112,7 @@ All significant work is done asynchronously through RabbitMQ message queues. The
 - `ANALYZE_DATA`, `ANALYZE_LIBRARY_REQUEST`, `UPDATE_IMAGES_REQUESTED` — analysis & image refresh
 - `CONTINUE_WATCHING_REBUILD_REQUESTED` — nightly rebuild of the continue-watching cache (see below)
 - `TRANSCODE_REQUESTED`, `TRANSCODE_PASS_REQUESTED`, `PRE_TRANSCODE_RECENTLY_WATCHED` — HLS transcoding (see below)
-- `SEARCH_INDEX_REQUESTED`, `SEARCH_REINDEX_REQUESTED` — Typesense indexing (search module). The enabled flag (`app.ister.typesense.enabled`) is checked at **runtime** inside the handlers (disabled → events consumed and discarded), NOT via `@ConditionalOnProperty` — bean conditions are frozen at GraalVM native-image build time, so conditional beans would be baked out of the prod image. Module properties files imported via `spring.config.import` need a `META-INF/native-image/resource-config.json` in their module (see `search/src/main/resources/META-INF/native-image/`). Creation events come free via `ServerEventService.createXFoundEvent`; enrichment handlers emit after metadata saves; any code deleting a searchable entity must call `createSearchDeleteEvent`. GraphQL: `search(term)` returns a `SearchResult` union hydrated from PostgreSQL; `rebuildSearchIndex` rebuilds into a fresh collection + alias swap. **Multilingual:** the collection schema and `query_by` are generated from `LanguageProperties.tags()` — each configured language gets `title_<tag>`/`description_<tag>`/`genre_<tag>` fields with the matching Typesense `locale`; `SearchDocument` is a `Map<String,Object>` (not a fixed record) so the localized keys stay dynamic. Adding a language needs a re-scan (to create the new `MetadataEntity` rows) followed by `rebuildSearchIndex` (schema is fixed at collection creation). See [Languages](README.md#languages).
+- `SEARCH_INDEX_REQUESTED`, `SEARCH_REINDEX_REQUESTED` — Typesense indexing (search module). The enabled flag (`app.ister.typesense.enabled`) is checked at **runtime** inside the handlers (disabled → events consumed and discarded), NOT via `@ConditionalOnProperty` — bean conditions are frozen at GraalVM native-image build time, so conditional beans would be baked out of the prod image. Module YAML config files imported via `spring.config.import` need a `META-INF/native-image/resource-config.json` in their module (see `search/src/main/resources/META-INF/native-image/`). Creation events come free via `ServerEventService.createXFoundEvent`; enrichment handlers emit after metadata saves; any code deleting a searchable entity must call `createSearchDeleteEvent`. GraphQL: `search(term)` returns a `SearchResult` union hydrated from PostgreSQL; `rebuildSearchIndex` rebuilds into a fresh collection + alias swap. **Multilingual:** the collection schema and `query_by` are generated from `LanguageProperties.tags()` — each configured language gets `title_<tag>`/`description_<tag>`/`genre_<tag>` fields with the matching Typesense `locale`; `SearchDocument` is a `Map<String,Object>` (not a fixed record) so the localized keys stay dynamic. Adding a language needs a re-scan (to create the new `MetadataEntity` rows) followed by `rebuildSearchIndex` (schema is fixed at collection creation). See [Languages](README.md#languages).
 
 **Directory/node-scoped queues:** transcode queues are not global. All directory-scoped queue names come from `core/.../config/DirectoryQueueNames`: `queues(base)` = own directories + cache dir (owner-only events), `queues(base, HelperJob)` additionally includes `app.ister.helper.disks` entries for that job and drops the own directories when the owner lists the job in `app.ister.helper.offload-jobs`. Three job families are helper-capable (`TRANSCODE`, `DETECT_SEGMENTS`, `SUBTITLES`): a helper node competes on the owner's queues, reads the source via `MediaFileInputResolver` (local path or the owner's tokenized, range-capable `/mediaFile/{id}/download`) and uploads results (`POST /cache/upload/{fileName}` for SRTs, `POST /transcode/upload/...` for segments). `NodeTokenManager`/`RemoteNodeClient` live in `core/.../node/`. The legacy `app.ister.transcoder.disks` maps to helper disks with the `TRANSCODE` job. See `doc/admin/en/05-multi-node.md`.
 
@@ -233,11 +233,19 @@ Roughly a dozen `@Scheduled` beans; the ones with operational consequences:
 - Create cache directories on disk
 - Validate multi-node configuration
 
-Libraries and directories are configured in `disk/src/main/resources/disk.properties` (or via env vars).
+Libraries and directories are configured in `disk/src/main/resources/disk.yaml` (or via env vars).
 
 ## Key Configuration
 
-**application.properties** (server module) imports: `core.properties`, `disk.properties`, `git.properties`
+**Config is YAML**, one file per module, imported by `server/src/main/resources/application.yaml` in this
+order (later imports win): `git.properties` (generated, stays `.properties`), `core.yaml`, `disk.yaml`,
+`transcoder.yaml`, `search.yaml`. Conventions (also in the header of `core.yaml`): quote every value that
+contains `${...}`; an intentionally empty value is `""`; dotted map keys (logger names) go in `[brackets]`;
+Hibernate/Feign/springdoc key segments stay verbatim; the env-var names inside the placeholders
+(`CACHE_DIR`, `DB_HOST`, `OIDC_URL`, …) are an interface used by the Helm chart and docker-compose — never
+rename them. `@TestPropertySource(locations=…)` cannot read YAML: tests that need a key set it inline with
+`properties = "…"`. The Helm chart (`../chart`, `server.config` in `values.yaml`) pins a copy of the tunable
+defaults: **when you change a default in a module YAML file, mirror it there.**
 
 Essential runtime config:
 - PostgreSQL: `spring.datasource.url` (default: localhost/ister)
@@ -257,8 +265,10 @@ Essential runtime config:
 
 Config is bound through `@ConfigurationProperties` classes, not scattered `@Value`s: `LanguageProperties`,
 `AppIsterServerConfig` (disk), `WorkerDiskConfig`, `OwnDirectoriesProperties`/`HelperProperties`/`TranscoderDisksConfig` (core, deprecated alias),
-`TypesenseProperties`. Machine-local overrides go in gitignored `*-local.properties` (e.g.
-`core/src/main/resources/core-local.properties`); `bootRun` forces `spring.profiles.active=local`.
+`TypesenseProperties`. Machine-local overrides go in gitignored `*-local.yaml` (e.g.
+`core/src/main/resources/core-local.yaml`); `bootRun` forces `spring.profiles.active=local`. Spring only picks
+up the profile variant with the same extension as the import, so a leftover `core-local.properties` is
+silently ignored — convert it to `core-local.yaml` (it holds a real TMDB token; never track it).
 
 **Local dev credentials** (docker-compose-local.yml): DB = ister/ister, RabbitMQ = user/password
 
@@ -267,7 +277,8 @@ Config is bound through `@ConfigurationProperties` classes, not scattered `@Valu
   native-image build time, so the bean is baked out of the prod image. Check the flag inside the bean instead
   (see the Typesense note above).
 - Reflection/resource hints are hand-maintained per module under `src/main/resources/META-INF/native-image/`.
-  A properties file imported via `spring.config.import` needs an entry in its module's `resource-config.json`.
+  A YAML config file imported via `spring.config.import` needs an entry in its module's `resource-config.json`
+  (pattern `<module>.*\\.yaml`).
 - `hibernate.ddl-auto=validate` in prod: an entity change without a matching Flyway migration fails startup.
 
 ## API Surface

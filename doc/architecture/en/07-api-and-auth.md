@@ -26,14 +26,14 @@ Errors are mapped centrally in `api/.../error/` — `RestExceptionHandler` for R
 `GraphQlExceptionResolver` for GraphQL.
 
 The Spring Actuator runs on a separate management port, **8081** (`management.server.port` in
-`core.properties`), keeping health/metrics off the public API port. Podcast directory search is
+`core.yaml`), keeping health/metrics off the public API port. Podcast directory search is
 proxied through the free iTunes Search API (`ItunesSearchService`, api module; base URL is a
 property like every external endpoint).
 
 ## GraphQL
 
 The schema lives at `api/src/main/resources/graphql/schema.graphqls`; the GraphQL IDE (GraphiQL) is
-enabled **unconditionally** — `spring.graphql.graphiql.enabled=true` in `core.properties` and
+enabled **unconditionally** — `spring.graphql.graphiql.enabled=true` in `core.yaml` and
 `/graphiql` is `permitAll` in `OIDCSecurityConfig` — not just in dev. Besides queries and mutations
 there are four websocket subscriptions ([chapter 5](05-continue-watching-and-status.md)):
 

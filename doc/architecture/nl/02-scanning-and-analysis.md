@@ -13,7 +13,7 @@ per-item `refresh*`-mutations, `MetadataRefreshController`).
 
 `disk/.../StartupTasks` luistert op Spring's `ContextRefreshedEvent` — bij startup worden geen
 RabbitMQ-events verstuurd. Het maakt of updatet `NodeEntity`-, `LibraryEntity`- en
-`DirectoryEntity`-rijen op basis van de configuratieproperties (`disk.properties` / env vars),
+`DirectoryEntity`-rijen op basis van de configuratieproperties (`disk.yaml` / env vars),
 maakt de cache-directories op disk aan en valideert de multi-node-configuratie. Zie het
 [startup-diagram](../diagrams/startup.md).
 

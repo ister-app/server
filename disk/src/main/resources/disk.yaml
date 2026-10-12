@@ -1,0 +1,57 @@
+# disk.yaml — libraries and directories of this node, imported by server/src/main/resources/application.yaml.
+# Everything here is an example (commented out); configure through env vars
+# (APP_ISTER_DISK_LIBRARIES_0_NAME, ...) or the gitignored disk-local.yaml. Same conventions as core.yaml.
+
+# app:
+#   ister:
+#     disk:
+#       # The libraries (type: MOVIE, SHOW, MUSIC, BOOK, PODCAST or COMIC)
+#       # A PODCAST library needs no directory: feeds are added from the app and episodes are
+#       # downloaded to this node's cache directory.
+#       libraries:
+#         - name: shows
+#           type: SHOW
+#         - name: books
+#           type: BOOK
+#         - name: podcasts
+#           type: PODCAST
+#         # COMIC libraries are series-first: {directory}/{Series Name (optional year)}/Volume 27.cbz
+#         # (also .pdf and .epub; tolerated patterns: attackontitan_vol27.pdf, series_issue8.pdf, name#3.cbz)
+#         - name: comics
+#           type: COMIC
+#
+#       # The directories
+#       directories:
+#         - name: disk1
+#           path: /disk1
+#           library: shows
+#         - name: disk2
+#           path: /disk2
+#           library: shows
+#         # An S3 directory: no path, but the name of an app.ister.s3.connections[n] entry (core.yaml)
+#         # and an optional key prefix inside its bucket. Every node that lists the same name with the same
+#         # connection + prefix is attached to it and takes its share of scanning, analysis, transcoding and
+#         # streaming; a node whose entry points elsewhere refuses to start.
+#         - name: shows-s3
+#           s3-connection: garage
+#           prefix: media/shows
+#           library: shows
+#
+#     server:
+#       # Images per message of a blur-hash sweep. Must stay small enough that one chunk finishes well
+#       # within RabbitMQ's consumer_timeout (default 30 min), or the message is requeued and the sweep
+#       # restarts forever without ever committing.
+#       blur-hash:
+#         chunk-size: 500
+#       # Episodes per message of intro/outro segment detection. Fingerprinting decodes ~14 minutes of
+#       # audio per episode (plus its comparison neighbours), so one chunk must finish well within
+#       # RabbitMQ's consumer_timeout (default 30 min), or the channel is closed and the message requeued
+#       # forever. The handler chains a successor message per season until no episodes are pending.
+#       segment-detect:
+#         chunk-size: 4
+#
+#     transcoder:
+#       # Deprecated: use app.ister.helper.disks[n].name (core.yaml) with jobs=TRANSCODE instead.
+#       # Still honoured: names listed here replace the own directories for transcoding only.
+#       disks:
+#         - name: disk1

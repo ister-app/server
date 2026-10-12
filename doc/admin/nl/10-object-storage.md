@@ -24,14 +24,18 @@ Drie dingen staan los van elkaar en zijn elk optioneel:
 Credentials en endpoints staan in benoemde connecties, alleen in de configuratie — nooit in de
 database:
 
-```properties
-app.ister.s3.connections[0].name=garage
-app.ister.s3.connections[0].endpoint=http://garage:3900  # leeg = AWS
-app.ister.s3.connections[0].region=us-east-1
-app.ister.s3.connections[0].bucket=ister
-app.ister.s3.connections[0].path-style=true             # vereist door de meeste zelfgehoste servers
-app.ister.s3.connections[0].access-key=…
-app.ister.s3.connections[0].secret-key=…
+```yaml
+app:
+  ister:
+    s3:
+      connections:
+        - name: garage
+          endpoint: http://garage:3900   # leeg = AWS
+          region: us-east-1
+          bucket: ister
+          path-style: true              # vereist door de meeste zelfgehoste servers
+          access-key: …
+          secret-key: …
 ```
 
 Omgevingsvariabelen werken zoals altijd (`APP_ISTER_S3_CONNECTIONS_0_NAME`, …). Eén connectie is
@@ -43,11 +47,15 @@ omgevingsvariabelen, `~/.aws`).
 
 In plaats van een `path` noemt een directory een connectie en, optioneel, een key-prefix:
 
-```properties
-app.ister.disk.directories[1].name=shows-s3
-app.ister.disk.directories[1].library=shows
-app.ister.disk.directories[1].s3-connection=garage
-app.ister.disk.directories[1].prefix=media/shows
+```yaml
+app:
+  ister:
+    disk:
+      directories:
+        - name: shows-s3
+          library: shows
+          s3-connection: garage
+          prefix: media/shows
 ```
 
 De objecten onder de prefix volgen dezelfde indelingsregels als een schijf ([Libraries en
@@ -80,9 +88,12 @@ houdt het als LRU-cache, begrensd door `app.ister.s3.local-copy-max-bytes` (2 Gi
 
 ## Gedeelde cache
 
-```properties
-app.ister.server.cache-s3-connection=garage
-app.ister.server.cache-s3-prefix=cache
+```yaml
+app:
+  ister:
+    server:
+      cache-s3-connection: garage
+      cache-s3-prefix: cache
 ```
 
 Hiermee schrijft de node elk afgeleid bestand naar `s3://bucket/cache/…` in plaats van naar zijn
@@ -98,9 +109,12 @@ gedeelde cache (één node per run, bepaald door een databaselock), met dezelfde
 
 ## Gedeelde transcode-opslag
 
-```properties
-app.ister.server.tmp-s3-connection=garage
-app.ister.server.tmp-s3-prefix=tmp
+```yaml
+app:
+  ister:
+    server:
+      tmp-s3-connection: garage
+      tmp-s3-prefix: tmp
 ```
 
 Het encoderen gebeurt nog steeds in de lokale `TMP_DIR` van de node die de pass draait — de
