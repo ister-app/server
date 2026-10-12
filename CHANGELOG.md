@@ -1,5 +1,25 @@
 # Changelog
 
+## server v5.2.2
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `5.2.2` |
+| `ghcr.io/ister-app/migrations` | `5.2.2` |
+
+### Other
+
+- chore(config): drop dead logger key app.ister.server.entitiy ([`dc34432`](https://github.com/ister-app/server/commit/dc34432))
+- refactor(config): convert Spring .properties files to YAML ([`ae4f92a`](https://github.com/ister-app/server/commit/ae4f92a))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:5.2.2
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v5.2.1...v5.2.2
+
 ## server v5.2.1
 
 | Image | Tag |
