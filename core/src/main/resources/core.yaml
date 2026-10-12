@@ -14,7 +14,6 @@ logging:
   group:
     tomcat: app.ister.server
   level:
-    "[app.ister.server.entitiy]": trace
     tomcat: trace
     # Jaffree logs every ffmpeg/ffprobe stderr line: metadata dumps, chapters, each cropdetect frame.
     # During a library scan that is ~40k lines per 10 minutes, and the container log rotates away
