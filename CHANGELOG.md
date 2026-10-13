@@ -1,5 +1,24 @@
 # Changelog
 
+## server v5.2.3
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `5.2.3` |
+| `ghcr.io/ister-app/migrations` | `5.2.3` |
+
+### Other
+
+- docs: note the chart's automatic server.config sync ([`3fe3c67`](https://github.com/ister-app/server/commit/3fe3c67))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:5.2.3
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v5.2.2...v5.2.3
+
 ## server v5.2.2
 
 | Image | Tag |
