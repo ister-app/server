@@ -52,10 +52,21 @@ spring:
           # Default matches the development Keycloak bundled in docker-compose.yml (keycloak/Ister-realm.json).
           issuer-uri: "${OIDC_URL:http://keycloak:8060/realms/Ister}"
 
+  # Virtual threads for Tomcat, the RabbitMQ listeners and the schedulers. The HLS endpoints park
+  # a request thread while they poll for a playlist or segment (up to the transcode timeouts), so
+  # on a platform-thread pool a few dozen waiting players exhausted Tomcat. Java 25 no longer pins
+  # a virtual thread inside synchronized, so the ffmpeg-holding monitors in the transcoder are safe.
+  threads:
+    virtual:
+      enabled: "${SPRING_THREADS_VIRTUAL_ENABLED:true}"
+
   jpa:
     hibernate:
       ddl-auto: validate
     show-sql: false
+    # Load-bearing: the GraphQL resolvers navigate lazy associations after their query returned.
+    # The HLS and node-download paths are excluded from it (OpenInViewConfig), otherwise every
+    # waiting or streaming request keeps a pooled connection for its whole duration.
     open-in-view: true
     properties:
       hibernate:

@@ -425,10 +425,14 @@ class FileControllerTest {
         app.ister.core.entity.DirectoryEntity dir = app.ister.core.entity.DirectoryEntity.builder()
                 .name("s3-dir").path("s3://" + store.bucket()).storageKind(app.ister.core.enums.StorageKind.S3)
                 .s3Connection("garage").s3Bucket(store.bucket()).build();
-        MediaFileEntity entity = MediaFileEntity.builder().path("s3://" + store.bucket() + "/" + key).directoryEntity(dir).build();
+        ReflectionTestUtils.setField(dir, "id", UUID.randomUUID());
+        MediaFileEntity entity = MediaFileEntity.builder().path("s3://" + store.bucket() + "/" + key).build();
+        entity.setDirectoryEntity(dir);
         ReflectionTestUtils.setField(entity, "id", id);
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(entity));
-        when(objectStoreRegistry.forEntity(entity)).thenReturn(store);
+        // The download runs without open-in-view: the controller resolves the directory by id.
+        when(directoryRepository.findById(dir.getId())).thenReturn(Optional.of(dir));
+        when(objectStoreRegistry.forDirectory(dir)).thenReturn(store);
         return entity;
     }
 

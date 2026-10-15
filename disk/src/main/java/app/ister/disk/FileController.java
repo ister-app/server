@@ -167,7 +167,10 @@ public class FileController {
                                                HttpServletRequest request) throws IOException {
         var mediaFileEntity = mediaFileRepository.findById(id).orElseThrow();
         if (ObjectRef.isS3Uri(mediaFileEntity.getPath())) {
-            return objectResource(objectStoreRegistry.forEntity(mediaFileEntity), ObjectStoreRegistry.keyOf(mediaFileEntity),
+            // By id, not mediaFileEntity.getDirectoryEntity(): this path runs without open-in-view
+            // (OpenInViewConfig), so the lazy association is not navigable here.
+            var directory = directoryRepository.findById(mediaFileEntity.getDirectoryEntityId()).orElseThrow();
+            return objectResource(objectStoreRegistry.forDirectory(directory), ObjectStoreRegistry.keyOf(mediaFileEntity),
                     rangeHeader, request);
         }
         return fileResource(Path.of(mediaFileEntity.getPath()));
