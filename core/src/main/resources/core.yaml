@@ -58,9 +58,12 @@ spring:
   # a virtual thread inside synchronized, so the ffmpeg-holding monitors in the transcoder are safe.
   # GraphQL resolvers stay on the request thread (GraphQlControllerConfig): off it they would lose
   # the open-in-view session and the SecurityContext.
+  # No env placeholder on purpose: the executors behind this key are chosen by bean conditions,
+  # which the native image freezes at build time. An env override would silently do nothing in
+  # production; the JVM-run build (bootRun, tests) honours the key as usual.
   threads:
     virtual:
-      enabled: "${SPRING_THREADS_VIRTUAL_ENABLED:true}"
+      enabled: true
 
   jpa:
     hibernate:

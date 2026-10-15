@@ -92,7 +92,8 @@ geproduceerd, parkeert in een pollloop (`SharedTmpReadThrough`) tot maximaal
   en daarmee een gepoolde JDBC-verbinding, tot het antwoord geschreven was, dus elke wachtende
   speler kostte één verbinding uit de pool. `HlsWaitConnectionIntegrationTest` bemonstert de
   Hikari-pool tijdens zo'n wachttijd en faalt als er een verbinding wordt vastgehouden.
-- **Ook geen platform-thread.** `spring.threads.virtual.enabled` staat aan (`core.yaml`): Tomcat,
+- **Ook geen platform-thread.** `spring.threads.virtual.enabled` staat aan (`core.yaml`, vastgelegd bij
+  het bouwen van de native image omdat hij bean-condities stuurt): Tomcat,
   de RabbitMQ-listeners en de schedulers draaien op virtual threads, dus een geparkeerd verzoek is
   een geparkeerde continuation in plaats van een van de 200 Tomcat-threads. Java 25 pint een
   virtual thread niet meer binnen `synchronized`, dus de monitors die de transcoder rond

@@ -88,7 +88,8 @@ Two things keep that cheap:
   connection, lived until the response was written, so every waiting player cost one of the pool's
   connections. `HlsWaitConnectionIntegrationTest` samples the Hikari pool during such a wait and
   fails if a connection is held.
-- **No platform thread either.** `spring.threads.virtual.enabled` is on (`core.yaml`): Tomcat,
+- **No platform thread either.** `spring.threads.virtual.enabled` is on (`core.yaml`, fixed when
+  the native image is built because it drives bean conditions): Tomcat,
   the RabbitMQ listeners and the schedulers run on virtual threads, so a parked request is a
   parked continuation rather than one of Tomcat's 200 threads. Java 25 does not pin a virtual
   thread inside `synchronized`, so the monitors the transcoder holds around ffmpeg runs need no
