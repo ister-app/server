@@ -56,6 +56,8 @@ spring:
   # a request thread while they poll for a playlist or segment (up to the transcode timeouts), so
   # on a platform-thread pool a few dozen waiting players exhausted Tomcat. Java 25 no longer pins
   # a virtual thread inside synchronized, so the ffmpeg-holding monitors in the transcoder are safe.
+  # GraphQL resolvers stay on the request thread (GraphQlControllerConfig): off it they would lose
+  # the open-in-view session and the SecurityContext.
   threads:
     virtual:
       enabled: "${SPRING_THREADS_VIRTUAL_ENABLED:true}"

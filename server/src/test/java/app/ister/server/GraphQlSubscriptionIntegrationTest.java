@@ -2,7 +2,18 @@ package app.ister.server;
 
 import app.ister.core.enums.PlayState;
 import app.ister.core.eventdata.PlaybackStatusData;
+import app.ister.core.entity.LibraryEntity;
+import app.ister.core.entity.MetadataEntity;
+import app.ister.core.entity.MovieEntity;
+import app.ister.core.enums.LibraryType;
+import app.ister.core.repository.LibraryRepository;
+import app.ister.core.repository.MetadataRepository;
+import app.ister.core.repository.MovieRepository;
 import app.ister.core.service.MessageSender;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -86,6 +97,15 @@ class GraphQlSubscriptionIntegrationTest {
 
     @Autowired
     MessageSender messageSender;
+
+    @Autowired
+    LibraryRepository libraryRepository;
+    @Autowired
+    MovieRepository movieRepository;
+    @Autowired
+    MetadataRepository metadataRepository;
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -298,5 +318,39 @@ class GraphQlSubscriptionIntegrationTest {
                 throw new AssertionError("expected '" + type + "' frame but received: " + node);
             }
         }
+    }
+
+    /**
+     * Regression: with virtual threads enabled, Spring Boot hands the GraphQL controller
+     * configurer the application task executor and Spring for GraphQL then runs every blocking
+     * resolver on it, off the request thread, where the open-in-view session does not exist.
+     * In production every query touching a lazy collection (here Movie.metadata) failed with a
+     * LazyInitializationException. GraphQlControllerConfig keeps resolvers on the request thread.
+     */
+    @Test
+    void aResolverNavigatingALazyCollectionRunsWithTheRequestsSession() throws Exception {
+        UUID movieId = new TransactionTemplate(transactionManager).execute(_ -> {
+            LibraryEntity library = libraryRepository.save(LibraryEntity.builder()
+                    .name("lazy-it-" + UUID.randomUUID()).libraryType(LibraryType.MOVIE).build());
+            MovieEntity movie = movieRepository.save(MovieEntity.builder()
+                    .libraryEntity(library).name("Lazy Movie").releaseYear(2020).build());
+            metadataRepository.save(MetadataEntity.builder()
+                    .movieEntity(movie).language("eng").title("Lazy Movie (metadata)").build());
+            return movie.getId();
+        });
+
+        String query = "{\"query\":\"{ movieById(id: \\\"" + movieId + "\\\") { name metadata { title } } }\"}";
+        HttpResponse<String> response = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/graphql"))
+                        .header("Authorization", "Bearer test-token")
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(query)).build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(200, response.statusCode(), response.body());
+        JsonNode body = MAPPER.readTree(response.body());
+        assertTrue(body.path("errors").isMissingNode() || body.path("errors").isEmpty(), response.body());
+        assertEquals("Lazy Movie (metadata)",
+                body.path("data").path("movieById").path("metadata").get(0).path("title").asText());
     }
 }

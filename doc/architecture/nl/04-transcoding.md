@@ -96,7 +96,11 @@ geproduceerd, parkeert in een pollloop (`SharedTmpReadThrough`) tot maximaal
   de RabbitMQ-listeners en de schedulers draaien op virtual threads, dus een geparkeerd verzoek is
   een geparkeerde continuation in plaats van een van de 200 Tomcat-threads. Java 25 pint een
   virtual thread niet meer binnen `synchronized`, dus de monitors die de transcoder rond
-  ffmpeg-runs vasthoudt hebben geen speciale behandeling nodig.
+  ffmpeg-runs vasthoudt hebben geen speciale behandeling nodig. Eén ding mogen virtual threads
+  niet veranderen: met ze aan zou Spring Boot elke GraphQL-resolver op de application task
+  executor draaien, buiten de request-thread en dus zonder zijn open-in-view-sessie.
+  `GraphQlControllerConfig` (api) definieert de controller-configurer zonder die executor, zodat
+  resolvers op de request-thread blijven draaien.
 
 ## Pre-transcoding en achtergrondprioriteit
 
