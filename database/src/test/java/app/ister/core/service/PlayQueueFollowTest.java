@@ -27,6 +27,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -52,6 +53,10 @@ class PlayQueueFollowTest {
 
     @InjectMocks
     private PlayQueueService subject;
+
+    /** Real recorder over the same mocks: the follower watch-status assertions go through it. */
+    @InjectMocks
+    private PlayQueueWatchStatusRecorder watchStatusRecorder;
 
     @Mock
     private PlayQueueRepository playQueueRepository;
@@ -99,6 +104,7 @@ class PlayQueueFollowTest {
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(subject, "watchStatusRecorder", watchStatusRecorder);
         owner = UserEntity.builder().id(UUID.randomUUID()).name("owner").build();
         caller = UserEntity.builder().id(UUID.randomUUID()).name("caller").build();
     }

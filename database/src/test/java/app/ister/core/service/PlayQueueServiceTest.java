@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -48,6 +49,10 @@ class PlayQueueServiceTest {
 
     @InjectMocks
     private PlayQueueService subject;
+
+    /** Real recorder over the same mocks: the heartbeat tests below assert through it. */
+    @InjectMocks
+    private PlayQueueWatchStatusRecorder watchStatusRecorder;
 
     @Mock
     private PlayQueueRepository playQueueRepository;
@@ -129,6 +134,8 @@ class PlayQueueServiceTest {
 
     @BeforeEach
     void setUp() {
+        // @InjectMocks only wires mocks; the recorder is a second real object built from them.
+        ReflectionTestUtils.setField(subject, "watchStatusRecorder", watchStatusRecorder);
         user = UserEntity.builder().id(UUID.randomUUID()).build();
         // Reads and edits now resolve the caller (for the remote-control gate); default the gate
         // open so the mechanics tests behave as before. Permission tests stub these explicitly.
