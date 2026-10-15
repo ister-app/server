@@ -60,6 +60,8 @@ See [Object storage](10-object-storage.md). Connections are indexed lists (`APP_
 | `app.ister.worker.tmdb.certification-country` | | `US` | ISO 3166-1 country whose certification/content rating (e.g. `16`, `PG-13`, `TV-MA`) is stored on movies and shows; falls back to US, then any country that has one. |
 | `app.ister.languages` | `ISTER_LANGUAGES` | `en,nl` | comma-separated ISO-639-1 tags; first = primary. Drives which languages metadata is fetched in **and** which languages search indexes. Changing it requires a re-scan plus `rebuildSearchIndex` — see [Search](06-search-typesense.md). |
 | `app.ister.worker.musicbrainz.min-request-interval-millis` | | `1100` | spacing between MusicBrainz calls; stays just above their 1-request-per-second policy — lower it only against your own mirror |
+| `app.ister.worker.openlibrary.min-request-interval-millis` | | `1000` | spacing between Open Library calls (search, author, work lookups) |
+| `app.ister.worker.wikipedia.min-request-interval-millis` | | `500` | spacing between Wikidata/Wikipedia calls (person bios, series lookups) |
 
 ## Search (Typesense)
 

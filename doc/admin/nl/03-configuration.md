@@ -61,6 +61,8 @@ Zie [Objectopslag](10-object-storage.md). Connecties zijn geïndexeerde lijsten 
 | `app.ister.worker.tmdb.certification-country` | | `US` | ISO 3166-1-land waarvan de keuring/leeftijdsclassificatie (bv. `16`, `PG-13`, `TV-MA`) bij films en shows wordt opgeslagen; valt terug op US en daarna op een willekeurig land dat er een heeft. |
 | `app.ister.languages` | `ISTER_LANGUAGES` | `en,nl` | kommagescheiden ISO-639-1-tags; de eerste = primair. Bepaalt in welke talen metadata wordt opgehaald **én** welke talen de zoekindex krijgt. Wijzigen vereist een re-scan plus `rebuildSearchIndex` — zie [Zoeken](06-search-typesense.md). |
 | `app.ister.worker.musicbrainz.min-request-interval-millis` | | `1100` | tussenruimte tussen MusicBrainz-aanroepen; blijft net boven hun 1-verzoek-per-seconde-beleid — alleen verlagen tegen je eigen mirror |
+| `app.ister.worker.openlibrary.min-request-interval-millis` | | `1000` | tussenruimte tussen Open Library-aanroepen (zoeken, auteur- en werk-lookups) |
+| `app.ister.worker.wikipedia.min-request-interval-millis` | | `500` | tussenruimte tussen Wikidata-/Wikipedia-aanroepen (persoonsbio's, reeks-lookups) |
 
 ## Zoeken (Typesense)
 

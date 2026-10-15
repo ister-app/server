@@ -32,7 +32,7 @@ class WikipediaServiceTest {
 
     @BeforeEach
     void setUp() {
-        subject = new WikipediaService(WIKIDATA_ENDPOINT, WIKIDATA_API, "https://{lang}.wikipedia.org/api/rest_v1/page/summary/{title}");
+        subject = new WikipediaService(WIKIDATA_ENDPOINT, WIKIDATA_API, "https://{lang}.wikipedia.org/api/rest_v1/page/summary/{title}", 0);
         // The service builds its own RestClient in the constructor; rebind it to a mock server
         // so no real network calls are made.
         RestClient.Builder builder = RestClient.builder();

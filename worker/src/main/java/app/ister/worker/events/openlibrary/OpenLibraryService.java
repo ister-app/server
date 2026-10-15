@@ -3,6 +3,7 @@ package app.ister.worker.events.openlibrary;
 import app.ister.core.enums.MetadataSource;
 import app.ister.worker.events.wikipedia.WikipediaService;
 import app.ister.worker.http.MetadataRestClients;
+import app.ister.worker.http.RequestPacer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -39,16 +40,20 @@ public class OpenLibraryService {
     private final String authorPhotoBase;
     private final WikipediaService wikipediaService;
     private final RestClient restClient;
+    /** Open Library asks for well under a few requests per second per client; one pacer covers every call. */
+    private final RequestPacer pacer;
 
     public OpenLibraryService(
             @Value("${app.ister.worker.openlibrary.base:https://openlibrary.org}") String openLibraryBase,
             @Value("${app.ister.worker.openlibrary.covers-base:https://covers.openlibrary.org/b/id/}") String coversBase,
             @Value("${app.ister.worker.openlibrary.author-photo-base:https://covers.openlibrary.org/a/olid/}") String authorPhotoBase,
+            @Value("${app.ister.worker.openlibrary.min-request-interval-millis:1000}") long minRequestIntervalMillis,
             WikipediaService wikipediaService) {
         this.openLibraryBase = openLibraryBase;
         this.coversBase = coversBase;
         this.authorPhotoBase = authorPhotoBase;
         this.wikipediaService = wikipediaService;
+        this.pacer = new RequestPacer(minRequestIntervalMillis);
         this.restClient = MetadataRestClients.json();
     }
 
@@ -102,7 +107,7 @@ public class OpenLibraryService {
     /** The work an edition with this ISBN belongs to, or empty when Open Library doesn't know it. */
     private Optional<Map<String, Object>> searchWorkByIsbn(String isbn) {
         try {
-            Thread.sleep(1000);
+            pacer.acquire();
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restClient.get()
                     .uri(openLibraryBase + "/search.json?q=isbn:{isbn}&limit=1&fields=key,title,cover_i,first_publish_year",
@@ -116,9 +121,6 @@ public class OpenLibraryService {
                 return Optional.of(match);
             }
             log.debug("No Open Library work for isbn={}", isbn);
-            return Optional.empty();
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
             return Optional.empty();
         } catch (RestClientException e) {
             log.warn("Open Library isbn search error for isbn={}: {}", isbn, e.getMessage());
@@ -171,7 +173,7 @@ public class OpenLibraryService {
     /** Key ("OL23919A") of the first author search result whose name matches ours after normalisation. */
     private Optional<String> searchAuthorKey(String name) {
         try {
-            Thread.sleep(1000);
+            pacer.acquire();
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restClient.get()
                     .uri(openLibraryBase + "/search/authors.json?q={name}&limit=5", name)
@@ -188,9 +190,6 @@ public class OpenLibraryService {
                 }
             }
             log.debug("No Open Library author matched name={}", name);
-            return Optional.empty();
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
             return Optional.empty();
         } catch (RestClientException e) {
             log.warn("Open Library author search error for name={}: {}", name, e.getMessage());
@@ -210,16 +209,13 @@ public class OpenLibraryService {
     /** The author record ("/authors/OL...A"), or an empty map when the fetch failed. */
     private Map<String, Object> fetchAuthor(String authorKey) {
         try {
-            Thread.sleep(1000);
+            pacer.acquire();
             @SuppressWarnings("unchecked")
             Map<String, Object> author = restClient.get()
                     .uri(openLibraryBase + "/authors/{key}.json", authorKey)
                     .retrieve()
                     .body(Map.class);
             return author == null ? Map.of() : author;
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            return Map.of();
         } catch (RestClientException e) {
             log.warn("Open Library author fetch error for {}: {}", authorKey, e.getMessage());
             return Map.of();
@@ -252,7 +248,7 @@ public class OpenLibraryService {
     /** First search result whose title matches ours after normalisation. */
     private Optional<Map<String, Object>> searchWork(String title, String authorName) {
         try {
-            Thread.sleep(1000);
+            pacer.acquire();
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restClient.get()
                     .uri(openLibraryBase + "/search.json?title={title}&author={author}&limit=5&fields=key,title,author_name,cover_i,first_publish_year",
@@ -273,9 +269,6 @@ public class OpenLibraryService {
             }
             log.debug("No Open Library work matched title={} author={}", title, authorName);
             return Optional.empty();
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            return Optional.empty();
         } catch (RestClientException e) {
             log.warn("Open Library search error for title={} author={}: {}", title, authorName, e.getMessage());
             return Optional.empty();
@@ -285,16 +278,13 @@ public class OpenLibraryService {
     /** The work's description ("/works/OL...W"). */
     private String fetchDescription(String workKey) {
         try {
-            Thread.sleep(1000);
+            pacer.acquire();
             @SuppressWarnings("unchecked")
             Map<String, Object> work = restClient.get()
                     .uri(openLibraryBase + workKey + ".json")
                     .retrieve()
                     .body(Map.class);
             return work == null ? null : textValue(work.get("description"));
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            return null;
         } catch (RestClientException e) {
             log.warn("Open Library work fetch error for {}: {}", workKey, e.getMessage());
             return null;

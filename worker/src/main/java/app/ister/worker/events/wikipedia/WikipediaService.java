@@ -1,6 +1,7 @@
 package app.ister.worker.events.wikipedia;
 
 import app.ister.worker.http.MetadataRestClients;
+import app.ister.worker.http.RequestPacer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -66,6 +67,8 @@ public class WikipediaService {
     /** URI template with {lang} and {title} placeholders; configurable so CI can mock it. */
     private final String summaryTemplate;
     private final RestClient restClient;
+    /** Wikimedia's etiquette for unauthenticated clients: keep calls serialized and spaced. */
+    private final RequestPacer pacer;
 
     public WikipediaService(
             @Value("${app.ister.worker.wikidata.entity-base:https://www.wikidata.org/wiki/Special:EntityData/}")
@@ -73,10 +76,13 @@ public class WikipediaService {
             @Value("${app.ister.worker.wikidata.api-base:https://www.wikidata.org/w/api.php}")
             String wikidataApiBase,
             @Value("${app.ister.worker.wikipedia.summary-template:https://{lang}.wikipedia.org/api/rest_v1/page/summary/{title}}")
-            String summaryTemplate) {
+            String summaryTemplate,
+            @Value("${app.ister.worker.wikipedia.min-request-interval-millis:500}")
+            long minRequestIntervalMillis) {
         this.wikidataEntityBase = wikidataEntityBase;
         this.wikidataApiBase = wikidataApiBase;
         this.summaryTemplate = summaryTemplate;
+        this.pacer = new RequestPacer(minRequestIntervalMillis);
         this.restClient = MetadataRestClients.json();
     }
 
@@ -150,7 +156,7 @@ public class WikipediaService {
     /** Ids of the top Wikidata items for a name, best match first. */
     List<String> searchEntityIds(String name, String languageTag) {
         try {
-            Thread.sleep(500);
+            pacer.acquire();
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restClient.get()
                     .uri(wikidataApiBase + "?action=wbsearchentities&format=json&type=item&limit={limit}"
@@ -167,9 +173,6 @@ public class WikipediaService {
                     .filter(String.class::isInstance)
                     .map(String.class::cast)
                     .toList();
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            return List.of();
         } catch (RestClientException e) {
             log.debug("Wikidata search failed for {}: {}", name, e.getMessage());
             return List.of();
@@ -236,16 +239,13 @@ public class WikipediaService {
     /** Wikidata entity document, or an empty map when the fetch failed or the body was null. */
     Map<String, Object> fetchWikidataEntity(String wikidataId) {
         try {
-            Thread.sleep(500);
+            pacer.acquire();
             @SuppressWarnings("unchecked")
             Map<String, Object> body = restClient.get()
                     .uri(wikidataEntityBase + "{id}.json", wikidataId)
                     .retrieve()
                     .body(Map.class);
             return body == null ? Map.of() : body;
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            return Map.of();
         } catch (RestClientException e) {
             log.debug("Wikidata fetch failed for {}: {}", wikidataId, e.getMessage());
             return Map.of();
@@ -266,7 +266,7 @@ public class WikipediaService {
 
     private Summary fetchSummary(String languageTag, String pageTitle) {
         try {
-            Thread.sleep(500);
+            pacer.acquire();
             @SuppressWarnings("unchecked")
             Map<String, Object> summary = restClient.get()
                     .uri(summaryTemplate, languageTag, pageTitle)
@@ -283,9 +283,6 @@ public class WikipediaService {
                 thumbnail = src;
             }
             return new Summary(extractText, thumbnail);
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            return null;
         } catch (RestClientException e) {
             log.debug("Wikipedia summary fetch failed for {}/{}: {}", languageTag, pageTitle, e.getMessage());
             return null;
