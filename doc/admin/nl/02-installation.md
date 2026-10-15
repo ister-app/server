@@ -86,9 +86,11 @@ Twee images worden gepubliceerd op GHCR, altijd **in lockstep** getagd:
 | `ghcr.io/ister-app/server` | De server zelf (GraalVM native image, Fedora-basis met FFmpeg en mkvtoolnix inbegrepen) |
 | `ghcr.io/ister-app/migrations` | Een Flyway-image met de databasemigraties |
 
-Releases krijgen schone semver-tags (`2.0.0`); elke push naar `main` wordt daarnaast getagd met
-de snapshot-versie (`2.0.1-SNAPSHOT`) en `main`. Pin de server- en migrations-images op
-**dezelfde tag**, zodat schema en code nooit uit elkaar lopen.
+Releases krijgen schone semver-tags (`<major>.<minor>.<patch>`, zie de
+[releasepagina](https://github.com/ister-app/server/releases) voor de huidige); elke push naar
+`main` wordt daarnaast getagd met de volgende snapshot-versie (`<versie>-SNAPSHOT`) en `main`.
+Pin de server- en migrations-images op **dezelfde tag**, zodat schema en code nooit uit elkaar
+lopen.
 
 ## Databasemigraties
 
