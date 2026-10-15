@@ -75,6 +75,25 @@ semaphore (`max-concurrent-files`, default 2). A pass holds a thread for the ent
 Pre-transcoding competes for the same pool, so it is easy to starve interactive playback — which is
 why background work is throttled and preemptible (below).
 
+### The request side: waiting without holding anything
+
+A playlist or segment request that arrives before the transcoder has produced the file parks in
+a poll loop (`SharedTmpReadThrough`) for up to `master-playlist-timeout-ms` / `segment-timeout-ms`.
+Two things keep that cheap:
+
+- **No database connection during the wait.** `HlsService` reads its entities in short read-only
+  transactions and hands plain values to the loops, and the HLS paths (plus the node-to-node
+  `/mediaFile/{id}/download` streams) are excluded from open-in-view in `OpenInViewConfig`.
+  With the default open-in-view wiring the request's Hibernate session, and with it a pooled JDBC
+  connection, lived until the response was written, so every waiting player cost one of the pool's
+  connections. `HlsWaitConnectionIntegrationTest` samples the Hikari pool during such a wait and
+  fails if a connection is held.
+- **No platform thread either.** `spring.threads.virtual.enabled` is on (`core.yaml`): Tomcat,
+  the RabbitMQ listeners and the schedulers run on virtual threads, so a parked request is a
+  parked continuation rather than one of Tomcat's 200 threads. Java 25 does not pin a virtual
+  thread inside `synchronized`, so the monitors the transcoder holds around ffmpeg runs need no
+  special treatment.
+
 ## Pre-transcoding and background priority
 
 `PRE_TRANSCODE_RECENTLY_WATCHED` (per disk, every 15 minutes) reads the continue-watching entries
@@ -186,17 +205,18 @@ fetches it once through `/mediaFileStream/{id}/download` into the file's transco
 An S3 directory has no owner: any attached node may consume the transcode queues, and the node
 the client talks to is not necessarily the one running the pass. `TranscodeRequestedData` and
 `TranscodePassRequestedData` therefore carry `requestingNodeUrl`; a transcoding node pushes to
-that node when it is another one (`HlsService.uploadTarget`), which reuses the helper-to-owner
-segment push.
+that node when it is another one (`SegmentUploadCoordinator.uploadTarget`, the class that owns the
+push targets and the segment watcher), which reuses the helper-to-owner segment push.
 
 With `app.ister.server.tmp-s3-connection` set, the push target becomes the cluster-shared
 `TmpStore` (`S3TmpStore`, `tmp/{mediaFileId}/…`) instead: the watcher publishes stable segments,
 playlists and — last, after the pass — the done marker. The read side is a read-through: every
 `HlsService` lookup checks the local tmp dir first and then pulls the missing playlist, marker or
-segment from the store into it (`syncFromShared`), so the encoder-side invariants (size stability,
-done markers, `keep_until`, the local sweeps) are untouched and `HlsController` keeps serving real
-files. Waiting for a segment produced elsewhere polls the store instead of the local pass
-(`waitForSegment`). The tmp cleanup also sweeps the store, one node per run under an advisory lock;
+segment from the store into it (`SharedTmpReadThrough.syncFromShared`), so the encoder-side
+invariants (size stability, done markers, `keep_until`, the local sweeps) are untouched and
+`HlsController` keeps serving real files. Waiting for a segment produced elsewhere polls the store
+instead of the local pass (`SharedTmpReadThrough.waitForSegment`); that class holds every
+request-side wait loop of HLS playback. The tmp cleanup also sweeps the store, one node per run under an advisory lock;
 re-analysis (`deleteHlsCache`) drops the published directory too.
 
 

@@ -79,6 +79,25 @@ voor de volledige duur van het bestand. Pre-transcoding concurreert om dezelfde 
 makkelijk om interactieve playback uit te hongeren — vandaar dat achtergrondwerk gethrottled en
 preëmptabel is (zie hieronder).
 
+### De verzoekkant: wachten zonder iets vast te houden
+
+Een playlist- of segmentverzoek dat binnenkomt voordat de transcoder het bestand heeft
+geproduceerd, parkeert in een pollloop (`SharedTmpReadThrough`) tot maximaal
+`master-playlist-timeout-ms` / `segment-timeout-ms`. Twee dingen houden dat goedkoop:
+
+- **Geen databaseverbinding tijdens het wachten.** `HlsService` leest zijn entiteiten in korte
+  read-only-transacties en geeft platte waarden aan de loops, en de HLS-paden (plus de
+  node-naar-node-streams van `/mediaFile/{id}/download`) zijn in `OpenInViewConfig` uitgesloten van
+  open-in-view. Met de standaard open-in-view-bedrading leefde de Hibernate-sessie van het verzoek,
+  en daarmee een gepoolde JDBC-verbinding, tot het antwoord geschreven was, dus elke wachtende
+  speler kostte één verbinding uit de pool. `HlsWaitConnectionIntegrationTest` bemonstert de
+  Hikari-pool tijdens zo'n wachttijd en faalt als er een verbinding wordt vastgehouden.
+- **Ook geen platform-thread.** `spring.threads.virtual.enabled` staat aan (`core.yaml`): Tomcat,
+  de RabbitMQ-listeners en de schedulers draaien op virtual threads, dus een geparkeerd verzoek is
+  een geparkeerde continuation in plaats van een van de 200 Tomcat-threads. Java 25 pint een
+  virtual thread niet meer binnen `synchronized`, dus de monitors die de transcoder rond
+  ffmpeg-runs vasthoudt hebben geen speciale behandeling nodig.
+
 ## Pre-transcoding en achtergrondprioriteit
 
 `PRE_TRANSCODE_RECENTLY_WATCHED` (per disk, elke 15 minuten) leest de continue-watching-entries
@@ -197,16 +216,19 @@ transcode-cachemap van het bestand.
 Een S3-directory heeft geen eigenaar: elke gekoppelde node mag de transcode-queues lezen, en de
 node waar de client mee praat is niet noodzakelijk de node die de pass draait.
 `TranscodeRequestedData` en `TranscodePassRequestedData` dragen daarom `requestingNodeUrl`; een
-transcoderende node pusht naar die node als het een andere is (`HlsService.uploadTarget`), wat de
-segment-push van helper naar eigenaar hergebruikt.
+transcoderende node pusht naar die node als het een andere is (`SegmentUploadCoordinator.uploadTarget`,
+de klasse die de push-doelen en de segment-watcher beheert), wat de segment-push van helper naar
+eigenaar hergebruikt.
 
 Met `app.ister.server.tmp-s3-connection` gezet wordt het push-doel in plaats daarvan de
 cluster-gedeelde `TmpStore` (`S3TmpStore`, `tmp/{mediaFileId}/…`): de watcher publiceert stabiele
 segmenten, playlists en — als laatste, na de pass — de done-markering. De leeskant is een
 read-through: elke `HlsService`-lookup kijkt eerst in de lokale tmp-map en haalt daarna de
-ontbrekende playlist, markering of het segment uit de opslag daarnaartoe (`syncFromShared`), zodat
-de invarianten aan de encoderkant (groottestabiliteit, done-markeringen, `keep_until`, de lokale
-sweeps) onaangeroerd blijven en `HlsController` echte bestanden blijft serveren. Wachten op een
-elders geproduceerd segment pollt de opslag in plaats van de lokale pass (`waitForSegment`). De
+ontbrekende playlist, markering of het segment uit de opslag daarnaartoe
+(`SharedTmpReadThrough.syncFromShared`), zodat de invarianten aan de encoderkant
+(groottestabiliteit, done-markeringen, `keep_until`, de lokale sweeps) onaangeroerd blijven en
+`HlsController` echte bestanden blijft serveren. Wachten op een elders geproduceerd segment pollt de
+opslag in plaats van de lokale pass (`SharedTmpReadThrough.waitForSegment`); die klasse bevat elke
+wachtloop aan de verzoekkant van HLS-afspelen. De
 tmp-opschoning veegt ook de opslag, één node per run onder een advisory lock; heranalyse
 (`deleteHlsCache`) verwijdert de gepubliceerde map ook.

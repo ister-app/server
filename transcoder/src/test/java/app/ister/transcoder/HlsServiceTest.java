@@ -78,6 +78,8 @@ class HlsServiceTest {
     @InjectMocks private HlsSubtitleService subtitleService;
     @InjectMocks private HlsTranscodeService transcodeService;
     private HlsService hlsService;
+    private SegmentUploadCoordinator uploadCoordinator;
+    private SharedTmpReadThrough sharedTmp;
 
     @BeforeEach
     void setUp() {
@@ -96,14 +98,21 @@ class HlsServiceTest {
         ReflectionTestUtils.setField(transcodeService, "concurrentFileSlots", new Semaphore(10));
         // By default the transcode queue for the media file's directory exists.
         lenient().when(amqpAdmin.getQueueProperties(anyString())).thenReturn(new java.util.Properties());
+        MediaFileInputResolver inputResolver = new MediaFileInputResolver(nodeTokenManager, objectStoreRegistry,
+                new app.ister.core.config.S3Properties(), directoryRepository, LOCAL_NODE_NAME, "http://127.0.0.1:8080");
+        app.ister.core.storage.TmpStoreProvider tmpStoreProvider =
+                new app.ister.core.storage.TmpStoreProvider((app.ister.core.storage.TmpStore) null);
+        uploadCoordinator = new SegmentUploadCoordinator(transcodeService, remoteNodeClient, inputResolver, tmpStoreProvider);
+        ReflectionTestUtils.setField(uploadCoordinator, "uploadDrainTimeoutMs", 5000L);
+        sharedTmp = new SharedTmpReadThrough(tmpStoreProvider, transcodeService);
+        ReflectionTestUtils.setField(sharedTmp, "tmpDir", tempDir.toString());
+        ReflectionTestUtils.setField(sharedTmp, "segmentTimeoutMs", 5000L);
         hlsService = new HlsService(playlistBuilder, subtitleService,
                 new HlsBitmapSubtitleService(jaffree, "/usr/bin/mkvextract"), transcodeService,
                 mediaFileRepository, mediaFileStreamRepository, messageSender,
-                remoteNodeClient, new MediaFileInputResolver(nodeTokenManager, objectStoreRegistry, new app.ister.core.config.S3Properties(),
-                        directoryRepository, LOCAL_NODE_NAME, "http://127.0.0.1:8080"),
-                objectStoreRegistry, new app.ister.core.storage.TmpStoreProvider((app.ister.core.storage.TmpStore) null), amqpAdmin, transactionManager);
+                remoteNodeClient, inputResolver, objectStoreRegistry, tmpStoreProvider, amqpAdmin, transactionManager,
+                uploadCoordinator, sharedTmp);
         ReflectionTestUtils.setField(hlsService, "tmpDir", tempDir.toString());
-        ReflectionTestUtils.setField(hlsService, "uploadDrainTimeoutMs", 5000L);
     }
 
     @AfterEach
@@ -1609,12 +1618,13 @@ class HlsServiceTest {
 
         HlsTranscodeService mockTs = mock(HlsTranscodeService.class);
         ReflectionTestUtils.setField(hlsService, "transcodeService", mockTs);
+        ReflectionTestUtils.setField(uploadCoordinator, "transcodeService", mockTs);
         when(mockTs.getActiveFuture(passKey)).thenReturn(CompletableFuture.completedFuture(null));
         when(nodeTokenManager.getDownloadToken()).thenReturn("test-token");
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(remoteMediaFileEntity(id)));
 
         ExecutorService syncExecutor = Executors.newSingleThreadExecutor();
-        ReflectionTestUtils.setField(hlsService, "watcherExecutor", syncExecutor);
+        ReflectionTestUtils.setField(uploadCoordinator, "watcherExecutor", syncExecutor);
 
         TranscodePassRequestedData data = TranscodePassRequestedData.builder()
                 .eventType(EventType.TRANSCODE_PASS_REQUESTED)
@@ -1636,6 +1646,7 @@ class HlsServiceTest {
 
         HlsTranscodeService mockTs = mock(HlsTranscodeService.class);
         ReflectionTestUtils.setField(hlsService, "transcodeService", mockTs);
+        ReflectionTestUtils.setField(uploadCoordinator, "transcodeService", mockTs);
         when(mockTs.getActiveFuture(passKey)).thenReturn(CompletableFuture.completedFuture(null));
         when(nodeTokenManager.getDownloadToken()).thenReturn("test-token");
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(remoteMediaFileEntity(id)));
@@ -1647,7 +1658,7 @@ class HlsServiceTest {
         when(mockTs.stableSegmentOrNull(segFile)).thenReturn(segFile);
 
         ExecutorService syncExecutor = Executors.newSingleThreadExecutor();
-        ReflectionTestUtils.setField(hlsService, "watcherExecutor", syncExecutor);
+        ReflectionTestUtils.setField(uploadCoordinator, "watcherExecutor", syncExecutor);
 
         TranscodePassRequestedData data = TranscodePassRequestedData.builder()
                 .eventType(EventType.TRANSCODE_PASS_REQUESTED)
@@ -1668,6 +1679,7 @@ class HlsServiceTest {
 
         HlsTranscodeService mockTs = mock(HlsTranscodeService.class);
         ReflectionTestUtils.setField(hlsService, "transcodeService", mockTs);
+        ReflectionTestUtils.setField(uploadCoordinator, "transcodeService", mockTs);
         when(mockTs.getActiveFuture(passKey)).thenReturn(CompletableFuture.completedFuture(null));
         when(nodeTokenManager.getDownloadToken()).thenReturn("test-token");
         when(mediaFileRepository.findById(id)).thenReturn(Optional.of(remoteMediaFileEntity(id)));
@@ -1682,7 +1694,7 @@ class HlsServiceTest {
                 .when(remoteNodeClient).uploadFile(any(), any(), eq(segFile));
 
         ExecutorService syncExecutor = Executors.newSingleThreadExecutor();
-        ReflectionTestUtils.setField(hlsService, "watcherExecutor", syncExecutor);
+        ReflectionTestUtils.setField(uploadCoordinator, "watcherExecutor", syncExecutor);
 
         TranscodePassRequestedData data = TranscodePassRequestedData.builder()
                 .eventType(EventType.TRANSCODE_PASS_REQUESTED)
@@ -2030,7 +2042,7 @@ class HlsServiceTest {
 
     @Test
     void watcherExecutorUsesCustomThreadFactory() throws Exception {
-        ExecutorService executor = (ExecutorService) ReflectionTestUtils.getField(hlsService, "watcherExecutor");
+        ExecutorService executor = (ExecutorService) ReflectionTestUtils.getField(uploadCoordinator, "watcherExecutor");
         CountDownLatch latch = new CountDownLatch(1);
         AtomicBoolean isDaemon = new AtomicBoolean(false);
         executor.submit(() -> {
