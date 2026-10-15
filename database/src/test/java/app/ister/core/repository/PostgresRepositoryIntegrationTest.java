@@ -99,6 +99,9 @@ class PostgresRepositoryIntegrationTest {
     private ContinueWatchingRepository continueWatchingRepository;
 
     @Autowired
+    private ScheduledJobRunRepository scheduledJobRunRepository;
+
+    @Autowired
     private MediaFileStreamRepository mediaFileStreamRepository;
 
     @Autowired
@@ -1322,6 +1325,21 @@ class PostgresRepositoryIntegrationTest {
     void aSeasonCanBeClaimedForSegmentDetection() {
         assertTrue(mediaFileSegmentRepository.tryLockSeason(
                 MediaFileSegmentRepository.SEGMENT_DETECTION_LOCK_NAMESPACE, UUID.randomUUID()));
+    }
+
+    /**
+     * The cluster-wide job claim (V52) is one upsert whose WHERE decides who runs: the first
+     * caller inserts, a second inside the interval updates nothing, and once the interval has
+     * passed the row is claimable again. make_interval and the conditional ON CONFLICT need a
+     * real PostgreSQL to prove.
+     */
+    @Test
+    void aScheduledJobIsClaimedOncePerInterval() {
+        String job = "claim-test-" + UUID.randomUUID();
+
+        assertTrue(scheduledJobRunRepository.tryClaim(job, Duration.ofHours(1)), "first claim inserts the row");
+        assertFalse(scheduledJobRunRepository.tryClaim(job, Duration.ofHours(1)), "second claim inside the interval loses");
+        assertTrue(scheduledJobRunRepository.tryClaim(job, Duration.ZERO), "an expired interval frees the claim");
     }
 
     /**

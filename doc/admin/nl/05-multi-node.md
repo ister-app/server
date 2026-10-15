@@ -148,6 +148,11 @@ bereiken), terwijl `APP_ISTER_CLUSTER_NAME` overal hetzelfde is.
   de snelste "draait alles?"-check.
 - Scans, metadata en opschoning draaien per node voor de directories die hij bezit; je start
   `scanLibraries` één keer en elke node pakt zijn eigen deel op.
+- Clusterbrede geplande taken (de nachtelijke continue-watching-rebuild, de uurlijkse
+  podcast-verversing) vuren op elke node maar draaien één keer: de eerste node die de taak in de
+  tabel `scheduled_job_run` claimt zet het werk in de queue, de andere slaan die periode over.
+  Niets te configureren; de claim duurt korter dan de cron-periode, dus een node met een iets
+  achterlopende klok kan geen periode onbezet laten.
 - **Houd de klok van elke node NTP-gedisciplineerd.** Listen-along-clients peilen het
   ongeauthenticeerde `/time`-endpoint om hun klok-offset te meten, en device-presence loopt
   cluster-breed over de status-exchange — omdat clients met elke node kunnen praten, hangt de

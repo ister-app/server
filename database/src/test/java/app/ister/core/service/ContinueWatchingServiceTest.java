@@ -1,5 +1,6 @@
 package app.ister.core.service;
 
+import app.ister.core.config.ContinueWatchingProperties;
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.ContinueWatchingEntity;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -56,6 +58,7 @@ class ContinueWatchingServiceTest {
     @Mock private ChapterRepository chapterRepository;
     @Mock private BookRepository bookRepository;
     @Mock private PodcastEpisodeRepository podcastEpisodeRepository;
+    @Spy private ContinueWatchingProperties properties = new ContinueWatchingProperties();
 
     private final UserEntity user = user();
     private final ShowEntity show = show();
@@ -393,7 +396,6 @@ class ContinueWatchingServiceTest {
 
     @Test
     void rebuildThrowsAwayTheOldEntriesAndRecomputesFromTheWatchHistory() {
-        ReflectionTestUtils.setField(subject, "historyDays", 150);
         EpisodeEntity episode = episode(1, 2);
         Instant lastWatched = Instant.now().minusSeconds(60);
         when(watchStatusRepository.findRecentEpisodeEntries(eq(user.getId()), any()))
@@ -412,7 +414,6 @@ class ContinueWatchingServiceTest {
 
     @Test
     void rebuildHandsAFinishedEpisodeOverToTheNextOne() {
-        ReflectionTestUtils.setField(subject, "historyDays", 150);
         EpisodeEntity episode = episode(1, 2);
         UUID nextId = UUID.randomUUID();
         Instant lastWatched = Instant.now().minusSeconds(60);
@@ -435,7 +436,6 @@ class ContinueWatchingServiceTest {
     /** The rebuild reproduces the completion rule: an epub position older than the audio finish is stale. */
     @Test
     void rebuildDropsAReadingPositionOlderThanTheAudiobookFinish() {
-        ReflectionTestUtils.setField(subject, "historyDays", 150);
         BookEntity book = book();
         ChapterEntity lastChapter = chapter(book, 44);
         Instant finishedAt = Instant.now().minusSeconds(60);
@@ -458,7 +458,6 @@ class ContinueWatchingServiceTest {
     /** Reading again after finishing the audiobook is a fresh start: the book comes back. */
     @Test
     void rebuildKeepsAReadingPositionNewerThanTheAudiobookFinish() {
-        ReflectionTestUtils.setField(subject, "historyDays", 150);
         BookEntity book = book();
         ChapterEntity lastChapter = chapter(book, 44);
         Instant finishedAt = Instant.now().minusSeconds(3600);

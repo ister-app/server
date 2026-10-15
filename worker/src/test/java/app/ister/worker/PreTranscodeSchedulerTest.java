@@ -3,14 +3,15 @@ package app.ister.worker;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.PreTranscodeRecentlyWatchedData;
 import app.ister.core.service.MessageSender;
+import app.ister.worker.config.PretranscodeProperties;
 import app.ister.worker.config.WorkerDiskConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
@@ -22,6 +23,9 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class PreTranscodeSchedulerTest {
+
+    @Spy
+    private PretranscodeProperties properties = new PretranscodeProperties();
 
     @InjectMocks
     private PreTranscodeScheduler subject;
@@ -40,7 +44,7 @@ class PreTranscodeSchedulerTest {
 
     @Test
     void schedulePreTranscodeSendsMessageForEachDirectory() {
-        ReflectionTestUtils.setField(subject, "enabled", true);
+        properties.setEnabled(true);
         when(workerDiskConfig.getDirectories()).thenReturn(List.of(diskEntry("disk1"), diskEntry("disk2")));
 
         subject.schedulePreTranscode();
@@ -60,7 +64,7 @@ class PreTranscodeSchedulerTest {
 
     @Test
     void schedulePreTranscodeDoesNothingWhenNoDirectoriesConfigured() {
-        ReflectionTestUtils.setField(subject, "enabled", true);
+        properties.setEnabled(true);
         when(workerDiskConfig.getDirectories()).thenReturn(List.of());
 
         subject.schedulePreTranscode();
@@ -71,7 +75,7 @@ class PreTranscodeSchedulerTest {
 
     @Test
     void schedulePreTranscodeDoesNothingWhenDisabled() {
-        ReflectionTestUtils.setField(subject, "enabled", false);
+        properties.setEnabled(false);
 
         subject.schedulePreTranscode();
 

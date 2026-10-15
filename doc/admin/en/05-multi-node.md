@@ -140,6 +140,11 @@ Points to copy from it: each node has its **own** `CACHE_DIR`, its own published
   "is everything up?" check.
 - Scans, metadata and cleanup run per node for the directories it owns; you trigger `scanLibraries`
   once and each node picks up its share.
+- Cluster-wide scheduled jobs (the nightly continue-watching rebuild, the hourly podcast
+  refresh) fire on every node but run once: the first node to claim the job in the
+  `scheduled_job_run` table queues the work, the others skip that period. Nothing to configure;
+  the claim lasts shorter than the cron period, so a node with a slightly late clock cannot
+  leave a period unclaimed.
 - **Keep every node's clock NTP-disciplined.** Listen-along clients probe the unauthenticated
   `/time` endpoint to measure their clock offset, and device presence travels cluster-wide over the
   status exchange — since clients can talk to any node, the measured offset depends on which node

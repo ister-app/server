@@ -23,6 +23,7 @@ import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.PodcastRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ServerEventService;
+import app.ister.worker.config.PodcastProperties;
 import app.ister.worker.events.tmdbmetadata.ImageDownloadService;
 import app.ister.worker.events.tmdbmetadata.ImageSave;
 import lombok.extern.slf4j.Slf4j;
@@ -74,8 +75,7 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
     @Value("${app.ister.server.name}")
     private String nodeName;
 
-    @Value("${app.ister.worker.podcast.auto-download-count:3}")
-    private int autoDownloadCount;
+    private final PodcastProperties properties;
 
     public HandlePodcastRefreshRequested(PodcastRepository podcastRepository,
                                          PodcastEpisodeRepository podcastEpisodeRepository,
@@ -88,7 +88,8 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
                                          MessageSender messageSender,
                                          DirectoryRepository directoryRepository,
                                          OwnDirectoriesProperties ownDirectories,
-                                         app.ister.core.config.DirectoryQueueNames directoryQueueNames) {
+                                         app.ister.core.config.DirectoryQueueNames directoryQueueNames,
+                                         PodcastProperties properties) {
         this.podcastRepository = podcastRepository;
         this.podcastEpisodeRepository = podcastEpisodeRepository;
         this.metadataRepository = metadataRepository;
@@ -101,6 +102,7 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
         this.directoryRepository = directoryRepository;
         this.ownDirectories = ownDirectories;
         this.directoryQueueNames = directoryQueueNames;
+        this.properties = properties;
     }
 
     @Override
@@ -226,7 +228,7 @@ public class HandlePodcastRefreshRequested implements Handle<PodcastRefreshReque
      */
     private void requestAutoDownloads(PodcastEntity podcast) {
         List<UUID> episodeIds = podcastEpisodeRepository
-                .findEpisodeIdsForPodcastOrdered(podcast.getId(), autoDownloadCount, 0).stream()
+                .findEpisodeIdsForPodcastOrdered(podcast.getId(), properties.getAutoDownloadCount(), 0).stream()
                 .filter(episodeId -> !mediaFileRepository.existsByPodcastEpisodeEntityId(episodeId))
                 .toList();
         if (episodeIds.isEmpty()) {

@@ -226,6 +226,11 @@ Roughly a dozen `@Scheduled` beans; the ones with operational consequences:
 - `PodcastRefreshScheduler` (hourly), `StreamTokenService` (expiry sweep), `NodeTokenManager` (multi-node
   token refresh).
 
+A job that fans work out for the whole cluster (the continue-watching rebuild, the podcast refresh) must
+not queue it once per node: it claims a run with `ScheduledJobClaimService.claim(name, interval)` (core;
+one upsert on `scheduled_job_run`, V52) and skips when another node already did. Per-node sweeps use the
+transaction-scoped advisory locks (`tryLockDirectoryScan`) instead.
+
 ## Startup Initialization
 
 `disk/.../StartupTasks` handles `ContextRefreshedEvent` to:

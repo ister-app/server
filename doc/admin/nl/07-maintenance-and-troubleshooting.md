@@ -16,8 +16,8 @@ en de gebruikelijke verdachten wanneer iets er raar uitziet.
 | Cache-opschoning | disk | dagelijks, 04:30 | verwijdert cachebestanden waar geen databaserij naar verwijst ("zombies"); laat podcastdownloads ouder dan `podcast-retention-days` (30) verlopen, tenzij iemand middenin een aflevering zit |
 | Tmp-transcode-opschoning | transcoder | dagelijks, 04:30 | dezelfde sweep voor de tijdelijke HLS-transcodemap |
 | Pre-transcode | worker | elke 15 min | warmt HLS-uitvoer op voor wat gebruikers waarschijnlijk als volgende afspelen |
-| Continue-watching-rebuild | worker | 's nachts, 03:30 | herberekent de continue-watching-lijst van elke gebruiker vanaf nul; verwijdert items waarvan de media weg is |
-| Podcast-verversing | worker | elk uur | haalt elke geabonneerde feed op, zet downloads van nieuwe afleveringen in de queue |
+| Continue-watching-rebuild | worker | 's nachts, 03:30 | herberekent de continue-watching-lijst van elke gebruiker vanaf nul; verwijdert items waarvan de media weg is. Draait op één node per nacht (geclaimd in `scheduled_job_run`) |
+| Podcast-verversing | worker | elk uur | haalt elke geabonneerde feed op, zet downloads van nieuwe afleveringen in de queue. Eén library-serverende node per `refresh-min-interval-minutes` doet de sweep |
 | Transcode-cache-sweep | transcoder | elke 15 min | verwijdert afgeronde HLS-uitvoer ouder dan `cache-retention-hours` (2 u), met respect voor de `keep_until`-markering van elke sessie — dít is de sweep die tussen de dagelijkse runs door daadwerkelijk HLS-ruimte vrijmaakt |
 | Streamtoken-verloop | database | elk uur | verwijdert verlopen HLS-/afbeeldings-streamtokens |
 | Afspeelsessie-sweep | core | elke 15 s | laat verlopen client-afspeelsessies uit het live register verdwijnen |

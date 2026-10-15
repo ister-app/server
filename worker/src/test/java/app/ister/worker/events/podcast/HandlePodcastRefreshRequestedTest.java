@@ -18,6 +18,7 @@ import app.ister.core.repository.PodcastEpisodeRepository;
 import app.ister.core.repository.PodcastRepository;
 import app.ister.core.service.MessageSender;
 import app.ister.core.service.ServerEventService;
+import app.ister.worker.config.PodcastProperties;
 import app.ister.worker.events.tmdbmetadata.ImageDownloadService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,6 +76,9 @@ class HandlePodcastRefreshRequestedTest {
     @Mock
     private app.ister.core.config.DirectoryQueueNames directoryQueueNames;
 
+    @org.mockito.Spy
+    private PodcastProperties podcastProperties = new PodcastProperties();
+
     @InjectMocks
     private HandlePodcastRefreshRequested subject;
 
@@ -84,7 +88,7 @@ class HandlePodcastRefreshRequestedTest {
     void setUp() {
         org.mockito.Mockito.lenient().when(directoryQueueNames.cacheDirName()).thenReturn("node1-cache-directory");
         ReflectionTestUtils.setField(subject, "nodeName", "node1");
-        ReflectionTestUtils.setField(subject, "autoDownloadCount", 2);
+        podcastProperties.setAutoDownloadCount(2);
 
         podcast = PodcastEntity.builder()
                 .libraryEntity(LibraryEntity.builder().name("podcasts").build())

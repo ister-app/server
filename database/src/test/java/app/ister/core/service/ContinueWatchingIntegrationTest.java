@@ -48,7 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 // PersistenceConfig (@EnableJpaAuditing) is filtered out of the slice; needed for dateCreated/dateUpdated
 @org.springframework.context.annotation.Import({app.ister.core.config.PersistenceConfig.class,
-        ContinueWatchingService.class})
+        ContinueWatchingService.class, app.ister.core.config.ContinueWatchingProperties.class})
 @Testcontainers(disabledWithoutDocker = true)
 class ContinueWatchingIntegrationTest {
 

@@ -15,8 +15,8 @@ should know about, what to back up, and the usual suspects when something looks 
 | Cache cleanup | disk | daily, 04:30 | deletes cache files no database row references ("zombies"); expires podcast downloads past `podcast-retention-days` (30) unless someone is mid-episode |
 | Tmp transcode cleanup | transcoder | daily, 04:30 | same sweep for the HLS transcode tmp dir |
 | Pre-transcode | worker | every 15 min | warms up HLS output for what users will likely play next |
-| Continue-watching rebuild | worker | nightly, 03:30 | recomputes each user's continue-watching list from scratch; prunes entries whose media is gone |
-| Podcast refresh | worker | hourly | fetches every subscribed feed, queues new episode downloads |
+| Continue-watching rebuild | worker | nightly, 03:30 | recomputes each user's continue-watching list from scratch; prunes entries whose media is gone. Runs on one node per night (claimed in `scheduled_job_run`) |
+| Podcast refresh | worker | hourly | fetches every subscribed feed, queues new episode downloads. One library-serving node per `refresh-min-interval-minutes` does the sweep |
 | Transcode cache sweep | transcoder | every 15 min | deletes finished HLS output older than `cache-retention-hours` (2 h), honouring each session's `keep_until` marker — this is the sweep that actually frees HLS space between the daily runs |
 | Stream-token expiry | database | hourly | deletes expired HLS/image stream tokens |
 | Playback-session sweep | core | every 15 s | expires stale client playback sessions from the live registry |

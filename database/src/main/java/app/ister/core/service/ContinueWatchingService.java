@@ -1,5 +1,6 @@
 package app.ister.core.service;
 
+import app.ister.core.config.ContinueWatchingProperties;
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.ContinueWatchingEntity;
@@ -17,7 +18,6 @@ import app.ister.core.repository.WatchStatusRepository;
 import app.ister.core.repository.WatchStatusRepository.RecentEntry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,9 +57,7 @@ public class ContinueWatchingService {
     private final BookRepository bookRepository;
     private final PodcastEpisodeRepository podcastEpisodeRepository;
 
-    /** How far back the continue-watching list looks; older entries are dropped on rebuild. */
-    @Value("${app.ister.server.continue-watching.history-days:150}")
-    private int historyDays;
+    private final ContinueWatchingProperties properties;
 
     /** The user's list, newest first. Entries with nothing left to resume are left out. */
     @Transactional(readOnly = true)
@@ -377,6 +375,6 @@ public class ContinueWatchingService {
     }
 
     private Instant cutoff() {
-        return Instant.now().minus(Duration.ofDays(historyDays));
+        return Instant.now().minus(Duration.ofDays(properties.getHistoryDays()));
     }
 }

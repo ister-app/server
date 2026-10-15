@@ -3,10 +3,10 @@ package app.ister.worker;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.PreTranscodeRecentlyWatchedData;
 import app.ister.core.service.MessageSender;
+import app.ister.worker.config.PretranscodeProperties;
 import app.ister.worker.config.WorkerDiskConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -21,13 +21,11 @@ public class PreTranscodeScheduler {
 
     private final MessageSender messageSender;
     private final WorkerDiskConfig workerDiskConfig;
-
-    @Value("${app.ister.worker.pretranscode.enabled:true}")
-    private boolean enabled;
+    private final PretranscodeProperties properties;
 
     @Scheduled(cron = "5 */15 * * * *")
     public void schedulePreTranscode() {
-        if (!enabled) {
+        if (!properties.isEnabled()) {
             log.debug("Pre-transcode scheduling is disabled, skipping");
             return;
         }
