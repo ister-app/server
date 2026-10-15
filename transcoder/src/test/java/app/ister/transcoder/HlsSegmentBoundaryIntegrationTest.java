@@ -22,6 +22,7 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Runs the real FFmpeg passes (ffmpeg must be on PATH, as in CI) and verifies that the
@@ -32,6 +33,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class HlsSegmentBoundaryIntegrationTest {
 
+    private static final String FFMPEG_DIR = "/usr/bin";
+
     @TempDir
     Path tempDir;
 
@@ -40,8 +43,10 @@ class HlsSegmentBoundaryIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        // Skip (reported as such) rather than fail on a machine without ffmpeg; CI installs it.
+        assumeTrue(Files.exists(Path.of(FFMPEG_DIR, "ffmpeg")), "ffmpeg not installed");
         jaffree = new Jaffree();
-        ReflectionTestUtils.setField(jaffree, "dirOfFFmpeg", "/usr/bin");
+        ReflectionTestUtils.setField(jaffree, "dirOfFFmpeg", FFMPEG_DIR);
         FfprobeService ffprobeService = new FfprobeService(jaffree);
         service = new HlsTranscodeService(jaffree, ffprobeService);
         ReflectionTestUtils.setField(service, "tmpDir", tempDir.toString());

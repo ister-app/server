@@ -75,3 +75,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: ./gradlew build check jacocoTestReport sonar --info
+      # The *IntegrationTest classes skip themselves when no container runtime is reachable, which
+      # would leave the step above green without ever having run Flyway or the native queries.
+      - name: Check that the integration tests ran
+        if: always()
+        run: ci/check-integration-tests.sh
