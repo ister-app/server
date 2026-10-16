@@ -1,5 +1,38 @@
 # Changelog
 
+## server v5.3.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `5.3.0` |
+| `ghcr.io/ister-app/migrations` | `5.3.0` |
+
+### Features
+
+- feat(worker): pace Open Library and Wikipedia calls with RequestPacer ([`126ce77`](https://github.com/ister-app/server/commit/126ce77))
+- feat(scheduler): run cluster-wide scheduled jobs on one node per period ([`d86b047`](https://github.com/ister-app/server/commit/d86b047))
+
+### Fixes
+
+- fix(config): virtual threads are a build-time setting, drop the env override ([`8a7ee6b`](https://github.com/ister-app/server/commit/8a7ee6b))
+- fix(graphql): keep controller methods on the request thread under virtual threads ([`1c7f0ac`](https://github.com/ister-app/server/commit/1c7f0ac))
+- fix(hls): stop waiting requests from holding a pooled database connection ([`3cbb255`](https://github.com/ister-app/server/commit/3cbb255))
+
+### Other
+
+- refactor(playqueue): move watch-status recording into PlayQueueWatchStatusRecorder ([`cea99db`](https://github.com/ister-app/server/commit/cea99db))
+- refactor(hls): split segment uploads and shared-tmp read-through out of HlsService ([`a33d9d9`](https://github.com/ister-app/server/commit/a33d9d9))
+- docs: drop the finished IMPROVEMENTS.md and the hardcoded image tag example ([`e314e51`](https://github.com/ister-app/server/commit/e314e51))
+- ci: fail the build when the integration tests did not run ([`a77fc50`](https://github.com/ister-app/server/commit/a77fc50))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:5.3.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v5.2.3...v5.3.0
+
 ## server v5.2.3
 
 | Image | Tag |
