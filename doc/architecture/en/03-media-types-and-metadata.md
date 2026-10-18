@@ -174,6 +174,51 @@ cache. Epub volumes reuse the full `EPUB_FILE_FOUND` pipeline. `COMIC_SERIES_FOU
 Wikipedia/Wikidata — local artwork always wins and is never overwritten. Pages are served to the
 reader by `ComicResourceController` (`/comic/{mediaFileId}/manifest`, `/page/{index}`, `/file`).
 
+## Games (`LibraryType.GAME`, migration V53)
+
+Games are the first library type whose content is **not served as a stream**: the desktop player
+downloads a game, starts a local emulator (RetroArch with the libretro core named by
+`GamePlatform`, RPCS3) or the game itself / Steam, and syncs the user's saves back. The server is
+the library plus the per-user save cloud.
+
+`game_entity` identity is `(library, platform, name, pathYear)`; `form` (`GameForm`) says what the
+files are: `ROM`, `PS3_FOLDER`, `PC_PORTABLE_ZIP`, `PC_LINUX_INSTALLER`, `PC_LINUX_PORTABLE`,
+`STEAM`. Single-file forms attach `MediaFileEntity.gameEntity` rows (`gameEntryFile = false` for
+the `.bin` companions of a `.cue`); folder forms have no per-file rows (see
+[chapter 2](02-scanning-and-analysis.md#games)). `title` is a display override (`PARAM.SFO`
+`TITLE`, the Steam name, later a metadata provider), `name` stays the path identity.
+
+`HandleGameFound` (worker, `GAME_FOUND`) enriches: for PS3 it reads `PARAM.SFO` (`ParamSfoParser`:
+`TITLE`, `TITLE_ID`) and copies `ICON0.PNG` into the cache store as the cover when the folder has
+no artwork; for PC and Steam forms it resolves **save locations** from the community
+[Ludusavi manifest](https://github.com/mtkennerly/ludusavi-manifest) — `LudusaviManifestService`
+downloads the ~10 MB YAML at most once per `refresh-hours`, keeps it in the cache store under
+`ludusavi/manifest.yaml` and reduces it to two in-memory indexes (Steam app id → entry, normalized
+title → entry); matching is strict (app id, else exact normalized title — a wrong folder is worse
+than no sync). The result lands in `manifest_save_paths` (JSON, `GameSavePaths`: path templates
+with Ludusavi placeholders like `<winAppData>`, plus an `os`), `manifest_matched_by` and
+`steam_cloud`; an admin's `save_paths` override always wins. `GameMetadataProvider` is the seam
+for an external source (IGDB) — `NoopGameMetadataProvider` today.
+
+**Saves** (`GameSaveService`, disk): one zip per play session, uploaded raw to
+`POST /game/{id}/saves?baseVersion=N`; versions count up per (user, game), the newest
+`app.ister.games.save-retention` survive, objects live in the cache store under
+`saves/<userId>/<gameId>/<version>.zip` and are referenced by `game_save_entity` (so the cache
+cleanup keeps them). A head newer than the client's `baseVersion` answers **409** with the head's
+details — another device played in between — unless `force=true`; `…/saves/{v}/restore` copies an
+older version as a new head so the history stays linear. The upload is "short tx → stream to tmp →
+short tx", like the admin upload's chunks.
+
+**Achievements** come from the client, which reads them from the local emulator/store files after
+a session (RPCS3's `TROPCONF.SFM` + `TROPUSR.DAT`, Steam's `appcache/stats` KeyValues):
+`POST /game/{id}/achievements` carries the full definition list plus the unlocks
+(`GameAchievementService`: upsert per `(game, source, externalId)`, an unlock time never moves
+back), icons arrive as PNG bodies and are stored as `ImageType.ICON` images.
+
+**Play state** is one `WatchStatusEntity` per user per game (`playTimeMs`, `dateUpdated` = last
+played), written by the `recordGamePlayed` mutation, which also keeps the continue-watching entry
+(type `GAME`, the game is its own group).
+
 ## Podcasts (`LibraryType.PODCAST`)
 
 The first **feed-based** library type: there is no library directory. `subscribePodcast(feedUrl)` or

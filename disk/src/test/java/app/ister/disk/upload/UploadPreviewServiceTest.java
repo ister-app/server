@@ -12,6 +12,7 @@ import app.ister.core.storage.LibraryWriteStoreResolver;
 import app.ister.disk.scanner.Scanners;
 import app.ister.disk.scanner.scanners.AudioScanner;
 import app.ister.disk.scanner.scanners.ComicScanner;
+import app.ister.disk.scanner.scanners.GameScanner;
 import app.ister.disk.scanner.scanners.EpubScanner;
 import app.ister.disk.scanner.scanners.ImageScanner;
 import app.ister.disk.scanner.scanners.MediaFileScanner;
@@ -21,6 +22,7 @@ import app.ister.disk.upload.UploadDtos.Entry;
 import app.ister.disk.upload.UploadDtos.IgnoreReason;
 import app.ister.disk.upload.UploadDtos.PlanRequest;
 import app.ister.disk.upload.UploadDtos.PreviewEntry;
+import app.ister.disk.upload.UploadDtos.PreviewRoot;
 import app.ister.disk.upload.UploadDtos.PreviewResponse;
 import app.ister.disk.upload.UploadDtos.PreviewStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,7 +57,7 @@ class UploadPreviewServiceTest {
                 mock(MediaFileScanner.class, CALLS_REAL_METHODS), mock(ImageScanner.class, CALLS_REAL_METHODS),
                 mock(NfoScanner.class, CALLS_REAL_METHODS), mock(SubtitleScanner.class, CALLS_REAL_METHODS),
                 mock(AudioScanner.class, CALLS_REAL_METHODS), mock(EpubScanner.class, CALLS_REAL_METHODS),
-                mock(ComicScanner.class, CALLS_REAL_METHODS));
+                mock(ComicScanner.class, CALLS_REAL_METHODS), mock(GameScanner.class, CALLS_REAL_METHODS));
         service = new UploadPreviewService(scanners, mediaFileRepository, imageRepository, otherPathFileRepository,
                 uploadFileRepository, writeStoreResolver);
     }
@@ -184,6 +186,55 @@ class UploadPreviewServiceTest {
         assertThat(volume.recognition().series()).isEqualTo("Dr. Stone");
         assertThat(volume.recognition().volume()).isEqualTo(27.0);
         assertThat(entry(response, "extras/deep/Volume 99.cbz").status()).isEqualTo(PreviewStatus.IGNORED);
+    }
+
+    @Test
+    void gameRomCoverAndNestedExtras() {
+        DirectoryEntity games = directory(LibraryType.GAME, "/media/games");
+        PreviewResponse response = service.preview(games, request(null, "gbc", false,
+                "Tetris (1989)/Tetris.gbc", "Tetris (1989)/cover.jpg", "Tetris (1989)/readme.txt",
+                "Tetris (1989)/extras/box.jpg"));
+
+        PreviewEntry rom = entry(response, "Tetris (1989)/Tetris.gbc");
+        assertThat(rom.status()).isEqualTo(PreviewStatus.RECOGNISED);
+        assertThat(rom.recognition().kind()).isEqualTo("GAME");
+        assertThat(rom.recognition().title()).isEqualTo("Tetris");
+        assertThat(rom.recognition().year()).isEqualTo(1989);
+        assertThat(rom.recognition().platform()).isEqualTo("GBC");
+        assertThat(rom.recognition().form()).isEqualTo("ROM");
+        assertThat(entry(response, "Tetris (1989)/cover.jpg").status()).isEqualTo(PreviewStatus.RECOGNISED);
+        assertThat(entry(response, "Tetris (1989)/readme.txt").ignoreReason()).isEqualTo(IgnoreReason.UNSUPPORTED_FILE);
+        assertThat(entry(response, "Tetris (1989)/extras/box.jpg").ignoreReason()).isEqualTo(IgnoreReason.FOLDER_NOT_SCANNED);
+        assertThat(response.roots()).extracting(PreviewRoot::level).containsExactly("GAME_PLATFORM");
+    }
+
+    @Test
+    void ps3TreeIsAcceptedThroughItsMarkerAndRefusedWithoutIt() {
+        DirectoryEntity games = directory(LibraryType.GAME, "/media/games");
+        PreviewResponse response = service.preview(games, request("ps3", null, false,
+                "Demon Souls (2010)/PS3_GAME/PARAM.SFO", "Demon Souls (2010)/PS3_GAME/USRDIR/EBOOT.BIN",
+                "Demon Souls (2010)/PS3_GAME/USRDIR/data/level1.bin",
+                "Lost Game (2011)/PS3_GAME/USRDIR/EBOOT.BIN"));
+
+        assertThat(entry(response, "Demon Souls (2010)/PS3_GAME/PARAM.SFO").recognition().kind()).isEqualTo("GAME_MARKER");
+        assertThat(entry(response, "Demon Souls (2010)/PS3_GAME/USRDIR/EBOOT.BIN").status()).isEqualTo(PreviewStatus.RECOGNISED);
+        assertThat(entry(response, "Demon Souls (2010)/PS3_GAME/USRDIR/data/level1.bin").status()).isEqualTo(PreviewStatus.RECOGNISED);
+        PreviewEntry orphan = entry(response, "Lost Game (2011)/PS3_GAME/USRDIR/EBOOT.BIN");
+        assertThat(orphan.status()).isEqualTo(PreviewStatus.IGNORED);
+        assertThat(orphan.ignoreReason()).isEqualTo(IgnoreReason.GAME_INCOMPLETE);
+        assertThat(orphan.detail()).contains("PS3_GAME/PARAM.SFO");
+        assertThat(response.uploadFiles()).isEqualTo(3);
+    }
+
+    @Test
+    void steamTreeTravelsWithItsManifest() {
+        DirectoryEntity games = directory(LibraryType.GAME, "/media/games");
+        PreviewResponse response = service.preview(games, request("steam", "Stardew Valley (2016)", false,
+                "appmanifest_413150.acf", "Stardew Valley/Stardew Valley.exe", "Stardew Valley/Content/data.xnb"));
+
+        assertThat(entry(response, "appmanifest_413150.acf").recognition().form()).isEqualTo("STEAM");
+        assertThat(entry(response, "Stardew Valley/Content/data.xnb").status()).isEqualTo(PreviewStatus.RECOGNISED);
+        assertThat(response.roots()).extracting(PreviewRoot::level).containsExactly("GAME");
     }
 
     @Test

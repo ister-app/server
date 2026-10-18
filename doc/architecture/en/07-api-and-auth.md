@@ -20,6 +20,7 @@ areas:
 | Search & misc | search (`SearchController`), current user (`MeController`), server clock (`TimeController`) |
 | Server | server info, server status, `.well-known` |
 | File serving (disk module) | epub resources (`EpubResourceController` area), comic pages (`ComicResourceController`: `/comic/{mediaFileId}/manifest`, `/page/{index}`, `/file`), image downloads + media-file download + transcode segment upload (`FileController`, see below) |
+| Games (disk module) | `GameResourceController` — `/game/{gameId}/manifest` (the file list a client downloads), `/game/{gameId}/file/{*relative}` (Range), the calling user's saves (`/saves` list, raw-zip POST with `baseVersion` → 409 on a newer head, `/saves/{v}` download, `/restore`, `/delete`) and the achievement report (`/achievements`, `/achievements/{source}/{externalId}/icon`). Bearer or stream token like the other media routes; library visibility is enforced by `MediaAccessEnforcementFilter` on the game id. See [chapter 3](03-media-types-and-metadata.md#games) |
 | Admin upload (disk module) | `LibraryUploadController` — `/library-upload/**`: directory picker, scanner-backed preview, resumable chunked upload sessions. Admin only and **bearer JWT only** (no stream tokens: a URL token that can write into a library is a worse leak than one that reads a segment); GET/POST only, because the CORS setup the web player depends on allows nothing else. See [chapter 2](02-scanning-and-analysis.md#admin-upload) |
 
 Errors are mapped centrally in `api/.../error/` — `RestExceptionHandler` for REST,

@@ -49,6 +49,21 @@ public class MediaFileEntity extends FileFromPathEntity {
     @ManyToOne(optional = true)
     private PodcastEpisodeEntity podcastEpisodeEntity;
 
+    /** Set for the file(s) of a single-file game (ROM, PC zip, Linux installer/archive). */
+    @Getter(onMethod = @__(@JsonBackReference))
+    @Setter
+    @ManyToOne(optional = true)
+    private GameEntity gameEntity;
+
+    /**
+     * Whether this is the file the client launches; false for the companions of a multi-file ROM
+     * set (the .bin tracks of a .cue), which are downloaded with the game but never launched.
+     */
+    @Setter
+    @Column(nullable = false)
+    @lombok.Builder.Default
+    private boolean gameEntryFile = true;
+
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "mediaFileEntity")
     private List<MediaFileStreamEntity> mediaFileStreamEntity;
 

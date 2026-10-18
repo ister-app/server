@@ -153,6 +153,19 @@ public class ImageEntity extends FileFromPathEntity {
 
     @Getter(onMethod = @__(@JsonBackReference))
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "game_entity_id", referencedColumnName = "id", insertable = false, updatable = false)
+    private GameEntity gameEntity;
+
+    @Column(name = "game_entity_id")
+    private UUID gameEntityId;
+
+    public void setGameEntity(GameEntity gameEntity) {
+        this.gameEntity = gameEntity;
+        this.gameEntityId = (gameEntity != null) ? gameEntity.getId() : null;
+    }
+
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "podcast_entity_id", referencedColumnName = "id", insertable = false, updatable = false)
     private PodcastEntity podcastEntity;
 

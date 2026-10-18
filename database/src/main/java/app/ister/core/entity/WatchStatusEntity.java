@@ -11,7 +11,7 @@ import lombok.experimental.SuperBuilder;
 import java.util.UUID;
 
 @Entity
-@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"playQueueItemId", "userEntityId", "movieEntityId", "episodeEntityId", "chapterEntityId", "bookEntityId", "podcastEpisodeEntityId", "trackEntityId"}))
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"playQueueItemId", "userEntityId", "movieEntityId", "episodeEntityId", "chapterEntityId", "bookEntityId", "podcastEpisodeEntityId", "trackEntityId", "gameEntityId"}))
 @Getter
 @Setter
 @SuperBuilder
@@ -63,6 +63,18 @@ public class WatchStatusEntity extends BaseEntity {
     @Getter(onMethod = @__(@JsonBackReference))
     @ManyToOne(optional = true)
     private TrackEntity trackEntity;
+
+    /**
+     * Set for games: one row per user per game ({@link #playQueueItemId} holds the game id), with
+     * {@code dateUpdated} as "last played" and {@link #playTimeMs} as the accumulated play time.
+     */
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne(optional = true)
+    private GameEntity gameEntity;
+
+    /** Accumulated play time in milliseconds; only meaningful on game rows. */
+    @Column(nullable = false)
+    private long playTimeMs;
 
     @Column(nullable = false)
     private boolean watched;

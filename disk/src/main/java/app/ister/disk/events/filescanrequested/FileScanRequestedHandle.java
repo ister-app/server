@@ -23,9 +23,9 @@ public class FileScanRequestedHandle implements Handle<FileScanRequestedData> {
     private final DirectoryRepository directoryRepository;
     private final Scanners scanners;
 
-    public FileScanRequestedHandle(DirectoryRepository directoryRepository, MediaFileScanner mediaFileScanner, ImageScanner imageScanner, NfoScanner nfoScanner, SubtitleScanner subtitleScanner, AudioScanner audioScanner, EpubScanner epubScanner, ComicScanner comicScanner) {
+    public FileScanRequestedHandle(DirectoryRepository directoryRepository, MediaFileScanner mediaFileScanner, ImageScanner imageScanner, NfoScanner nfoScanner, SubtitleScanner subtitleScanner, AudioScanner audioScanner, EpubScanner epubScanner, ComicScanner comicScanner, GameScanner gameScanner) {
         this.directoryRepository = directoryRepository;
-        this.scanners = new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner, comicScanner);
+        this.scanners = new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner, comicScanner, gameScanner);
     }
 
     @RabbitListener(queues = "#{@diskQueueNamingConfig.getFileScanRequestedQueues()}")

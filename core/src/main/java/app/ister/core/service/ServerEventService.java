@@ -75,6 +75,15 @@ public class ServerEventService {
                         .build()));
     }
 
+    /** A new or changed game: the worker reads PARAM.SFO / the Steam manifest and looks up save paths. */
+    public void createGameFoundEvent(UUID gameId) {
+        publishAfterCommit(() -> messageSender.sendGameFound(GameFoundData.builder()
+                        .eventType(EventType.GAME_FOUND)
+                        .gameId(gameId)
+                        .build()));
+        createSearchIndexEvent(SearchEntityType.GAME, gameId);
+    }
+
     public void createSearchIndexEvent(SearchEntityType entityType, UUID entityId) {
         sendSearchIndexEvent(entityType, entityId, SearchIndexRequestedData.Action.UPSERT);
     }

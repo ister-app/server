@@ -9,6 +9,7 @@ import app.ister.core.eventdata.FileScanRequestedData;
 import app.ister.core.service.MessageSender;
 import app.ister.disk.scanner.scanners.AudioScanner;
 import app.ister.disk.scanner.scanners.ComicScanner;
+import app.ister.disk.scanner.scanners.GameScanner;
 import app.ister.disk.scanner.scanners.EpubScanner;
 import app.ister.disk.scanner.scanners.ImageScanner;
 import app.ister.disk.scanner.scanners.MediaFileScanner;
@@ -44,6 +45,7 @@ class S3LibraryScannerTest {
     @Mock private AudioScanner audioScanner;
     @Mock private EpubScanner epubScanner;
     @Mock private ComicScanner comicScanner;
+    @Mock private GameScanner gameScanner;
 
     private DirectoryEntity showDirectory(String prefix) {
         DirectoryEntity dir = DirectoryEntity.builder()
@@ -58,7 +60,7 @@ class S3LibraryScannerTest {
 
     private S3LibraryScanner scanner(DirectoryEntity dir, FakeObjectStore store) {
         return new S3LibraryScanner(dir, store, new ScanEntryDispatcher(dir, scannedCache, messageSender,
-                new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner, comicScanner)));
+                new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner, comicScanner, gameScanner)));
     }
 
     /** Only show/season prefixes are descended into; the pruned subtree is never listed, and dot-prefixes are skipped. */

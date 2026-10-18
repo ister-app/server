@@ -67,6 +67,11 @@ public class QueueConfig {
     }
 
     @Bean
+    public Queue queueGameFound() {
+        return new Queue(APP_ISTER_SERVER_GAME_FOUND);
+    }
+
+    @Bean
     public Queue queuePodcastRefreshRequested() {
         return new Queue(APP_ISTER_SERVER_PODCAST_REFRESH_REQUESTED);
     }

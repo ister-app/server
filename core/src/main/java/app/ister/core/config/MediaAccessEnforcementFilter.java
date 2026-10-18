@@ -20,7 +20,8 @@ import java.util.UUID;
 
 /**
  * Enforces library visibility on the id-addressed media endpoints ({@code /hls/{mediaFileId}},
- * {@code /epub/{mediaFileId}}, {@code /comic/{mediaFileId}}, {@code /images/{imageId}/download}).
+ * {@code /epub/{mediaFileId}}, {@code /comic/{mediaFileId}}, {@code /game/{gameId}},
+ * {@code /images/{imageId}/download}).
  * Authentication (bearer or stream token) has already happened earlier in the chain; this filter
  * only decides whether the authenticated user may see the library the resource belongs to.
  * A denied resource answers 404, indistinguishable from a resource that does not exist.
@@ -31,6 +32,9 @@ import java.util.UUID;
 public class MediaAccessEnforcementFilter extends OncePerRequestFilter {
 
     private static final List<String> MEDIA_FILE_PATHS = List.of("/hls/", "/epub/", "/comic/");
+    /** {@code /game/{gameId}/...}: addressed by game id rather than media file id. */
+    @SuppressWarnings("java:S1075")
+    private static final String GAME_PATH = "/game/";
     @SuppressWarnings("java:S1075")
     private static final String IMAGE_PATH = "/images/";
 
@@ -59,10 +63,19 @@ public class MediaAccessEnforcementFilter extends OncePerRequestFilter {
         if (id.isEmpty()) {
             return true; // malformed id: let the controller answer its usual 400/404
         }
-        Optional<LibraryEntity> library = isMediaFilePath(path)
-                ? mediaLibraryResolver.ofMediaFileId(id.get())
-                : mediaLibraryResolver.ofImageId(id.get());
+        Optional<LibraryEntity> library;
+        if (isMediaFilePath(path)) {
+            library = mediaLibraryResolver.ofMediaFileId(id.get());
+        } else if (isGamePath(path)) {
+            library = mediaLibraryResolver.ofGameId(id.get());
+        } else {
+            library = mediaLibraryResolver.ofImageId(id.get());
+        }
         return library.map(lib -> libraryAccessService.canAccess(lib, authentication)).orElse(true);
+    }
+
+    private boolean isGamePath(String path) {
+        return path.startsWith(pathPrefix + GAME_PATH);
     }
 
     private boolean isMediaFilePath(String path) {
@@ -91,6 +104,6 @@ public class MediaAccessEnforcementFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return !isMediaFilePath(path) && !path.startsWith(pathPrefix + IMAGE_PATH);
+        return !isMediaFilePath(path) && !isGamePath(path) && !path.startsWith(pathPrefix + IMAGE_PATH);
     }
 }

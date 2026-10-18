@@ -229,11 +229,18 @@ app:
       enabled: "${UPLOAD_ENABLED:true}"
       chunk-size: "${UPLOAD_CHUNK_SIZE:16MB}"
       max-active-sessions: "${UPLOAD_MAX_ACTIVE_SESSIONS:2}"
-      max-files-per-session: "${UPLOAD_MAX_FILES_PER_SESSION:20000}"
+      max-files-per-session: "${UPLOAD_MAX_FILES_PER_SESSION:100000}"
       max-concurrent-chunks: "${UPLOAD_MAX_CONCURRENT_CHUNKS:4}"
       session-idle-timeout: "${UPLOAD_SESSION_IDLE_TIMEOUT:24h}"
       cleanup-interval: "${UPLOAD_CLEANUP_INTERVAL:PT1H}"
       min-free-space: "${UPLOAD_MIN_FREE_SPACE:5GB}"
+
+    # Game libraries: the per-user save cloud (GameSaveService). A client uploads one zip per play
+    # session; the newest save-retention snapshots per user per game are kept.
+    games:
+      save-retention: "${GAMES_SAVE_RETENTION:10}"
+      save-max-bytes: "${GAMES_SAVE_MAX_BYTES:512MB}"
+      achievement-icon-max-bytes: "${GAMES_ACHIEVEMENT_ICON_MAX_BYTES:512KB}"
 
     # S3 object storage (see doc/admin: Object storage). Named connections; a directory refers to one
     # by name (disk.yaml: app.ister.disk.directories[n].s3-connection). Works with AWS (leave the

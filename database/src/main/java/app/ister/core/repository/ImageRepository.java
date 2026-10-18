@@ -78,6 +78,12 @@ public interface ImageRepository extends CrudRepository<ImageEntity, UUID> {
     @Query("select i from ImageEntity i where i.seriesEntityId = :seriesEntityId order by i.id")
     List<ImageEntity> findBySeriesEntityId(@Param("seriesEntityId") UUID seriesEntityId);
 
+    @Query("select i from ImageEntity i where i.gameEntityId = :gameEntityId order by i.id")
+    List<ImageEntity> findByGameEntityId(@Param("gameEntityId") UUID gameEntityId);
+
+    @Query("select i from ImageEntity i where i.gameEntityId in :gameEntityIds order by i.id")
+    List<ImageEntity> findByGameEntityIdIn(@Param("gameEntityIds") java.util.Collection<UUID> gameEntityIds);
+
     @Query("select i from ImageEntity i where i.podcastEntityId = :podcastEntityId order by i.id")
     List<ImageEntity> findByPodcastEntityId(@Param("podcastEntityId") UUID podcastEntityId);
 

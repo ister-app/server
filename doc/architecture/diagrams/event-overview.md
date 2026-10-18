@@ -43,6 +43,7 @@ graph LR
         W7[HandleAlbumFound]
         W8[HandleBookFound]
         W9[HandleComicSeriesFound]
+        W12[HandleGameFound]
         W10[HandlePodcastRefreshRequested]
         W11[HandleContinueWatchingRebuildRequested]
     end
@@ -69,6 +70,7 @@ graph LR
     H2 --> H13 --> H6
     H2 --> H14 --> H6
     H14 --> W9
+    H2 -->|GAME_FOUND after commit| W12
 
     T2 --> W1
     W1 --> H8
@@ -83,7 +85,7 @@ graph LR
     W1 --> H12 --> H7
 
     T3 --> W2
-    W2 --> W3 & W4 & W5 & W6 & W7
+    W2 --> W3 & W4 & W5 & W6 & W7 & W12
     W2 --> H9
     H9 --> H3 & H4 & H7 & H5
 

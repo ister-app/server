@@ -1,6 +1,7 @@
 package app.ister.core.service;
 
 import app.ister.core.entity.BookEntity;
+import app.ister.core.entity.GameEntity;
 import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.MovieEntity;
@@ -12,6 +13,7 @@ import app.ister.core.enums.MediaType;
 import app.ister.core.enums.TrackHistoryScope;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.BookRepository;
+import app.ister.core.repository.GameRepository;
 import app.ister.core.repository.ChapterRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
@@ -58,6 +60,7 @@ public class PlaybackHistoryService {
     private final ChapterRepository chapterRepository;
     private final BookRepository bookRepository;
     private final PodcastEpisodeRepository podcastEpisodeRepository;
+    private final GameRepository gameRepository;
 
     /** The user's history for one item, newest first. BOOK/COMIC merges in the chapter listens. */
     @Transactional(readOnly = true)
@@ -75,6 +78,8 @@ public class PlaybackHistoryService {
             case CHAPTER -> watchStatusRepository
                     .findByUserEntityExternalIdAndChapterEntity(externalId, chapter(mediaId), NEWEST_FIRST);
             case BOOK, COMIC -> bookHistory(externalId, book(mediaId));
+            // One row per user per game: its dateUpdated is the last session, playTimeMs the total.
+            case GAME -> watchStatusRepository.findByUserEntityExternalIdAndGameEntity(externalId, game(mediaId));
         };
     }
 
@@ -132,6 +137,7 @@ public class PlaybackHistoryService {
                     .getOrCreateForPodcastEpisode(authentication, UUID.randomUUID(), podcastEpisode(mediaId));
             case CHAPTER -> watchStatusService.getOrCreateForChapter(authentication, chapter(mediaId));
             case BOOK, COMIC -> markBookRead(watchStatusService.getOrCreateForBook(authentication, book(mediaId)));
+            case GAME -> throw new IllegalArgumentException("Games are recorded through recordGamePlayed, not marked played");
         };
         entity.setWatched(true);
         watchStatusRepository.save(entity);
@@ -177,6 +183,7 @@ public class PlaybackHistoryService {
             case CHAPTER -> chapterRepository.findById(mediaId)
                     .map(c -> c.getBookEntity().getLibraryEntity());
             case BOOK, COMIC -> bookRepository.findById(mediaId).map(BookEntity::getLibraryEntity);
+            case GAME -> gameRepository.findById(mediaId).map(GameEntity::getLibraryEntity);
             case PODCAST_EPISODE -> podcastEpisodeRepository.findById(mediaId)
                     .map(pe -> pe.getPodcastEntity().getLibraryEntity());
         };
@@ -196,6 +203,10 @@ public class PlaybackHistoryService {
 
     private ChapterEntity chapter(UUID id) {
         return chapterRepository.findById(id).orElseThrow(() -> notFound("Chapter", id));
+    }
+
+    private GameEntity game(UUID id) {
+        return gameRepository.findById(id).orElseThrow(() -> notFound("Game", id));
     }
 
     private BookEntity book(UUID id) {

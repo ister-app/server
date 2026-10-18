@@ -3,6 +3,7 @@ package app.ister.core.repository;
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.GameEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.UserEntity;
 import app.ister.core.entity.WatchStatusEntity;
@@ -12,6 +13,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,6 +37,12 @@ public interface WatchStatusRepository extends JpaRepository<WatchStatusEntity, 
 
     /** Reading rows: one per user per book, keyed by the book itself (no play queue). */
     Optional<WatchStatusEntity> findByUserEntityAndBookEntity(UserEntity userEntity, BookEntity bookEntity);
+
+    Optional<WatchStatusEntity> findByUserEntityAndGameEntity(UserEntity userEntity, GameEntity gameEntity);
+
+    List<WatchStatusEntity> findByUserEntityExternalIdAndGameEntity(String externalId, GameEntity gameEntity);
+
+    List<WatchStatusEntity> findByUserEntityAndGameEntityIn(UserEntity userEntity, Collection<GameEntity> games);
 
     Optional<WatchStatusEntity> findByUserEntityAndPlayQueueItemIdAndPodcastEpisodeEntity(UserEntity userEntity, UUID playQueueItemId, app.ister.core.entity.PodcastEpisodeEntity podcastEpisodeEntity);
 
@@ -290,6 +298,21 @@ public interface WatchStatusRepository extends JpaRepository<WatchStatusEntity, 
             ORDER BY pe.podcast_entity_id, wse.date_updated DESC
             """, nativeQuery = true)
     List<RecentEntry> findRecentPodcastEpisodeEntries(@Param("userId") UUID userId, @Param("cutoff") Instant cutoff);
+
+    /** The games the user played since the cutoff; a game is its own group. */
+    @Query(value = """
+            SELECT wse.game_entity_id AS "itemId",
+              wse.game_entity_id AS "groupId",
+              wse.date_updated AS "lastWatched",
+              wse.watched AS "watched",
+              wse.progress_in_milliseconds AS "progressInMilliseconds",
+              wse.reading_progress AS "readingProgress"
+            FROM watch_status_entity wse
+            WHERE wse.user_entity_id = :userId AND wse.date_updated >= :cutoff
+              AND wse.game_entity_id IS NOT NULL
+            ORDER BY wse.date_updated DESC
+            """, nativeQuery = true)
+    List<RecentEntry> findRecentGameEntries(@Param("userId") UUID userId, @Param("cutoff") Instant cutoff);
 
 
     List<WatchStatusEntity> findByMovieEntity(MovieEntity movieEntity);

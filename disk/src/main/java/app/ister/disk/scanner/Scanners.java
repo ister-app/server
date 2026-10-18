@@ -5,6 +5,7 @@ import app.ister.core.enums.LibraryType;
 import app.ister.disk.scanner.scanners.AudioScanner;
 import app.ister.disk.scanner.scanners.ComicScanner;
 import app.ister.disk.scanner.scanners.EpubScanner;
+import app.ister.disk.scanner.scanners.GameScanner;
 import app.ister.disk.scanner.scanners.ImageScanner;
 import app.ister.disk.scanner.scanners.MediaFileScanner;
 import app.ister.disk.scanner.scanners.NfoScanner;
@@ -25,7 +26,8 @@ public record Scanners(
         SubtitleScanner subtitle,
         AudioScanner audio,
         EpubScanner epub,
-        ComicScanner comic) {
+        ComicScanner comic,
+        GameScanner game) {
 
     public List<Scanner> forLibrary(LibraryType libraryType) {
         if (libraryType == LibraryType.MUSIC) {
@@ -37,12 +39,16 @@ public record Scanners(
         if (libraryType == LibraryType.COMIC) {
             return List.of(comic, image);
         }
+        if (libraryType == LibraryType.GAME) {
+            return List.of(game, image);
+        }
         return List.of(mediaFile, image, nfo, subtitle);
     }
 
-    /** Music, book and comic paths are parsed relative to the library root, so their scanners need the directory. */
+    /** Music, book, comic and game paths are parsed relative to the library root, so their scanners need the directory. */
     public static boolean directoryScoped(LibraryType libraryType) {
-        return libraryType == LibraryType.MUSIC || libraryType == LibraryType.BOOK || libraryType == LibraryType.COMIC;
+        return libraryType == LibraryType.MUSIC || libraryType == LibraryType.BOOK || libraryType == LibraryType.COMIC
+                || libraryType == LibraryType.GAME;
     }
 
     public static LibraryType libraryTypeOf(DirectoryEntity directoryEntity) {
@@ -57,6 +63,7 @@ public record Scanners(
             case AudioScanner s -> s.analyzable(path, regularFile, directoryEntity);
             case EpubScanner s -> s.analyzable(path, regularFile, directoryEntity);
             case ComicScanner s -> s.analyzable(path, regularFile, directoryEntity);
+            case GameScanner s -> s.analyzable(path, regularFile, directoryEntity);
             case ImageScanner s -> s.analyzable(path, regularFile, size, directoryEntity);
             case NfoScanner s -> s.analyzable(path, regularFile, size, directoryEntity);
             default -> scanner.analyzable(path, regularFile, size);

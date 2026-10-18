@@ -71,6 +71,10 @@ public class MetadataEntity extends BaseEntity {
     @ManyToOne
     private SeriesEntity seriesEntity;
 
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne
+    private GameEntity gameEntity;
+
     /** Provenance/dedup URI (e.g. "wikipedia://https://en.wikipedia..."); no natural length bound. */
     @Setter
     @Column(columnDefinition = "text")

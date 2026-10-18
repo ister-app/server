@@ -14,5 +14,7 @@ public enum MediaType {
      * A comic volume being read; never streamed. Used for watch status and continue-watching,
      * where entries are grouped per comic series.
      */
-    COMIC
+    COMIC,
+    /** A game: never streamed; watch status holds last-played and play time, grouped per game. */
+    GAME
 }

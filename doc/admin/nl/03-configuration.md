@@ -154,10 +154,21 @@ Zie [Media uploaden](11-uploading-media.md) voor waar deze tegen beschermen.
 | --- | --- | --- |
 | `UPLOAD_ENABLED` | `true` | zet de admin-upload-endpoints helemaal uit |
 | `UPLOAD_CHUNK_SIZE` | `16MB` | één chunk-request; moet binnen de body-limiet van de reverse proxy passen, minimaal 5 MB |
-| `UPLOAD_MAX_ACTIVE_SESSIONS` / `UPLOAD_MAX_FILES_PER_SESSION` | `2` / `20000` | uploads tegelijk (clusterbreed), bestanden per upload |
+| `UPLOAD_MAX_ACTIVE_SESSIONS` / `UPLOAD_MAX_FILES_PER_SESSION` | `2` / `100000` | gelijktijdige uploads (clusterbreed), bestanden per upload (een Steam- of PS3-game is één upload van tot ~100k bestanden) |
 | `UPLOAD_MAX_CONCURRENT_CHUNKS` | `4` | chunk-requests die één node tegelijk afhandelt |
 | `UPLOAD_SESSION_IDLE_TIMEOUT` / `UPLOAD_CLEANUP_INTERVAL` | `24h` / `PT1H` | wanneer een verlaten upload verloopt, en hoe vaak dat gecontroleerd wordt |
 | `UPLOAD_MIN_FREE_SPACE` | `5GB` | ruimte die een lokale directory na een upload vrijhoudt |
+
+## Games
+
+De per-gebruiker save-cloud van GAME-libraries (zie [Libraries en media-indeling](04-libraries-and-media-layout.md)).
+
+| Instelling | Standaard | Opmerkingen |
+| --- | --- | --- |
+| `GAMES_SAVE_RETENTION` | `10` | bewaarde save-snapshots per gebruiker per game; oudere worden verwijderd zodra een nieuwe binnenkomt |
+| `GAMES_SAVE_MAX_BYTES` | `512MB` | grootste save-snapshot die een client mag uploaden |
+| `GAMES_ACHIEVEMENT_ICON_MAX_BYTES` | `512KB` | grootste prestatie-icoon dat een client mag uploaden |
+| `app.ister.worker.ludusavi.manifest-url` | het Ludusavi-manifest op GitHub | bron van de save-locaties van pc-/Steam-games; gecachet in de cachemap onder `ludusavi/`, ververst elke `refresh-hours` (`168`); `enabled: false` zet de lookup uit |
 
 ## Externe metadata-endpoints
 
@@ -169,7 +180,8 @@ lopen — de CI van de chart wijst ze allemaal naar één WireMock-pod:
 `app.ister.worker.musicbrainz.base` / `.coverart-release-base` / `.coverart-release-group-base` /
 `.commons-filepath-base`, `app.ister.worker.openlibrary.base` / `.covers-base` /
 `.author-photo-base`, `app.ister.worker.wikidata.entity-base` / `.api-base`,
-`app.ister.worker.wikipedia.summary-template`, `app.ister.api.podcast.itunes-base`.
+`app.ister.worker.wikipedia.summary-template`, `app.ister.api.podcast.itunes-base`,
+`app.ister.worker.ludusavi.manifest-url`.
 
 ## Libraries en directories
 

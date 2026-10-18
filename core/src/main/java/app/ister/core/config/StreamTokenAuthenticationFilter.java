@@ -32,7 +32,7 @@ public class StreamTokenAuthenticationFilter extends OncePerRequestFilter {
     // Route prefixes, not file locations: they must match the controller mappings, so making them
     // configurable would only let a deployment break its own stream authentication.
     private static final List<String> USER_PATHS =
-            List.of("/hls/", "/images/", "/epub/", "/comic/", "/reading-progress", "/book-progress");
+            List.of("/hls/", "/images/", "/epub/", "/comic/", "/game/", "/reading-progress", "/book-progress");
     // Node-to-node: a helper node reads media files and extracted subtitles from the owner
     // with a download token, and pushes HLS artefacts / cache files back with an upload token.
     private static final List<String> DOWNLOAD_PATHS = List.of("/mediaFile/", "/mediaFileStream/");

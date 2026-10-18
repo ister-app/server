@@ -153,10 +153,21 @@ See [Uploading media](11-uploading-media.md) for what these protect against.
 | --- | --- | --- |
 | `UPLOAD_ENABLED` | `true` | switches the admin upload endpoints off entirely |
 | `UPLOAD_CHUNK_SIZE` | `16MB` | one chunk request; must fit the reverse proxy's body limit, minimum 5 MB |
-| `UPLOAD_MAX_ACTIVE_SESSIONS` / `UPLOAD_MAX_FILES_PER_SESSION` | `2` / `20000` | uploads at once (cluster-wide), files per upload |
+| `UPLOAD_MAX_ACTIVE_SESSIONS` / `UPLOAD_MAX_FILES_PER_SESSION` | `2` / `100000` | uploads at once (cluster-wide), files per upload (a Steam or PS3 game is one upload of up to ~100k files) |
 | `UPLOAD_MAX_CONCURRENT_CHUNKS` | `4` | chunk requests one node handles at once |
 | `UPLOAD_SESSION_IDLE_TIMEOUT` / `UPLOAD_CLEANUP_INTERVAL` | `24h` / `PT1H` | when an abandoned upload expires, and how often that is checked |
 | `UPLOAD_MIN_FREE_SPACE` | `5GB` | space a local directory keeps free after an upload |
+
+## Games
+
+The per-user save cloud of GAME libraries (see [Libraries and media layout](04-libraries-and-media-layout.md)).
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| `GAMES_SAVE_RETENTION` | `10` | save snapshots kept per user per game; older ones are deleted when a new one arrives |
+| `GAMES_SAVE_MAX_BYTES` | `512MB` | largest save snapshot a client may upload |
+| `GAMES_ACHIEVEMENT_ICON_MAX_BYTES` | `512KB` | largest achievement icon a client may upload |
+| `app.ister.worker.ludusavi.manifest-url` | the Ludusavi manifest on GitHub | where PC/Steam save locations come from; cached in the cache directory under `ludusavi/`, refreshed every `refresh-hours` (`168`); `enabled: false` turns the lookup off |
 
 ## External metadata endpoints
 
@@ -168,7 +179,8 @@ chart's CI points them all at one WireMock pod:
 `app.ister.worker.musicbrainz.base` / `.coverart-release-base` / `.coverart-release-group-base` /
 `.commons-filepath-base`, `app.ister.worker.openlibrary.base` / `.covers-base` /
 `.author-photo-base`, `app.ister.worker.wikidata.entity-base` / `.api-base`,
-`app.ister.worker.wikipedia.summary-template`, `app.ister.api.podcast.itunes-base`.
+`app.ister.worker.wikipedia.summary-template`, `app.ister.api.podcast.itunes-base`,
+`app.ister.worker.ludusavi.manifest-url`.
 
 ## Libraries and directories
 

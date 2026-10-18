@@ -6,6 +6,7 @@ import app.ister.core.enums.SearchEntityType;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.GameRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.PersonRepository;
 import app.ister.core.repository.PodcastRepository;
@@ -50,6 +51,7 @@ public class SearchController {
     private final TrackRepository trackRepository;
     private final BookRepository bookRepository;
     private final PodcastRepository podcastRepository;
+    private final GameRepository gameRepository;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -109,6 +111,7 @@ public class SearchController {
             case TRACK -> trackRepository;
             case BOOK -> bookRepository;
             case PODCAST -> podcastRepository;
+            case GAME -> gameRepository;
         };
     }
 }

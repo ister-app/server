@@ -82,9 +82,12 @@ class GraphQlSubscriptionIntegrationTest {
     static class FakeJwtConfig {
         @Bean
         JwtDecoder jwtDecoder() {
+            // The subject is derived from the token value: every request with the same literal
+            // token is the same user (the game tests upload saves and list them back), while a
+            // test that wants a second user can simply present a second token string.
             return token -> Jwt.withTokenValue(token)
                     .header("alg", "none")
-                    .subject(UUID.randomUUID().toString())
+                    .subject(UUID.nameUUIDFromBytes(token.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString())
                     .claim("roles", List.of("user", "admin"))
                     .issuedAt(Instant.now())
                     .expiresAt(Instant.now().plusSeconds(3600))

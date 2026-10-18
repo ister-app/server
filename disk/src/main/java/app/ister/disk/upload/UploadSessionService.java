@@ -356,11 +356,19 @@ public class UploadSessionService {
     }
 
     private void finishSessionIfDone(UploadSessionEntity session, LibraryWriteStore store) throws IOException {
-        boolean open = fileRepository.findByUploadSessionIdOrderByTargetPath(session.getId()).stream()
-                .anyMatch(f -> f.getStatus().isActive());
+        List<UploadFileEntity> files = fileRepository.findByUploadSessionIdOrderByTargetPath(session.getId());
+        boolean open = files.stream().anyMatch(f -> f.getStatus().isActive());
         if (!open) {
             session.setStatus(UploadSessionStatus.COMPLETED);
             store.abortSession(session.getId());
+            // Folder-form games are scanned through their marker once the whole tree is there.
+            DirectoryEntity directory = session.getDirectoryEntity();
+            List<String> markers = files.stream()
+                    .filter(f -> f.getStatus() == UploadFileStatus.COMPLETED)
+                    .map(UploadFileEntity::getTargetPath)
+                    .filter(path -> UploadedFilePublisher.isDeferredGameMarker(directory, path))
+                    .toList();
+            publisher.publishGameMarkers(directory, markers);
             log.info("Upload session {} completed", session.getId());
         }
         sessionRepository.save(session);

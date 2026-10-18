@@ -175,6 +175,52 @@ seriebeschrijvingen en een thumbnail toe vanuit Wikipedia/Wikidata — lokale ar
 wordt nooit overschreven. Pagina's worden aan de reader geserveerd door `ComicResourceController`
 (`/comic/{mediaFileId}/manifest`, `/page/{index}`, `/file`).
 
+## Games (`LibraryType.GAME`, migratie V53)
+
+Games zijn het eerste librarytype waarvan de inhoud **niet als stream wordt geserveerd**: de
+desktop-player downloadt een game, start een lokale emulator (RetroArch met de libretro-core die
+`GamePlatform` noemt, RPCS3) of de game zelf / Steam, en synchroniseert de saves van de gebruiker
+terug. De server is de bibliotheek plus de save-cloud per gebruiker.
+
+De identiteit van `game_entity` is `(library, platform, name, pathYear)`; `form` (`GameForm`) zegt
+wat de bestanden zijn: `ROM`, `PS3_FOLDER`, `PC_PORTABLE_ZIP`, `PC_LINUX_INSTALLER`,
+`PC_LINUX_PORTABLE`, `STEAM`. Eén-bestands-vormen koppelen `MediaFileEntity.gameEntity`-rijen
+(`gameEntryFile = false` voor de `.bin`-companions van een `.cue`); mapvormen hebben geen rij per
+bestand (zie [hoofdstuk 2](02-scanning-and-analysis.md#games)). `title` is een weergave-override
+(`PARAM.SFO` `TITLE`, de Steam-naam, later een metadataprovider), `name` blijft de pad-identiteit.
+
+`HandleGameFound` (worker, `GAME_FOUND`) verrijkt: voor PS3 leest hij `PARAM.SFO`
+(`ParamSfoParser`: `TITLE`, `TITLE_ID`) en kopieert `ICON0.PNG` als cover naar de cache-store als
+de map geen artwork heeft; voor pc- en Steam-vormen lost hij de **save-locaties** op uit het
+community-[Ludusavi-manifest](https://github.com/mtkennerly/ludusavi-manifest) —
+`LudusaviManifestService` downloadt de ~10 MB YAML hooguit eens per `refresh-hours`, bewaart hem in
+de cache-store onder `ludusavi/manifest.yaml` en reduceert hem tot twee in-memory indexen (Steam-
+app-id → entry, genormaliseerde titel → entry); de matching is strikt (app-id, anders exacte
+genormaliseerde titel — een verkeerde map is erger dan geen synchronisatie). Het resultaat komt in
+`manifest_save_paths` (JSON, `GameSavePaths`: padsjablonen met Ludusavi-placeholders zoals
+`<winAppData>`, plus een `os`), `manifest_matched_by` en `steam_cloud`; de `save_paths`-override van
+een beheerder wint altijd. `GameMetadataProvider` is de seam voor een externe bron (IGDB) — nu
+`NoopGameMetadataProvider`.
+
+**Saves** (`GameSaveService`, disk): één zip per speelsessie, raw geüpload naar
+`POST /game/{id}/saves?baseVersion=N`; versies tellen op per (gebruiker, game), de nieuwste
+`app.ister.games.save-retention` blijven bewaard, de objecten staan in de cache-store onder
+`saves/<userId>/<gameId>/<version>.zip` en worden gerefereerd door `game_save_entity` (zodat de
+cache-opruiming ze laat staan). Een head die nieuwer is dan de `baseVersion` van de client geeft
+**409** met de gegevens van de head — een ander apparaat speelde tussendoor — tenzij `force=true`;
+`…/saves/{v}/restore` kopieert een oudere versie als nieuwe head zodat de historie lineair blijft.
+De upload is "korte tx → streamen naar tmp → korte tx", zoals de chunks van de admin-upload.
+
+**Prestaties** komen van de client, die ze na een sessie uit de lokale emulator-/storebestanden
+leest (RPCS3's `TROPCONF.SFM` + `TROPUSR.DAT`, Steams `appcache/stats`-KeyValues):
+`POST /game/{id}/achievements` bevat de volledige definitielijst plus de ontgrendelingen
+(`GameAchievementService`: upsert per `(game, source, externalId)`, een ontgrendeltijd gaat nooit
+terug), iconen komen als PNG-body binnen en worden als `ImageType.ICON`-afbeeldingen opgeslagen.
+
+**Speelstatus** is één `WatchStatusEntity` per gebruiker per game (`playTimeMs`, `dateUpdated` =
+laatst gespeeld), geschreven door de mutatie `recordGamePlayed`, die ook de continue-watching-entry
+bijhoudt (type `GAME`, de game is zijn eigen groep).
+
 ## Podcasts (`LibraryType.PODCAST`)
 
 Het eerste **feed-gebaseerde** librarytype: er is geen library-directory. `subscribePodcast(feedUrl)`

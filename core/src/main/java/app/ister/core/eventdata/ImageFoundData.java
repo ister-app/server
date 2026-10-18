@@ -40,6 +40,8 @@ public class ImageFoundData extends MessageData {
     private UUID seriesEntityId;
     @Nullable
     private UUID podcastEntityId;
+    @Nullable
+    private UUID gameEntityId;
 
     // Sonar FP: Lombok @SuperBuilder declares builder() on the subclass itself
     @SuppressWarnings("java:S3252")
@@ -60,6 +62,7 @@ public class ImageFoundData extends MessageData {
                 .bookEntityId(imageEntity.getBookEntity() == null ? imageEntity.getBookEntityId() : imageEntity.getBookEntity().getId())
                 .seriesEntityId(imageEntity.getSeriesEntity() == null ? imageEntity.getSeriesEntityId() : imageEntity.getSeriesEntity().getId())
                 .podcastEntityId(imageEntity.getPodcastEntity() == null ? imageEntity.getPodcastEntityId() : imageEntity.getPodcastEntity().getId())
+                .gameEntityId(imageEntity.getGameEntity() == null ? imageEntity.getGameEntityId() : imageEntity.getGameEntity().getId())
                 .build();
     }
 }

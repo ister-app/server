@@ -3,6 +3,7 @@ package app.ister.api.controller;
 import app.ister.core.entity.AlbumEntity;
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.GameEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.RatingEntity;
@@ -11,6 +12,7 @@ import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.RatingMediaType;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.BookRepository;
+import app.ister.core.repository.GameRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.PodcastRepository;
@@ -49,6 +51,7 @@ public class RatingController {
     private final TrackRepository trackRepository;
     private final BookRepository bookRepository;
     private final PodcastRepository podcastRepository;
+    private final GameRepository gameRepository;
 
     @PreAuthorize("hasRole('user')")
     @MutationMapping
@@ -65,6 +68,8 @@ public class RatingController {
             case BOOK -> bookRepository.findById(mediaId).map(BookEntity::getLibraryEntity);
             case PODCAST -> podcastRepository.findById(mediaId)
                     .map(app.ister.core.entity.PodcastEntity::getLibraryEntity);
+            case GAME -> gameRepository.findById(mediaId)
+                    .map(app.ister.core.entity.GameEntity::getLibraryEntity);
         };
         if (library.isEmpty() || !libraryAccessService.canAccess(library.get(), authentication)) {
             return false;
@@ -79,6 +84,14 @@ public class RatingController {
                 .findByUserEntityExternalIdAndMovieEntityIn(authentication.getName(), movies).stream()
                 .collect(Collectors.toMap(r -> r.getMovieEntity().getId(), RatingEntity::getValue));
         return ratingsFor(movies, MovieEntity::getId, byId);
+    }
+
+    @BatchMapping(typeName = "Game", field = "rating")
+    public Map<GameEntity, Integer> gameRating(List<GameEntity> games, Authentication authentication) {
+        Map<UUID, Integer> byId = ratingRepository
+                .findByUserEntityExternalIdAndGameEntityIn(authentication.getName(), games).stream()
+                .collect(Collectors.toMap(r -> r.getGameEntity().getId(), RatingEntity::getValue));
+        return ratingsFor(games, GameEntity::getId, byId);
     }
 
     @BatchMapping(typeName = "Show", field = "rating")

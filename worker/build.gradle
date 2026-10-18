@@ -30,6 +30,9 @@ dependencies {
     // Blurhash
     implementation libs.blurhash
 
+    // Ludusavi save-location manifest (YAML); version from the Spring Boot BOM
+    implementation 'org.yaml:snakeyaml'
+
     // Testing Dependencies
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

@@ -79,6 +79,13 @@ never from the filename.
 `.epub`; loose patterns like `attackontitan_vol27.pdf`, `series_issue8.pdf` and `name#3.cbz`
 are tolerated.
 
+**Games** — platform-first: `{platform}/{Title (year)}/…`. A ROM is one file in its game folder
+(`n64/Super Mario 64 (1996)/Super Mario 64.z64`), a PS3 game is its whole folder (marked by
+`PS3_GAME/PARAM.SFO`), a PC game is a portable zip (Windows) or a GOG-style `.sh` installer /
+`tar` archive (Linux), and a Steam game is its installed `steamapps/common/<installdir>` tree
+next to its `appmanifest_<appid>.acf`. Games are **played on the client** (the desktop player
+starts RetroArch, RPCS3, the game or Steam); the server keeps the files and every user's saves.
+
 In SHOW and MOVIE libraries the recognised video containers are `mkv`, `mp4`, `webm`, `m4v`, `flv` and `avi`; subtitles: `.srt`
 next to the video (picture-based subtitles inside the container — Blu-ray PGS, DVD VobSub — are shown as they are, no conversion); local artwork: `jpg`/`png`;
 `.nfo` files are read for metadata hints. Other library types accept their own extension lists —

@@ -206,6 +206,22 @@ multi-episode file never straddle a chunk boundary), and `HandleDetectSegments` 
 successor message for the same season only after that commit. The version column is the cursor,
 and it is stamped even when decoding fails, so the chain always terminates.
 
+### Games
+
+A GAME library is platform-first (`<dir>/<platform>/<Title (Year)>/…`, parsed by `GamePathObject`;
+the platform table — folder aliases, launchable extensions, companion extensions, default
+launcher — is the `GamePlatform` enum). `GameScanner` reacts to exactly two kinds of file: the
+**game file** of a single-file form (a ROM and its `.bin` companions, a PC zip, a Linux installer
+or tar — each becomes a `MediaFileEntity` with `gameEntity`, like comic volumes) and the **marker**
+of a folder form (`PS3_GAME/PARAM.SFO`, `appmanifest_<appid>.acf`). Everything else inside a PS3 or
+Steam tree is deliberately *not* scannable: such a game is 5k–100k files, which would swamp the
+media-file table and the scan cache, so it is **one `game_entity` row with `rootPath`**, sized by
+walking the tree (`GameTreeLister`, LOCAL and S3) and re-sized on every rescan of the marker.
+`DirectoryPruner` descends into a game's sub-folders only for those two platforms. A Steam marker
+is parsed on the spot (`VdfParser`: app id, name, `installdir`, build id) and the game only
+counts when the `installdir` folder exists next to the `.acf`. Creation publishes `GAME_FOUND`
+(global queue); the handler is described in [chapter 3](03-media-types-and-metadata.md#games).
+
 ## Admin upload
 
 See the [upload-flow diagram](../diagrams/upload-flow.md). `LibraryUploadController` (disk module,
@@ -248,6 +264,16 @@ directory. It lives in `disk` because the path parsers do, and it is REST becaus
   that reaches a node that cannot write the directory gets `421`.
 - **Cleanup.** `UploadCleanupScheduler` (hourly, every node) expires idle sessions whose storage it
   can reach and removes staging folders without an active session.
+
+### Game trees in the upload
+
+Because only the marker of a PS3/Steam game is scannable, the preview would call every other file
+of the tree *unsupported*. `UploadPreviewService` therefore groups the entries per game folder:
+when the group holds the marker, every file under that folder is RECOGNISED (`GAME_TREE_FILE`);
+without it they are IGNORED with `GAME_INCOMPLETE` and a detail naming the missing marker. On
+completion `UploadedFilePublisher` publishes no event for tree files at all and **defers the
+marker's `FILE_SCAN_REQUESTED` to the end of the session** (`publishGameMarkers`), so the scanner
+sizes a complete tree. `max-files-per-session` defaults to 100 000 for the same reason.
 
 ## Metadata backfill
 

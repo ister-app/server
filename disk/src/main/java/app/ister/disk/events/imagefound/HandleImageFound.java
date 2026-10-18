@@ -75,6 +75,7 @@ public class HandleImageFound implements Handle<ImageFoundData> {
                 imageEntity.setBookEntityId(messageData.getBookEntityId());
                 imageEntity.setSeriesEntityId(messageData.getSeriesEntityId());
                 imageEntity.setPodcastEntityId(messageData.getPodcastEntityId());
+                imageEntity.setGameEntityId(messageData.getGameEntityId());
             } else {
                 imageEntity = ImageEntity.builder()
                         .directoryEntityId(messageData.getDirectoryEntityId())
@@ -90,6 +91,7 @@ public class HandleImageFound implements Handle<ImageFoundData> {
                         .bookEntityId(messageData.getBookEntityId())
                         .seriesEntityId(messageData.getSeriesEntityId())
                         .podcastEntityId(messageData.getPodcastEntityId())
+                        .gameEntityId(messageData.getGameEntityId())
                         .fileLastModifiedTime(lastModified)
                         .fileCreationTime(created)
                         .build();

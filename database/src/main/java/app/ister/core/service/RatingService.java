@@ -6,6 +6,7 @@ import app.ister.core.enums.RatingMediaType;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.GameRepository;
 import app.ister.core.repository.PodcastRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.RatingRepository;
@@ -38,6 +39,7 @@ public class RatingService {
     private final TrackRepository trackRepository;
     private final BookRepository bookRepository;
     private final PodcastRepository podcastRepository;
+    private final GameRepository gameRepository;
 
     /**
      * Sets or clears the calling user's rating for a single media item.
@@ -76,6 +78,7 @@ public class RatingService {
             case TRACK -> ratingRepository.findByUserEntityAndTrackEntity(user, track(mediaId));
             case BOOK -> ratingRepository.findByUserEntityAndBookEntity(user, book(mediaId));
             case PODCAST -> ratingRepository.findByUserEntityAndPodcastEntity(user, podcast(mediaId));
+            case GAME -> ratingRepository.findByUserEntityAndGameEntity(user, game(mediaId));
         };
     }
 
@@ -91,6 +94,7 @@ public class RatingService {
             case TRACK -> builder.trackEntity(track(mediaId));
             case BOOK -> builder.bookEntity(book(mediaId));
             case PODCAST -> builder.podcastEntity(podcast(mediaId));
+            case GAME -> builder.gameEntity(game(mediaId));
         }
         return builder.build();
     }
@@ -121,6 +125,10 @@ public class RatingService {
 
     private app.ister.core.entity.PodcastEntity podcast(UUID id) {
         return podcastRepository.findById(id).orElseThrow(() -> notFound("Podcast", id));
+    }
+
+    private app.ister.core.entity.GameEntity game(UUID id) {
+        return gameRepository.findById(id).orElseThrow(() -> notFound("Game", id));
     }
 
     private static NoSuchElementException notFound(String type, UUID id) {

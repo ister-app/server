@@ -12,7 +12,7 @@ registries.
 
 Zie het [continue-watching-flow-diagram](../diagrams/continue-watching-flow.md). De
 `continue_watching`-tabel (migratie V20) bevat één rij per user per container — show / film / boek
-/ comicserie / podcastaflevering (`group_id`) — die wijst naar het item om mee te hervatten. Bij
+/ comicserie / podcastaflevering / game (`group_id`) — die wijst naar het item om mee te hervatten. Bij
 comics is de container de serie en de target het volgende volume
 (`ContinueWatchingService.upsertComicVolume`; `recomputeForComicSeries` laat de serie terugkeren
 wanneer de scanner een volume toevoegt).

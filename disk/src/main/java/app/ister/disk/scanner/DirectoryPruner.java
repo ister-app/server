@@ -40,6 +40,16 @@ public final class DirectoryPruner {
             ComicPathObject comicPath = new ComicPathObject(root, dirPath, true);
             return comicPath.getDirType() == DirType.SERIES;
         }
+        if (type == LibraryType.GAME) {
+            GamePathObject gamePath = new GamePathObject(root, dirPath, true);
+            // Platform and game folders always; a game's own sub-folders only for the folder-form
+            // platforms (PS3, Steam) whose marker and files live below the game folder.
+            return switch (gamePath.getDirType()) {
+                case GAME_PLATFORM, GAME -> true;
+                case GAME_TREE -> gamePath.descendIntoTree();
+                default -> false;
+            };
+        }
         return List.of(DirType.SHOW, DirType.SEASON).contains(new PathObject(dirPath).getDirType());
     }
 }

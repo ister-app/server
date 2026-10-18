@@ -185,6 +185,48 @@ Attack on Titan (2009)/
 - Series artwork: `.jpg`/`.jpeg`/`.png` whose name contains `cover`, `folder`, `poster` or
   `background` (typing per the backdrop/poster rule above).
 
+## Games
+
+```
+{platform}/{Title ({year})}/…
+```
+
+```
+gbc/Tetris (1989)/Tetris.gbc
+gbc/Tetris (1989)/cover.jpg
+psx/Crash Bandicoot (1996)/Crash Bandicoot.cue
+psx/Crash Bandicoot (1996)/Crash Bandicoot.bin
+ps3/Demon's Souls (2009)/PS3_GAME/PARAM.SFO
+ps3/Demon's Souls (2009)/PS3_GAME/USRDIR/EBOOT.BIN
+pc/Celeste (2018)/Celeste.zip
+linux/Stardew Valley (2016)/stardew_valley_1.6.sh
+steam/Stardew Valley (2016)/appmanifest_413150.acf
+steam/Stardew Valley (2016)/Stardew Valley/Stardew Valley.exe
+```
+
+- **Platform folder first.** Accepted names (case-insensitive): `nes`, `snes`/`sfc`, `n64`, `gb`,
+  `gbc`, `gba`, `nds`, `psx`/`ps1`, `ps2`, `ps3`, `gc`/`gamecube`, `wii`, `pc`/`windows`, `linux`,
+  `steam`. Anything else under the library root is ignored.
+- **One game per folder**, named `Title (year)`; the year is optional and part of the game's
+  identity, like books. A loose file directly under the platform folder is ignored.
+- **ROM platforms**: the launchable file is the one with the platform's extension (`z64`/`n64`/`v64`,
+  `gb`, `gbc`, `gba`, `nds`, `sfc`/`smc`, `nes`/`fds`, `cue`/`chd`/`pbp`, `iso`/`chd`, `iso`/`gcm`/`rvz`/`wbfs`);
+  companions such as the `.bin` tracks of a `.cue` travel with it. Sub-folders of a ROM game are
+  not scanned.
+- **PS3**: the game folder holds `PS3_GAME/PARAM.SFO` (or one wrapper folder deeper,
+  `BLUS30443/PS3_GAME/…`); the whole tree is served as it is. Title and title id come from
+  `PARAM.SFO`, the cover from `ICON0.PNG` when the folder has no `cover.jpg`. Only the marker file is
+  scanned — a game is one entry, never one per file.
+- **PC**: `pc/` takes one `.zip` of a ready-to-run Windows game (the exe at the zip's root or in a
+  single top folder); `linux/` takes a GOG `.sh` installer or a `.tar`/`.tar.gz`/`.tar.xz` of a
+  ready-to-run Linux game.
+- **Steam**: the game folder holds the `appmanifest_<appid>.acf` from a Steam library **and** the
+  install folder it names (`installdir`), copied from `steamapps/common`. Both are required; the
+  player restores them into a local Steam library and starts the game through Steam, so the Steam
+  account playing must own the game.
+- Artwork: `.jpg`/`.jpeg`/`.png` whose name contains `cover`, `folder`, `poster` or `background`,
+  directly in the game folder.
+
 ## Podcasts
 
 No naming rules — a `PODCAST` library has no directory on disk at all. Episodes are fetched from

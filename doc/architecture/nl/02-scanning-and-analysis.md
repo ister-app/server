@@ -223,6 +223,23 @@ multi-episode-bestand nooit over een chunkgrens vallen), en publiceert `HandleDe
 ná die commit een opvolgerbericht voor hetzelfde seizoen. De versiekolom is de cursor en wordt ook
 bij een mislukte decode gestempeld, dus de keten termineert altijd.
 
+### Games
+
+Een GAME-library is platform-eerst (`<dir>/<platform>/<Titel (Jaar)>/…`, geparsed door
+`GamePathObject`; de platformtabel — mapaliassen, startbare extensies, bijbehorende extensies,
+standaard-launcher — is de enum `GamePlatform`). `GameScanner` reageert op precies twee soorten
+bestand: het **gamebestand** van een één-bestands-vorm (een ROM met zijn `.bin`-companions, een
+pc-zip, een Linux-installer of -tar — elk wordt een `MediaFileEntity` met `gameEntity`, zoals
+stripvolumes) en de **marker** van een mapvorm (`PS3_GAME/PARAM.SFO`, `appmanifest_<appid>.acf`).
+Al het andere in een PS3- of Steam-boom is bewust *niet* scanbaar: zo'n game bestaat uit 5k–100k
+bestanden, wat de mediabestandtabel en de scancache zou overspoelen, dus het is **één
+`game_entity`-rij met `rootPath`**, opgemeten door de boom te doorlopen (`GameTreeLister`, LOCAL en
+S3) en opnieuw gemeten bij elke herscan van de marker. `DirectoryPruner` daalt alleen voor die twee
+platformen af in de submappen van een game. Een Steam-marker wordt direct geparsed (`VdfParser`:
+app-id, naam, `installdir`, build-id) en de game telt alleen mee als de `installdir`-map naast de
+`.acf` bestaat. Aanmaken publiceert `GAME_FOUND` (globale queue); de handler staat in
+[hoofdstuk 3](03-media-types-and-metadata.md#games).
+
 ## Admin-upload
 
 Zie het [upload-flow-diagram](../diagrams/upload-flow.md). `LibraryUploadController` (disk-module,
@@ -266,6 +283,16 @@ omdat geen enkele module buiten `api` GraphQL host.
   delegeert), en een request dat een node bereikt die de directory niet kan schrijven krijgt `421`.
 - **Opruimen.** `UploadCleanupScheduler` (elk uur, elke node) laat idle sessies verlopen waarvan
   hij de opslag kan bereiken en verwijdert staging-mappen zonder actieve sessie.
+
+### Game-bomen in de upload
+
+Omdat alleen de marker van een PS3-/Steam-game scanbaar is, zou de preview elk ander bestand van
+de boom *niet ondersteund* noemen. `UploadPreviewService` groepeert de entries daarom per gamemap:
+zit de marker in de groep, dan is elk bestand onder die map RECOGNISED (`GAME_TREE_FILE`); zonder
+marker zijn ze IGNORED met `GAME_INCOMPLETE` en een detail dat de ontbrekende marker noemt. Bij
+voltooiing publiceert `UploadedFilePublisher` voor boombestanden helemaal geen event en **stelt het
+`FILE_SCAN_REQUESTED` van de marker uit tot het einde van de sessie** (`publishGameMarkers`), zodat
+de scanner een complete boom opmeet. `max-files-per-session` staat daarom standaard op 100 000.
 
 ## Metadata-backfill
 

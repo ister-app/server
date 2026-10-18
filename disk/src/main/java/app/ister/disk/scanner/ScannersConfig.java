@@ -3,6 +3,7 @@ package app.ister.disk.scanner;
 import app.ister.disk.scanner.scanners.AudioScanner;
 import app.ister.disk.scanner.scanners.ComicScanner;
 import app.ister.disk.scanner.scanners.EpubScanner;
+import app.ister.disk.scanner.scanners.GameScanner;
 import app.ister.disk.scanner.scanners.ImageScanner;
 import app.ister.disk.scanner.scanners.MediaFileScanner;
 import app.ister.disk.scanner.scanners.NfoScanner;
@@ -17,8 +18,8 @@ public class ScannersConfig {
     @SuppressWarnings("java:S107") // one parameter per scanner
     public Scanners scanners(MediaFileScanner mediaFileScanner, ImageScanner imageScanner, NfoScanner nfoScanner,
                              SubtitleScanner subtitleScanner, AudioScanner audioScanner, EpubScanner epubScanner,
-                             ComicScanner comicScanner) {
+                             ComicScanner comicScanner, GameScanner gameScanner) {
         return new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner,
-                comicScanner);
+                comicScanner, gameScanner);
     }
 }

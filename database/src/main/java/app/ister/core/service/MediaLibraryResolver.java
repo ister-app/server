@@ -2,6 +2,7 @@ package app.ister.core.service;
 
 import app.ister.core.entity.AlbumEntity;
 import app.ister.core.entity.BookEntity;
+import app.ister.core.entity.GameEntity;
 import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
@@ -14,6 +15,7 @@ import app.ister.core.enums.PlayQueueSourceType;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.ChapterRepository;
+import app.ister.core.repository.GameRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.LibraryRepository;
@@ -53,11 +55,18 @@ public class MediaLibraryResolver {
     private final ChapterRepository chapterRepository;
     private final PodcastEpisodeRepository podcastEpisodeRepository;
     private final PlaylistRepository playlistRepository;
+    private final GameRepository gameRepository;
 
     /** Transactional so the lazy parent chain can be walked outside an open web session. */
     @Transactional(readOnly = true)
     public Optional<LibraryEntity> ofMediaFileId(UUID mediaFileId) {
         return mediaFileRepository.findById(mediaFileId).flatMap(this::ofMediaFile);
+    }
+
+    /** The library of a game, for the id-addressed {@code /game/{gameId}/...} endpoints. */
+    @Transactional(readOnly = true)
+    public Optional<LibraryEntity> ofGameId(UUID gameId) {
+        return gameRepository.findById(gameId).map(GameEntity::getLibraryEntity);
     }
 
     @Transactional(readOnly = true)
@@ -106,7 +115,7 @@ public class MediaLibraryResolver {
             case PODCAST_EPISODE -> item.getPodcastEpisodeEntityId() == null ? Optional.empty()
                     : podcastEpisodeRepository.findById(item.getPodcastEpisodeEntityId())
                             .map(episode -> episode.getPodcastEntity().getLibraryEntity());
-            case BOOK, COMIC -> Optional.empty();
+            case BOOK, COMIC, GAME -> Optional.empty();
         };
     }
 
@@ -131,6 +140,9 @@ public class MediaLibraryResolver {
         }
         if (mediaFile.getPodcastEpisodeEntity() != null) {
             return Optional.ofNullable(mediaFile.getPodcastEpisodeEntity().getPodcastEntity().getLibraryEntity());
+        }
+        if (mediaFile.getGameEntity() != null) {
+            return Optional.ofNullable(mediaFile.getGameEntity().getLibraryEntity());
         }
         return Optional.empty();
     }
@@ -169,6 +181,9 @@ public class MediaLibraryResolver {
         }
         if (image.getPodcastEpisodeEntity() != null) {
             return Optional.ofNullable(image.getPodcastEpisodeEntity().getPodcastEntity().getLibraryEntity());
+        }
+        if (image.getGameEntity() != null) {
+            return Optional.ofNullable(image.getGameEntity().getLibraryEntity());
         }
         return Optional.empty();
     }

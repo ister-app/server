@@ -58,6 +58,8 @@ class SearchIndexServiceTest {
     @Mock
     private app.ister.core.repository.PodcastRepository podcastRepository;
     @Mock
+    private app.ister.core.repository.GameRepository gameRepository;
+    @Mock
     private TypesenseClient typesenseClient;
     @Mock
     private PlatformTransactionManager transactionManager;
@@ -80,7 +82,8 @@ class SearchIndexServiceTest {
         properties.setCollection("media");
         lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         subject = new SearchIndexService(movieRepository, showRepository, episodeRepository, personRepository,
-                albumRepository, trackRepository, bookRepository, podcastRepository, new SearchDocumentMapper(new LanguageProperties()), typesenseClient, properties,
+                albumRepository, trackRepository, bookRepository, podcastRepository, gameRepository,
+                new SearchDocumentMapper(new LanguageProperties()), typesenseClient, properties,
                 transactionManager);
     }
 
@@ -126,6 +129,7 @@ class SearchIndexServiceTest {
         when(trackRepository.findAll(any(PageRequest.class))).thenAnswer(invocation -> Page.empty(invocation.getArgument(0)));
         when(bookRepository.findAll(any(PageRequest.class))).thenAnswer(invocation -> Page.empty(invocation.getArgument(0)));
         when(podcastRepository.findAll(any(PageRequest.class))).thenAnswer(invocation -> Page.empty(invocation.getArgument(0)));
+        when(gameRepository.findAll(any(PageRequest.class))).thenAnswer(invocation -> Page.empty(invocation.getArgument(0)));
         when(typesenseClient.listCollectionNames()).thenReturn(List.of("media_v1", "other"));
 
         subject.reindex();

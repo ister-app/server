@@ -3,6 +3,7 @@ package app.ister.search;
 import app.ister.core.enums.SearchEntityType;
 import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.BookRepository;
+import app.ister.core.repository.GameRepository;
 import app.ister.core.repository.EpisodeRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.PersonRepository;
@@ -38,6 +39,7 @@ public class SearchIndexService {
     private final TrackRepository trackRepository;
     private final BookRepository bookRepository;
     private final PodcastRepository podcastRepository;
+    private final GameRepository gameRepository;
     private final SearchDocumentMapper searchDocumentMapper;
     private final TypesenseClient typesenseClient;
     private final TypesenseProperties properties;
@@ -52,6 +54,7 @@ public class SearchIndexService {
                               TrackRepository trackRepository,
                               BookRepository bookRepository,
                               PodcastRepository podcastRepository,
+                              GameRepository gameRepository,
                               SearchDocumentMapper searchDocumentMapper,
                               TypesenseClient typesenseClient,
                               TypesenseProperties properties,
@@ -64,6 +67,7 @@ public class SearchIndexService {
         this.trackRepository = trackRepository;
         this.bookRepository = bookRepository;
         this.podcastRepository = podcastRepository;
+        this.gameRepository = gameRepository;
         this.searchDocumentMapper = searchDocumentMapper;
         this.typesenseClient = typesenseClient;
         this.properties = properties;
@@ -110,6 +114,7 @@ public class SearchIndexService {
         indexAll(trackRepository, searchDocumentMapper::toDocument, newCollection);
         indexAll(bookRepository, searchDocumentMapper::toDocument, newCollection);
         indexAll(podcastRepository, searchDocumentMapper::toDocument, newCollection);
+        indexAll(gameRepository, searchDocumentMapper::toDocument, newCollection);
         typesenseClient.upsertAlias(properties.getCollection(), newCollection);
         dropOldCollections(newCollection);
         log.info("Search reindex finished; alias {} now points to {}", properties.getCollection(), newCollection);
@@ -135,6 +140,7 @@ public class SearchIndexService {
             case TRACK -> trackRepository.findById(entityId).map(searchDocumentMapper::toDocument);
             case BOOK -> bookRepository.findById(entityId).map(searchDocumentMapper::toDocument);
             case PODCAST -> podcastRepository.findById(entityId).map(searchDocumentMapper::toDocument);
+            case GAME -> gameRepository.findById(entityId).map(searchDocumentMapper::toDocument);
         };
     }
 

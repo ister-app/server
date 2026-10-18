@@ -4,6 +4,7 @@ import app.ister.core.config.LanguageProperties;
 import app.ister.core.entity.AlbumEntity;
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.GameEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.MovieEntity;
@@ -139,6 +140,20 @@ public class SearchDocumentMapper {
                 .title(podcast.getTitle())
                 .context(podcast.getAuthor())
                 .libraryId(libraryId(podcast.getLibraryEntity()));
+        addLocalized(builder, byLanguage);
+        return builder.build();
+    }
+
+    /** A game: its display title, with the platform as context so "mario n64" finds the N64 one. */
+    public SearchDocument toDocument(GameEntity game) {
+        Map<String, MetadataEntity> byLanguage = byLanguage(game.getMetadataEntities());
+        SearchDocument.Builder builder = SearchDocument.builder()
+                .id(game.getId().toString())
+                .type(SearchEntityType.GAME.name())
+                .title(game.displayTitle())
+                .context(game.getPlatform().name())
+                .year(game.getReleaseYear())
+                .libraryId(libraryId(game.getLibraryEntity()));
         addLocalized(builder, byLanguage);
         return builder.build();
     }

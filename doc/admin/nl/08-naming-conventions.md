@@ -194,6 +194,48 @@ Attack on Titan (2009)/
 - Serie-artwork: `.jpg`/`.jpeg`/`.png` met `cover`, `folder`, `poster` of `background` in de naam
   (het type volgt de achtergrond-/posterregel hierboven).
 
+## Games
+
+```
+{platform}/{Titel ({jaar})}/…
+```
+
+```
+gbc/Tetris (1989)/Tetris.gbc
+gbc/Tetris (1989)/cover.jpg
+psx/Crash Bandicoot (1996)/Crash Bandicoot.cue
+psx/Crash Bandicoot (1996)/Crash Bandicoot.bin
+ps3/Demon's Souls (2009)/PS3_GAME/PARAM.SFO
+ps3/Demon's Souls (2009)/PS3_GAME/USRDIR/EBOOT.BIN
+pc/Celeste (2018)/Celeste.zip
+linux/Stardew Valley (2016)/stardew_valley_1.6.sh
+steam/Stardew Valley (2016)/appmanifest_413150.acf
+steam/Stardew Valley (2016)/Stardew Valley/Stardew Valley.exe
+```
+
+- **Platformmap eerst.** Geaccepteerde namen (hoofdletterongevoelig): `nes`, `snes`/`sfc`, `n64`,
+  `gb`, `gbc`, `gba`, `nds`, `psx`/`ps1`, `ps2`, `ps3`, `gc`/`gamecube`, `wii`, `pc`/`windows`,
+  `linux`, `steam`. Al het andere onder de library-root wordt genegeerd.
+- **Eén game per map**, genoemd `Titel (jaar)`; het jaar is optioneel en hoort bij de identiteit
+  van de game, net als bij boeken. Een los bestand direct onder de platformmap wordt genegeerd.
+- **ROM-platformen**: het startbestand is het bestand met de extensie van het platform
+  (`z64`/`n64`/`v64`, `gb`, `gbc`, `gba`, `nds`, `sfc`/`smc`, `nes`/`fds`, `cue`/`chd`/`pbp`,
+  `iso`/`chd`, `iso`/`gcm`/`rvz`/`wbfs`); bijbehorende bestanden zoals de `.bin`-tracks van een
+  `.cue` reizen mee. Submappen van een ROM-game worden niet gescand.
+- **PS3**: de gamemap bevat `PS3_GAME/PARAM.SFO` (of één tussenmap dieper, `BLUS30443/PS3_GAME/…`);
+  de hele boom wordt geserveerd zoals hij is. Titel en title-id komen uit `PARAM.SFO`, de cover uit
+  `ICON0.PNG` als de map geen `cover.jpg` heeft. Alleen het markerbestand wordt gescand — een game
+  is één item, nooit één per bestand.
+- **PC**: `pc/` neemt één `.zip` van een speelklare Windows-game (het exe in de root van de zip of
+  in één bovenmap); `linux/` neemt een GOG-`.sh`-installer of een `.tar`/`.tar.gz`/`.tar.xz` van een
+  speelklare Linux-game.
+- **Steam**: de gamemap bevat de `appmanifest_<appid>.acf` uit een Steam-bibliotheek **én** de
+  installatiemap die hij noemt (`installdir`), gekopieerd uit `steamapps/common`. Beide zijn
+  verplicht; de player zet ze terug in een lokale Steam-bibliotheek en start de game via Steam, dus
+  het spelende Steam-account moet de game bezitten.
+- Artwork: `.jpg`/`.jpeg`/`.png` met `cover`, `folder`, `poster` of `background` in de naam, direct
+  in de gamemap.
+
 ## Podcasts
 
 Geen naamregels — een `PODCAST`-library heeft helemaal geen map op schijf. Afleveringen komen uit

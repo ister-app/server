@@ -5,6 +5,7 @@ import app.ister.core.entity.NodeEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.repository.DirectoryRepository;
+import app.ister.core.repository.GameSaveRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
@@ -19,6 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import app.ister.core.storage.CacheDirectoryResolver;
 import app.ister.core.storage.CacheStore;
 import app.ister.core.storage.FileAccess;
+import app.ister.core.storage.PathStrings;
 import app.ister.core.storage.ObjectStat;
 
 import java.io.IOException;
@@ -45,6 +47,7 @@ public class CacheCleanupScheduler {
     private final MediaFileRepository mediaFileRepository;
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final WatchStatusRepository watchStatusRepository;
+    private final GameSaveRepository gameSaveRepository;
     private final CacheCleanupService cacheCleanupService;
     private final CacheDirectoryResolver cacheDirectoryResolver;
     private final FileAccess fileAccess;
@@ -57,7 +60,7 @@ public class CacheCleanupScheduler {
     public CacheCleanupScheduler(NodeService nodeService, DirectoryRepository directoryRepository,
                                  ImageRepository imageRepository, MediaFileRepository mediaFileRepository,
                                  MediaFileStreamRepository mediaFileStreamRepository, WatchStatusRepository watchStatusRepository,
-                                 CacheCleanupService cacheCleanupService, CacheDirectoryResolver cacheDirectoryResolver,
+                                 GameSaveRepository gameSaveRepository, CacheCleanupService cacheCleanupService, CacheDirectoryResolver cacheDirectoryResolver,
                                  FileAccess fileAccess, PlatformTransactionManager transactionManager) {
         this.nodeService = nodeService;
         this.directoryRepository = directoryRepository;
@@ -65,6 +68,7 @@ public class CacheCleanupScheduler {
         this.mediaFileRepository = mediaFileRepository;
         this.mediaFileStreamRepository = mediaFileStreamRepository;
         this.watchStatusRepository = watchStatusRepository;
+        this.gameSaveRepository = gameSaveRepository;
         this.cacheCleanupService = cacheCleanupService;
         this.cacheDirectoryResolver = cacheDirectoryResolver;
         this.fileAccess = fileAccess;
@@ -120,7 +124,11 @@ public class CacheCleanupScheduler {
         Set<String> referenced = new HashSet<>(imageRepository.findPathsByDirectoryEntityId(cacheDir.getId()));
         // Media files on the cache directory (downloaded podcast episodes) are referenced too.
         referenced.addAll(mediaFileRepository.findPathsByDirectoryEntityId(cacheDir.getId()));
+        // Game save snapshots (GameSaveService) live on the cache directory too.
+        referenced.addAll(gameSaveRepository.findStoredPathsByCacheDirectoryEntityId(cacheDir.getId()));
         String prefix = cacheDir.getPath();
+        // The worker's cached Ludusavi save-location manifest has no row (LudusaviManifestService.CACHE_KEY).
+        referenced.add(PathStrings.join(prefix, "ludusavi/manifest.yaml"));
         allStreamPaths.stream().filter(p -> p.startsWith(prefix)).forEach(referenced::add);
         return referenced;
     }

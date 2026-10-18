@@ -4,6 +4,7 @@ import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.ContinueWatchingEntity;
 import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.GameEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PodcastEpisodeEntity;
 import app.ister.core.entity.UserEntity;
@@ -73,6 +74,7 @@ public class RecentlyWatchedController {
             case PODCAST_EPISODE -> entry.getPodcastEpisodeEntity() == null
                     || entry.getPodcastEpisodeEntity().getPodcastEntity() == null
                     ? null : entry.getPodcastEpisodeEntity().getPodcastEntity().getLibraryEntity();
+            case GAME -> entry.getGameEntity() == null ? null : entry.getGameEntity().getLibraryEntity();
             case TRACK -> null;
         };
     }
@@ -101,6 +103,8 @@ public class RecentlyWatchedController {
                     : RecentlyWatched.ofPodcastEpisode(entry.getPodcastEpisodeEntity(), entry.getLastWatched());
             case COMIC -> entry.getBookEntity() == null ? null
                     : RecentlyWatched.ofComic(entry.getBookEntity(), entry.getLastWatched());
+            case GAME -> entry.getGameEntity() == null ? null
+                    : RecentlyWatched.ofGame(entry.getGameEntity(), entry.getLastWatched());
             case TRACK -> null;
         });
     }
@@ -123,6 +127,11 @@ public class RecentlyWatchedController {
     @SchemaMapping(typeName = "RecentlyWatched", field = "book")
     public BookEntity book(RecentlyWatched item) {
         return item.book();
+    }
+
+    @SchemaMapping(typeName = "RecentlyWatched", field = "game")
+    public GameEntity game(RecentlyWatched item) {
+        return item.game();
     }
 
     @SchemaMapping(typeName = "RecentlyWatched", field = "podcastEpisode")

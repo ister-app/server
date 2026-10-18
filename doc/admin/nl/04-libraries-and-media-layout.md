@@ -80,6 +80,13 @@ nooit aan de bestandsnaam.
 `.epub`; losse patronen als `attackontitan_vol27.pdf`, `series_issue8.pdf` en `name#3.cbz`
 worden getolereerd.
 
+**Games** — platform eerst: `{platform}/{Titel (jaar)}/…`. Een ROM is één bestand in zijn
+gamemap (`n64/Super Mario 64 (1996)/Super Mario 64.z64`), een PS3-game is de hele map (herkend aan
+`PS3_GAME/PARAM.SFO`), een pc-game een portable zip (Windows) of een GOG-achtige `.sh`-installer /
+`tar`-archief (Linux), en een Steam-game zijn geïnstalleerde `steamapps/common/<installdir>`-boom
+naast zijn `appmanifest_<appid>.acf`. Games worden **op de client gespeeld** (de desktop-player start
+RetroArch, RPCS3, de game zelf of Steam); de server bewaart de bestanden en de saves van elke gebruiker.
+
 In SHOW- en MOVIE-libraries zijn de herkende videocontainers `mkv`, `mp4`, `webm`, `m4v`, `flv` en `avi`; ondertitels: `.srt`
 naast de video (beeldondertitels in de container — blu-ray-PGS, dvd-VobSub — worden getoond zoals ze zijn, zonder omzetting); lokale artwork:
 `jpg`/`png`; `.nfo`-bestanden worden gelezen voor metadata-hints. Andere librarytypes hebben hun

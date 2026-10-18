@@ -3,6 +3,7 @@ package app.ister.core.repository;
 import app.ister.core.entity.AlbumEntity;
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.GameEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.RatingEntity;
 import app.ister.core.entity.ShowEntity;
@@ -19,6 +20,12 @@ public interface RatingRepository extends CrudRepository<RatingEntity, UUID> {
 
     // Write path: look up the caller's existing rating for a single item.
     Optional<RatingEntity> findByUserEntityAndMovieEntity(UserEntity userEntity, MovieEntity movieEntity);
+
+    Optional<RatingEntity> findByUserEntityAndGameEntity(UserEntity userEntity, GameEntity gameEntity);
+
+    List<RatingEntity> findByUserEntityAndGameEntityIn(UserEntity userEntity, Collection<GameEntity> games);
+
+    List<RatingEntity> findByUserEntityExternalIdAndGameEntityIn(String externalId, Collection<GameEntity> games);
 
     Optional<RatingEntity> findByUserEntityAndShowEntity(UserEntity userEntity, ShowEntity showEntity);
 

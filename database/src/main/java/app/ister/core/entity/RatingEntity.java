@@ -53,6 +53,10 @@ public class RatingEntity extends BaseEntity {
     @ManyToOne(optional = true)
     private PodcastEntity podcastEntity;
 
+    @Getter(onMethod = @__(@JsonBackReference))
+    @ManyToOne(optional = true)
+    private GameEntity gameEntity;
+
     @Column(nullable = false)
     private int value;
 }

@@ -43,6 +43,16 @@ Wat de preview over een bestand kan zeggen:
 | Bezet | Een andere lopende upload schrijft hetzelfde bestand |
 | Ongeldig | Het pad kan niet worden opgeslagen (bijvoorbeeld een naam die met een punt begint) |
 
+### Games
+
+Een game-upload is de gamemap, met de platformmap als bovenliggende map (`ps3`, `steam`, `gbc`, …;
+zie [Naamconventies](08-naming-conventions.md#games)). Een PS3- of Steam-game bestaat uit duizenden
+bestanden waarvan alleen de marker (`PS3_GAME/PARAM.SFO`, `appmanifest_<appid>.acf`) wordt gescand:
+de preview accepteert de hele boom zodra de marker deel uitmaakt van de upload, en meldt de
+bestanden van een map zonder marker als *Genegeerd* (`GAME_INCOMPLETE`). De scan van zo'n game
+draait pas als de hele upload binnen is, niet bestand voor bestand. `UPLOAD_MAX_FILES_PER_SESSION`
+(standaard 100 000) is daarop afgestemd.
+
 ### Overschrijven
 
 Met **Overschrijven** aan wordt een bestaand bestand vervangen en opnieuw geanalyseerd (streams,

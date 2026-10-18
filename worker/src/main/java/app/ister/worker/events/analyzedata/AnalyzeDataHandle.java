@@ -9,6 +9,7 @@ import app.ister.core.entity.NodeEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.eventdata.AnalyzeData;
+import app.ister.core.eventdata.GameFoundData;
 import app.ister.core.repository.*;
 import app.ister.core.service.MessageSender;
 import app.ister.worker.events.common.FoundEventDispatcher;
@@ -59,6 +60,7 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
     private final MediaFileRepository mediaFileRepository;
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final ImageRepository imageRepository;
+    private final GameRepository gameRepository;
     private final FoundEventDispatcher dispatcher;
 
     @RabbitListener(queues = MessageQueue.APP_ISTER_SERVER_ANALYZE_DATA)
@@ -222,6 +224,11 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
             case COMIC -> seriesRepository.findAllByLibraryEntityId(data.getLibraryId())
                     .forEach(series -> publishAfterCommit(() -> messageSender.sendAnalyzeData(
                             AnalyzeData.builder().eventType(EventType.ANALYZE_DATA).seriesId(series.getId()).build())));
+            // Games have no deletable external metadata yet: a refresh re-reads the files (PARAM.SFO,
+            // the Steam manifest) and re-resolves the save locations through GAME_FOUND.
+            case GAME -> gameRepository.findIdsByLibraryEntityId(data.getLibraryId())
+                    .forEach(gameId -> publishAfterCommit(() -> messageSender.sendGameFound(
+                            GameFoundData.builder().eventType(EventType.GAME_FOUND).gameId(gameId).build())));
             default -> log.warn("Force refresh is not supported for library {} of type {}; skipping",
                     library.getName(), library.getLibraryType());
         }

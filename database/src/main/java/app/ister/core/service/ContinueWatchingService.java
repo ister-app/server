@@ -85,6 +85,9 @@ public class ContinueWatchingService {
             onBookChanged(status, user, lastWatched);
         } else if (status.getPodcastEpisodeEntity() != null) {
             onPodcastEpisodeChanged(status, user, lastWatched);
+        } else if (status.getGameEntity() != null) {
+            // A game is never "finished": every play session puts it (back) at the top.
+            upsertGame(user, status.getGameEntity().getId(), lastWatched);
         }
     }
 
@@ -185,6 +188,9 @@ public class ContinueWatchingService {
         }
         for (RecentEntry entry : watchStatusRepository.findRecentPodcastEpisodeEntries(userId, cutoff)) {
             upsertPodcastEpisode(user, entry.getGroupId(), podcastTarget(userId, entry), entry.getLastWatched());
+        }
+        for (RecentEntry entry : watchStatusRepository.findRecentGameEntries(userId, cutoff)) {
+            upsertGame(user, entry.getGroupId(), entry.getLastWatched());
         }
         log.debug("Rebuilt continue watching for user: {}", userId);
     }
@@ -372,6 +378,10 @@ public class ContinueWatchingService {
     private void upsertPodcastEpisode(UserEntity user, UUID groupId, UUID podcastEpisodeId, Instant lastWatched) {
         continueWatchingRepository.upsert(user.getId(), MediaType.PODCAST_EPISODE.name(), groupId,
                 null, null, null, null, podcastEpisodeId, lastWatched);
+    }
+
+    private void upsertGame(UserEntity user, UUID gameId, Instant lastWatched) {
+        continueWatchingRepository.upsertGame(user.getId(), gameId, lastWatched);
     }
 
     private Instant cutoff() {

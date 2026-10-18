@@ -49,7 +49,9 @@ public final class UploadDtos {
         /** No scanner of this library type takes this kind of file here. */
         UNSUPPORTED_FILE,
         /** A parent folder is at a level the scan does not descend into; detail = that folder. */
-        FOLDER_NOT_SCANNED
+        FOLDER_NOT_SCANNED,
+        /** A file inside a game folder whose marker (PS3_GAME/PARAM.SFO, appmanifest_<appid>.acf) is not part of the upload. */
+        GAME_INCOMPLETE
     }
 
     /** What the path parsers made of a file. Only the fields of its library type are set. */
@@ -58,7 +60,8 @@ public final class UploadDtos {
                               String title, Integer year, Integer season, List<Integer> episodes,
                               String artist, String album, Integer disc, Integer track,
                               String author, String book, Integer chapter,
-                              String series, Double volume) {
+                              String series, Double volume,
+                              String platform, String form) {
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)

@@ -71,6 +71,13 @@ type Query {
     chapterById(id: ID): Chapter
     podcasts(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID): PodcastPage
     podcastById(id: ID): Podcast
+    "Games of a GAME library (or every visible one), optionally one platform."
+    games(page: Int, size: Int, sorting: SortingEnum, sortingOrder: SortingOrder, libraryId: ID, platform: GamePlatform): GamePage
+    gameById(id: ID): Game
+    "The platforms a GAME library knows: folder names, file extensions and the default launcher per platform."
+    gamePlatforms: [GamePlatformInfo!]!
+    "The calling user's most recently unlocked achievements across games."
+    recentAchievements(limit: Int): [GameAchievement!]!
     """
     Episodes of one podcast. Always paged: feeds can hold hundreds of episodes. Without an explicit
     sortingOrder the calling user's stored order for this podcast is used (newest first when unset).
@@ -131,7 +138,7 @@ type Attribution {
     license: String
 }
 
-union SearchResult = Movie | Show | Episode | Person | Album | Track | Book | Podcast
+union SearchResult = Movie | Show | Episode | Person | Album | Track | Book | Podcast | Game
 
 enum MetadataRefreshMode {
     "Fetch only what is missing (metadata, artwork, image blur-hashes). Cheap, idempotent, safe to run anytime."
@@ -207,6 +214,16 @@ type Mutation {
     one watch status row per user per book.
     """
     updateReadingProgress(bookId: ID!, location: String!, progress: Float!): WatchStatus!
+    """
+    Records a finished play session of the calling user: the game moves to the top of continue
+    watching and the duration is added to its play time. There is one watch status row per user per game.
+    """
+    recordGamePlayed(gameId: ID!, durationMs: Int!): WatchStatus!
+    "Admin only. Overrides where a game keeps its saves (Ludusavi placeholders, e.g. <winAppData>/Game/Saves); empty clears the override."
+    updateGameSavePaths(gameId: ID!, savePaths: [String!]!): Game!
+    "Copies an older save snapshot of the calling user to a new head version."
+    restoreGameSave(gameId: ID!, version: Int!): GameSave!
+    deleteGameSave(gameId: ID!, version: Int!): Boolean!
     "Admin only. Subscribes to an RSS feed (or reactivates an unsubscribed one) and queues the first refresh."
     subscribePodcast(feedUrl: String!): Podcast!
     "Admin only. Deactivates the subscription; episodes and listening history are kept."
@@ -873,6 +890,8 @@ enum LibraryType {
     PODCAST
     "Comics (pdf/cbz/epub); series-first layout: one directory per series."
     COMIC
+    "Emulator ROMs, PS3 folders, PC and Steam games; played on the client, saves synced through the server."
+    GAME
 }
 
 enum MediaType {
@@ -887,6 +906,8 @@ enum MediaType {
     PODCAST_EPISODE
     "A comic volume being read; grouped per series in recently watched."
     COMIC
+    "A game; watch status holds last-played and play time, one continue-watching entry per game."
+    GAME
 }
 
 enum RatingMediaType {
@@ -897,6 +918,7 @@ enum RatingMediaType {
     TRACK
     BOOK
     PODCAST
+    GAME
 }
 
 enum PlayQueueSourceType {
@@ -1693,6 +1715,167 @@ type RecentlyWatched {
     book: Book
     "Partially played podcast episode (type PODCAST_EPISODE)."
     podcastEpisode: PodcastEpisode
+    "A recently played game (type GAME)."
+    game: Game
+}
+
+"""
+A game in a GAME library. Played on the client: the player downloads the files listed by
+GET /game/{id}/manifest, starts a local emulator or the game itself (see launcher) and syncs the
+calling user's saves through /game/{id}/saves.
+"""
+type Game {
+    id: ID!
+    "Path identity: the game folder name without its year."
+    name: String!
+    "Display title: from PARAM.SFO / the Steam manifest / a metadata provider, else name."
+    title: String!
+    releaseYear: Int!
+    platform: GamePlatform!
+    form: GameForm!
+    "What the client launches, relative to the game folder or archive root; null when the single file is the game."
+    entryPath: String
+    "PS3 title id (BLUS12345); names RPCS3's savedata and trophy folders."
+    titleId: String
+    steamAppId: String
+    "The folder name under steamapps/common a Steam game is restored into."
+    steamInstallDir: String
+    "Ludusavi reports Steam Cloud sync for this game; clients warn about syncing twice."
+    steamCloud: Boolean!
+    sizeBytes: Float!
+    fileCount: Int!
+    "How the client should start the game, derived from the platform."
+    launcher: GameLauncherHint!
+    "Where the game keeps its saves: the admin override when set, else what the Ludusavi manifest says."
+    savePaths: [GameSavePath!]!
+    "ADMIN / MANIFEST / NONE: where savePaths came from."
+    savePathSource: String!
+    "The admin override alone (empty when none), for the settings screen."
+    savePathOverride: [GameSavePath!]!
+    images: [Image!]
+    metadata: [Metadata!]
+    library: Library!
+    "The calling user's rating (1-10), or null if unrated."
+    rating: Int
+    "When the calling user last played (ISO-8601), or null."
+    lastPlayed: String
+    "The calling user's accumulated play time in milliseconds."
+    playTimeMs: Float!
+    "The calling user's save snapshots, newest first."
+    saves: [GameSave!]!
+    "Achievement progress of the calling user; total 0 when nothing was reported yet."
+    achievements: GameAchievementSummary!
+}
+
+type GamePage {
+    content: [Game!]!
+    totalPages: Int!
+    totalElements: Int!
+    number: Int!
+    size: Int!
+}
+
+"A save-location template with Ludusavi placeholders; os narrows it to windows / linux / mac, null = any."
+type GameSavePath {
+    path: String!
+    os: String
+}
+
+type GameLauncherHint {
+    kind: GameLauncherKind!
+    "The libretro core name (snes9x, mupen64plus_next, ...) for RETROARCH launches."
+    retroArchCore: String
+}
+
+type GamePlatformInfo {
+    platform: GamePlatform!
+    "Folder names under the library root this platform answers to."
+    folderNames: [String!]!
+    "File extensions of a launchable file (empty for folder platforms)."
+    entryExtensions: [String!]!
+    "Extensions of companion files of a ROM set (the .bin of a .cue)."
+    companionExtensions: [String!]!
+    launcher: GameLauncherHint!
+}
+
+type GameSave {
+    id: ID!
+    version: Int!
+    sizeBytes: Float!
+    sha256: String!
+    "The client that uploaded it (hostname)."
+    deviceName: String
+    note: String
+    "When it was uploaded (ISO-8601)."
+    createdAt: String!
+}
+
+type GameAchievementSummary {
+    total: Int!
+    unlocked: Int!
+    list: [GameAchievement!]!
+}
+
+type GameAchievement {
+    id: ID!
+    source: GameAchievementSource!
+    externalId: String!
+    name: String!
+    description: String
+    "PS3 trophy grade: BRONZE / SILVER / GOLD / PLATINUM."
+    grade: String
+    hidden: Boolean!
+    icon: Image
+    "When the calling user unlocked it (ISO-8601); null while locked."
+    unlockedAt: String
+    game: Game!
+}
+
+enum GamePlatform {
+    NES
+    SNES
+    N64
+    GB
+    GBC
+    GBA
+    NDS
+    PSX
+    PS2
+    GC
+    WII
+    PS3
+    PC
+    LINUX
+    STEAM
+}
+
+enum GameForm {
+    "One ROM file (plus companions), launched in a RetroArch core."
+    ROM
+    "A PS3 game folder (PS3_GAME/USRDIR/EBOOT.BIN), launched with RPCS3."
+    PS3_FOLDER
+    "A zip of a ready-to-run Windows game folder."
+    PC_PORTABLE_ZIP
+    "A GOG-style Linux installer (.sh)."
+    PC_LINUX_INSTALLER
+    "A tar archive of a ready-to-run Linux game folder."
+    PC_LINUX_PORTABLE
+    "An installed Steam game (steamapps/common tree + appmanifest), restored into a local Steam library."
+    STEAM
+}
+
+enum GameLauncherKind {
+    RETROARCH
+    RPCS3
+    NATIVE_WINDOWS
+    NATIVE_LINUX
+    STEAM
+}
+
+enum GameAchievementSource {
+    PS3_TROPHY
+    STEAM
+    RETROACHIEVEMENTS
 }
 
 type StreamToken {

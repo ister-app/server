@@ -6,6 +6,7 @@ import app.ister.core.entity.NodeEntity;
 import app.ister.core.entity.PodcastEpisodeEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.repository.DirectoryRepository;
+import app.ister.core.repository.GameSaveRepository;
 import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
@@ -58,6 +59,8 @@ class CacheCleanupSchedulerTest {
     private MediaFileStreamRepository mediaFileStreamRepository;
     @Mock
     private WatchStatusRepository watchStatusRepository;
+    @Mock
+    private GameSaveRepository gameSaveRepository;
     @Mock
     private CacheCleanupService cacheCleanupService;
 
@@ -153,7 +156,9 @@ class CacheCleanupSchedulerTest {
         verify(cacheCleanupService).clean(eq(cachePath), referenced.capture(), eq(Duration.ofHours(24)), eq(false));
         assertEquals(Set.of(cachePath + "/image.jpg",
                         cachePath + "/podcasts/episode.mp3",
-                        cachePath + "/subtitle.vtt"),
+                        cachePath + "/subtitle.vtt",
+                        // The worker's cached Ludusavi manifest has no row and is always kept.
+                        cachePath + "/ludusavi/manifest.yaml"),
                 referenced.getValue());
     }
 

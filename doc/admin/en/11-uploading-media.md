@@ -41,6 +41,16 @@ What the preview can say about a file:
 | Busy | Another running upload is writing the same file |
 | Invalid | The path cannot be stored (for example a name starting with a dot) |
 
+### Games
+
+A game upload is the game folder, under the platform folder as parent (`ps3`, `steam`, `gbc`, …;
+see [Naming conventions](08-naming-conventions.md#games)). A PS3 or Steam game is thousands of
+files of which only the marker (`PS3_GAME/PARAM.SFO`, `appmanifest_<appid>.acf`) is scanned: the
+preview accepts the whole tree once the marker is part of the upload, and reports the files of a
+folder without its marker as *Ignored* (`GAME_INCOMPLETE`). The scan of such a game runs when the
+whole upload has landed, not file by file. `UPLOAD_MAX_FILES_PER_SESSION` (default 100 000) is
+sized for that.
+
 ### Overwriting
 
 With **Overwrite** on, an existing file is replaced and analysed again (streams, duration,

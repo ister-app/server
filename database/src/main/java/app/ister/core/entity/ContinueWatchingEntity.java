@@ -67,6 +67,10 @@ public class ContinueWatchingEntity extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     private PodcastEpisodeEntity podcastEpisodeEntity;
 
+    /** A game to pick up again (entry type GAME; the game is its own group). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    private GameEntity gameEntity;
+
     /** Sort key of the list: when the user last played something in this container. */
     @Column(nullable = false)
     private Instant lastWatched;

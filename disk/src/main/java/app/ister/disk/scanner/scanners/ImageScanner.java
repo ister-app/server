@@ -21,6 +21,7 @@ import app.ister.core.utils.Jaffree;
 import app.ister.disk.scanner.ArtistTagParser;
 import app.ister.disk.scanner.BookPathObject;
 import app.ister.disk.scanner.ComicPathObject;
+import app.ister.disk.scanner.GamePathObject;
 import app.ister.disk.scanner.MusicPathObject;
 import app.ister.disk.scanner.PathObject;
 import app.ister.disk.scanner.enums.DirType;
@@ -78,6 +79,9 @@ public class ImageScanner implements Scanner {
             ComicPathObject comicPath = new ComicPathObject(directoryEntity.getPath(), path);
             return comicPath.getFileType().equals(FileType.IMAGE);
         }
+        if (isGameLibrary(directoryEntity)) {
+            return new GamePathObject(directoryEntity.getPath(), path, false).getFileType().equals(FileType.IMAGE);
+        }
         return analyzable(path, isRegularFile, size);
     }
 
@@ -105,6 +109,8 @@ public class ImageScanner implements Scanner {
             linkToBookLibraryEntity(imageEntity, directoryEntity, path);
         } else if (isComicLibrary(directoryEntity)) {
             linkToComicLibraryEntity(imageEntity, directoryEntity, path);
+        } else if (isGameLibrary(directoryEntity)) {
+            linkToGameLibraryEntity(imageEntity, directoryEntity, path);
         } else {
             linkToVideoLibraryEntity(imageEntity, new PathObject(path), directoryEntity);
         }
@@ -141,6 +147,21 @@ public class ImageScanner implements Scanner {
     private boolean isComicLibrary(DirectoryEntity directoryEntity) {
         return directoryEntity.getLibraryEntity() != null
                 && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.COMIC;
+    }
+
+    private boolean isGameLibrary(DirectoryEntity directoryEntity) {
+        return directoryEntity.getLibraryEntity() != null
+                && directoryEntity.getLibraryEntity().getLibraryType() == LibraryType.GAME;
+    }
+
+    /** Artwork directly in a game folder (cover.jpg/folder.jpg) belongs to the game. */
+    private void linkToGameLibraryEntity(ImageEntity.ImageEntityBuilder<?, ?> imageEntity,
+                                         DirectoryEntity directoryEntity, String path) {
+        GamePathObject gamePath = new GamePathObject(directoryEntity.getPath(), path, false);
+        if (gamePath.getGameName() != null) {
+            imageEntity.gameEntity(scannerHelperService.getOrCreateGame(directoryEntity.getLibraryEntity(),
+                    gamePath.getPlatform(), gamePath.getGameName(), gamePath.getPathYear(), null));
+        }
     }
 
     /** Artwork inside a comic series directory (cover.jpg/folder.jpg) belongs to the series. */

@@ -11,7 +11,7 @@ continue-watching list is a precomputed table; live status is a fanout of in-mem
 
 See the [continue-watching-flow diagram](../diagrams/continue-watching-flow.md). The
 `continue_watching` table (migration V20) holds one row per user per container — show / movie / book
-/ comic series / podcast episode (`group_id`) — pointing at the item to resume with. For comics the
+/ comic series / podcast episode / game (`group_id`) — pointing at the item to resume with. For comics the
 container is the series and the target the next volume (`ContinueWatchingService.upsertComicVolume`;
 `recomputeForComicSeries` revives the series when the scanner adds a volume). `ContinueWatchingService`
 (database module) owns it; the GraphQL `recentlyWatched` query is a single indexed read.

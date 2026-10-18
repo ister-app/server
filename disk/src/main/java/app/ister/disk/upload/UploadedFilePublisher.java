@@ -19,6 +19,9 @@ import app.ister.core.service.MessageSender;
 import app.ister.core.storage.LocalCopy;
 import app.ister.core.storage.TmpStoreProvider;
 import app.ister.core.utils.AfterCommitPublisher;
+import app.ister.disk.scanner.GamePathObject;
+import app.ister.disk.scanner.Scanners;
+import app.ister.disk.scanner.enums.FileType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -44,6 +47,7 @@ import java.util.stream.Stream;
 @Component
 public class UploadedFilePublisher {
 
+    private final Scanners scanners;
     private final MessageSender messageSender;
     private final MediaFileRepository mediaFileRepository;
     private final MediaFileEpisodeRepository mediaFileEpisodeRepository;
@@ -52,11 +56,12 @@ public class UploadedFilePublisher {
     private final TmpStoreProvider tmpStoreProvider;
     private final String tmpDir;
 
-    public UploadedFilePublisher(MessageSender messageSender, MediaFileRepository mediaFileRepository,
+    public UploadedFilePublisher(Scanners scanners, MessageSender messageSender, MediaFileRepository mediaFileRepository,
                                  MediaFileEpisodeRepository mediaFileEpisodeRepository,
                                  ImageRepository imageRepository, LocalCopy localCopy,
                                  TmpStoreProvider tmpStoreProvider,
                                  @Value("${app.ister.server.tmp-dir}") String tmpDir) {
+        this.scanners = scanners;
         this.messageSender = messageSender;
         this.mediaFileRepository = mediaFileRepository;
         this.mediaFileEpisodeRepository = mediaFileEpisodeRepository;
@@ -66,18 +71,33 @@ public class UploadedFilePublisher {
         this.tmpDir = tmpDir;
     }
 
-    /** Call inside the transaction that marks the upload file completed; the events go out after its commit. */
-    public void published(DirectoryEntity directory, String path, long size) {
+    /**
+     * Call inside the transaction that marks the upload file completed; the events go out after its
+     * commit. Returns false for a file whose event must wait for the whole session: the marker of a
+     * folder-form game sizes its tree when scanned, so it is published by
+     * {@link #publishGameMarkers} once every file of the session has landed. The other files of
+     * such a tree need no event at all (no scanner takes them).
+     */
+    public boolean published(DirectoryEntity directory, String path, long size) {
+        if (Scanners.libraryTypeOf(directory) == LibraryType.GAME) {
+            FileType fileType = new GamePathObject(directory.getPath(), path, false).getFileType();
+            if (fileType == FileType.GAME_MARKER) {
+                return false;
+            }
+            if (fileType == FileType.GAME_TREE_FILE || scanners.analyzableBy(directory, path, true, size).isEmpty()) {
+                return true;
+            }
+        }
         Optional<MediaFileEntity> mediaFile = mediaFileRepository.findByDirectoryEntityAndPath(directory, path);
         if (mediaFile.isPresent()) {
             replaced(directory, mediaFile.get(), size);
-            return;
+            return true;
         }
         Optional<ImageEntity> image = imageRepository.findByDirectoryEntityAndPath(directory, path);
         if (image.isPresent()) {
             ImageFoundData data = ImageFoundData.fromImageEntity(image.get());
             AfterCommitPublisher.publishAfterCommit(() -> messageSender.sendImageFound(data, directory.getName()));
-            return;
+            return true;
         }
         // New to the library (or a replaced nfo/subtitle, whose handlers re-read on every event).
         FileScanRequestedData data = FileScanRequestedData.builder()
@@ -89,6 +109,28 @@ public class UploadedFilePublisher {
                 .directoryEntityUUID(directory.getId())
                 .build();
         AfterCommitPublisher.publishAfterCommit(() -> messageSender.sendFileScanRequested(data, directory.getName()));
+        return true;
+    }
+
+    /** The deferred game markers of a finished session: one scan request each, after commit. */
+    public void publishGameMarkers(DirectoryEntity directory, List<String> markerPaths) {
+        for (String path : markerPaths) {
+            FileScanRequestedData data = FileScanRequestedData.builder()
+                    .eventType(EventType.FILE_SCAN_REQUESTED)
+                    .path(path)
+                    .regularFile(true)
+                    .size(0)
+                    .lastModified(java.time.Instant.now())
+                    .directoryEntityUUID(directory.getId())
+                    .build();
+            AfterCommitPublisher.publishAfterCommit(() -> messageSender.sendFileScanRequested(data, directory.getName()));
+        }
+    }
+
+    /** Whether a completed upload file is a game marker whose scan request waits for the session end. */
+    public static boolean isDeferredGameMarker(DirectoryEntity directory, String path) {
+        return Scanners.libraryTypeOf(directory) == LibraryType.GAME
+                && new GamePathObject(directory.getPath(), path, false).getFileType() == FileType.GAME_MARKER;
     }
 
     private void replaced(DirectoryEntity directory, MediaFileEntity mediaFile, long size) {

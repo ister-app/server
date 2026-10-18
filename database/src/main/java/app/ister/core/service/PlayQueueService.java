@@ -432,7 +432,7 @@ public class PlayQueueService {
                     .map(ChapterEntity::getMediaFileEntities).orElse(List.of());
             case PODCAST_EPISODE -> podcastEpisodeRepository.findById(item.getPodcastEpisodeEntityId())
                     .map(PodcastEpisodeEntity::getMediaFileEntities).orElse(List.of());
-            case BOOK, COMIC -> List.of();
+            case BOOK, COMIC, GAME -> List.of();
         };
     }
 
@@ -848,6 +848,7 @@ public class PlayQueueService {
                     case BOOK -> throw new IllegalArgumentException("Book libraries cannot be shuffled; play a single book instead");
                     case PODCAST -> throw new IllegalArgumentException("Podcast libraries cannot be shuffled; play a single podcast instead");
                     case COMIC -> throw new IllegalArgumentException("Comic libraries cannot be played; comics are read, not streamed");
+                    case GAME -> throw new IllegalArgumentException("Game libraries cannot be played; games run on the client");
                 };
             }
         };
@@ -1024,6 +1025,7 @@ public class PlayQueueService {
             case PODCAST_EPISODE -> podcastEpisodeRepository.existsById(mediaId);
             case BOOK -> throw new IllegalArgumentException("Books cannot be added to a play queue; add their chapters instead");
             case COMIC -> throw new IllegalArgumentException("Comics cannot be added to a play queue; they are read, not streamed");
+            case GAME -> throw new IllegalArgumentException("Games cannot be added to a play queue; they run on the client");
         };
         if (!exists) {
             throw new IllegalArgumentException("Media item not found");

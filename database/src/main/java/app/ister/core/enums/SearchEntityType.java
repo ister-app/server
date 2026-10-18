@@ -9,4 +9,5 @@ public enum SearchEntityType {
     TRACK,
     BOOK,
     PODCAST,
+    GAME,
 }

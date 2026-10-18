@@ -1,5 +1,7 @@
 package app.ister.disk.upload;
 
+import app.ister.disk.scanner.Scanners;
+
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
@@ -63,7 +65,7 @@ class UploadedFilePublisherTest {
     @BeforeEach
     void setUp() {
         when(tmpStoreProvider.shared()).thenReturn(Optional.empty());
-        publisher = new UploadedFilePublisher(messageSender, mediaFileRepository, mediaFileEpisodeRepository,
+        publisher = new UploadedFilePublisher(mock(Scanners.class), messageSender, mediaFileRepository, mediaFileEpisodeRepository,
                 imageRepository, localCopy, tmpStoreProvider, tmpDir.toString());
     }
 

@@ -13,10 +13,12 @@ import app.ister.core.utils.LibraryPathValidator;
 import app.ister.disk.scanner.BookPathObject;
 import app.ister.disk.scanner.ComicPathObject;
 import app.ister.disk.scanner.DirectoryPruner;
+import app.ister.disk.scanner.GamePathObject;
 import app.ister.disk.scanner.MusicPathObject;
 import app.ister.disk.scanner.PathObject;
 import app.ister.disk.scanner.Scanners;
 import app.ister.disk.scanner.enums.DirType;
+import app.ister.disk.scanner.enums.FileType;
 import app.ister.disk.upload.UploadDtos.Entry;
 import app.ister.disk.upload.UploadDtos.IgnoreReason;
 import app.ister.disk.upload.UploadDtos.PlanRequest;
@@ -133,6 +135,7 @@ public class UploadPreviewService {
     /** Pass 2: would the scan pick it up. Returns the targets it would; the others get their verdict here. */
     private List<String> scannableTargets(DirectoryEntity directory, List<Entry> entries,
                                           String[] targets, PreviewEntry[] verdicts) {
+        Set<String> markedGameRoots = markedGameRoots(directory, targets);
         List<String> wanted = new ArrayList<>();
         for (int i = 0; i < entries.size(); i++) {
             if (targets[i] == null) {
@@ -143,13 +146,57 @@ public class UploadPreviewService {
             if (prunedAt.isPresent()) {
                 verdicts[i] = verdict(entry, targets[i], PreviewStatus.IGNORED, IgnoreReason.FOLDER_NOT_SCANNED,
                         relativeTo(directory, prunedAt.get()), null);
-            } else if (scanners.analyzableBy(directory, targets[i], true, entry.size()).isEmpty()) {
-                verdicts[i] = verdict(entry, targets[i], PreviewStatus.IGNORED, IgnoreReason.UNSUPPORTED_FILE, null, null);
-            } else {
+            } else if (!scanners.analyzableBy(directory, targets[i], true, entry.size()).isEmpty()) {
                 wanted.add(targets[i]);
+            } else if (isGameTreeFile(directory, targets[i])) {
+                gameTreeVerdict(directory, entry, targets[i], markedGameRoots, verdicts, wanted, i);
+            } else {
+                verdicts[i] = verdict(entry, targets[i], PreviewStatus.IGNORED, IgnoreReason.UNSUPPORTED_FILE, null, null);
             }
         }
         return wanted;
+    }
+
+    /**
+     * Folder-form games (PS3, Steam) are thousands of files of which only the marker is scannable;
+     * the scan accepts the whole tree through that marker. The preview does the same: every file
+     * under a game folder whose marker is part of the upload is uploaded, a tree without its marker
+     * is reported incomplete rather than silently dropped as "unsupported".
+     */
+    private static Set<String> markedGameRoots(DirectoryEntity directory, String[] targets) {
+        if (Scanners.libraryTypeOf(directory) != LibraryType.GAME) {
+            return Set.of();
+        }
+        Set<String> roots = new HashSet<>();
+        for (String target : targets) {
+            if (target == null) {
+                continue;
+            }
+            GamePathObject path = new GamePathObject(directory.getPath(), target, false);
+            if (path.getFileType() == FileType.GAME_MARKER) {
+                roots.add(path.getGameRootPath());
+            }
+        }
+        return roots;
+    }
+
+    private static boolean isGameTreeFile(DirectoryEntity directory, String target) {
+        return Scanners.libraryTypeOf(directory) == LibraryType.GAME
+                && new GamePathObject(directory.getPath(), target, false).getFileType() == FileType.GAME_TREE_FILE;
+    }
+
+    @SuppressWarnings("java:S107") // the preview's parallel arrays
+    private static void gameTreeVerdict(DirectoryEntity directory, Entry entry, String target, Set<String> markedGameRoots,
+                                        PreviewEntry[] verdicts, List<String> wanted, int i) {
+        GamePathObject path = new GamePathObject(directory.getPath(), target, false);
+        if (markedGameRoots.contains(path.getGameRootPath())) {
+            wanted.add(target);
+            return;
+        }
+        String marker = path.getPlatform() == app.ister.core.enums.GamePlatform.STEAM
+                ? "appmanifest_<appid>.acf" : "PS3_GAME/PARAM.SFO";
+        verdicts[i] = verdict(entry, target, PreviewStatus.IGNORED, IgnoreReason.GAME_INCOMPLETE,
+                "missing " + marker + " in " + relativeTo(directory, path.getGameRootPath()), null);
     }
 
     private static PreviewStatus status(String target, Set<String> busy, Set<String> existing) {
@@ -236,25 +283,32 @@ public class UploadPreviewService {
                 MusicPathObject p = new MusicPathObject(root, target, false);
                 yield new Recognition(p.getFileType().name(), null, null, null, null,
                         p.getArtistName(), p.getAlbumName(), p.getDiscNumber(), positive(p.getTrackNumber()),
-                        null, null, null, null, null);
+                        null, null, null, null, null, null, null);
             }
             case BOOK -> {
                 BookPathObject p = new BookPathObject(root, target, false);
                 yield new Recognition(p.getFileType().name(), null, positive(p.getBookYear()), null, null,
                         null, null, null, null,
-                        p.getAuthorName(), p.getBookName(), positive(p.getChapterNumber()), null, null);
+                        p.getAuthorName(), p.getBookName(), positive(p.getChapterNumber()), null, null, null, null);
+            }
+            case GAME -> {
+                GamePathObject p = new GamePathObject(root, target, false);
+                yield new Recognition(p.getFileType().name(), p.getGameName(), positive(p.getPathYear()), null, null,
+                        null, null, null, null, null, null, null, null, null,
+                        p.getPlatform() == null ? null : p.getPlatform().name(),
+                        p.getForm() == null ? null : p.getForm().name());
             }
             case COMIC -> {
                 ComicPathObject p = new ComicPathObject(root, target, false);
                 yield new Recognition(p.getFileType().name(), p.getVolumeTitle(), positive(p.getStartYear()), null, null,
-                        null, null, null, null, null, null, null, p.getSeriesName(), p.getVolumeNumber());
+                        null, null, null, null, null, null, null, p.getSeriesName(), p.getVolumeNumber(), null, null);
             }
             default -> {
                 PathObject p = new PathObject(target);
                 boolean episode = p.getDirType() == DirType.EPISODE;
                 yield new Recognition(p.getFileType().name(), p.getName() == null ? null : p.getName().strip(),
                         positive(p.getYear()), episode ? p.getSeason() : null, episode ? p.getEpisodes() : null,
-                        null, null, null, null, null, null, null, null, null);
+                        null, null, null, null, null, null, null, null, null, null, null);
             }
         };
     }
@@ -302,6 +356,7 @@ public class UploadPreviewService {
             case MUSIC -> new MusicPathObject(root, folder, true).getDirType();
             case BOOK -> new BookPathObject(root, folder, true).getDirType();
             case COMIC -> new ComicPathObject(root, folder, true).getDirType();
+            case GAME -> new GamePathObject(root, folder, true).getDirType();
             default -> new PathObject(folder).getDirType();
         };
         // The movie and show layouts share one parser, which calls every "Name (Year)" folder a show.

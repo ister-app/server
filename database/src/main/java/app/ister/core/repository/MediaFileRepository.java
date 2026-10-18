@@ -44,6 +44,10 @@ public interface MediaFileRepository extends CrudRepository<MediaFileEntity, UUI
     /** Epub files attached directly to a book. */
     List<MediaFileEntity> findByBookEntityId(UUID bookId);
 
+    List<MediaFileEntity> findByGameEntityId(UUID gameId);
+
+    List<MediaFileEntity> findByGameEntityIdIn(Collection<UUID> gameIds);
+
     /** Batch variant for the metadata backfill: epub files of many books in one query. */
     List<MediaFileEntity> findByBookEntityIdIn(Collection<UUID> bookIds);
 

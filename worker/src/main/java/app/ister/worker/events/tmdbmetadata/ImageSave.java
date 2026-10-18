@@ -5,6 +5,7 @@ import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.GameEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PodcastEntity;
 import app.ister.core.entity.SeriesEntity;
@@ -29,30 +30,36 @@ public class ImageSave {
                                   @Nullable AlbumEntity album,
                                   @Nullable BookEntity book,
                                   @Nullable PodcastEntity podcast,
-                                  @Nullable SeriesEntity series) {
+                                  @Nullable SeriesEntity series,
+                                  @Nullable GameEntity game) {
 
         public MediaEntityRef(@Nullable MovieEntity movie, @Nullable ShowEntity show,
                               @Nullable EpisodeEntity episode, @Nullable PersonEntity person,
                               @Nullable AlbumEntity album) {
-            this(movie, show, episode, person, album, null, null, null);
+            this(movie, show, episode, person, album, null, null, null, null);
         }
 
         public MediaEntityRef(@Nullable MovieEntity movie, @Nullable ShowEntity show,
                               @Nullable EpisodeEntity episode, @Nullable PersonEntity person,
                               @Nullable AlbumEntity album, @Nullable BookEntity book) {
-            this(movie, show, episode, person, album, book, null, null);
+            this(movie, show, episode, person, album, book, null, null, null);
         }
 
         public MediaEntityRef(@Nullable MovieEntity movie, @Nullable ShowEntity show,
                               @Nullable EpisodeEntity episode, @Nullable PersonEntity person,
                               @Nullable AlbumEntity album, @Nullable BookEntity book,
                               @Nullable PodcastEntity podcast) {
-            this(movie, show, episode, person, album, book, podcast, null);
+            this(movie, show, episode, person, album, book, podcast, null, null);
         }
 
         /** A comic series' artwork (Wikipedia thumbnail). */
         public static MediaEntityRef ofSeries(SeriesEntity series) {
-            return new MediaEntityRef(null, null, null, null, null, null, null, series);
+            return new MediaEntityRef(null, null, null, null, null, null, null, series, null);
+        }
+
+        /** A game's artwork (PS3 ICON0.PNG, a provider cover). */
+        public static MediaEntityRef ofGame(GameEntity game) {
+            return new MediaEntityRef(null, null, null, null, null, null, null, null, game);
         }
     }
 
@@ -77,6 +84,7 @@ public class ImageSave {
                 .bookEntityId(mediaEntityRef.book() == null ? null : mediaEntityRef.book().getId())
                 .podcastEntityId(mediaEntityRef.podcast() == null ? null : mediaEntityRef.podcast().getId())
                 .seriesEntityId(mediaEntityRef.series() == null ? null : mediaEntityRef.series().getId())
+                .gameEntityId(mediaEntityRef.game() == null ? null : mediaEntityRef.game().getId())
                 // Route by the cache DIRECTORY name (matches HandleImageFound's queue), not the
                 // node name — the IMAGE_FOUND queues are named per directory, so using the node
                 // name sent every downloaded TMDB image to a queue with no consumer (silently

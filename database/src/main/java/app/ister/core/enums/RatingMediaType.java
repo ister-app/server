@@ -11,5 +11,6 @@ public enum RatingMediaType {
     ALBUM,
     TRACK,
     BOOK,
-    PODCAST
+    PODCAST,
+    GAME
 }

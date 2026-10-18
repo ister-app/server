@@ -161,7 +161,7 @@ public class PlaylistService {
                     .collect(Collectors.toMap(PodcastEpisodeEntity::getId,
                             episode -> episode.getPodcastEntity().getId())));
             case MOVIE, SHOW, BOOK -> mediaIds;
-            case COMIC -> List.of();
+            case COMIC, GAME -> List.of();
         };
         return owners.stream().distinct().toList();
     }
@@ -185,7 +185,7 @@ public class PlaylistService {
             case SHOW -> imageRepository.findByEpisodeEntityIdIn(ownerIds);
             case BOOK -> imageRepository.findByBookEntityIdIn(ownerIds);
             case PODCAST -> imageRepository.findByPodcastEntityIdIn(ownerIds);
-            case COMIC -> List.of();
+            case COMIC, GAME -> List.of();
         };
         Map<UUID, ImageEntity> byOwner = new HashMap<>();
         for (ImageEntity image : images) {
@@ -225,7 +225,7 @@ public class PlaylistService {
             case SHOW -> image.getEpisodeEntityId();
             case BOOK -> image.getBookEntityId();
             case PODCAST -> image.getPodcastEntityId();
-            case COMIC -> null;
+            case COMIC, GAME -> null;
         };
     }
 
@@ -335,7 +335,7 @@ public class PlaylistService {
             case MUSIC -> FilterKind.TRACK;
             case MOVIE -> FilterKind.MOVIE;
             case SHOW -> FilterKind.EPISODE;
-            case BOOK, PODCAST, COMIC -> throw new IllegalArgumentException(
+            case BOOK, PODCAST, COMIC, GAME -> throw new IllegalArgumentException(
                     "Smart playlists are not supported for " + libraryType + " libraries");
         };
     }
@@ -349,6 +349,7 @@ public class PlaylistService {
             case PODCAST -> MediaType.PODCAST_EPISODE;
             case BOOK -> MediaType.BOOK;
             case COMIC -> throw new IllegalArgumentException("Comic libraries cannot have playlists");
+            case GAME -> throw new IllegalArgumentException("Game libraries cannot have playlists");
         };
     }
 

@@ -29,7 +29,8 @@ public class UploadProperties {
     /** Sessions that may be active at once, cluster-wide. */
     private int maxActiveSessions = 2;
 
-    private int maxFilesPerSession = 20_000;
+    /** A Steam or PS3 game is one session of up to ~100k small files. */
+    private int maxFilesPerSession = 100_000;
 
     /** Chunk requests this node handles at once; more get 429. */
     private int maxConcurrentChunks = 4;

@@ -149,6 +149,11 @@ public class MessageSender {
         send(APP_ISTER_SERVER_COMIC_SERIES_FOUND, comicSeriesFoundData);
     }
 
+    /** Global queue: any worker node enriches a new or changed game (PARAM.SFO, Ludusavi save paths). */
+    public void sendGameFound(GameFoundData gameFoundData) {
+        send(APP_ISTER_SERVER_GAME_FOUND, gameFoundData);
+    }
+
     /** Global queue: any worker node may pick up a feed refresh. */
     public void sendPodcastRefreshRequested(PodcastRefreshRequestedData data) {
         send(APP_ISTER_SERVER_PODCAST_REFRESH_REQUESTED, data);

@@ -3,6 +3,7 @@ package app.ister.core.service;
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.ChapterEntity;
 import app.ister.core.entity.EpisodeEntity;
+import app.ister.core.entity.GameEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PodcastEpisodeEntity;
 import app.ister.core.entity.TrackEntity;
@@ -109,6 +110,16 @@ public class WatchStatusService {
      * user per book.
      */
     @SuppressWarnings("java:S3252")
+    /** A game's single row per user: last played ({@code dateUpdated}) and accumulated play time. */
+    public WatchStatusEntity getOrCreateForGame(UserEntity userEntity, GameEntity gameEntity) {
+        return watchStatusRepository.findByUserEntityAndGameEntity(userEntity, gameEntity)
+                .orElseGet(() -> watchStatusRepository.save(WatchStatusEntity.builder()
+                        .userEntity(userEntity)
+                        .playQueueItemId(gameEntity.getId())
+                        .gameEntity(gameEntity)
+                        .watched(false).build()));
+    }
+
     public WatchStatusEntity getOrCreateForBook(Authentication authentication, BookEntity bookEntity) {
         UserEntity userEntity = userService.getOrCreateUser(authentication);
         return watchStatusRepository.findByUserEntityAndBookEntity(userEntity, bookEntity)

@@ -1,6 +1,8 @@
 package app.ister.core.service;
 
 import app.ister.core.entity.*;
+import app.ister.core.enums.GameForm;
+import app.ister.core.enums.GamePlatform;
 import app.ister.core.enums.SearchEntityType;
 import app.ister.core.repository.*;
 
@@ -34,6 +36,7 @@ public class ScannerHelperService {
     private final ServerEventService serverEventService;
     private final ContinueWatchingService continueWatchingService;
     private final BookSeriesService bookSeriesService;
+    private final GameRepository gameRepository;
 
     /**
      * Check if the database contains a show wit the given parameters.
@@ -344,6 +347,38 @@ public class ScannerHelperService {
             continueWatchingService.recomputeForComicSeries(seriesEntity.getId());
         }
         return bookEntity;
+    }
+
+    /**
+     * The game at (library, platform, name, path year), created when missing. {@code form} may be
+     * null when the caller only knows the folder (a cover image scanned before the game file): the
+     * platform's natural form is assumed and the game scanner corrects it from the real file.
+     */
+    public GameEntity getOrCreateGame(LibraryEntity libraryEntity, GamePlatform platform, String name,
+                                      int pathYear, GameForm form) {
+        return gameRepository.findByLibraryEntityAndPlatformAndNameAndPathYear(libraryEntity, platform, name, pathYear)
+                .orElseGet(() -> {
+                    GameEntity game = gameRepository.save(GameEntity.builder()
+                            .libraryEntity(libraryEntity)
+                            .platform(platform)
+                            .form(form != null ? form : defaultFormOf(platform))
+                            .name(name)
+                            .pathYear(pathYear)
+                            .releaseYear(pathYear)
+                            .build());
+                    serverEventService.createGameFoundEvent(game.getId());
+                    return game;
+                });
+    }
+
+    private static GameForm defaultFormOf(GamePlatform platform) {
+        return switch (platform) {
+            case PS3 -> GameForm.PS3_FOLDER;
+            case STEAM -> GameForm.STEAM;
+            case PC -> GameForm.PC_PORTABLE_ZIP;
+            case LINUX -> GameForm.PC_LINUX_PORTABLE;
+            default -> GameForm.ROM;
+        };
     }
 
     /**

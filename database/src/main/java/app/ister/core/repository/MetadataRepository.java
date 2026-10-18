@@ -30,6 +30,8 @@ public interface MetadataRepository extends JpaRepository<MetadataEntity, UUID> 
 
     List<MetadataEntity> findBySeriesEntityId(UUID seriesId);
 
+    List<MetadataEntity> findByGameEntityId(UUID gameId);
+
     List<MetadataEntity> findByChapterEntityId(UUID chapterId);
 
     List<MetadataEntity> findByPodcastEntityId(UUID podcastId);

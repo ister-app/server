@@ -9,6 +9,7 @@ import app.ister.core.service.OrphanTrackCleanupService;
 import app.ister.core.storage.ObjectStoreRegistry;
 import app.ister.disk.scanner.scanners.AudioScanner;
 import app.ister.disk.scanner.scanners.ComicScanner;
+import app.ister.disk.scanner.scanners.GameScanner;
 import app.ister.disk.scanner.scanners.EpubScanner;
 import app.ister.disk.scanner.scanners.ImageScanner;
 import app.ister.disk.scanner.scanners.MediaFileScanner;
@@ -36,6 +37,7 @@ public class LibraryScanner {
     private final AudioScanner audioScanner;
     private final EpubScanner epubScanner;
     private final ComicScanner comicScanner;
+    private final GameScanner gameScanner;
     private final ImageRepository imageRepository;
     private final MediaFileRepository mediaFileRepository;
     private final OtherPathFileRepository otherPathFileRepository;
@@ -68,6 +70,6 @@ public class LibraryScanner {
     }
 
     private Scanners scanners() {
-        return new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner, comicScanner);
+        return new Scanners(mediaFileScanner, imageScanner, nfoScanner, subtitleScanner, audioScanner, epubScanner, comicScanner, gameScanner);
     }
 }

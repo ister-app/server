@@ -20,7 +20,7 @@ public interface ContinueWatchingRepository extends JpaRepository<ContinueWatchi
             SELECT c FROM ContinueWatchingEntity c
             WHERE c.userEntity.id = :userId AND c.lastWatched >= :cutoff
               AND (c.episodeEntity IS NOT NULL OR c.movieEntity IS NOT NULL OR c.chapterEntity IS NOT NULL
-                   OR c.bookEntity IS NOT NULL OR c.podcastEpisodeEntity IS NOT NULL)
+                   OR c.bookEntity IS NOT NULL OR c.podcastEpisodeEntity IS NOT NULL OR c.gameEntity IS NOT NULL)
             ORDER BY c.lastWatched DESC""")
     List<ContinueWatchingEntity> findEntries(@Param("userId") UUID userId, @Param("cutoff") Instant cutoff);
 
@@ -131,6 +131,20 @@ public interface ContinueWatchingRepository extends JpaRepository<ContinueWatchi
                         @Param("bookTargetId") UUID bookTargetId,
                         @Param("lastWatched") Instant lastWatched);
 
+    /** A game's single {@code GAME} entry: the game is both the group and the target. */
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+            INSERT INTO continue_watching (id, date_created, date_updated, user_entity_id, entry_type, group_id,
+                                           game_entity_id, last_watched)
+            VALUES (gen_random_uuid(), now(), now(), :userId, 'GAME', :gameId, :gameId, :lastWatched)
+            ON CONFLICT (user_entity_id, entry_type, group_id) DO UPDATE SET
+                date_updated = now(),
+                game_entity_id = EXCLUDED.game_entity_id,
+                last_watched = GREATEST(continue_watching.last_watched, EXCLUDED.last_watched)""",
+            nativeQuery = true)
+    void upsertGame(@Param("userId") UUID userId,
+                    @Param("gameId") UUID gameId,
+                    @Param("lastWatched") Instant lastWatched);
 
     @Modifying
     @Query("DELETE FROM ContinueWatchingEntity c WHERE c.movieEntity.id = :movieId")
