@@ -39,7 +39,7 @@ public final class GameSavePaths {
         }
         try {
             return MAPPER.readValue(json, LIST);
-        } catch (JsonProcessingException e) {
+        } catch (JsonProcessingException _) {
             return List.of();
         }
     }

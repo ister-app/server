@@ -180,7 +180,7 @@ public class GameResourceController {
      */
     @PostMapping(value = "/game/{gameId}/saves", consumes = {"application/zip", "application/octet-stream"})
     @PreAuthorize("hasRole('user')")
-    public ResponseEntity<?> uploadSave(@PathVariable UUID gameId,
+    public ResponseEntity<Object> uploadSave(@PathVariable UUID gameId,
                                         @RequestParam(required = false) Integer baseVersion,
                                         @RequestParam(defaultValue = "false") boolean force,
                                         @RequestParam(required = false) String device,
@@ -195,7 +195,7 @@ public class GameResourceController {
             return ResponseEntity.status(HttpStatus.LENGTH_REQUIRED).build();
         }
         try (InputStream body = request.getInputStream()) {
-            GameSaveEntity saved = saveService.store(user, game, baseVersion, force, device, note, sha256, body, length);
+            GameSaveEntity saved = saveService.store(user, game, new GameSaveService.Upload(baseVersion, force, device, note, sha256), body, length);
             return ResponseEntity.status(HttpStatus.CREATED).body(GameSaveDto.of(saved));
         } catch (GameSaveService.ConflictException conflict) {
             GameSaveEntity head = conflict.head();
@@ -371,34 +371,41 @@ public class GameResourceController {
     /** Where a manifest path's bytes come from, or empty when it is not a file of this game. */
     private Optional<Source> sourceOf(GameEntity game, String relativePath) throws IOException {
         if (!game.getForm().isFolder()) {
-            for (MediaFileEntity file : mediaFileRepository.findByGameEntityId(game.getId())) {
-                if (relativePath.equals(PathStrings.fileName(file.getPath()))) {
-                    Path local = localCopy.localPathOrNull(file);
-                    if (local != null && Files.exists(local)) {
-                        return Optional.of(new Source(Files.size(local), () -> Files.newInputStream(local)));
-                    }
-                    Optional<ObjectStat> stat = fileAccess.stat(file.getDirectoryEntity(), file.getPath());
-                    return stat.map(s -> new Source(s.size(), () -> fileAccess.open(file.getDirectoryEntity(), file.getPath())));
+            return singleFileSource(game, relativePath);
+        }
+        String full = game.getRootPath() + "/" + relativePath;
+        if (game.getDirectoryEntity().isS3()) {
+            Optional<ObjectStat> stat = fileAccess.stat(game.getDirectoryEntity(), full);
+            return stat.map(s -> new Source(s.size(), () -> fileAccess.open(game.getDirectoryEntity(), full)));
+        }
+        return localTreeSource(Path.of(game.getRootPath()).toRealPath(), Path.of(full));
+    }
+
+    /** A single-file game: the manifest path is the file name of one of its attached rows. */
+    private Optional<Source> singleFileSource(GameEntity game, String relativePath) throws IOException {
+        for (MediaFileEntity file : mediaFileRepository.findByGameEntityId(game.getId())) {
+            if (relativePath.equals(PathStrings.fileName(file.getPath()))) {
+                Path local = localCopy.localPathOrNull(file);
+                if (local != null && Files.exists(local)) {
+                    return Optional.of(new Source(Files.size(local), () -> Files.newInputStream(local)));
                 }
+                Optional<ObjectStat> stat = fileAccess.stat(file.getDirectoryEntity(), file.getPath());
+                return stat.map(s -> new Source(s.size(), () -> fileAccess.open(file.getDirectoryEntity(), file.getPath())));
             }
+        }
+        return Optional.empty();
+    }
+
+    /** A file of a local folder game, resolved through symlinks and confined to the game's folder. */
+    private static Optional<Source> localTreeSource(Path rootPath, Path target) throws IOException {
+        if (!Files.isRegularFile(target)) {
             return Optional.empty();
         }
-        String root = game.getRootPath();
-        String full = root + "/" + relativePath;
-        if (!game.getDirectoryEntity().isS3()) {
-            Path rootPath = Path.of(root).toRealPath();
-            Path target = Path.of(full);
-            if (!Files.isRegularFile(target)) {
-                return Optional.empty();
-            }
-            Path real = target.toRealPath();
-            if (!real.startsWith(rootPath)) {
-                log.warn("Refusing game file outside its folder: {}", full);
-                return Optional.empty();
-            }
-            return Optional.of(new Source(Files.size(real), () -> Files.newInputStream(real)));
+        Path real = target.toRealPath();
+        if (!real.startsWith(rootPath)) {
+            log.warn("Refusing game file outside its folder: {}", target);
+            return Optional.empty();
         }
-        Optional<ObjectStat> stat = fileAccess.stat(game.getDirectoryEntity(), full);
-        return stat.map(s -> new Source(s.size(), () -> fileAccess.open(game.getDirectoryEntity(), full)));
+        return Optional.of(new Source(Files.size(real), () -> Files.newInputStream(real)));
     }
 }

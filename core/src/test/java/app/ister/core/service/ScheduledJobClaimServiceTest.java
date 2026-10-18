@@ -11,6 +11,8 @@ import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,6 +34,6 @@ class ScheduledJobClaimServiceTest {
         assertTrue(subject.claim("nightly", Duration.ofHours(20)));
         assertFalse(subject.claim("nightly", Duration.ofHours(20)));
 
-        verify(transactionManager, org.mockito.Mockito.times(2)).getTransaction(org.mockito.ArgumentMatchers.any());
+        verify(transactionManager, times(2)).getTransaction(any());
     }
 }

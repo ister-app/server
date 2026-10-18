@@ -146,7 +146,7 @@ public final class VdfParser {
     private void skipWhitespaceAndComments() {
         while (pos < text.length()) {
             char c = text.charAt(pos);
-            if (Character.isWhitespace(c) || c == '﻿') {
+            if (Character.isWhitespace(c) || c == '\uFEFF') {
                 pos++;
             } else if (c == '/' && pos + 1 < text.length() && text.charAt(pos + 1) == '/') {
                 while (pos < text.length() && text.charAt(pos) != '\n') {

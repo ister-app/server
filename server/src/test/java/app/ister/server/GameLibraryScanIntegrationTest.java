@@ -276,12 +276,13 @@ class GameLibraryScanIntegrationTest {
         assertEquals("ROM-", new String(chunk.getBody(), StandardCharsets.UTF_8));
         assertEquals("bytes 4-7/" + ROM.length, chunk.getHeaders().getFirst(HttpHeaders.CONTENT_RANGE));
 
-        assertThrows(HttpClientErrorException.class, () -> rest.exchange(
-                url("/game/%s/file/../../gbc/Tetris (1989)/Tetris.gbc", steam.getId()),
-                HttpMethod.GET, new HttpEntity<>(auth()), byte[].class), "traversal is refused");
-        assertThrows(HttpClientErrorException.NotFound.class, () -> rest.exchange(
-                url("/game/%s/file/nope.bin", tetris.getId()),
-                HttpMethod.GET, new HttpEntity<>(auth()), byte[].class));
+        HttpEntity<Void> authed = new HttpEntity<>(auth());
+        String traversal = url("/game/%s/file/../../gbc/Tetris (1989)/Tetris.gbc", steam.getId());
+        assertThrows(HttpClientErrorException.class,
+                () -> rest.exchange(traversal, HttpMethod.GET, authed, byte[].class), "traversal is refused");
+        String missing = url("/game/%s/file/nope.bin", tetris.getId());
+        assertThrows(HttpClientErrorException.NotFound.class,
+                () -> rest.exchange(missing, HttpMethod.GET, authed, byte[].class));
     }
 
     private void verifySaves(RestTemplate rest, GameEntity game) throws Exception {
@@ -293,8 +294,9 @@ class GameLibraryScanIntegrationTest {
         assertEquals("laptop", first.get("deviceName").asText());
 
         // A second device that never saw v1 uploads from base 0: that is a conflict.
-        HttpClientErrorException conflict = assertThrows(HttpClientErrorException.class, () ->
-                post(rest, url("/game/%s/saves?baseVersion=0&device=desktop", game.getId()), zip, SAVE_TWO));
+        String staleUpload = url("/game/%s/saves?baseVersion=0&device=desktop", game.getId());
+        HttpClientErrorException conflict = assertThrows(HttpClientErrorException.class,
+                () -> post(rest, staleUpload, zip, SAVE_TWO));
         assertEquals(409, conflict.getStatusCode().value());
         assertTrue(conflict.getResponseBodyAsString().contains("\"latestVersion\":1"), conflict.getResponseBodyAsString());
 

@@ -49,7 +49,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -201,7 +200,7 @@ public class GameController {
         CacheStore store = cacheDirectoryResolver.store();
         String storedPath;
         try (InputStream in = fileAccess.open(source.getCacheDirectoryEntity(), source.getStoredPath())) {
-            storedPath = store.write("saves/" + user.getId() + "/" + game.getId() + "/" + next + ".zip",
+            storedPath = store.write(String.join("/", "saves", user.getId().toString(), game.getId().toString(), next + ".zip"),
                     in, source.getSizeBytes(), "application/zip");
         }
         return gameSaveRepository.save(GameSaveEntity.builder()
@@ -320,10 +319,9 @@ public class GameController {
         for (UserGameAchievementEntity unlock : userAchievementRepository.findByUserAndGame(user.getId(), game.getId())) {
             unlockedAt.put(unlock.getGameAchievementEntity().getId(), unlock.getUnlockedAt());
         }
-        List<GameAchievementView> list = new ArrayList<>();
-        for (GameAchievementEntity definition : definitions) {
-            list.add(view(definition, unlockedAt.get(definition.getId())));
-        }
+        List<GameAchievementView> list = definitions.stream()
+                .map(definition -> view(definition, unlockedAt.get(definition.getId())))
+                .toList();
         return new GameAchievementSummary(definitions.size(), unlockedAt.size(), list);
     }
 

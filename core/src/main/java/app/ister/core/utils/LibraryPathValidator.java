@@ -4,7 +4,8 @@ import app.ister.core.storage.PathStrings;
 
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
-import java.util.ArrayList;
+import java.util.stream.Collectors;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -50,11 +51,9 @@ public final class LibraryPathValidator {
             throw new IllegalArgumentException("Absolute path: " + relativePath);
         }
         String trimmed = relativePath.endsWith("/") ? relativePath.substring(0, relativePath.length() - 1) : relativePath;
-        List<String> segments = new ArrayList<>();
-        for (String segment : trimmed.split("/", -1)) {
-            segments.add(requireSegment(segment));
-        }
-        return String.join("/", segments);
+        return Arrays.stream(trimmed.split("/", -1))
+                .map(LibraryPathValidator::requireSegment)
+                .collect(Collectors.joining("/"));
     }
 
     /**

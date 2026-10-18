@@ -154,10 +154,15 @@ class RasterImageDecoderTest {
         int[][] centres = {{8, 8}, {24, 8}, {8, 24}, {24, 24}};
         for (int i = 0; i < centres.length; i++) {
             int pixel = decoded.getRGB(centres[i][0], centres[i][1]);
-            assertEquals(QUADRANTS[i][0], (pixel >> 16) & 0xFF, 3, "red of quadrant " + i);
-            assertEquals(QUADRANTS[i][1], (pixel >> 8) & 0xFF, 3, "green of quadrant " + i);
-            assertEquals(QUADRANTS[i][2], pixel & 0xFF, 3, "blue of quadrant " + i);
+            assertClose(QUADRANTS[i][0], (pixel >> 16) & 0xFF, "red of quadrant " + i);
+            assertClose(QUADRANTS[i][1], (pixel >> 8) & 0xFF, "green of quadrant " + i);
+            assertClose(QUADRANTS[i][2], pixel & 0xFF, "blue of quadrant " + i);
         }
+    }
+
+    /** Lossy decoders (JPEG) land within a few levels of the painted value. */
+    private static void assertClose(int expected, int actual, String what) {
+        assertTrue(Math.abs(expected - actual) <= 3, what + ": expected " + expected + " ±3 but was " + actual);
     }
 
     private static void assertPixelsMatch(BufferedImage expected, BufferedImage actual, int tolerance) {

@@ -26,7 +26,8 @@ class ParamSfoParserTest {
     @Test
     void rejectsGarbage() {
         assertThrows(IllegalArgumentException.class, () -> ParamSfoParser.parse(new byte[8]));
-        assertThrows(IllegalArgumentException.class, () -> ParamSfoParser.parse("not a psf file at all".getBytes()));
+        byte[] text = "not a psf file at all".getBytes(StandardCharsets.US_ASCII);
+        assertThrows(IllegalArgumentException.class, () -> ParamSfoParser.parse(text));
     }
 
     /** Builds a PSF file the way the PS3 SDK lays it out: header, index, key table, data table. */

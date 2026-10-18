@@ -141,9 +141,10 @@ public class GameScanner implements Scanner {
 
         GameTreeLister.TreeStats stats;
         try {
-            stats = gamePath.getForm() == GameForm.STEAM
-                    ? treeLister.stats(directoryEntity, gamePath.getGameRootPath() + "/" + steam.installDir())
-                    : treeLister.stats(directoryEntity, gamePath.getGameRootPath());
+            String treeRoot = gamePath.getForm() == GameForm.STEAM
+                    ? gamePath.getGameRootPath() + "/" + steam.installDir()
+                    : gamePath.getGameRootPath();
+            stats = treeLister.stats(directoryEntity, treeRoot);
         } catch (IOException e) {
             log.warn("Could not size game folder {}: {}", gamePath.getGameRootPath(), e.getMessage());
             stats = new GameTreeLister.TreeStats(game.getSizeBytes(), game.getFileCount());

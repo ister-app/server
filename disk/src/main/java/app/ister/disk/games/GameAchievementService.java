@@ -63,7 +63,6 @@ public class GameAchievementService {
                 .filter(u -> u.getGameAchievementEntity().getSource() == source)
                 .forEach(u -> unlocks.put(u.getGameAchievementEntity().getExternalId(), u));
 
-        int unlocked = 0;
         for (Reported item : reported) {
             if (item.externalId() == null || item.externalId().isBlank() || item.name() == null) {
                 continue;
@@ -73,9 +72,7 @@ public class GameAchievementService {
                 upsertUnlock(unlocks, user, definition, item.unlockedAt(), deviceName);
             }
         }
-        for (UserGameAchievementEntity unlock : userAchievementRepository.findByUserAndGame(user.getId(), game.getId())) {
-            unlocked++;
-        }
+        int unlocked = userAchievementRepository.findByUserAndGame(user.getId(), game.getId()).size();
         return new Summary((int) achievementRepository.countByGameEntityId(game.getId()), unlocked);
     }
 
@@ -130,7 +127,7 @@ public class GameAchievementService {
     }
 
     /** Stores an icon for a definition; a second upload replaces the reference, the old file is swept later. */
-    @Transactional
+    @Transactional(rollbackFor = IOException.class)
     public Optional<ImageEntity> storeIcon(GameEntity game, GameAchievementSource source, String externalId,
                                            byte[] png) throws IOException {
         if (png.length > properties.getAchievementIconMaxBytes().toBytes()) {

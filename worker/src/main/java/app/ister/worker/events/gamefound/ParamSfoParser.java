@@ -59,15 +59,12 @@ public final class ParamSfoParser {
             if (key.isEmpty() || start < 0 || dataLength < 0 || start + (long) dataLength > bytes.length) {
                 continue; // A damaged entry must not hide the readable ones.
             }
-            switch (format) {
-                case FORMAT_INT32 -> {
-                    if (dataLength >= 4) {
-                        result.put(key, Integer.toUnsignedLong(buffer.getInt(start)));
-                    }
-                }
-                case FORMAT_UTF8, FORMAT_UTF8_NUL -> result.put(key, readString(bytes, start, dataLength));
-                default -> { /* binary blobs are not needed */ }
+            if (format == FORMAT_INT32 && dataLength >= 4) {
+                result.put(key, Integer.toUnsignedLong(buffer.getInt(start)));
+            } else if (format == FORMAT_UTF8 || format == FORMAT_UTF8_NUL) {
+                result.put(key, readString(bytes, start, dataLength));
             }
+            // binary blobs and truncated ints are not needed
         }
         return result;
     }

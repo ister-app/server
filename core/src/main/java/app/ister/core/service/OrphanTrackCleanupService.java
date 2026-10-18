@@ -28,6 +28,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * After a scan swept away media files, the tracks (and albums) they belonged to would otherwise
@@ -85,12 +86,10 @@ public class OrphanTrackCleanupService {
     }
 
     private Optional<TrackEntity> findReplacement(TrackEntity orphan) {
-        Set<String> titles = new LinkedHashSet<>();
-        for (MetadataEntity metadata : metadataRepository.findByTrackEntityId(orphan.getId())) {
-            if (metadata.getTitle() != null && !metadata.getTitle().isBlank()) {
-                titles.add(metadata.getTitle());
-            }
-        }
+        Set<String> titles = metadataRepository.findByTrackEntityId(orphan.getId()).stream()
+                .map(MetadataEntity::getTitle)
+                .filter(title -> title != null && !title.isBlank())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
         for (String title : titles) {
             List<TrackEntity> candidates = trackRepository.findReplacementCandidates(orphan.getPersonEntity(), title, orphan.getId());
             if (!candidates.isEmpty()) {

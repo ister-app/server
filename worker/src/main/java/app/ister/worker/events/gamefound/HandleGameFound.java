@@ -136,7 +136,7 @@ public class HandleGameFound implements Handle<GameFoundData> {
         try (InputStream in = fileAccess.open(directory, iconPath.get())) {
             byte[] png = in.readNBytes((int) MAX_ICON_BYTES);
             CacheStore store = cacheDirectoryResolver.store();
-            String storedPath = store.write("games/" + game.getId() + "/" + UUID.randomUUID() + ".png", png, "image/png");
+            String storedPath = store.write(String.join("/", "games", game.getId().toString(), UUID.randomUUID() + ".png"), png, "image/png");
             imageSave.save(store.directory(), storedPath, ImageType.COVER, null,
                     "ps3sfo://" + game.getId() + "/ICON0.PNG", ImageSave.MediaEntityRef.ofGame(game));
         } catch (IOException e) {

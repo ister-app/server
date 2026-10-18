@@ -22,6 +22,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import javax.sql.DataSource;
 import java.net.URI;
+import java.time.Duration;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -31,6 +32,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -93,12 +95,14 @@ class HlsWaitConnectionIntegrationTest {
                         .header("Authorization", "Bearer test-token").GET().build(),
                 HttpResponse.BodyHandlers.ofString());
 
+        // Sample the pool every 100ms for two seconds, starting after the short read-only
+        // transaction that precedes the wait.
         List<Integer> samples = new ArrayList<>();
-        Thread.sleep(500); // past the short read-only transaction that precedes the wait
-        for (int i = 0; i < 20; i++) {
-            samples.add(hikari.getHikariPoolMXBean().getActiveConnections());
-            Thread.sleep(100);
-        }
+        await().pollDelay(Duration.ofMillis(500)).pollInterval(Duration.ofMillis(100)).atMost(Duration.ofSeconds(10))
+                .until(() -> {
+                    samples.add(hikari.getHikariPoolMXBean().getActiveConnections());
+                    return samples.size() >= 20;
+                });
         assertFalse(pending.isDone(), "the request should still be waiting while the pool was sampled");
 
         // The transcode handler runs a short transaction of its own, so a sample may see 1 in

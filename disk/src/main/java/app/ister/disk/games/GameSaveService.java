@@ -87,30 +87,32 @@ public class GameSaveService {
     }
 
     /**
-     * Stores a snapshot streamed from the client as the next version.
+     * What the client tells us about an uploaded snapshot.
      *
      * @param baseVersion the head version the client synced from (0 = none); null skips the check
      * @param force       accept even when the head moved past {@code baseVersion}
      * @param expectedSha the client's sha-256 of the body (hex), or null
      */
-    public GameSaveEntity store(UserEntity user, GameEntity game, Integer baseVersion, boolean force,
-                                String deviceName, String note, String expectedSha,
+    public record Upload(Integer baseVersion, boolean force, String deviceName, String note, String expectedSha) {}
+
+    /** Stores a snapshot streamed from the client as the next version. */
+    public GameSaveEntity store(UserEntity user, GameEntity game, Upload upload,
                                 InputStream body, long contentLength) throws IOException {
         if (contentLength > properties.getSaveMaxBytes().toBytes()) {
             throw new IllegalArgumentException("Save snapshot larger than " + properties.getSaveMaxBytes());
         }
-        checkConflict(user, game, baseVersion, force);
+        checkConflict(user, game, upload.baseVersion(), upload.force());
 
         Files.createDirectories(Path.of(tmpDir));
         Path staged = Files.createTempFile(Path.of(tmpDir), "gamesave-", ".zip");
         try {
             String sha = copyAndHash(body, staged, properties.getSaveMaxBytes().toBytes());
-            if (expectedSha != null && !expectedSha.equalsIgnoreCase(sha)) {
+            if (upload.expectedSha() != null && !upload.expectedSha().equalsIgnoreCase(sha)) {
                 throw new IllegalArgumentException("Save snapshot checksum mismatch");
             }
             long size = Files.size(staged);
             // The head may have moved while the body streamed in: check again before claiming a version.
-            checkConflict(user, game, baseVersion, force);
+            checkConflict(user, game, upload.baseVersion(), upload.force());
             int version = head(user, game).map(GameSaveEntity::getVersion).orElse(0) + 1;
             CacheStore store = cacheDirectoryResolver.store();
             String storedPath = store.write(key(user, game, version), staged, "application/zip");
@@ -122,8 +124,8 @@ public class GameSaveService {
                     .storedPath(storedPath)
                     .sizeBytes(size)
                     .sha256(sha)
-                    .deviceName(trim(deviceName))
-                    .note(trim(note))
+                    .deviceName(trim(upload.deviceName()))
+                    .note(trim(upload.note()))
                     .build()));
             trim(user, game);
             return saved;
@@ -206,7 +208,7 @@ public class GameSaveService {
     }
 
     private static String key(UserEntity user, GameEntity game, int version) {
-        return "saves/" + user.getId() + "/" + game.getId() + "/" + version + ".zip";
+        return String.join("/", "saves", user.getId().toString(), game.getId().toString(), version + ".zip");
     }
 
     private static String copyAndHash(InputStream body, Path target, long maxBytes) throws IOException {
@@ -237,6 +239,9 @@ public class GameSaveService {
             return null;
         }
         String stripped = value.strip();
-        return stripped.isEmpty() ? null : stripped.length() > 255 ? stripped.substring(0, 255) : stripped;
+        if (stripped.isEmpty()) {
+            return null;
+        }
+        return stripped.length() > 255 ? stripped.substring(0, 255) : stripped;
     }
 }

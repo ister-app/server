@@ -93,7 +93,7 @@ public class GamePathObject {
         }
         gameName = stripYear(parts[1]);
         pathYear = parseYear(parts[1]);
-        gameRootPath = root + parts[0] + "/" + parts[1];
+        gameRootPath = root + String.join("/", parts[0], parts[1]);
         if (parts.length == 2) {
             dirType = DirType.GAME;
             return;
@@ -108,34 +108,45 @@ public class GamePathObject {
     }
 
     private void classifyFile(String fileName, boolean directlyInGameFolder) {
+        switch (platform) {
+            case PS3 -> classifyPs3File(fileName, directlyInGameFolder);
+            case STEAM -> classifySteamFile(fileName, directlyInGameFolder);
+            default -> {
+                if (directlyInGameFolder) {
+                    classifySingleFile(fileName); // nothing below the game folder is part of the grammar
+                }
+            }
+        }
+    }
+
+    private void classifyPs3File(String fileName, boolean directlyInGameFolder) {
+        if (relativeInGame.endsWith(PS3_MARKER) && isPs3MarkerPlacement()) {
+            fileType = FileType.GAME_MARKER;
+            form = GameForm.PS3_FOLDER;
+        } else {
+            classifyTreeFile(fileName, directlyInGameFolder);
+        }
+    }
+
+    private void classifySteamFile(String fileName, boolean directlyInGameFolder) {
+        Matcher manifest = STEAM_MANIFEST.matcher(fileName);
+        if (directlyInGameFolder && manifest.matches()) {
+            fileType = FileType.GAME_MARKER;
+            form = GameForm.STEAM;
+            steamAppId = Long.parseLong(manifest.group(1));
+        } else {
+            classifyTreeFile(fileName, directlyInGameFolder);
+        }
+    }
+
+    /** Folder forms: an image next to the marker is a cover, everything else belongs to the tree. */
+    private void classifyTreeFile(String fileName, boolean directlyInGameFolder) {
+        fileType = directlyInGameFolder && isGameImage(fileName.toLowerCase(Locale.ROOT))
+                ? FileType.IMAGE : FileType.GAME_TREE_FILE;
+    }
+
+    private void classifySingleFile(String fileName) {
         String lower = fileName.toLowerCase(Locale.ROOT);
-        if (platform == GamePlatform.PS3) {
-            if (relativeInGame.endsWith(PS3_MARKER) && isPs3MarkerPlacement()) {
-                fileType = FileType.GAME_MARKER;
-                form = GameForm.PS3_FOLDER;
-            } else if (directlyInGameFolder && isGameImage(lower)) {
-                fileType = FileType.IMAGE;
-            } else {
-                fileType = FileType.GAME_TREE_FILE;
-            }
-            return;
-        }
-        if (platform == GamePlatform.STEAM) {
-            Matcher manifest = STEAM_MANIFEST.matcher(fileName);
-            if (directlyInGameFolder && manifest.matches()) {
-                fileType = FileType.GAME_MARKER;
-                form = GameForm.STEAM;
-                steamAppId = Long.parseLong(manifest.group(1));
-            } else if (directlyInGameFolder && isGameImage(lower)) {
-                fileType = FileType.IMAGE;
-            } else {
-                fileType = FileType.GAME_TREE_FILE;
-            }
-            return;
-        }
-        if (!directlyInGameFolder) {
-            return; // Single-file platforms: nothing below the game folder is part of the grammar.
-        }
         if (platform.isEntryFile(fileName)) {
             fileType = FileType.GAME;
             entryFile = true;

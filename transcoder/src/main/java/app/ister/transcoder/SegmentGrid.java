@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * The segment boundaries of one stream: where every segment starts, and where
@@ -78,13 +79,11 @@ public record SegmentGrid(List<Double> starts, double end) {
             return new SegmentGrid(List.copyOf(candidates), usableEnd(playlistEnd, totalDuration));
         }
 
-        List<Double> starts = new ArrayList<>();
-        for (Double start : candidates) {
-            // Keep the first start no matter what: a stream always has one segment.
-            if (starts.isEmpty() || end - start >= MIN_TAIL_SECONDS) {
-                starts.add(start);
-            }
-        }
+        // Keep the first start no matter what: a stream always has one segment.
+        List<Double> starts = Stream.concat(
+                        candidates.stream().limit(1),
+                        candidates.stream().skip(1).filter(start -> end - start >= MIN_TAIL_SECONDS))
+                .toList();
         int dropped = candidates.size() - starts.size();
         if (dropped > 0) {
             log.debug("Trimmed {} segment boundaries past the end of the stream ({}s)", dropped, end);

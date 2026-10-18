@@ -278,9 +278,9 @@ public class FilterQueryService {
             }
             parts.add(renderCondition(kind, condition, params, ctx));
         }
-        for (MediaFilter sub : group.groupsOrEmpty()) {
-            parts.add(renderGroup(kind, sub, false, params, ctx, depth + 1, conditionCount));
-        }
+        group.groupsOrEmpty().stream()
+                .map(sub -> renderGroup(kind, sub, false, params, ctx, depth + 1, conditionCount))
+                .forEach(parts::add);
         if (parts.isEmpty()) {
             return "TRUE";
         }

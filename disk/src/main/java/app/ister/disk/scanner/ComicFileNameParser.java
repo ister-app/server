@@ -1,6 +1,5 @@
 package app.ister.disk.scanner;
 
-import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -107,6 +106,6 @@ public final class ComicFileNameParser {
     private static String formatNumber(Double number) {
         return number == Math.floor(number)
                 ? String.valueOf(number.longValue())
-                : String.format(Locale.ROOT, "%s", number);
+                : String.valueOf(number);
     }
 }
