@@ -15,6 +15,7 @@ import app.ister.core.enums.GamePlatform;
 import app.ister.core.enums.SortingEnum;
 import app.ister.core.enums.SortingOrder;
 import app.ister.core.games.GameSavePaths;
+import app.ister.core.games.GameVersion;
 import app.ister.core.games.GameSavePaths.SavePath;
 import app.ister.core.repository.GameAchievementRepository;
 import app.ister.core.repository.GameRepository;
@@ -243,6 +244,22 @@ public class GameController {
     @SchemaMapping(typeName = "Game", field = "steamAppId")
     public String steamAppId(GameEntity game) {
         return game.getSteamAppId() == null ? null : game.getSteamAppId().toString();
+    }
+
+    /** The same value the manifest's {@code version}/ETag carries — see {@link GameVersion}. */
+    @SchemaMapping(typeName = "Game", field = "version")
+    public String version(GameEntity game) {
+        return GameVersion.of(game);
+    }
+
+    @SchemaMapping(typeName = "Game", field = "steamBuildId")
+    public String steamBuildId(GameEntity game) {
+        return game.getSteamBuildId() == null ? null : game.getSteamBuildId().toString();
+    }
+
+    @SchemaMapping(typeName = "Game", field = "updatedAt")
+    public String updatedAt(GameEntity game) {
+        return game.getDateUpdated() == null ? null : game.getDateUpdated().toString();
     }
 
     @SchemaMapping(typeName = "Game", field = "launcher")

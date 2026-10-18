@@ -1744,6 +1744,12 @@ type Game {
     steamCloud: Boolean!
     sizeBytes: Float!
     fileCount: Int!
+    "Changes when the game's files changed on the server; equals the manifest's version (steamBuildId when set, else a digest)."
+    version: String
+    "Steam's build number from the .acf, when the game is a Steam game."
+    steamBuildId: String
+    "When the game row last changed (ISO-8601 instant)."
+    updatedAt: String
     "How the client should start the game, derived from the platform."
     launcher: GameLauncherHint!
     "Where the game keeps its saves: the admin override when set, else what the Ludusavi manifest says."

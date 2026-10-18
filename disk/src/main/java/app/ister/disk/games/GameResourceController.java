@@ -7,6 +7,7 @@ import app.ister.core.entity.UserEntity;
 import app.ister.core.enums.GameAchievementSource;
 import app.ister.core.enums.GameForm;
 import app.ister.core.enums.GamePlatform;
+import app.ister.core.games.GameVersion;
 import app.ister.core.repository.GameRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.service.LibraryAccessService;
@@ -54,9 +55,14 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <ul>
  *   <li>{@code GET /game/{id}/manifest} — what to download: every file with its size, the entry
- *       to launch, the form/platform. Single-file games list their media files; folder games
- *       (PS3, Steam) are listed live from the game folder (cached per size/file-count).</li>
- *   <li>{@code GET /game/{id}/file/{*relative}} — one file, with HTTP Range so a client can resume.</li>
+ *       to launch, the form/platform, plus a {@code version} ({@link GameVersion}, the same value
+ *       as {@code Game.version} in GraphQL) so an installed client can tell the game changed.
+ *       Single-file games list their media files; folder games (PS3, Steam) are listed live from
+ *       the game folder (cached per size/file-count).</li>
+ *   <li>{@code GET /game/{id}/file/{*relative}} — one file, with HTTP Range so a client can resume.
+ *       Game files are not immutable (a re-upload keeps the path), so they carry an ETag and
+ *       {@code Last-Modified} with {@code no-cache} instead of a year-long cache; only the save
+ *       zips are immutable.</li>
  *   <li>{@code /game/{id}/saves...} — the calling user's save snapshots: list, upload (raw zip body,
  *       409 on a conflicting newer head), download, restore.</li>
  *   <li>{@code POST /game/{id}/achievements} — the client's report of trophies/achievements.</li>
@@ -72,6 +78,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class GameResourceController {
 
     private static final String CACHE_CONTROL_IMMUTABLE = "private, max-age=31536000, immutable";
+    private static final String CACHE_CONTROL_REVALIDATE = "private, no-cache";
     private static final MediaType ZIP = MediaType.parseMediaType("application/zip");
 
     private final GameRepository gameRepository;
@@ -89,9 +96,14 @@ public class GameResourceController {
 
     public record GameFile(String path, long size, @Nullable Instant lastModified, boolean entry) {}
 
+    /**
+     * {@code version} is {@link GameVersion#of}; {@code updatedAt} the newest {@code lastModified}
+     * of the listed files (null without files).
+     */
     public record GameManifest(UUID gameId, GamePlatform platform, GameForm form, @Nullable String entryPath,
                                @Nullable String titleId, @Nullable Long steamAppId, @Nullable String steamInstallDir,
-                               long totalBytes, int fileCount, List<GameFile> files) {}
+                               long totalBytes, int fileCount, @Nullable String version, @Nullable Instant updatedAt,
+                               List<GameFile> files) {}
 
     public record GameSaveDto(UUID id, int version, long sizeBytes, String sha256, @Nullable String deviceName,
                               @Nullable String note, Instant createdAt) {
@@ -115,24 +127,32 @@ public class GameResourceController {
                                                  @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch,
                                                  Authentication authentication) throws IOException {
         GameEntity game = visibleGame(gameId, authentication);
-        String etag = "\"%s-%d-%d\"".formatted(game.getId(), game.getSizeBytes(), game.getFileCount());
+        String version = GameVersion.of(game);
+        String etag = "\"%s-%s\"".formatted(game.getId(), version);
         if (etag.equals(ifNoneMatch)) {
             return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
         }
         List<GameFile> files = filesOf(game);
         long total = files.stream().mapToLong(GameFile::size).sum();
+        Instant updatedAt = files.stream().map(GameFile::lastModified).filter(java.util.Objects::nonNull)
+                .max(java.util.Comparator.naturalOrder()).orElse(null);
         return ResponseEntity.ok()
                 .eTag(etag)
-                .header(HttpHeaders.CACHE_CONTROL, "private, no-cache")
+                .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_REVALIDATE)
                 .body(new GameManifest(game.getId(), game.getPlatform(), game.getForm(), game.getEntryPath(),
                         game.getTitleId(), game.getSteamAppId(), game.getSteamInstallDir(),
-                        total, files.size(), files));
+                        total, files.size(), version, updatedAt, files));
     }
 
-    /** One file of the game by its manifest path, with single-range support for resumable downloads. */
+    /**
+     * One file of the game by its manifest path, with single-range support for resumable downloads.
+     * The ETag is {@code "<size>-<lastModifiedEpochMillis>"}; a matching {@code If-None-Match}
+     * answers 304 so a client can revalidate an installed file without downloading it.
+     */
     @GetMapping("/game/{gameId}/file/{*relative}")
     public ResponseEntity<StreamingResponseBody> file(@PathVariable UUID gameId, @PathVariable String relative,
                                                       @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader,
+                                                      @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch,
                                                       Authentication authentication) throws IOException {
         GameEntity game = visibleGame(gameId, authentication);
         String relativePath = LibraryPathValidator.requireRelative(relative.startsWith("/") ? relative.substring(1) : relative);
@@ -141,12 +161,24 @@ public class GameResourceController {
             return ResponseEntity.notFound().build();
         }
         Source src = source.get();
+        String etag = "\"%d-%d\"".formatted(src.size(), src.lastModified() == null ? 0L : src.lastModified().toEpochMilli());
+        if (etag.equals(ifNoneMatch)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                    .eTag(etag)
+                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                    .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_REVALIDATE)
+                    .build();
+        }
         Range range = ByteRanges.parseRange(rangeHeader, src.size());
         ResponseEntity.BodyBuilder response = ResponseEntity
                 .status(range != null ? HttpStatus.PARTIAL_CONTENT : HttpStatus.OK)
                 .header(HttpHeaders.ACCEPT_RANGES, "bytes")
-                .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_IMMUTABLE)
+                .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_REVALIDATE)
+                .eTag(etag)
                 .contentType(MediaType.APPLICATION_OCTET_STREAM);
+        if (src.lastModified() != null) {
+            response.lastModified(src.lastModified());
+        }
         if (range != null) {
             return response
                     .contentLength(range.length())
@@ -358,7 +390,7 @@ public class GameResourceController {
         return game.getSteamAppId() == null ? null : "appmanifest_" + game.getSteamAppId() + ".acf";
     }
 
-    private record Source(long size, Opener opener) {
+    private record Source(long size, @Nullable Instant lastModified, Opener opener) {
         InputStream open() throws IOException {
             return opener.open();
         }
@@ -376,7 +408,7 @@ public class GameResourceController {
         String full = game.getRootPath() + "/" + relativePath;
         if (game.getDirectoryEntity().isS3()) {
             Optional<ObjectStat> stat = fileAccess.stat(game.getDirectoryEntity(), full);
-            return stat.map(s -> new Source(s.size(), () -> fileAccess.open(game.getDirectoryEntity(), full)));
+            return stat.map(s -> new Source(s.size(), s.lastModified(), () -> fileAccess.open(game.getDirectoryEntity(), full)));
         }
         return localTreeSource(Path.of(game.getRootPath()).toRealPath(), Path.of(full));
     }
@@ -387,10 +419,11 @@ public class GameResourceController {
             if (relativePath.equals(PathStrings.fileName(file.getPath()))) {
                 Path local = localCopy.localPathOrNull(file);
                 if (local != null && Files.exists(local)) {
-                    return Optional.of(new Source(Files.size(local), () -> Files.newInputStream(local)));
+                    return Optional.of(new Source(Files.size(local), Files.getLastModifiedTime(local).toInstant(),
+                            () -> Files.newInputStream(local)));
                 }
                 Optional<ObjectStat> stat = fileAccess.stat(file.getDirectoryEntity(), file.getPath());
-                return stat.map(s -> new Source(s.size(), () -> fileAccess.open(file.getDirectoryEntity(), file.getPath())));
+                return stat.map(s -> new Source(s.size(), s.lastModified(), () -> fileAccess.open(file.getDirectoryEntity(), file.getPath())));
             }
         }
         return Optional.empty();
@@ -406,6 +439,6 @@ public class GameResourceController {
             log.warn("Refusing game file outside its folder: {}", target);
             return Optional.empty();
         }
-        return Optional.of(new Source(Files.size(real), () -> Files.newInputStream(real)));
+        return Optional.of(new Source(Files.size(real), Files.getLastModifiedTime(real).toInstant(), () -> Files.newInputStream(real)));
     }
 }

@@ -202,6 +202,19 @@ genormaliseerde titel — een verkeerde map is erger dan geen synchronisatie). H
 een beheerder wint altijd. `GameMetadataProvider` is de seam voor een externe bron (IGDB) — nu
 `NoopGameMetadataProvider`.
 
+**Manifest en bestanden** (`GameResourceController`, disk): `GET /game/{id}/manifest` somt elk
+bestand op (pad, grootte, `lastModified`, entry-vlag) plus een `version` en `updatedAt` (de nieuwste
+bestandstijd). `version` is wat een geïnstalleerde client vergelijkt om te zien dat de game op de
+server veranderd is, en het is dezelfde waarde als `Game.version` in GraphQL: `GameVersion`
+(database-module) geeft de Steam-`buildId` uit de `.acf` als die er is, anders de eerste 16
+hex-tekens van SHA-256 over `sizeBytes|fileCount|dateUpdated` — één regel op basis van alleen de
+entity, omdat de bestandslijst van een mapgame alleen in de disk-module wordt gelopen. De
+manifest-ETag is `"<gameId>-<version>"` (`If-None-Match` → 304). Gamebestanden
+(`/game/{id}/file/{*relative}`) zijn **niet** immutable — een her-upload behoudt het pad — dus ze
+antwoorden met `Cache-Control: private, no-cache`, een ETag `"<grootte>-<lastModifiedMillis>"` en
+`Last-Modified` (304 bij een passende `If-None-Match`), naast de Range-ondersteuning. Alleen de
+save-zips hieronder zijn immutable.
+
 **Saves** (`GameSaveService`, disk): één zip per speelsessie, raw geüpload naar
 `POST /game/{id}/saves?baseVersion=N`; versies tellen op per (gebruiker, game), de nieuwste
 `app.ister.games.save-retention` blijven bewaard, de objecten staan in de cache-store onder

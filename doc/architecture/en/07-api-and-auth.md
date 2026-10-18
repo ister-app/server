@@ -20,7 +20,7 @@ areas:
 | Search & misc | search (`SearchController`), current user (`MeController`), server clock (`TimeController`) |
 | Server | server info, server status, `.well-known` |
 | File serving (disk module) | epub resources (`EpubResourceController` area), comic pages (`ComicResourceController`: `/comic/{mediaFileId}/manifest`, `/page/{index}`, `/file`), image downloads + media-file download + transcode segment upload (`FileController`, see below) |
-| Games (disk module) | `GameResourceController` — `/game/{gameId}/manifest` (the file list a client downloads), `/game/{gameId}/file/{*relative}` (Range), the calling user's saves (`/saves` list, raw-zip POST with `baseVersion` → 409 on a newer head, `/saves/{v}` download, `/restore`, `/delete`) and the achievement report (`/achievements`, `/achievements/{source}/{externalId}/icon`). Bearer or stream token like the other media routes; library visibility is enforced by `MediaAccessEnforcementFilter` on the game id. See [chapter 3](03-media-types-and-metadata.md#games) |
+| Games (disk module) | `GameResourceController` — `/game/{gameId}/manifest` (the file list a client downloads, with a `version` to detect a changed game), `/game/{gameId}/file/{*relative}` (Range, ETag/`Last-Modified` revalidation), the calling user's saves (`/saves` list, raw-zip POST with `baseVersion` → 409 on a newer head, `/saves/{v}` download, `/restore`, `/delete`) and the achievement report (`/achievements`, `/achievements/{source}/{externalId}/icon`). Bearer or stream token like the other media routes; library visibility is enforced by `MediaAccessEnforcementFilter` on the game id. See [chapter 3](03-media-types-and-metadata.md#games) |
 | Admin upload (disk module) | `LibraryUploadController` — `/library-upload/**`: directory picker, scanner-backed preview, resumable chunked upload sessions. Admin only and **bearer JWT only** (no stream tokens: a URL token that can write into a library is a worse leak than one that reads a segment); GET/POST only, because the CORS setup the web player depends on allows nothing else. See [chapter 2](02-scanning-and-analysis.md#admin-upload) |
 
 Errors are mapped centrally in `api/.../error/` — `RestExceptionHandler` for REST,
@@ -148,7 +148,8 @@ answers **404**, indistinguishable from a resource that does not exist. Node-to-
 **ETag and conditional GET** (`If-None-Match` → 304). The cache policy is deliberately
 `private, max-age` with revalidation rather than `immutable`: a scanned library image keeps its id
 when the file behind it is replaced in place, so clients must be able to revalidate cheaply —
-unlike the comic and epub resources, which are immutable. Operational note: a reverse proxy in
+unlike the comic and epub resources, which are immutable. Game files revalidate the same way
+(ETag + `Last-Modified`, [chapter 3](03-media-types-and-metadata.md#games)). Operational note: a reverse proxy in
 front of the server must pass `If-None-Match`/`ETag` through, or every image request degrades to a
 full download. The same controller handles the node-to-node endpoints, authenticated with node
 tokens only: `GET /mediaFile/{id}/download` (multi-node source reads, with byte ranges) and

@@ -200,6 +200,19 @@ with Ludusavi placeholders like `<winAppData>`, plus an `os`), `manifest_matched
 `steam_cloud`; an admin's `save_paths` override always wins. `GameMetadataProvider` is the seam
 for an external source (IGDB) — `NoopGameMetadataProvider` today.
 
+**Manifest and files** (`GameResourceController`, disk): `GET /game/{id}/manifest` lists every
+file (path, size, `lastModified`, entry flag) plus a `version` and `updatedAt` (the newest file
+time). `version` is what an installed client compares to detect that the game changed on the
+server, and it is the same value as `Game.version` in GraphQL: `GameVersion` (database module)
+returns the Steam `buildId` from the `.acf` when there is one, else the first 16 hex characters of
+SHA-256 over `sizeBytes|fileCount|dateUpdated` — one rule from the entity alone, because the file
+list of a folder game is only walked in the disk module. The manifest ETag is
+`"<gameId>-<version>"` (`If-None-Match` → 304). Game files (`/game/{id}/file/{*relative}`) are
+**not** immutable — a re-upload keeps the path — so they answer with
+`Cache-Control: private, no-cache`, an ETag `"<size>-<lastModifiedMillis>"` and `Last-Modified`
+(304 on a matching `If-None-Match`), next to the Range support. Only the save zips below are
+immutable.
+
 **Saves** (`GameSaveService`, disk): one zip per play session, uploaded raw to
 `POST /game/{id}/saves?baseVersion=N`; versions count up per (user, game), the newest
 `app.ister.games.save-retention` survive, objects live in the cache store under
