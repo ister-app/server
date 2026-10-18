@@ -17,6 +17,7 @@ import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.AudioFileFoundData;
 import app.ister.core.eventdata.ComicFileFoundData;
 import app.ister.core.eventdata.EpubFileFoundData;
+import app.ister.core.eventdata.DetectSegmentsData;
 import app.ister.core.eventdata.FileScanRequestedData;
 import app.ister.core.eventdata.ImageFoundData;
 import app.ister.core.eventdata.MediaFileFoundData;
@@ -82,6 +83,20 @@ class UploadedFilePublisherTest {
         when(mediaFileRepository.findByDirectoryEntityAndPath(directory, mediaFile.getPath()))
                 .thenReturn(Optional.of(mediaFile));
         return mediaFile;
+    }
+
+    @Test
+    void segmentDetectionIsRequestedOncePerSeason() {
+        DirectoryEntity directory = directory(LibraryType.SHOW);
+        UUID season1 = UUID.randomUUID();
+        UUID season2 = UUID.randomUUID();
+
+        publisher.publishSegmentDetection(directory, List.of(season1, season1, season2, season1));
+
+        ArgumentCaptor<DetectSegmentsData> data = ArgumentCaptor.forClass(DetectSegmentsData.class);
+        verify(messageSender, times(2)).sendDetectSegments(data.capture(), eq("disk"));
+        assertThat(data.getAllValues()).extracting(DetectSegmentsData::getSeasonEntityUUID).containsExactly(season1, season2);
+        assertThat(data.getAllValues()).extracting(DetectSegmentsData::getDirectoryEntityUUID).containsOnly(directory.getId());
     }
 
     @Test

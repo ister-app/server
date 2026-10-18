@@ -4,6 +4,7 @@ import app.ister.core.entity.*;
 import app.ister.core.enums.StreamCodecType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.ImageType;
+import app.ister.core.enums.UploadSessionStatus;
 import app.ister.core.eventdata.DetectSegmentsData;
 import app.ister.core.eventdata.ImageFoundData;
 import app.ister.core.eventdata.MediaFileFoundData;
@@ -43,6 +44,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     private final MediaFileStreamRepository mediaFileStreamRepository;
     private final ImageRepository imageRepository;
     private final MediaFileEpisodeRepository mediaFileEpisodeRepository;
+    private final UploadSessionRepository uploadSessionRepository;
 
     private final MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams;
     private final MediaFileFoundCreateBackground mediaFileFoundCreateBackground;
@@ -67,6 +69,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
                                 MediaFileStreamRepository mediaFileStreamRepository,
                                 ImageRepository imageRepository,
                                 MediaFileEpisodeRepository mediaFileEpisodeRepository,
+                                UploadSessionRepository uploadSessionRepository,
                                 MediaFileFoundCheckForStreams mediaFileFoundCheckForStreams,
                                 MediaFileFoundCreateBackground mediaFileFoundCreateBackground,
                                 MediaFileFoundGetDuration mediaFileFoundGetDuration,
@@ -83,6 +86,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
         this.mediaFileStreamRepository = mediaFileStreamRepository;
         this.imageRepository = imageRepository;
         this.mediaFileEpisodeRepository = mediaFileEpisodeRepository;
+        this.uploadSessionRepository = uploadSessionRepository;
         this.mediaFileFoundCheckForStreams = mediaFileFoundCheckForStreams;
         this.mediaFileFoundCreateBackground = mediaFileFoundCreateBackground;
         this.mediaFileFoundGetDuration = mediaFileFoundGetDuration;
@@ -165,8 +169,17 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
             }
             // Intro/outro detection is season-wide (it compares sibling episodes) and must see the
             // committed duration/detector version, hence after the persist. Idempotent on the
-            // handler side, so firing once per analyzed episode is fine.
+            // handler side, so firing once per analyzed episode is fine. Not while an upload into
+            // this directory is still running: detection would compete with the transfer for CPU
+            // and, worse, compare the first episodes against the one or two siblings that have
+            // landed, find nothing and stamp them as done. UploadSessionService fires one event per
+            // season when the session finishes; an episode analyzed after that fires its own here.
             episodeEntity.ifPresent(episode -> {
+                if (uploadSessionRepository.existsByDirectoryEntityAndStatus(directoryEntity, UploadSessionStatus.ACTIVE)) {
+                    log.debug("Upload into {} still active, leaving segment detection of {} to the session end",
+                            directoryEntity.getName(), mediaFileEntity.getPath());
+                    return;
+                }
                 DetectSegmentsData detectSegmentsData = DetectSegmentsData.builder()
                         .eventType(EventType.DETECT_SEGMENTS)
                         .seasonEntityUUID(episode.getSeasonEntity().getId())

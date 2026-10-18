@@ -203,6 +203,13 @@ dezelfde backfill. Bekende beperking: een seizoen verspreid over meerdere nodes 
 afleveringen die lokaal op elke node staan — een node met één losse aflevering detecteert er niets
 voor.
 
+Zolang een admin-upload naar de directory nog loopt (`upload_session_entity` ACTIVE) stuurt
+`HandleMediaFileFound` het event **niet**: de detectie zou met de overdracht om CPU concurreren en,
+erger, de eerste gelande afleveringen vergelijken met één of twee siblings, niets vinden en ze toch
+als klaar stempelen. `UploadSessionService` publiceert bij het einde van de sessie één
+`DETECT_SEGMENTS` per seizoen (`UploadedFilePublisher.publishSegmentDetection`); een aflevering
+waarvan de analyse daarna pas klaar is stuurt zoals altijd haar eigen event.
+
 Die idempotentie geldt serieel, niet gelijktijdig. Het herberekenen van een bestand is een
 delete-gevolgd-door-insert, en twee transacties die dat voor hetzelfde seizoen doen zien noch
 annuleren elkaars rijen, dus een heranalyse-sweep — één bericht per bestand, allemaal voor dezelfde

@@ -1,5 +1,6 @@
 package app.ister.core.repository;
 
+import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.UploadSessionEntity;
 import app.ister.core.enums.UploadSessionStatus;
 import org.springframework.data.repository.CrudRepository;
@@ -15,4 +16,7 @@ public interface UploadSessionRepository extends CrudRepository<UploadSessionEnt
     List<UploadSessionEntity> findByStatus(UploadSessionStatus status);
 
     long countByStatus(UploadSessionStatus status);
+
+    /** Whether an upload into this directory is still going on (segment detection waits for it). */
+    boolean existsByDirectoryEntityAndStatus(DirectoryEntity directoryEntity, UploadSessionStatus status);
 }

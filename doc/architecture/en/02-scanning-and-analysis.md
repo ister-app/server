@@ -188,6 +188,13 @@ detection everywhere via the same backfill. Known limitation: a season spread ov
 only pairs the episodes local to each node — a node holding a single stray episode detects nothing
 for it.
 
+While an admin upload into the directory is still running (`upload_session_entity` ACTIVE),
+`HandleMediaFileFound` does **not** fire the event: detection would compete with the transfer for
+CPU and, worse, compare the first episodes that landed against one or two siblings, find nothing
+and stamp them as done. `UploadSessionService` publishes one `DETECT_SEGMENTS` per season when the
+session finishes (`UploadedFilePublisher.publishSegmentDetection`); an episode whose analysis
+completes after that fires its own event as usual.
+
 That idempotence is serial, not concurrent. Recomputing a file is a delete-then-insert, and two
 transactions doing it for the same season neither see nor cancel each other's rows, so a
 re-analysis sweep — one message per file, all for the same few seasons — stored every segment once

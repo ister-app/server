@@ -3,6 +3,7 @@ package app.ister.disk.events.mediafilefound;
 import app.ister.core.entity.*;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.StreamCodecType;
+import app.ister.core.enums.UploadSessionStatus;
 import app.ister.core.eventdata.ImageFoundData;
 import app.ister.core.eventdata.MediaFileFoundData;
 import app.ister.core.eventdata.SubtitleExtractRequestedData;
@@ -59,6 +60,8 @@ class HandleMediaFileFoundTest {
     private MediaFileFoundEpisodeBoundaries mediaFileFoundEpisodeBoundariesMock;
     @Mock
     private MessageSender messageSenderMock;
+    @Mock
+    private UploadSessionRepository uploadSessionRepositoryMock;
 
     @Mock
     private app.ister.core.node.MediaFileInputResolver inputResolver;
@@ -259,6 +262,37 @@ class HandleMediaFileFoundTest {
 
         verify(mediaFileRepositoryMock).save(mediaFileEntity);
         verify(messageSenderMock).sendImageFound(any(ImageFoundData.class), eq("cache"));
+    }
+
+    @Test
+    void holdsSegmentDetectionWhileAnUploadIntoTheDirectoryIsActive() {
+        ReflectionTestUtils.setField(subject, "dirOfFFmpeg", "/usr/bin");
+        DirectoryEntity directoryEntity = DirectoryEntity.builder().build();
+        UUID episodeId = UUID.randomUUID();
+        EpisodeEntity episodeEntity = EpisodeEntity.builder().seasonEntity(testSeason()).id(episodeId).imagesEntities(new ArrayList<>()).build();
+        String filePath = "/home/path/episode.mkv";
+        MediaFileFoundData data = MediaFileFoundData.builder()
+                .eventType(EventType.MEDIA_FILE_FOUND)
+                .directoryEntityUUID(directoryEntity.getId())
+                .episodeEntityUUID(episodeId)
+                .path(filePath)
+                .build();
+        MediaFileEntity mediaFileEntity = MediaFileEntity.builder().path(filePath).build();
+        DirectoryEntity cacheDirectory = DirectoryEntity.builder()
+                .id(UUID.randomUUID()).path("/cache/").name("cache").build();
+
+        when(directoryRepositoryMock.findById(directoryEntity.getId())).thenReturn(Optional.of(directoryEntity));
+        when(episodeRepositoryMock.findById(episodeId)).thenReturn(Optional.of(episodeEntity));
+        when(mediaFileRepositoryMock.findByDirectoryEntityAndPath(directoryEntity, filePath)).thenReturn(Optional.of(mediaFileEntity));
+        when(mediaFileFoundCheckForStreamsMock.checkForStreams(eq(mediaFileEntity), any(), any())).thenReturn(new MediaFileFoundCheckForStreams.CheckResult(List.of(), false, 10000L));
+        when(cacheDirectoryResolver.forThisNode()).thenReturn(cacheDirectory);
+        when(uploadSessionRepositoryMock.existsByDirectoryEntityAndStatus(directoryEntity, UploadSessionStatus.ACTIVE)).thenReturn(true);
+
+        subject.handle(data);
+
+        verify(mediaFileRepositoryMock).save(mediaFileEntity);
+        // the session end publishes one event for the whole season instead
+        verify(messageSenderMock, never()).sendDetectSegments(any(), any());
     }
 
     @Test

@@ -2,6 +2,10 @@ package app.ister.disk.upload;
 
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.LibraryEntity;
+import app.ister.core.repository.MediaFileRepository;
+import app.ister.core.entity.SeasonEntity;
+import app.ister.core.entity.MediaFileEntity;
+import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.UploadFileEntity;
 import app.ister.core.entity.UploadSessionEntity;
 import app.ister.core.enums.DirectoryType;
@@ -17,6 +21,7 @@ import app.ister.core.storage.LibraryWriteStoreResolver;
 import app.ister.core.storage.LocalLibraryWriteStore;
 import app.ister.disk.upload.UploadDtos.ChunkResponse;
 import app.ister.disk.upload.UploadDtos.Entry;
+import app.ister.disk.upload.UploadDtos.FileState;
 import app.ister.disk.upload.UploadDtos.PlanRequest;
 import app.ister.disk.upload.UploadDtos.PreviewEntry;
 import app.ister.disk.upload.UploadDtos.PreviewResponse;
@@ -64,6 +69,7 @@ class UploadSessionServiceTest {
     private final UploadSessionRepository sessionRepository = mock(UploadSessionRepository.class);
     private final UploadFileRepository fileRepository = mock(UploadFileRepository.class);
     private final UploadPartRepository partRepository = mock(UploadPartRepository.class);
+    private final MediaFileRepository mediaFileRepository = mock(MediaFileRepository.class);
 
     private final Map<UUID, UploadSessionEntity> sessions = new LinkedHashMap<>();
     private final Map<UUID, UploadFileEntity> files = new LinkedHashMap<>();
@@ -106,7 +112,7 @@ class UploadSessionServiceTest {
                 .sorted(Comparator.comparing(UploadFileEntity::getTargetPath)).toList());
 
         service = new UploadSessionService(properties, previewService, publisher, writeStoreResolver,
-                directoryRepository, sessionRepository, fileRepository, partRepository,
+                directoryRepository, sessionRepository, fileRepository, partRepository, mediaFileRepository,
                 mock(PlatformTransactionManager.class));
     }
 
@@ -214,6 +220,25 @@ class UploadSessionServiceTest {
         service.chunk(sessionId, fileId, 5, 5, body("world"));
         assertThat(service.complete(sessionId, fileId).status()).isEqualTo(UploadFileStatus.COMPLETED);
         assertThat(Files.readString(root.resolve("Show (2019)/a.mkv"))).isEqualTo("helloworld");
+    }
+
+    @Test
+    void aFinishedSessionAsksForSegmentDetectionOncePerSeason() throws IOException {
+        SessionResponse session = service.create(plan(false, Map.of("Season 01/s01e01.mkv", 3L, "Season 01/s01e02.mkv", 3L)), null);
+        UUID sessionId = session.sessionId();
+        SeasonEntity season = SeasonEntity.builder().id(UUID.randomUUID()).build();
+        for (FileState file : session.files()) {
+            EpisodeEntity episode = EpisodeEntity.builder().id(UUID.randomUUID()).seasonEntity(season).build();
+            when(mediaFileRepository.findByDirectoryEntityAndPath(directory, file.targetPath()))
+                    .thenReturn(Optional.of(MediaFileEntity.builder().path(file.targetPath()).episodeEntity(episode).build()));
+            service.chunk(sessionId, file.fileId(), 0, 3, body("abc"));
+        }
+
+        service.complete(sessionId, session.files().get(0).fileId());
+        verify(publisher, never()).publishSegmentDetection(any(), any());
+
+        service.complete(sessionId, session.files().get(1).fileId());
+        verify(publisher).publishSegmentDetection(directory, List.of(season.getId()));
     }
 
     @Test

@@ -8,6 +8,7 @@ import app.ister.core.enums.EventType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.AudioFileFoundData;
 import app.ister.core.eventdata.ComicFileFoundData;
+import app.ister.core.eventdata.DetectSegmentsData;
 import app.ister.core.eventdata.EpubFileFoundData;
 import app.ister.core.eventdata.FileScanRequestedData;
 import app.ister.core.eventdata.ImageFoundData;
@@ -29,7 +30,9 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -124,6 +127,22 @@ public class UploadedFilePublisher {
                     .directoryEntityUUID(directory.getId())
                     .build();
             AfterCommitPublisher.publishAfterCommit(() -> messageSender.sendFileScanRequested(data, directory.getName()));
+        }
+    }
+
+    /**
+     * Intro/outro detection for the seasons a finished session touched: one {@code DETECT_SEGMENTS}
+     * per season, after commit. {@code HandleMediaFileFound} holds its own per-episode event while
+     * the session is active, so that detection sees the whole season at once.
+     */
+    public void publishSegmentDetection(DirectoryEntity directory, Collection<UUID> seasonIds) {
+        for (UUID seasonId : new LinkedHashSet<>(seasonIds)) {
+            DetectSegmentsData data = DetectSegmentsData.builder()
+                    .eventType(EventType.DETECT_SEGMENTS)
+                    .seasonEntityUUID(seasonId)
+                    .directoryEntityUUID(directory.getId())
+                    .build();
+            AfterCommitPublisher.publishAfterCommit(() -> messageSender.sendDetectSegments(data, directory.getName()));
         }
     }
 

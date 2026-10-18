@@ -1,6 +1,7 @@
 package app.ister.disk.upload;
 
 import app.ister.core.entity.DirectoryEntity;
+import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.UploadFileEntity;
 import app.ister.core.entity.UploadPartEntity;
 import app.ister.core.entity.UploadSessionEntity;
@@ -8,6 +9,7 @@ import app.ister.core.entity.UserEntity;
 import app.ister.core.enums.UploadFileStatus;
 import app.ister.core.enums.UploadSessionStatus;
 import app.ister.core.repository.DirectoryRepository;
+import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.UploadFileRepository;
 import app.ister.core.repository.UploadPartRepository;
 import app.ister.core.repository.UploadSessionRepository;
@@ -36,6 +38,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -62,6 +65,7 @@ public class UploadSessionService {
     private final UploadSessionRepository sessionRepository;
     private final UploadFileRepository fileRepository;
     private final UploadPartRepository partRepository;
+    private final MediaFileRepository mediaFileRepository;
     private final TransactionTemplate tx;
     private final Semaphore chunkSlots;
     /** One writer per file: a LOCAL part file is appended to, two appenders would interleave. */
@@ -72,7 +76,7 @@ public class UploadSessionService {
                                 UploadedFilePublisher publisher, LibraryWriteStoreResolver writeStoreResolver,
                                 DirectoryRepository directoryRepository, UploadSessionRepository sessionRepository,
                                 UploadFileRepository fileRepository, UploadPartRepository partRepository,
-                                PlatformTransactionManager transactionManager) {
+                                MediaFileRepository mediaFileRepository, PlatformTransactionManager transactionManager) {
         this.properties = properties;
         this.previewService = previewService;
         this.publisher = publisher;
@@ -81,6 +85,7 @@ public class UploadSessionService {
         this.sessionRepository = sessionRepository;
         this.fileRepository = fileRepository;
         this.partRepository = partRepository;
+        this.mediaFileRepository = mediaFileRepository;
         this.tx = new TransactionTemplate(transactionManager);
         this.chunkSlots = new Semaphore(Math.max(1, properties.getMaxConcurrentChunks()));
     }
@@ -403,6 +408,20 @@ public class UploadSessionService {
                     .filter(path -> UploadedFilePublisher.isDeferredGameMarker(directory, path))
                     .toList();
             publisher.publishGameMarkers(directory, markers);
+            // Segment detection waited for the whole season (HandleMediaFileFound skips it while
+            // the session is active): one event per season that has an analyzed episode by now.
+            // A file still being analyzed is not in this list; its own handler fires once it sees
+            // the session is gone.
+            List<UUID> seasons = files.stream()
+                    .filter(f -> f.getStatus() == UploadFileStatus.COMPLETED)
+                    .map(f -> mediaFileRepository.findByDirectoryEntityAndPath(directory, f.getTargetPath()))
+                    .flatMap(Optional::stream)
+                    .map(MediaFileEntity::getEpisodeEntity)
+                    .filter(e -> e != null && e.getSeasonEntity() != null)
+                    .map(e -> e.getSeasonEntity().getId())
+                    .distinct()
+                    .toList();
+            publisher.publishSegmentDetection(directory, seasons);
             log.info("Upload session {} completed", session.getId());
         }
         sessionRepository.save(session);
