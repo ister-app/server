@@ -190,6 +190,33 @@ class UploadSessionServiceTest {
     }
 
     @Test
+    void aShortenedPartFileSendsTheClientBackToTheLastWholeChunk() throws IOException {
+        SessionResponse session = service.create(plan(false, Map.of("a.mkv", 10L)), null);
+        UUID sessionId = session.sessionId();
+        UUID fileId = session.files().getFirst().fileId();
+        service.chunk(sessionId, fileId, 0, 5, body("hello"));
+        service.chunk(sessionId, fileId, 5, 5, body("world"));
+
+        // chunks are not fsynced: a power loss left 7 of the recorded 10 bytes on disk
+        Path part = root.resolve(LibraryWriteStore.STAGING_DIR).resolve(sessionId.toString()).resolve(fileId + ".part");
+        Files.write(part, "hellowo".getBytes());
+
+        // the row follows the disk, rounded down to the chunk grid (chunks here are ≥ 5 MiB, so to 0)
+        assertThat(service.get(sessionId).files().getFirst().receivedBytes()).isZero();
+        assertThatThrownBy(() -> service.complete(sessionId, fileId))
+                .isInstanceOfSatisfying(UploadException.class, e -> {
+                    assertThat(e.status()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(e.body()).isEqualTo(new ChunkResponse(fileId, 0, UploadFileStatus.UPLOADING));
+                });
+
+        // the client resends from there and the file still comes out whole
+        service.chunk(sessionId, fileId, 0, 5, body("hello"));
+        service.chunk(sessionId, fileId, 5, 5, body("world"));
+        assertThat(service.complete(sessionId, fileId).status()).isEqualTo(UploadFileStatus.COMPLETED);
+        assertThat(Files.readString(root.resolve("Show (2019)/a.mkv"))).isEqualTo("helloworld");
+    }
+
+    @Test
     void skipsATargetThatAppearedSinceThePreview() throws IOException {
         SessionResponse session = service.create(plan(false, Map.of("a.mkv", 3L)), null);
         UUID fileId = session.files().getFirst().fileId();

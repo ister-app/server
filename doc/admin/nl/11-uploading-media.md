@@ -31,7 +31,9 @@ bewust niet geaccepteerd.
    bovenliggende map te kiezen. De mapnaam kun je hier aanpassen (bijvoorbeeld om de `(2019)` toe
    te voegen die een seriemap nodig heeft, zie [Naamgevingsconventies](08-naming-conventions.md)).
 4. **Uploaden.** Bestanden gaan in chunks omhoog. Een weggevallen verbinding, een dichtgeklapte
-   laptop of een herstarte server kost hooguit één chunk: de upload gaat verder waar hij was.
+   laptop of een herstarte server kost hooguit één chunk: de upload gaat verder waar hij was. Alleen
+   een stroomstoring op de server kan meer kosten — de chunks worden op de achtergrond naar schijf
+   geschreven — en dan gaat de upload verder vanaf de laatste chunk die wél is aangekomen.
 
 Wat de preview over een bestand kan zeggen:
 

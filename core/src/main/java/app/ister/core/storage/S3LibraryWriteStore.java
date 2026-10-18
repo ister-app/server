@@ -83,6 +83,11 @@ public class S3LibraryWriteStore implements LibraryWriteStore {
     }
 
     @Override
+    public OptionalLong stagedBytes(Staged staged) {
+        return OptionalLong.empty();
+    }
+
+    @Override
     public void abort(Staged staged) throws IOException {
         if (staged.uploadId() != null) {
             store.abortMultipartUpload(keyOf(staged.targetPath()), staged.uploadId());

@@ -83,6 +83,26 @@ class LocalLibraryWriteStoreTest {
     }
 
     @Test
+    void stagedBytesReportsWhatIsReallyOnDisk() throws IOException {
+        LibraryWriteStore.Staged staged = store.begin(sessionId, fileId, target("a.mkv"), 10);
+        assertEquals(0, store.stagedBytes(staged).orElseThrow());
+        store.writeChunk(staged, 0, 1, body("hello"), 5);
+        assertEquals(5, store.stagedBytes(staged).orElseThrow());
+    }
+
+    @Test
+    void copiesAChunkLargerThanItsBuffer() throws IOException {
+        byte[] big = new byte[(1 << 20) + 3];
+        for (int i = 0; i < big.length; i++) {
+            big[i] = (byte) i;
+        }
+        LibraryWriteStore.Staged staged = store.begin(sessionId, fileId, target("a.mkv"), big.length);
+        store.writeChunk(staged, 0, 1, new ByteArrayInputStream(big), big.length);
+        store.complete(staged, List.of(), big.length, false);
+        assertArrayEquals(big, Files.readAllBytes(root.resolve("a.mkv")));
+    }
+
+    @Test
     void refusesToCompleteWithTheWrongSize() throws IOException {
         LibraryWriteStore.Staged staged = store.begin(sessionId, fileId, target("a.mkv"), 10);
         store.writeChunk(staged, 0, 1, body("hello"), 5);

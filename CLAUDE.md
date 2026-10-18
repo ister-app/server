@@ -305,7 +305,11 @@ unreferenced cache file is the Ludusavi manifest, whitelisted by path in `CacheC
   not depend on `disk`, and no module but `api` hosts GraphQL. The preview asks the REAL scanners
   (`Scanners.analyzableBy`, shared with `ScanEntryDispatcher` and `FileScanRequestedHandle`) plus
   `DirectoryPruner`, so it cannot drift from the scan. Chunks are "short tx → stream → short tx",
-  never a transaction across the transfer. A finished new file is one `FILE_SCAN_REQUESTED`; a
+  never a transaction across the transfer. LOCAL chunks are not fsynced (one `force` at `complete`,
+  before the atomic move): the page cache survives a JVM restart, and after a power loss
+  `UploadSessionService.reconcileStaged` lowers `receivedBytes` to the last whole chunk really on
+  disk (`LibraryWriteStore.stagedBytes`) — on the chunk grid, because the client resumes on it and
+  an off-grid `receivedBytes` would 409 forever. A finished new file is one `FILE_SCAN_REQUESTED`; a
   REPLACED file gets its `*_FILE_FOUND` event published directly (`UploadedFilePublisher`), because
   the scanners stop at an existing row. Bearer JWT + `hasRole('admin')` only, never stream tokens;
   GET/POST only (`MvcConfig` CORS allows nothing else, the web player is cross-origin). See

@@ -29,7 +29,9 @@ only; the stream tokens that players use for playback are deliberately not accep
    can be changed here (for instance to add the `(2019)` a show folder needs, see
    [Naming conventions](08-naming-conventions.md)).
 4. **Upload.** Files go up in chunks. A dropped connection, a closed laptop or a restarted server
-   costs at most one chunk: the upload continues where it stopped.
+   costs at most one chunk: the upload continues where it stopped. Only a power loss on the server
+   can cost more — the chunks are written to disk in the background — and then the upload resumes
+   from the last chunk that did make it.
 
 What the preview can say about a file:
 

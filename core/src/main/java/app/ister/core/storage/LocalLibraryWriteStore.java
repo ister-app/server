@@ -24,10 +24,16 @@ import java.util.stream.Stream;
  * {@link LibraryWriteStore} on a LOCAL directory. Chunks are appended to
  * {@code <root>/.ister-upload/<session>/<file>.part}: on the same filesystem as the target, so
  * completing is an atomic move rather than a second copy of a 40 GB file.
+ *
+ * <p>Chunks are not fsynced one by one: the page cache survives a JVM restart, and a power loss
+ * is recovered from by {@link #stagedBytes} — the caller lowers its idea of the file to what is
+ * really on disk and the client resends from there. {@link #complete} syncs the part and its
+ * target folder once, so a COMPLETED file is on disk when its row commits.
  */
 public class LocalLibraryWriteStore implements LibraryWriteStore {
 
-    private static final int BUFFER_SIZE = 1 << 16;
+    /** Big enough that the copy loop is not the bottleneck at line rate; direct, so the channel does not copy again. */
+    private static final int BUFFER_SIZE = 1 << 20;
 
     private final DirectoryEntity directory;
     private final Path root;
@@ -80,13 +86,18 @@ public class LocalLibraryWriteStore implements LibraryWriteStore {
                 throw new IOException("Chunk of " + staged.targetPath() + " broke off after " + written
                         + " of " + length + " bytes");
             }
-            channel.force(false);
         }
         return null;
     }
 
+    @Override
+    public OptionalLong stagedBytes(Staged staged) throws IOException {
+        Path part = partFile(staged);
+        return OptionalLong.of(Files.exists(part) ? Files.size(part) : 0L);
+    }
+
     private static long copy(ReadableByteChannel in, FileChannel out, long length) throws IOException {
-        ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
+        ByteBuffer buffer = ByteBuffer.allocateDirect((int) Math.min(BUFFER_SIZE, length));
         long total = 0;
         while (total < length) {
             buffer.clear();
@@ -126,6 +137,10 @@ public class LocalLibraryWriteStore implements LibraryWriteStore {
         }
         requireInsideRoot(target.getParent());
         Files.createDirectories(target.getParent());
+        // The one fsync of the upload: the chunks only went to the page cache.
+        try (FileChannel channel = FileChannel.open(part, StandardOpenOption.WRITE)) {
+            channel.force(true);
+        }
         try {
             if (overwrite) {
                 Files.move(part, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
@@ -140,6 +155,16 @@ public class LocalLibraryWriteStore implements LibraryWriteStore {
             } else {
                 Files.move(part, target);
             }
+        }
+        syncDirectory(target.getParent());
+    }
+
+    /** Makes the rename itself durable; not every filesystem lets a directory be opened for that, then it is skipped. */
+    private static void syncDirectory(Path dir) {
+        try (FileChannel channel = FileChannel.open(dir, StandardOpenOption.READ)) {
+            channel.force(true);
+        } catch (IOException | UnsupportedOperationException _) {
+            // best effort
         }
     }
 

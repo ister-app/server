@@ -36,6 +36,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
@@ -170,8 +171,9 @@ public class UploadSessionService {
     public SessionResponse get(UUID sessionId) {
         return tx.execute(_ -> {
             UploadSessionEntity session = session(sessionId);
+            LibraryWriteStore store = storeFor(session.getDirectoryEntity());
             List<FileState> files = fileRepository.findByUploadSessionIdOrderByTargetPath(sessionId).stream()
-                    .map(file -> state(file, completedParts(file))).toList();
+                    .map(file -> state(reconcileStaged(file, store), completedParts(file))).toList();
             return new SessionResponse(session.getId(), session.getStatus(), session.getDirectoryEntity().getId(),
                     session.isOverwrite(), files, List.of());
         });
@@ -248,8 +250,39 @@ public class UploadSessionService {
             file.setStatus(UploadFileStatus.UPLOADING);
             fileRepository.save(file);
         }
+        reconcileStaged(file, store);
         return new ChunkContext(store, staged, directory.isS3(), file.getSize(), file.getChunkSize(),
                 file.getReceivedBytes());
+    }
+
+    /**
+     * Makes the staged bytes the truth for a LOCAL file. Chunks are not fsynced, so after a power
+     * loss the part file can be shorter than {@code receivedBytes} says; the row is then lowered to
+     * the last whole chunk on disk and the usual 409 sends the client back there. (The client
+     * resumes on the chunk grid, so anything off-grid would 409 forever.) Must run inside a
+     * transaction; a no-op for S3 and for files without bytes yet.
+     */
+    private UploadFileEntity reconcileStaged(UploadFileEntity file, LibraryWriteStore store) {
+        if (file.getStatus() != UploadFileStatus.UPLOADING || file.getS3UploadId() != null
+                || file.getUploadSession().getDirectoryEntity().isS3() || file.getReceivedBytes() == 0) {
+            return file;
+        }
+        Staged staged = new Staged(file.getUploadSession().getId(), file.getId(), file.getTargetPath(), null);
+        OptionalLong onDisk;
+        try {
+            onDisk = store.stagedBytes(staged);
+        } catch (IOException e) {
+            throw new UploadException(HttpStatus.SERVICE_UNAVAILABLE, "Cannot read staging of "
+                    + file.getTargetPath() + ": " + e.getMessage());
+        }
+        if (onDisk.isEmpty() || onDisk.getAsLong() >= file.getReceivedBytes()) {
+            return file;
+        }
+        long resumeAt = onDisk.getAsLong() - onDisk.getAsLong() % file.getChunkSize();
+        log.warn("Staged bytes of {} are short: {} on disk, {} recorded; resuming at {}", file.getTargetPath(),
+                onDisk.getAsLong(), file.getReceivedBytes(), resumeAt);
+        file.setReceivedBytes(resumeAt);
+        return fileRepository.save(file);
     }
 
     private static void validate(ChunkContext context, UUID fileId, long offset, long length) {
@@ -325,12 +358,13 @@ public class UploadSessionService {
         if (session.getStatus() != UploadSessionStatus.ACTIVE) {
             throw new UploadException(HttpStatus.CONFLICT, "Session is " + session.getStatus());
         }
+        DirectoryEntity directory = session.getDirectoryEntity();
+        LibraryWriteStore store = storeFor(directory);
+        file = reconcileStaged(file, store);
         if (file.getReceivedBytes() != file.getSize()) {
             throw new UploadException(HttpStatus.CONFLICT, "File is incomplete: " + file.getReceivedBytes() + " of "
                     + file.getSize() + " bytes", new ChunkResponse(fileId, file.getReceivedBytes(), file.getStatus()));
         }
-        DirectoryEntity directory = session.getDirectoryEntity();
-        LibraryWriteStore store = storeFor(directory);
         Staged staged = new Staged(sessionId, fileId, file.getTargetPath(), file.getS3UploadId());
         if (file.getStatus() == UploadFileStatus.PENDING) {
             // an empty file: there never was a chunk to begin it with

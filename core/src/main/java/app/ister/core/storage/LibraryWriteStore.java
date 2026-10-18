@@ -54,6 +54,12 @@ public interface LibraryWriteStore {
     void complete(Staged staged, List<ObjectStore.UploadedPart> parts, long expectedSize, boolean overwrite)
             throws IOException;
 
+    /**
+     * How many bytes of the file are really in staging — the truth a caller's bookkeeping is
+     * checked against after a crash. Empty when the store cannot say (S3: parts are known by number).
+     */
+    OptionalLong stagedBytes(Staged staged) throws IOException;
+
     /** Discards what was staged for one file; a no-op when nothing was. */
     void abort(Staged staged) throws IOException;
 
