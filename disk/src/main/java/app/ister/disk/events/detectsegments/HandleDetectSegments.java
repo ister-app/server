@@ -38,7 +38,7 @@ public class HandleDetectSegments implements Handle<DetectSegmentsData> {
     }
 
     @RabbitListener(queues = "#{@diskQueueNamingConfig.getDetectSegmentsQueues()}",
-            concurrency = "${app.ister.helper.concurrency}")
+            concurrency = "${app.ister.server.segment-detect.concurrency}")
     @Override
     public void listener(DetectSegmentsData detectSegmentsData) {
         Handle.super.listener(detectSegmentsData);

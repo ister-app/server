@@ -210,6 +210,11 @@ als klaar stempelen. `UploadSessionService` publiceert bij het einde van de sess
 `DETECT_SEGMENTS` per seizoen (`UploadedFilePublisher.publishSegmentDetection`); een aflevering
 waarvan de analyse daarna pas klaar is stuurt zoals altijd haar eigen event.
 
+Al het ffmpeg-/ffprobe-werk in dit hoofdstuk loopt via `BackgroundFfmpeg` (core): wrapperscripts
+die de binaries onder `nice -n 10` starten (`BACKGROUND_NICE`), en `HandleDetectSegments` heeft een
+eigen listener-concurrency (`SEGMENT_DETECT_CONCURRENCY`, standaard 1) in plaats van de gedeelde
+helperwaarde, zodat detectie ongeveer één core neemt en die afstaat aan afspelen en uploads.
+
 Die idempotentie geldt serieel, niet gelijktijdig. Het herberekenen van een bestand is een
 delete-gevolgd-door-insert, en twee transacties die dat voor hetzelfde seizoen doen zien noch
 annuleren elkaars rijen, dus een heranalyse-sweep — één bericht per bestand, allemaal voor dezelfde

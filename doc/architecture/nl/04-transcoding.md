@@ -124,7 +124,7 @@ moeten wachten op de volgende pre-transcode-cyclus.
 Achtergrondpasses (`background=true`) draaien alleen op restcapaciteit (`max-background-files`,
 `max-background-passes`) en worden **gepreëmpt** — FFmpeg gestopt, het event vervalt; de
 scheduler/prefetch stuurt later opnieuw — zodra interactieve playback een slot of thread nodig
-heeft. Achtergrond-FFmpeg draait daarnaast met OS-niceness (`background-nice`, default 10, 0 = uit)
+heeft. Achtergrond-FFmpeg draait daarnaast met OS-niceness (`app.ister.server.background-nice`, default 10, 0 = uit; dezelfde `BackgroundFfmpeg`-wrapper bedient de analyse-handlers in disk)
 via een bij startup gegenereerd wrapper-script, met terugval op normale prioriteit als `nice`
 ontbreekt. Een succesvolle pass schrijft een `done_<segmentPrefix>`-marker; alleen die marker (niet
 de enkele aanwezigheid van segmenten) laat een latere pre-transcode de pass overslaan.

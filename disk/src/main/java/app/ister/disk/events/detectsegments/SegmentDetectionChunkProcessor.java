@@ -3,6 +3,7 @@ package app.ister.disk.events.detectsegments;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.node.MediaFileInputResolver;
+import app.ister.core.utils.BackgroundFfmpeg;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MediaFileSegmentEntity;
 import app.ister.core.enums.SegmentType;
@@ -15,7 +16,6 @@ import app.ister.core.status.ActivityContext;
 import app.ister.core.status.ActivitySubjects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -125,8 +125,8 @@ public class SegmentDetectionChunkProcessor {
     private final AudioPcmReader audioPcmReader;
     private final MediaFileInputResolver inputResolver;
 
-    @Value("${app.ister.server.ffmpeg-dir}")
-    private String dirOfFFmpeg;
+    /** Nice-wrapped: detection decodes ~14 minutes of audio per episode and must yield to playback and uploads. */
+    private final BackgroundFfmpeg backgroundFfmpeg;
 
     /**
      * One processed chunk. {@code remaining} counts the pending episodes left for a successor
@@ -288,7 +288,7 @@ public class SegmentDetectionChunkProcessor {
             if (file == null) {
                 continue;
             }
-            short[] pcm = audioPcmReader.readMonoPcm(inputResolver.resolve(file), dirOfFFmpeg,
+            short[] pcm = audioPcmReader.readMonoPcm(inputResolver.resolve(file), backgroundFfmpeg.dir(),
                     intro.getStartInMilliseconds(),
                     intro.getEndInMilliseconds() - intro.getStartInMilliseconds());
             prints.addAll(phasePrints(pcm));
@@ -490,14 +490,14 @@ public class SegmentDetectionChunkProcessor {
     private List<ChromaFingerprinter.Fingerprint> introPrints(
             Map<UUID, List<ChromaFingerprinter.Fingerprint>> cache, EpisodeSlice slice) {
         return cache.computeIfAbsent(slice.episodeId(), id -> phasePrints(
-                audioPcmReader.readMonoPcm(inputResolver.resolve(slice.mediaFile()), dirOfFFmpeg,
+                audioPcmReader.readMonoPcm(inputResolver.resolve(slice.mediaFile()), backgroundFfmpeg.dir(),
                         slice.sliceStartMs(), Math.min(INTRO_WINDOW_MS, slice.sliceLengthMs()))));
     }
 
     private List<ChromaFingerprinter.Fingerprint> outroPrints(
             Map<UUID, List<ChromaFingerprinter.Fingerprint>> cache, EpisodeSlice slice) {
         return cache.computeIfAbsent(slice.episodeId(), id -> phasePrints(
-                audioPcmReader.readMonoPcm(inputResolver.resolve(slice.mediaFile()), dirOfFFmpeg,
+                audioPcmReader.readMonoPcm(inputResolver.resolve(slice.mediaFile()), backgroundFfmpeg.dir(),
                         slice.sliceEndMs() - outroWindowLengthMs(slice), outroWindowLengthMs(slice))));
     }
 

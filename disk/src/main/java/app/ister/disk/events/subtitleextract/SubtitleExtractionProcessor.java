@@ -16,6 +16,7 @@ import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MediaFileStreamRepository;
 import app.ister.core.status.ActivityContext;
 import app.ister.core.status.ActivitySubjects;
+import app.ister.core.utils.BackgroundFfmpeg;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -54,8 +55,8 @@ public class SubtitleExtractionProcessor {
     private final TransactionTemplate readOnlyTransaction;
     private final TransactionTemplate writeTransaction;
 
-    @Value("${app.ister.server.ffmpeg-dir}")
-    private String dirOfFFmpeg;
+    /** The nice-wrapped ffmpeg directory: extraction is background work. */
+    private final String dirOfFFmpeg;
 
     @Value("${app.ister.server.tmp-dir}")
     private String tmpDir;
@@ -68,7 +69,9 @@ public class SubtitleExtractionProcessor {
                                        MediaFileInputResolver inputResolver,
                                        RemoteNodeClient remoteNodeClient,
                                        CacheDirectoryResolver cacheDirectoryResolver,
+                                       BackgroundFfmpeg backgroundFfmpeg,
                                        PlatformTransactionManager transactionManager) {
+        this.dirOfFFmpeg = backgroundFfmpeg.dir();
         this.mediaFileRepository = mediaFileRepository;
         this.mediaFileStreamRepository = mediaFileStreamRepository;
         this.directoryRepository = directoryRepository;

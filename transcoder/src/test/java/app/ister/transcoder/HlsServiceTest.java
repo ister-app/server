@@ -60,6 +60,7 @@ class HlsServiceTest {
 
     @Mock private Jaffree jaffree;
     @Mock private FfprobeService ffprobeService;
+    @Mock private app.ister.core.utils.BackgroundFfmpeg backgroundFfmpeg;
     @Mock private MediaFileRepository mediaFileRepository;
     @Mock private MediaFileStreamRepository mediaFileStreamRepository;
     @Mock private MessageSender messageSender;

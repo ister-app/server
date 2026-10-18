@@ -59,6 +59,7 @@ class HandleDetectSegmentsTest {
     @Mock private DirectoryRepository directoryRepository;
     @Mock private MessageSender messageSender;
     @Mock private MediaFileInputResolver inputResolver;
+    @Mock private app.ister.core.utils.BackgroundFfmpeg backgroundFfmpeg;
 
     private HandleDetectSegments subject;
     private final List<EpisodeEntity> episodes = new java.util.ArrayList<>();
@@ -86,8 +87,7 @@ class HandleDetectSegmentsTest {
         };
         SegmentDetectionChunkProcessor processor = new SegmentDetectionChunkProcessor(episodeRepository,
                 mediaFileRepository, mediaFileSegmentRepository, mediaFileEpisodeService,
-                directoryRepository, fakeReader, inputResolver);
-        ReflectionTestUtils.setField(processor, "dirOfFFmpeg", "/usr/bin");
+                directoryRepository, fakeReader, inputResolver, backgroundFfmpeg);
         subject = new HandleDetectSegments(processor, messageSender);
         ReflectionTestUtils.setField(subject, "chunkSize", 10);
 
@@ -172,8 +172,7 @@ class HandleDetectSegmentsTest {
         };
         SegmentDetectionChunkProcessor processor = new SegmentDetectionChunkProcessor(episodeRepository,
                 mediaFileRepository, mediaFileSegmentRepository, mediaFileEpisodeService,
-                directoryRepository, silentReader, inputResolver);
-        ReflectionTestUtils.setField(processor, "dirOfFFmpeg", "/usr/bin");
+                directoryRepository, silentReader, inputResolver, backgroundFfmpeg);
         subject = new HandleDetectSegments(processor, messageSender);
         ReflectionTestUtils.setField(subject, "chunkSize", 10);
 

@@ -189,6 +189,14 @@ app:
         audience: "${OIDC_AUDIENCE:}"
 
       ffmpeg-dir: "${FFMPEG_DIR:/usr/bin}"
+      # Background ffmpeg/ffprobe (analysis, intro detection, subtitle extraction, pre-transcodes)
+      # run under `nice -n <background-nice>` so playback and uploads win the CPU; 0 = off.
+      background-nice: "${BACKGROUND_NICE:10}"
+      nice-path: "${NICE_PATH:/usr/bin/nice}"
+      segment-detect:
+        # Consumers for intro/outro detection on this node. One keeps ffmpeg plus the fingerprinting
+        # to about one core; a season's detection also waits for an upload into its directory to finish.
+        concurrency: "${SEGMENT_DETECT_CONCURRENCY:1}"
       tmp-dir: "${TMP_DIR:/tmp/ister/}"
       cache-dir: "${CACHE_DIR:/cache/}"
       # Unpacks DVD (VobSub) subtitle tracks for the bitmap-subtitle sprite sheets (HlsBitmapSubtitleService).

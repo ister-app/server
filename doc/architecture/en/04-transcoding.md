@@ -117,7 +117,7 @@ cycle.
 Background passes (`background=true`) run only on spare capacity (`max-background-files`,
 `max-background-passes`) and are **preempted** — FFmpeg stopped, the event discarded; the
 scheduler/prefetch will resend — as soon as interactive playback needs a slot or thread. Background
-FFmpeg additionally runs under OS niceness (`background-nice`, default 10, 0 = off) via a wrapper
+FFmpeg additionally runs under OS niceness (`app.ister.server.background-nice`, default 10, 0 = off; the same `BackgroundFfmpeg` wrapper serves the analysis handlers in disk) via a wrapper
 script generated at startup, falling back to normal priority when `nice` is missing. A successful
 pass writes a `done_<segmentPrefix>` marker; only that marker (not the mere presence of segments)
 lets a later pre-transcode skip the pass.

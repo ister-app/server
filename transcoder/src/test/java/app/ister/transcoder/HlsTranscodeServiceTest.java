@@ -1,5 +1,6 @@
 package app.ister.transcoder;
 
+import app.ister.core.utils.BackgroundFfmpeg;
 import app.ister.core.utils.Jaffree;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.FFmpegResult;
@@ -49,6 +50,9 @@ class HlsTranscodeServiceTest {
     @Mock private FfprobeService ffprobeService;
 
     @TempDir Path tempDir;
+
+    @Mock
+    private BackgroundFfmpeg backgroundFfmpeg;
 
     @InjectMocks
     private HlsTranscodeService service;
@@ -569,31 +573,9 @@ class HlsTranscodeServiceTest {
     // ========== background niceness ==========
 
     @Test
-    void createNiceWrapperReturnsNullWhenDisabled() {
-        ReflectionTestUtils.setField(service, "backgroundNice", 0);
-        assertNull(service.createNiceWrapper());
-    }
-
-    @Test
-    void createNiceWrapperWritesExecutableScript() throws IOException {
-        ReflectionTestUtils.setField(service, "backgroundNice", 10);
-        ReflectionTestUtils.setField(service, "nicePath", "/usr/bin/nice");
-        ReflectionTestUtils.setField(service, "ffmpegDir", "/usr/bin");
-
-        Path dir = service.createNiceWrapper();
-
-        assertNotNull(dir, "nice is available on Linux, wrapper should be created");
-        Path script = dir.resolve("ffmpeg");
-        assertTrue(Files.isExecutable(script));
-        String content = Files.readString(script);
-        assertTrue(content.contains("nice -n 10"));
-        assertTrue(content.contains("/usr/bin/ffmpeg"));
-    }
-
-    @Test
     void backgroundPassUsesNiceWrapperWhenAvailable() throws IOException {
         Path wrapperDir = Files.createDirectories(tempDir.resolve("nice-wrapper"));
-        ReflectionTestUtils.setField(service, "niceWrapperDir", wrapperDir);
+        when(backgroundFfmpeg.wrapperDir()).thenReturn(wrapperDir);
 
         assertNotNull(service.ffmpegFor(true));
         verify(jaffree, never()).getFFMPEG();
@@ -604,7 +586,6 @@ class HlsTranscodeServiceTest {
 
     @Test
     void backgroundPassFallsBackToNormalFfmpegWithoutWrapper() {
-        ReflectionTestUtils.setField(service, "niceWrapperDir", null);
 
         service.ffmpegFor(true);
 
@@ -1104,24 +1085,6 @@ class HlsTranscodeServiceTest {
         ReflectionTestUtils.setField(service, "tmpDir", regularFile.toString());
 
         assertDoesNotThrow(() -> service.extendKeepUntil(UUID.randomUUID(), System.currentTimeMillis() + 60_000));
-    }
-
-    // ========== nice wrapper failures ==========
-
-    @Test
-    void createNiceWrapperReturnsNullWhenNiceProbeFails() {
-        ReflectionTestUtils.setField(service, "backgroundNice", 10);
-        ReflectionTestUtils.setField(service, "nicePath", "/bin/false");
-
-        assertNull(service.createNiceWrapper());
-    }
-
-    @Test
-    void createNiceWrapperReturnsNullWhenNiceBinaryIsMissing() {
-        ReflectionTestUtils.setField(service, "backgroundNice", 10);
-        ReflectionTestUtils.setField(service, "nicePath", tempDir.resolve("no-such-nice").toString());
-
-        assertNull(service.createNiceWrapper());
     }
 
     // ========== cleanup edge cases ==========

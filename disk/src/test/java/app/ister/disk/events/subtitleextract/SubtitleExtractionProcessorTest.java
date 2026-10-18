@@ -47,6 +47,7 @@ class SubtitleExtractionProcessorTest {
     @Mock private MediaFileInputResolver inputResolver;
     @Mock private RemoteNodeClient remoteNodeClient;
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private app.ister.core.utils.BackgroundFfmpeg backgroundFfmpeg;
 
     @TempDir Path tempDir;
 
@@ -61,10 +62,10 @@ class SubtitleExtractionProcessorTest {
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.when(backgroundFfmpeg.dir()).thenReturn("/usr/bin");
         app.ister.disk.storage.CacheStoreMocks.realLocal(cacheDirectoryResolver);
         subject = new SubtitleExtractionProcessor(mediaFileRepository, mediaFileStreamRepository, directoryRepository,
-                extractor, inputResolver, remoteNodeClient, cacheDirectoryResolver, transactionManager);
-        ReflectionTestUtils.setField(subject, "dirOfFFmpeg", "/usr/bin");
+                extractor, inputResolver, remoteNodeClient, cacheDirectoryResolver, backgroundFfmpeg, transactionManager);
         ReflectionTestUtils.setField(subject, "tmpDir", tempDir.resolve("tmp").toString());
         ownerCache = tempDir.resolve("owner-cache");
 

@@ -121,6 +121,9 @@ class HandleAudioFileFoundTest {
 
     @Mock
     private org.springframework.transaction.PlatformTransactionManager transactionManager;
+    @Mock
+    private app.ister.core.utils.BackgroundFfmpeg backgroundFfmpeg;
+
     @InjectMocks
     private HandleAudioFileFound subject;
 

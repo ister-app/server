@@ -195,6 +195,11 @@ and stamp them as done. `UploadSessionService` publishes one `DETECT_SEGMENTS` p
 session finishes (`UploadedFilePublisher.publishSegmentDetection`); an episode whose analysis
 completes after that fires its own event as usual.
 
+All ffmpeg/ffprobe work in this chapter runs through `BackgroundFfmpeg` (core): wrapper scripts
+that start the binaries under `nice -n 10` (`BACKGROUND_NICE`), and `HandleDetectSegments` has its
+own listener concurrency (`SEGMENT_DETECT_CONCURRENCY`, default 1) instead of the shared helper
+value, so detection takes about one core and yields it to playback and uploads.
+
 That idempotence is serial, not concurrent. Recomputing a file is a delete-then-insert, and two
 transactions doing it for the same season neither see nor cancel each other's rows, so a
 re-analysis sweep — one message per file, all for the same few seasons — stored every segment once

@@ -48,7 +48,8 @@ class HlsSegmentBoundaryIntegrationTest {
         jaffree = new Jaffree();
         ReflectionTestUtils.setField(jaffree, "dirOfFFmpeg", FFMPEG_DIR);
         FfprobeService ffprobeService = new FfprobeService(jaffree);
-        service = new HlsTranscodeService(jaffree, ffprobeService);
+        // not initialised: no nice wrapper, every pass runs the real ffmpeg
+        service = new HlsTranscodeService(jaffree, ffprobeService, new app.ister.core.utils.BackgroundFfmpeg());
         ReflectionTestUtils.setField(service, "tmpDir", tempDir.toString());
         ReflectionTestUtils.setField(service, "segmentTimeoutMs", 60000L);
         ReflectionTestUtils.setField(service, "hwaccelProperty", "none");

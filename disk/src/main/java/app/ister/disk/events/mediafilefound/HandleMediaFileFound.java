@@ -19,6 +19,7 @@ import app.ister.core.storage.SourceUris;
 import app.ister.core.status.ActivityContext;
 import app.ister.core.status.ActivitySubjects;
 import app.ister.core.utils.AfterCommitPublisher;
+import app.ister.core.utils.BackgroundFfmpeg;
 import app.ister.core.Handle;
 import com.github.kokorin.jaffree.process.JaffreeAbnormalExitException;
 import lombok.extern.slf4j.Slf4j;
@@ -56,8 +57,8 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     private final CacheDirectoryResolver cacheDirectoryResolver;
     private final TransactionTemplate transactionTemplate;
 
-    @Value("${app.ister.server.ffmpeg-dir}")
-    private String dirOfFFmpeg;
+    /** The nice-wrapped ffmpeg/ffprobe directory: analysis is background work. */
+    private final String dirOfFFmpeg;
 
     @Value("${app.ister.server.tmp-dir}")
     private String tmpDir;
@@ -78,8 +79,10 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
                                 MessageSender messageSender,
                                 MediaFileInputResolver inputResolver,
                                 CacheDirectoryResolver cacheDirectoryResolver,
+                                BackgroundFfmpeg backgroundFfmpeg,
                                 PlatformTransactionManager transactionManager) {
         this.directoryRepository = directoryRepository;
+        this.dirOfFFmpeg = backgroundFfmpeg.dir();
         this.mediaFileRepository = mediaFileRepository;
         this.episodeRepository = episodeRepository;
         this.movieRepository = movieRepository;

@@ -62,6 +62,8 @@ class HandleMediaFileFoundTest {
     private MessageSender messageSenderMock;
     @Mock
     private UploadSessionRepository uploadSessionRepositoryMock;
+    @Mock
+    private app.ister.core.utils.BackgroundFfmpeg backgroundFfmpeg;
 
     @Mock
     private app.ister.core.node.MediaFileInputResolver inputResolver;

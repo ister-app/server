@@ -41,6 +41,7 @@ import app.ister.core.storage.SourceUris;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.service.ServerEventService;
 import app.ister.core.Handle;
+import app.ister.core.utils.BackgroundFfmpeg;
 import app.ister.core.utils.Jaffree;
 import app.ister.disk.events.mediafilefound.MediaFileFoundCheckForStreams;
 import app.ister.disk.events.mediafilefound.MediaFileFoundGetDuration;
@@ -98,8 +99,8 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
     private final CacheDirectoryResolver cacheDirectoryResolver;
     private final TmpStoreProvider tmpStoreProvider;
 
-    @Value("${app.ister.server.ffmpeg-dir}")
-    private String dirOfFFmpeg;
+    /** The nice-wrapped ffmpeg/ffprobe directory: analysis is background work. */
+    private final String dirOfFFmpeg;
 
     @Value("${app.ister.server.tmp-dir}")
     private String tmpDir;
@@ -120,6 +121,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
                                 MessageSender messageSender,
                                 ServerEventService serverEventService,
                                 Jaffree jaffree,
+                                BackgroundFfmpeg backgroundFfmpeg,
                                 MediaFileInputResolver inputResolver,
                                 CacheDirectoryResolver cacheDirectoryResolver,
                                 TmpStoreProvider tmpStoreProvider,
@@ -140,6 +142,7 @@ public class HandleAudioFileFound implements Handle<AudioFileFoundData> {
         this.messageSender = messageSender;
         this.serverEventService = serverEventService;
         this.jaffree = jaffree;
+        this.dirOfFFmpeg = backgroundFfmpeg.dir();
         this.inputResolver = inputResolver;
         this.cacheDirectoryResolver = cacheDirectoryResolver;
         this.tmpStoreProvider = tmpStoreProvider;

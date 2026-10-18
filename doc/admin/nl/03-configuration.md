@@ -95,8 +95,8 @@ mechaniek erachter staat in de architectuurgids, [Transcoding](../../architectur
 | `app.ister.transcoder.hls.max-concurrent-passes` | `4` | gelijktijdig lopende FFmpeg-passes (threadpoolgrootte) |
 | `app.ister.transcoder.hls.max-background-files` | `1` | bestanden die een achtergrond-pre-transcode mag vasthouden, onder het interactieve budget |
 | `app.ister.transcoder.hls.max-background-passes` | `2` | passes die een achtergrond-pre-transcode mag vasthouden |
-| `app.ister.transcoder.hls.background-nice` | `10` | `nice`-waarde voor achtergrondpasses, zodat interactief afspelen de CPU wint |
-| `app.ister.transcoder.hls.nice-path` | `/usr/bin/nice` | pad naar de `nice`-binary voor bovenstaande |
+| `BACKGROUND_NICE` (`app.ister.server.background-nice`) | `10` | `nice`-waarde voor achtergrond-ffmpeg/ffprobe — achtergrondpasses **en** analyse (probing, crop- en introdetectie, ondertitelextractie) — zodat afspelen en uploads de CPU winnen; `0` = uit |
+| `NICE_PATH` (`app.ister.server.nice-path`) | `/usr/bin/nice` | pad naar de `nice`-binary voor bovenstaande |
 | `app.ister.transcoder.hls.cache-retention-hours` | `2` | een transcode-cachemap wordt pas verwijderd na zo lang onaangeraakt (en voorbij zijn keep-until) |
 | `app.ister.transcoder.hls.segment-stability-ms` | `200` | een segmentbestand moet zo lang ongewijzigd zijn voordat het als klaar telt |
 | `app.ister.transcoder.hls.pass-timeout-multiplier` | `4` | pass-timeout = mediaduur × dit |
@@ -204,6 +204,7 @@ bescherming — de actuator-endpoints zelf zijn niet-geauthenticeerd — dus pub
 | `management.endpoints.web.exposure.include` | `health,metrics,prometheus` | welke Actuator-endpoints beschikbaar zijn |
 | `app.ister.server.blur-hash.chunk-size` | `500` | afbeeldingen per chunk tijdens de BlurHash-sweep (houdt een chunk onder de RabbitMQ-consumer-timeout) |
 | `app.ister.server.segment-detect.chunk-size` | `4` | afleveringen die per intro-/outro-detectiebericht worden gefingerprint; houd een chunk ruim onder de RabbitMQ-consumer-timeout |
+| `SEGMENT_DETECT_CONCURRENCY` (`app.ister.server.segment-detect.concurrency`) | `1` | intro-/outro-detectieconsumers op deze node; detectie van een seizoen wacht ook tot een upload naar zijn directory klaar is |
 | `app.ister.server.crop-detect-backfill` | `true` | ontsnappingsluik: `false` slaat de eenmalige crop-detectie-heranalyse van elk bestaand bestand bij de eerste scan na de upgrade over — zie [Onderhoud](07-maintenance-and-troubleshooting.md#eenmalige-upgrade-stappen) |
 | `app.ister.server.segment-detect-backfill` | `true` | zelfde ontsnappingsluik voor het eenmalige intro-/outro-fingerprinten van elke bestaande aflevering |
 

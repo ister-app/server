@@ -94,8 +94,8 @@ architecture guide, [Transcoding](../../architecture/en/04-transcoding.md).
 | `app.ister.transcoder.hls.max-concurrent-passes` | `4` | FFmpeg passes running at once (thread pool size) |
 | `app.ister.transcoder.hls.max-background-files` | `1` | files a background pre-transcode may hold, kept below the interactive budget |
 | `app.ister.transcoder.hls.max-background-passes` | `2` | passes a background pre-transcode may hold |
-| `app.ister.transcoder.hls.background-nice` | `10` | `nice` value for background passes so interactive playback wins the CPU |
-| `app.ister.transcoder.hls.nice-path` | `/usr/bin/nice` | path to the `nice` binary used for the above |
+| `BACKGROUND_NICE` (`app.ister.server.background-nice`) | `10` | `nice` value for background ffmpeg/ffprobe — background passes **and** analysis (probing, crop and intro detection, subtitle extraction) — so playback and uploads win the CPU; `0` = off |
+| `NICE_PATH` (`app.ister.server.nice-path`) | `/usr/bin/nice` | path to the `nice` binary used for the above |
 | `app.ister.transcoder.hls.cache-retention-hours` | `2` | a transcode cache dir is removed only after being untouched this long (and past its keep-until) |
 | `app.ister.transcoder.hls.segment-stability-ms` | `200` | a segment file must be unchanged this long before it counts as finished |
 | `app.ister.transcoder.hls.pass-timeout-multiplier` | `4` | pass timeout = media duration × this |
@@ -202,6 +202,7 @@ actuator endpoints themselves are unauthenticated — so never publish or proxy 
 | `management.endpoints.web.exposure.include` | `health,metrics,prometheus` | which Actuator endpoints are exposed |
 | `app.ister.server.blur-hash.chunk-size` | `500` | images processed per chunk during the BlurHash sweep (keeps a chunk under the RabbitMQ consumer timeout) |
 | `app.ister.server.segment-detect.chunk-size` | `4` | episodes fingerprinted per intro/outro-detection message; keep a chunk well under the RabbitMQ consumer timeout |
+| `SEGMENT_DETECT_CONCURRENCY` (`app.ister.server.segment-detect.concurrency`) | `1` | intro/outro-detection consumers on this node; detection for a season also waits until an upload into its directory has finished |
 | `app.ister.server.crop-detect-backfill` | `true` | escape hatch: `false` skips the one-time crop-detection re-analysis of every pre-existing file on the first scan after upgrading — see [Maintenance](07-maintenance-and-troubleshooting.md#one-off-upgrade-steps) |
 | `app.ister.server.segment-detect-backfill` | `true` | same escape hatch for the one-time intro/outro fingerprinting of every pre-existing episode |
 

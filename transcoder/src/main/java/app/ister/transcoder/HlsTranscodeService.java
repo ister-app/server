@@ -1,6 +1,7 @@
 package app.ister.transcoder;
 
 import app.ister.core.node.MediaFileInputResolver;
+import app.ister.core.utils.BackgroundFfmpeg;
 import app.ister.core.utils.Jaffree;
 import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.ffmpeg.UrlInput;
@@ -109,27 +110,8 @@ public class HlsTranscodeService {
     @Value("${app.ister.transcoder.hls.max-background-passes:2}")
     private int maxBackgroundPasses;
 
-    /**
-     * OS niceness for background FFmpeg processes (0 = run at normal priority). The kernel then
-     * only grants a background encode the CPU cycles interactive encodes leave unused, on top of
-     * the admission/preemption rules. Applied via a generated {@code nice}-wrapper script; when
-     * {@code nice} is unavailable the wrapper is disabled and background runs at normal priority.
-     */
-    @Value("${app.ister.transcoder.hls.background-nice:10}")
-    private int backgroundNice;
-
-    /** Absolute path of the {@code nice} binary; absolute so the wrapper never depends on PATH. */
-    @Value("${app.ister.transcoder.hls.nice-path:/usr/bin/nice}")
-    private String nicePath;
-
-    @Value("${app.ister.server.ffmpeg-dir}")
-    private String ffmpegDir;
-
-    /** Directory holding the nice-wrapper `ffmpeg` script; null when the wrapper is disabled. */
-    private Path niceWrapperDir;
-
-    /** Name of the wrapper directory inside {@link #tmpDir}; skipped by the cleanup job. */
-    private static final String NICE_WRAPPER_DIR_NAME = "ffmpeg-nice";
+    /** Nice-wrapped ffmpeg for background passes; shared with the analysis handlers in disk. */
+    private final BackgroundFfmpeg backgroundFfmpeg;
 
     /** A segment is considered fully written when its size is unchanged for this long. */
     @Value("${app.ister.transcoder.hls.segment-stability-ms:200}")
@@ -283,57 +265,13 @@ public class HlsTranscodeService {
         transcodeExecutor = Executors.newFixedThreadPool(maxConcurrentPasses);
         backgroundFileBudget = new Semaphore(Math.min(maxBackgroundFiles, maxConcurrentFiles));
         backgroundPassBudget = new Semaphore(Math.min(maxBackgroundPasses, maxConcurrentPasses));
-        niceWrapperDir = createNiceWrapper();
-    }
-
-    // ========== Background niceness ==========
-
-    /**
-     * Writes a wrapper script that starts FFmpeg under {@code nice -n <backgroundNice>}, in a
-     * fresh temp directory (Jaffree resolves {@code <dir>/ffmpeg}, so the script simply shadows
-     * the binary's name). Probes {@code nice} first; any failure disables the wrapper so
-     * background passes still run, just at normal priority.
-     *
-     * @return the wrapper directory, or null when disabled or unavailable
-     */
-    Path createNiceWrapper() {
-        if (backgroundNice <= 0) {
-            return null;
-        }
-        try {
-            Process probe = new ProcessBuilder(nicePath, "-n", String.valueOf(backgroundNice), "true")
-                    .redirectErrorStream(true)
-                    .start();
-            if (!probe.waitFor(5, java.util.concurrent.TimeUnit.SECONDS) || probe.exitValue() != 0) {
-                probe.destroyForcibly();
-                log.warn("'{} -n {}' probe failed; background FFmpeg passes will run at normal priority", nicePath, backgroundNice);
-                return null;
-            }
-            // Lives in the app-owned cache dir (not the world-writable system temp dir);
-            // the cleanup job skips it by name. Script and dir are owner-only.
-            Path dir = Paths.get(tmpDir, NICE_WRAPPER_DIR_NAME);
-            Files.createDirectories(dir);
-            Files.setPosixFilePermissions(dir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
-            Path script = dir.resolve("ffmpeg");
-            String realFfmpeg = Paths.get(ffmpegDir).resolve("ffmpeg").toString();
-            Files.writeString(script, "#!/bin/sh\nexec " + nicePath + " -n " + backgroundNice + " " + realFfmpeg + " \"$@\"\n");
-            Files.setPosixFilePermissions(script, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
-            log.info("Background FFmpeg passes run with nice -n {} via {}", backgroundNice, script);
-            return dir;
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            log.warn("Interrupted while probing 'nice'; background FFmpeg passes will run at normal priority");
-            return null;
-        } catch (IOException | RuntimeException e) {
-            log.warn("Could not set up nice wrapper; background FFmpeg passes will run at normal priority", e);
-            return null;
-        }
     }
 
     /** FFmpeg builder for a pass: background passes use the nice-wrapper when available. */
     com.github.kokorin.jaffree.ffmpeg.FFmpeg ffmpegFor(boolean background) {
-        if (background && niceWrapperDir != null) {
-            return com.github.kokorin.jaffree.ffmpeg.FFmpeg.atPath(niceWrapperDir);
+        Path wrapperDir = backgroundFfmpeg.wrapperDir();
+        if (background && wrapperDir != null) {
+            return com.github.kokorin.jaffree.ffmpeg.FFmpeg.atPath(wrapperDir);
         }
         return jaffree.getFFMPEG();
     }
@@ -1304,7 +1242,7 @@ public class HlsTranscodeService {
     /** Removes a single HLS cache dir when it is stale and its retention deadline has passed. */
     private void cleanupCacheDir(Path dir, Instant retentionThreshold, long now) {
         String dirName = dir.getFileName().toString();
-        if (NICE_WRAPPER_DIR_NAME.equals(dirName)) {
+        if (BackgroundFfmpeg.WRAPPER_DIR_NAME.equals(dirName)) {
             return;
         }
         if (readKeepUntil(dir) > now) {
