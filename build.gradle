@@ -74,6 +74,10 @@ subprojects {
 	tasks.named('test') {
 		jvmArgs += "-javaagent:${configurations.mockitoAgent.asPath}"
 		useJUnitPlatform()
+		// The server module keeps one Spring context per integration-test configuration alive
+		// (RabbitMQ listeners, Hikari, Hibernate each); Gradle's default 512m test heap ran out
+		// at the sixth context on CI.
+		maxHeapSize = '2g'
 		// When enable native image trace agent, disable jacoco.
 //		jvmArgs '-agentlib:native-image-agent=config-merge-dir=src/main/resources/META-INF/native-image'
 	}

@@ -207,12 +207,17 @@ class GameLibraryScanIntegrationTest {
         Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() ->
                 assertEquals(3, gameRepository.findAll().size(), "gbc + ps3 + steam"));
 
+        // The cover and the ROM are separate FILE_SCAN_REQUESTED messages: whichever lands first
+        // creates the game row, so the ROM's file and size can arrive a moment after the row.
+        Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> {
+            GameEntity tetris = gameByName("Tetris");
+            assertEquals(ROM.length, tetris.getSizeBytes(), "ROM attached and sized");
+            assertEquals(1, tetris.getFileCount());
+        });
         GameEntity tetris = gameByName("Tetris");
         assertEquals(GamePlatform.GBC, tetris.getPlatform());
         assertEquals(GameForm.ROM, tetris.getForm());
         assertEquals(1989, tetris.getPathYear());
-        assertEquals(ROM.length, tetris.getSizeBytes());
-        assertEquals(1, tetris.getFileCount());
         MediaFileEntity rom = mediaFileRepository.findByGameEntityId(tetris.getId()).getFirst();
         assertTrue(rom.isGameEntryFile());
         Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
