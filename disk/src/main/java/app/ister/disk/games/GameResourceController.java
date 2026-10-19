@@ -79,6 +79,7 @@ public class GameResourceController {
 
     private static final String CACHE_CONTROL_IMMUTABLE = "private, max-age=31536000, immutable";
     private static final String CACHE_CONTROL_REVALIDATE = "private, no-cache";
+    private static final String ACCEPT_RANGES_BYTES = "bytes";
     private static final MediaType ZIP = MediaType.parseMediaType("application/zip");
 
     private final GameRepository gameRepository;
@@ -165,19 +166,20 @@ public class GameResourceController {
         if (etag.equals(ifNoneMatch)) {
             return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
                     .eTag(etag)
-                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                    .header(HttpHeaders.ACCEPT_RANGES, ACCEPT_RANGES_BYTES)
                     .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_REVALIDATE)
                     .build();
         }
         Range range = ByteRanges.parseRange(rangeHeader, src.size());
         ResponseEntity.BodyBuilder response = ResponseEntity
                 .status(range != null ? HttpStatus.PARTIAL_CONTENT : HttpStatus.OK)
-                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                .header(HttpHeaders.ACCEPT_RANGES, ACCEPT_RANGES_BYTES)
                 .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_REVALIDATE)
                 .eTag(etag)
                 .contentType(MediaType.APPLICATION_OCTET_STREAM);
-        if (src.lastModified() != null) {
-            response.lastModified(src.lastModified());
+        Instant lastModified = src.lastModified();
+        if (lastModified != null) {
+            response.lastModified(lastModified);
         }
         if (range != null) {
             return response
@@ -250,7 +252,7 @@ public class GameResourceController {
         Range range = ByteRanges.parseRange(rangeHeader, entity.getSizeBytes());
         ResponseEntity.BodyBuilder response = ResponseEntity
                 .status(range != null ? HttpStatus.PARTIAL_CONTENT : HttpStatus.OK)
-                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                .header(HttpHeaders.ACCEPT_RANGES, ACCEPT_RANGES_BYTES)
                 .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_IMMUTABLE)
                 .eTag("\"" + entity.getSha256() + "\"")
                 .contentType(ZIP);

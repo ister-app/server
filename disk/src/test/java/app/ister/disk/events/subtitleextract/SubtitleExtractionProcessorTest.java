@@ -62,7 +62,7 @@ class SubtitleExtractionProcessorTest {
 
     @BeforeEach
     void setUp() {
-        org.mockito.Mockito.when(backgroundFfmpeg.dir()).thenReturn("/usr/bin");
+        when(backgroundFfmpeg.dir()).thenReturn("/usr/bin");
         app.ister.disk.storage.CacheStoreMocks.realLocal(cacheDirectoryResolver);
         subject = new SubtitleExtractionProcessor(mediaFileRepository, mediaFileStreamRepository, directoryRepository,
                 extractor, inputResolver, remoteNodeClient, cacheDirectoryResolver, backgroundFfmpeg, transactionManager);
