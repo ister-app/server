@@ -1,5 +1,39 @@
 # Changelog
 
+## server v5.4.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `5.4.0` |
+| `ghcr.io/ister-app/migrations` | `5.4.0` |
+
+### Features
+
+- feat(analysis): hold segment detection until the upload session finished ([`363e854e`](https://github.com/ister-app/server/commit/363e854e))
+- feat(games): manifest version + revalidatable game files for change detection ([`0a8b8a97`](https://github.com/ister-app/server/commit/0a8b8a97))
+- feat(games): GAME library type with client-side play, per-user save sync and achievements ([`0bf47952`](https://github.com/ister-app/server/commit/0bf47952))
+
+### Fixes
+
+- fix(games): accept achievement reports without hidden/sortOrder ([`c10ca6a4`](https://github.com/ister-app/server/commit/c10ca6a4))
+- fix(test): give the test JVM 2g and stop racing the ROM scan in the game integration test ([`5941d2b9`](https://github.com/ister-app/server/commit/5941d2b9))
+
+### Other
+
+- test(games): cover the games, storage and dispatcher code ([`47891405`](https://github.com/ister-app/server/commit/47891405))
+- refactor: resolve the open SonarCloud issues ([`9ad3ce18`](https://github.com/ister-app/server/commit/9ad3ce18))
+- perf(analysis): run analysis ffmpeg/ffprobe under nice, own concurrency for segment detection ([`e7e55007`](https://github.com/ister-app/server/commit/e7e55007))
+- perf(upload): sync staged bytes once at complete, recover from a shortened part file ([`dbfaed55`](https://github.com/ister-app/server/commit/dbfaed55))
+- refactor: resolve the open SonarCloud issues in the games code ([`ce524739`](https://github.com/ister-app/server/commit/ce524739))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:5.4.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v5.3.0...v5.4.0
+
 ## server v5.3.0
 
 | Image | Tag |
