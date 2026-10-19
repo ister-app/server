@@ -40,9 +40,18 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class GameAchievementService {
 
-    /** One achievement as the client saw it. {@code unlockedAt} is null while locked. */
+    /**
+     * One achievement as the client saw it. {@code unlockedAt} is null while locked. {@code hidden}
+     * and {@code sortOrder} are boxed so a client may leave them out of the JSON (Jackson rejects
+     * a missing primitive); they are normalized to {@code false} / {@code 0} and never null.
+     */
     public record Reported(String externalId, String name, @Nullable String description, @Nullable String grade,
-                           boolean hidden, int sortOrder, @Nullable Instant unlockedAt) {}
+                           Boolean hidden, Integer sortOrder, @Nullable Instant unlockedAt) {
+        public Reported {
+            hidden = Boolean.TRUE.equals(hidden);
+            sortOrder = sortOrder == null ? 0 : sortOrder;
+        }
+    }
 
     public record Summary(int total, int unlocked) {}
 

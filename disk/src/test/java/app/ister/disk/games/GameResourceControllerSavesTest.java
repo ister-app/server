@@ -48,6 +48,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -316,6 +317,27 @@ class GameResourceControllerSavesTest {
         assertThat(reported.getValue()).containsExactly(
                 new GameAchievementService.Reported("t1", "First", null, "BRONZE", false, 1, Instant.parse("2026-10-01T10:00:00Z")),
                 new GameAchievementService.Reported("t2", "Second", null, null, false, 2, null));
+    }
+
+    @Test
+    void reportAcceptsAchievementsWithoutHiddenAndSortOrder() throws Exception {
+        when(achievementService.report(eq(user), eq(game), eq(GameAchievementSource.STEAM), any(), isNull()))
+                .thenReturn(new GameAchievementService.Summary(1, 0));
+
+        mockMvc.perform(post("/game/" + gameId + "/achievements").principal(auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"source":"STEAM","achievements":[{"externalId":"ACH_1","name":"First"}]}
+                                """))
+                .andExpect(status().isOk());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<GameAchievementService.Reported>> reported = ArgumentCaptor.forClass(List.class);
+        verify(achievementService).report(eq(user), eq(game), eq(GameAchievementSource.STEAM), reported.capture(), isNull());
+        assertThat(reported.getValue()).containsExactly(
+                new GameAchievementService.Reported("ACH_1", "First", null, null, null, null, null));
+        assertThat(reported.getValue().getFirst().hidden()).isFalse();
+        assertThat(reported.getValue().getFirst().sortOrder()).isZero();
     }
 
     @Test
