@@ -2,9 +2,12 @@ package app.ister.worker.http;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.client.ClientHttpRequestFactory;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
+
+import java.net.http.HttpClient;
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -15,23 +18,25 @@ class MetadataRestClientsTest {
 
     /**
      * A metadata client without a read timeout parks a RabbitMQ listener thread — and its open
-     * transaction — forever on a provider that accepts the connection and never answers. The
-     * default request factory waits indefinitely, so the timeouts must be set explicitly.
+     * transaction — forever on a provider that accepts the connection and never answers, so the
+     * timeouts must be set explicitly. The factory must be the JDK one: the listener thread is
+     * virtual, and a client reading the socket on it can stall for its whole read timeout in the
+     * native image (GraalVM poller bug). Redirects must be followed, as HttpURLConnection did.
      */
     @Test
-    void clientIsBuiltWithConnectAndReadTimeouts() {
+    void clientIsBuiltOnTheJdkHttpClientWithConnectAndReadTimeouts() {
         RestClient client = MetadataRestClients.json();
 
         ClientHttpRequestFactory factory =
                 (ClientHttpRequestFactory) ReflectionTestUtils.getField(client, "clientRequestFactory");
         assertNotNull(factory);
-        SimpleClientHttpRequestFactory simple = assertInstanceOf(SimpleClientHttpRequestFactory.class, factory);
+        JdkClientHttpRequestFactory jdk = assertInstanceOf(JdkClientHttpRequestFactory.class, factory);
 
-        int connectTimeout = (int) ReflectionTestUtils.getField(simple, "connectTimeout");
-        int readTimeout = (int) ReflectionTestUtils.getField(simple, "readTimeout");
-        assertTrue(connectTimeout > 0, "connect timeout must be bounded");
-        assertTrue(readTimeout > 0, "read timeout must be bounded");
-        assertEquals(5_000, connectTimeout);
-        assertEquals(15_000, readTimeout);
+        HttpClient httpClient = (HttpClient) ReflectionTestUtils.getField(jdk, "httpClient");
+        assertNotNull(httpClient);
+        assertTrue(httpClient.connectTimeout().isPresent(), "connect timeout must be bounded");
+        assertEquals(Duration.ofSeconds(5), httpClient.connectTimeout().get());
+        assertEquals(HttpClient.Redirect.NORMAL, httpClient.followRedirects());
+        assertEquals(Duration.ofSeconds(15), ReflectionTestUtils.getField(jdk, "readTimeout"));
     }
 }

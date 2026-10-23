@@ -1,7 +1,7 @@
 package app.ister.worker.http;
 
+import app.ister.core.http.JdkHttpClients;
 import org.springframework.http.client.ClientHttpRequestFactory;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
@@ -16,6 +16,10 @@ import java.time.Duration;
  * stalling the queue. A bounded wait turns that into a logged failure and a retryable event.
  * <p>
  * The User-Agent is equally load-bearing: Wikimedia hosts answer the default Java agent with 403.
+ * <p>
+ * The request factory comes from {@link JdkHttpClients}: the listener threads are virtual, and a
+ * client that reads the socket on the calling thread can stall for its whole read timeout in the
+ * native image (GraalVM poller bug), so the I/O must happen on the JDK client's own thread.
  */
 public final class MetadataRestClients {
 
@@ -35,9 +39,6 @@ public final class MetadataRestClients {
     }
 
     private static ClientHttpRequestFactory requestFactory() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(CONNECT_TIMEOUT);
-        factory.setReadTimeout(READ_TIMEOUT);
-        return factory;
+        return JdkHttpClients.requestFactory(CONNECT_TIMEOUT, READ_TIMEOUT);
     }
 }

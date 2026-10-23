@@ -293,6 +293,12 @@ unreferenced cache file is the Ludusavi manifest, whitelisted by path in `CacheC
   A YAML config file imported via `spring.config.import` needs an entry in its module's `resource-config.json`
   (pattern `<module>.*\\.yaml`).
 - `hibernate.ddl-auto=validate` in prod: an entity change without a matching Flyway migration fails startup.
+- Never read a socket on a virtual thread: GraalVM's virtual-thread poller can leave such a read parked for
+  its whole timeout (oracle/graal #13787), and Tomcat, the RabbitMQ listeners and the schedulers all run on
+  virtual threads. Outgoing HTTP goes through `core/.../http/JdkHttpClients` (java.net.http; also the JWKS
+  fetch via `JwkSetHttpClientConfig`, Feign via `Http2Client`, Boot's `RestClient.Builder` via
+  `spring.http.clients.imperative.factory=jdk`), never `SimpleClientHttpRequestFactory`, `URLConnection` or a
+  bare `RestClient.builder()` (which picks Apache HttpClient, on the classpath through the AWS SDK).
 
 ## API Surface
 

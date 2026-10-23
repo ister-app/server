@@ -97,6 +97,10 @@ Two things keep that cheap:
   would run every GraphQL resolver on the application task executor, off the request thread
   and therefore without its open-in-view session. `GraphQlControllerConfig` (api) defines the
   controller configurer without that executor, so resolvers keep running on the request thread.
+  A second rule follows from the native image: GraalVM's virtual-thread poller can leave a blocking
+  socket read parked for its whole timeout although the data has arrived (oracle/graal #13787), so
+  every outgoing HTTP call, the JWKS fetch of Spring Security included, goes through the JDK HTTP
+  client (`JdkHttpClients` in core), which does its I/O on its own platform thread.
 
 ## Pre-transcoding and background priority
 

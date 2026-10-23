@@ -1,11 +1,13 @@
 package app.ister.api.service;
 
+import app.ister.core.http.JdkHttpClients;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -24,7 +26,10 @@ public class ItunesSearchService {
     public ItunesSearchService(
             @Value("${app.ister.api.podcast.itunes-base:https://itunes.apple.com}") String itunesBase) {
         this.itunesBase = itunesBase;
+        // Explicit JDK client: a bare RestClient.builder() picks Apache HttpClient (on the classpath via
+        // the AWS SDK), which reads the socket on the request's virtual thread; see JdkHttpClients.
         this.restClient = RestClient.builder()
+                .requestFactory(JdkHttpClients.requestFactory(Duration.ofSeconds(5), Duration.ofSeconds(15)))
                 .defaultHeader("User-Agent", USER_AGENT)
                 .defaultHeader("Accept", "application/json")
                 .build();

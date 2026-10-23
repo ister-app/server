@@ -2,17 +2,21 @@ package app.ister.worker.config;
 
 import app.ister.worker.clients.TmdbClient;
 import app.ister.worker.clients.TmdbRateLimiter;
+import app.ister.core.http.JdkHttpClients;
+import feign.Client;
 import feign.RequestInterceptor;
 import feign.RetryableException;
 import feign.Retryer;
 import feign.codec.Decoder;
 import feign.codec.ErrorDecoder;
+import feign.http2client.Http2Client;
 import feign.jackson.JacksonDecoder;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.cloud.openfeign.support.ResponseEntityDecoder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -20,6 +24,19 @@ import java.util.concurrent.TimeUnit;
 @Configuration
 @EnableFeignClients(clients = TmdbClient.class)
 public class FeignConfig {
+
+    /**
+     * TMDB calls run on RabbitMQ listener threads, which are virtual. Feign's default client
+     * (HttpURLConnection) reads the socket on that thread and can stall for its whole read timeout
+     * in the native image (GraalVM poller bug, see {@link JdkHttpClients}); the JDK HTTP client does
+     * its I/O on its own thread. Declared explicitly rather than relying on Spring Cloud's class
+     * condition, so the native image cannot bake it out. {@code Request.Options} still bounds the
+     * request.
+     */
+    @Bean
+    public Client feignClient() {
+        return new Http2Client(JdkHttpClients.httpClient(Duration.ofSeconds(5)));
+    }
 
     @Bean
     public Decoder feignDecoder() {

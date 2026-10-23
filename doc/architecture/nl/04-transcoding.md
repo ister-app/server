@@ -102,6 +102,10 @@ geproduceerd, parkeert in een pollloop (`SharedTmpReadThrough`) tot maximaal
   executor draaien, buiten de request-thread en dus zonder zijn open-in-view-sessie.
   `GraphQlControllerConfig` (api) definieert de controller-configurer zonder die executor, zodat
   resolvers op de request-thread blijven draaien.
+  Een tweede regel volgt uit de native image: GraalVM's virtual-thread-poller kan een blokkerende
+  socket-read zijn hele timeout geparkeerd laten terwijl de data al binnen is (oracle/graal #13787),
+  dus elke uitgaande HTTP-call, inclusief de JWKS-fetch van Spring Security, loopt via de JDK
+  HTTP-client (`JdkHttpClients` in core), die zijn I/O op een eigen platform-thread doet.
 
 ## Pre-transcoding en achtergrondprioriteit
 

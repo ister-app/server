@@ -61,9 +61,20 @@ spring:
   # No env placeholder on purpose: the executors behind this key are chosen by bean conditions,
   # which the native image freezes at build time. An env override would silently do nothing in
   # production; the JVM-run build (bootRun, tests) honours the key as usual.
+  # One consequence: GraalVM's virtual-thread poller can leave a blocking socket read parked for its
+  # whole timeout (oracle/graal #13787), so every outgoing HTTP call goes through the JDK HTTP client
+  # (app.ister.core.http.JdkHttpClients); see http.clients below.
   threads:
     virtual:
       enabled: true
+
+  # Request factory for Boot-built RestClient.Builder instances (Typesense). Boot would detect Apache
+  # HttpClient, which is on the classpath through the AWS SDK and reads the socket on the calling
+  # virtual thread; the JDK client does its I/O on its own thread (see the threads comment above).
+  http:
+    clients:
+      imperative:
+        factory: jdk
 
   jpa:
     hibernate:

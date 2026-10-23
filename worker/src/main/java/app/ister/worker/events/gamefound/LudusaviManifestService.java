@@ -89,11 +89,9 @@ public class LudusaviManifestService {
                 .build();
     }
 
-    private static org.springframework.http.client.SimpleClientHttpRequestFactory longReadFactory() {
-        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofSeconds(10));
-        factory.setReadTimeout(Duration.ofMinutes(2)); // ~10 MB on a slow link
-        return factory;
+    private static org.springframework.http.client.ClientHttpRequestFactory longReadFactory() {
+        // ~10 MB on a slow link; the JDK client keeps the socket read off the listener's virtual thread
+        return app.ister.core.http.JdkHttpClients.requestFactory(Duration.ofSeconds(10), Duration.ofMinutes(2));
     }
 
     /** The manifest entry for a game: by Steam app id when known, else by exact normalized title. */

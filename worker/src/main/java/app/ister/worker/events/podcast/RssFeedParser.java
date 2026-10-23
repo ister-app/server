@@ -1,5 +1,6 @@
 package app.ister.worker.events.podcast;
 
+import app.ister.core.http.JdkHttpClients;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +16,7 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -38,7 +40,10 @@ public class RssFeedParser {
     private final RestClient restClient;
 
     public RssFeedParser() {
+        // Explicit JDK client: a bare RestClient.builder() picks Apache HttpClient (on the classpath via
+        // the AWS SDK), which reads the socket on the listener's virtual thread; see JdkHttpClients.
         this.restClient = RestClient.builder()
+                .requestFactory(JdkHttpClients.requestFactory(Duration.ofSeconds(5), Duration.ofSeconds(15)))
                 .defaultHeader("User-Agent", USER_AGENT)
                 .build();
     }
