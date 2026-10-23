@@ -68,6 +68,14 @@ graalvmNative {
 }
 
 
+// processTestAot generates ~7500 sources (40 MB) for the integration-test contexts; compiling
+// them inside the Gradle daemon (512m default heap, gradle.properties is not tracked) made the
+// daemon stop on GC thrashing. A forked javac carries its own heap.
+tasks.named('compileAotTestJava') {
+    options.fork = true
+    options.forkOptions.memoryMaximumSize = '2g'
+}
+
 tasks.named('bootRun') {
     bootRun.systemProperty 'spring.profiles.active', "local"
 //	jvmArgs '-agentlib:native-image-agent=config-merge-dir=src/main/resources/META-INF/native-image'
