@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Achievements as reported by the client, which reads them from the local emulator/store files
@@ -61,9 +63,15 @@ public class GameAchievementService {
     private final CacheDirectoryResolver cacheDirectoryResolver;
     private final GameProperties properties;
 
+    /**
+     * Records a report. With {@code complete} the client vouches that {@code reported} is the game's
+     * whole set for {@code source} (a trophy config, a Steam schema): definitions of that source the
+     * report does not name are stale — a set credited to the wrong game by an earlier client — and
+     * are removed with every user's unlocks of them. A partial or empty report never removes anything.
+     */
     @Transactional
     public Summary report(UserEntity user, GameEntity game, GameAchievementSource source,
-                          List<Reported> reported, @Nullable String deviceName) {
+                          List<Reported> reported, @Nullable String deviceName, boolean complete) {
         Map<String, GameAchievementEntity> existing = new HashMap<>();
         achievementRepository.findByGameEntityIdAndSource(game.getId(), source)
                 .forEach(a -> existing.put(a.getExternalId(), a));
@@ -79,6 +87,18 @@ public class GameAchievementService {
             GameAchievementEntity definition = upsertDefinition(existing, game, source, item);
             if (item.unlockedAt() != null) {
                 upsertUnlock(unlocks, user, definition, item.unlockedAt(), deviceName);
+            }
+        }
+        if (complete && !reported.isEmpty()) {
+            Set<String> current = reported.stream().map(Reported::externalId).filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            List<GameAchievementEntity> stale = existing.values().stream()
+                    .filter(a -> !current.contains(a.getExternalId())).toList();
+            if (!stale.isEmpty()) {
+                log.info("Dropping {} {} achievement(s) of game {} the client's complete set does not carry",
+                        stale.size(), source, game.getId());
+                userAchievementRepository.deleteByDefinitions(stale);
+                achievementRepository.deleteAll(stale);
             }
         }
         int unlocked = userAchievementRepository.findByUserAndGame(user.getId(), game.getId()).size();

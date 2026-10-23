@@ -1,8 +1,10 @@
 package app.ister.core.repository;
 
+import app.ister.core.entity.GameAchievementEntity;
 import app.ister.core.entity.UserGameAchievementEntity;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -31,4 +33,8 @@ public interface UserGameAchievementRepository extends JpaRepository<UserGameAch
 
     @Query("select count(u) from UserGameAchievementEntity u where u.userEntity.id = :userId and u.gameAchievementEntity.gameEntity.id = :gameId")
     long countByUserAndGame(@Param("userId") UUID userId, @Param("gameId") UUID gameId);
+
+    @Modifying
+    @Query("delete from UserGameAchievementEntity u where u.gameAchievementEntity in :definitions")
+    void deleteByDefinitions(@Param("definitions") Collection<GameAchievementEntity> definitions);
 }

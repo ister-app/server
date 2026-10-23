@@ -116,8 +116,9 @@ public class GameResourceController {
 
     public record SaveConflict(String error, int latestVersion, Instant latestCreatedAt, @Nullable String latestDevice) {}
 
+    /** {@code complete} (optional, default false): the list is the game's whole set, stale definitions may go. */
     public record AchievementReport(GameAchievementSource source, @Nullable String deviceName,
-                                    List<GameAchievementService.Reported> achievements) {}
+                                    List<GameAchievementService.Reported> achievements, @Nullable Boolean complete) {}
 
     public record AchievementSummary(int total, int unlocked) {}
 
@@ -314,7 +315,8 @@ public class GameResourceController {
             throw new IllegalArgumentException("source and achievements are required");
         }
         GameAchievementService.Summary summary =
-                achievementService.report(user, game, report.source(), report.achievements(), report.deviceName());
+                achievementService.report(user, game, report.source(), report.achievements(), report.deviceName(),
+                        Boolean.TRUE.equals(report.complete()));
         return new AchievementSummary(summary.total(), summary.unlocked());
     }
 

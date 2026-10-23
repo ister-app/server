@@ -86,7 +86,7 @@ class GameAchievementServiceTest {
         when(achievementRepository.countByGameEntityId(game.getId())).thenReturn(2L);
 
         GameAchievementService.Summary summary = service.report(user, game, GameAchievementSource.PS3_TROPHY,
-                List.of(reported("t1", "First", T1), reported("t2", "Second", null)), "desk");
+                List.of(reported("t1", "First", T1), reported("t2", "Second", null)), "desk", false);
 
         assertThat(summary).isEqualTo(new GameAchievementService.Summary(2, 1));
         ArgumentCaptor<GameAchievementEntity> definitions = ArgumentCaptor.forClass(GameAchievementEntity.class);
@@ -110,7 +110,7 @@ class GameAchievementServiceTest {
         service.report(user, game, GameAchievementSource.STEAM, List.of(
                 reported("", "Blank id", T1),
                 reported(null, "Null id", T1),
-                reported("ok", null, T1)), null);
+                reported("ok", null, T1)), null, false);
 
         verify(achievementRepository, never()).save(any());
         verify(userAchievementRepository, never()).save(any());
@@ -126,7 +126,7 @@ class GameAchievementServiceTest {
 
         service.report(user, game, GameAchievementSource.STEAM, List.of(
                 new GameAchievementService.Reported("same", "Name same", "desc same", "BRONZE", false, 1, null),
-                new GameAchievementService.Reported("changed", "New name", "new desc", "GOLD", true, 5, null)), null);
+                new GameAchievementService.Reported("changed", "New name", "new desc", "GOLD", true, 5, null)), null, false);
 
         verify(achievementRepository, never()).save(same);
         verify(achievementRepository).save(changed);
@@ -155,7 +155,7 @@ class GameAchievementServiceTest {
 
         service.report(user, game, GameAchievementSource.PS3_TROPHY, List.of(
                 new GameAchievementService.Reported("earlier", "Name earlier", "desc earlier", "BRONZE", false, 1, T1),
-                new GameAchievementService.Reported("later", "Name later", "desc later", "BRONZE", false, 1, T2)), null);
+                new GameAchievementService.Reported("later", "Name later", "desc later", "BRONZE", false, 1, T2)), null, false);
 
         assertThat(earlierUnlock.getUnlockedAt()).isEqualTo(T1);
         assertThat(laterUnlock.getUnlockedAt()).as("never moves forwards").isEqualTo(T1);
@@ -219,5 +219,33 @@ class GameAchievementServiceTest {
         assertThat(existing.getGameEntityId()).isEqualTo(game.getId());
         assertThat(existing.getFileLastModifiedTime()).isNotNull();
         verify(imageRepository).save(existing);
+    }
+
+    @Test
+    void aCompleteReportDropsDefinitionsOfThatSourceItDoesNotName() {
+        GameAchievementEntity own = definition("1", GameAchievementSource.PS3_TROPHY);
+        GameAchievementEntity stale = definition("2", GameAchievementSource.PS3_TROPHY);
+        when(achievementRepository.findByGameEntityIdAndSource(game.getId(), GameAchievementSource.PS3_TROPHY))
+                .thenReturn(List.of(own, stale));
+        when(userAchievementRepository.findByUserAndGame(user.getId(), game.getId())).thenReturn(List.of());
+
+        service.report(user, game, GameAchievementSource.PS3_TROPHY, List.of(reported("1", "Own", null)), "box", true);
+
+        verify(userAchievementRepository).deleteByDefinitions(List.of(stale));
+        verify(achievementRepository).deleteAll(List.of(stale));
+    }
+
+    @Test
+    void aPartialOrEmptyReportRemovesNothing() {
+        GameAchievementEntity stale = definition("2", GameAchievementSource.PS3_TROPHY);
+        when(achievementRepository.findByGameEntityIdAndSource(game.getId(), GameAchievementSource.PS3_TROPHY))
+                .thenReturn(List.of(stale));
+        when(userAchievementRepository.findByUserAndGame(user.getId(), game.getId())).thenReturn(List.of());
+
+        service.report(user, game, GameAchievementSource.PS3_TROPHY, List.of(reported("1", "Own", null)), "box", false);
+        service.report(user, game, GameAchievementSource.PS3_TROPHY, List.of(), "box", true);
+
+        verify(userAchievementRepository, never()).deleteByDefinitions(any());
+        verify(achievementRepository, never()).deleteAll(any());
     }
 }

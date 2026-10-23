@@ -296,7 +296,7 @@ class GameResourceControllerSavesTest {
 
     @Test
     void reportAchievementsForwardsTheReportAndAnswersTheSummary() throws Exception {
-        when(achievementService.report(eq(user), eq(game), eq(GameAchievementSource.PS3_TROPHY), any(), eq("desk")))
+        when(achievementService.report(eq(user), eq(game), eq(GameAchievementSource.PS3_TROPHY), any(), eq("desk"), eq(false)))
                 .thenReturn(new GameAchievementService.Summary(42, 7));
 
         mockMvc.perform(post("/game/" + gameId + "/achievements").principal(auth)
@@ -313,7 +313,7 @@ class GameResourceControllerSavesTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<GameAchievementService.Reported>> reported = ArgumentCaptor.forClass(List.class);
-        verify(achievementService).report(eq(user), eq(game), eq(GameAchievementSource.PS3_TROPHY), reported.capture(), eq("desk"));
+        verify(achievementService).report(eq(user), eq(game), eq(GameAchievementSource.PS3_TROPHY), reported.capture(), eq("desk"), eq(false));
         assertThat(reported.getValue()).containsExactly(
                 new GameAchievementService.Reported("t1", "First", null, "BRONZE", false, 1, Instant.parse("2026-10-01T10:00:00Z")),
                 new GameAchievementService.Reported("t2", "Second", null, null, false, 2, null));
@@ -321,7 +321,7 @@ class GameResourceControllerSavesTest {
 
     @Test
     void reportAcceptsAchievementsWithoutHiddenAndSortOrder() throws Exception {
-        when(achievementService.report(eq(user), eq(game), eq(GameAchievementSource.STEAM), any(), isNull()))
+        when(achievementService.report(eq(user), eq(game), eq(GameAchievementSource.STEAM), any(), isNull(), eq(false)))
                 .thenReturn(new GameAchievementService.Summary(1, 0));
 
         mockMvc.perform(post("/game/" + gameId + "/achievements").principal(auth)
@@ -333,7 +333,7 @@ class GameResourceControllerSavesTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<GameAchievementService.Reported>> reported = ArgumentCaptor.forClass(List.class);
-        verify(achievementService).report(eq(user), eq(game), eq(GameAchievementSource.STEAM), reported.capture(), isNull());
+        verify(achievementService).report(eq(user), eq(game), eq(GameAchievementSource.STEAM), reported.capture(), isNull(), eq(false));
         assertThat(reported.getValue()).containsExactly(
                 new GameAchievementService.Reported("ACH_1", "First", null, null, null, null, null));
         assertThat(reported.getValue().getFirst().hidden()).isFalse();
