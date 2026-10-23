@@ -1,4 +1,4 @@
-FROM docker.io/flyway/flyway:13.10.0
+FROM docker.io/flyway/flyway:13.11.1
 
 COPY database/src/main/resources/db/migration /flyway/migrations
 
