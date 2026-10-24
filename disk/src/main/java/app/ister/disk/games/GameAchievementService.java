@@ -20,8 +20,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -155,7 +158,13 @@ public class GameAchievementService {
         }
     }
 
-    /** Stores an icon for a definition; a second upload replaces the reference, the old file is swept later. */
+    /**
+     * Stores an icon for a definition. The stored path carries a digest of the bytes, so a
+     * different icon is a different image row and a different {@code /images/{id}/download} URL:
+     * that URL is served with a day of {@code max-age}, and clients would keep showing the old
+     * picture (Red Dead Redemption's trophies on Fat Princess) under a reused id. The replaced row
+     * is deleted, which leaves its file to the cache sweep; the same bytes again reuse the row.
+     */
     @Transactional(rollbackFor = IOException.class)
     public Optional<ImageEntity> storeIcon(GameEntity game, GameAchievementSource source, String externalId,
                                            byte[] png) throws IOException {
@@ -171,7 +180,7 @@ public class GameAchievementService {
         }
         CacheStore store = cacheDirectoryResolver.store();
         String key = "achievements/" + game.getId() + "/" + source.name().toLowerCase() + "/"
-                + externalId.replaceAll("[^A-Za-z0-9._-]", "_") + ".png";
+                + externalId.replaceAll("[^A-Za-z0-9._-]", "_") + "-" + digest(png) + ".png";
         String storedPath = store.write(key, png, "image/png");
         ImageEntity image = imageRepository.findByDirectoryEntityIdAndPath(store.directory().getId(), storedPath)
                 .orElseGet(() -> ImageEntity.builder()
@@ -185,8 +194,20 @@ public class GameAchievementService {
         image.setGameEntityId(game.getId());
         image.setFileLastModifiedTime(Instant.now());
         imageRepository.save(image);
+        ImageEntity previous = definition.get().getIconImageEntity();
         definition.get().setIconImageEntity(image);
         achievementRepository.save(definition.get());
+        if (previous != null && previous.getId() != null && !previous.getId().equals(image.getId())) {
+            imageRepository.delete(previous);
+        }
         return Optional.of(image);
+    }
+
+    private static String digest(byte[] bytes) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes), 0, 6);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 }

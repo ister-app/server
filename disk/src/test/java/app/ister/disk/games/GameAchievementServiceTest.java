@@ -193,7 +193,8 @@ class GameAchievementServiceTest {
         Optional<ImageEntity> image = service.storeIcon(game, GameAchievementSource.STEAM, "ACH_1/odd id", new byte[]{1, 2});
 
         assertThat(image).isPresent();
-        assertThat(image.get().getPath()).isEqualTo("/cache/achievements/" + game.getId() + "/steam/ACH_1_odd_id.png");
+        // SHA-256 of {1, 2}, first six bytes.
+        assertThat(image.get().getPath()).isEqualTo("/cache/achievements/" + game.getId() + "/steam/ACH_1_odd_id-a12871fee210.png");
         assertThat(image.get().getType()).isEqualTo(ImageType.ICON);
         assertThat(image.get().getDirectoryEntityId()).isEqualTo(cacheDir.getId());
         assertThat(image.get().getGameEntityId()).isEqualTo(game.getId());
@@ -204,13 +205,15 @@ class GameAchievementServiceTest {
     }
 
     @Test
-    void aSecondIconUploadReusesTheExistingImageRow() throws Exception {
+    void theSameIconAgainReusesTheExistingImageRow() throws Exception {
         GameAchievementEntity definition = definition("t1", GameAchievementSource.PS3_TROPHY);
         when(achievementRepository.findByGameEntityIdAndSource(game.getId(), GameAchievementSource.PS3_TROPHY))
                 .thenReturn(List.of(definition));
+        // SHA-256 of {1}, first six bytes.
         ImageEntity existing = ImageEntity.builder().directoryEntityId(cacheDir.getId())
-                .path("/cache/achievements/" + game.getId() + "/ps3_trophy/t1.png").type(ImageType.ICON).build();
+                .path("/cache/achievements/" + game.getId() + "/ps3_trophy/t1-4bf5122f3445.png").type(ImageType.ICON).build();
         existing.setId(UUID.randomUUID());
+        definition.setIconImageEntity(existing);
         when(imageRepository.findByDirectoryEntityIdAndPath(cacheDir.getId(), existing.getPath())).thenReturn(Optional.of(existing));
 
         Optional<ImageEntity> image = service.storeIcon(game, GameAchievementSource.PS3_TROPHY, "t1", new byte[]{1});
@@ -219,6 +222,33 @@ class GameAchievementServiceTest {
         assertThat(existing.getGameEntityId()).isEqualTo(game.getId());
         assertThat(existing.getFileLastModifiedTime()).isNotNull();
         verify(imageRepository).save(existing);
+        verify(imageRepository, never()).delete(any());
+    }
+
+    @Test
+    void aDifferentIconGetsANewImageRowAndDropsTheOldOne() throws Exception {
+        GameAchievementEntity definition = definition("t1", GameAchievementSource.PS3_TROPHY);
+        when(achievementRepository.findByGameEntityIdAndSource(game.getId(), GameAchievementSource.PS3_TROPHY))
+                .thenReturn(List.of(definition));
+        ImageEntity old = ImageEntity.builder().directoryEntityId(cacheDir.getId())
+                .path("/cache/achievements/" + game.getId() + "/ps3_trophy/t1.png").type(ImageType.ICON).build();
+        old.setId(UUID.randomUUID());
+        definition.setIconImageEntity(old);
+        when(imageRepository.findByDirectoryEntityIdAndPath(any(), any())).thenReturn(Optional.empty());
+        when(imageRepository.save(any())).thenAnswer(invocation -> {
+            ImageEntity saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(UUID.randomUUID());
+            }
+            return saved;
+        });
+
+        Optional<ImageEntity> image = service.storeIcon(game, GameAchievementSource.PS3_TROPHY, "t1", new byte[]{2});
+
+        assertThat(image).isPresent();
+        assertThat(image.get().getId()).isNotEqualTo(old.getId());
+        assertThat(definition.getIconImageEntity()).isSameAs(image.get());
+        verify(imageRepository).delete(old);
     }
 
     @Test
