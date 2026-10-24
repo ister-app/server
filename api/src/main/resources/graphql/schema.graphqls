@@ -287,6 +287,18 @@ type Mutation {
     watching and the duration is added to its play time. There is one watch status row per user per game.
     """
     recordGamePlayed(gameId: ID!, durationMs: Int!): WatchStatus!
+    """
+    Heartbeat of an activity without a play queue — reading a BOOK or COMIC, or playing a GAME — so it
+    shows up in nowPlaying next to the playback sessions. sessionId is a client-generated id per
+    activity session (the same user must own it); the session expires like a playback session when
+    the heartbeats stop (60 s), or at once through endActivity. Visibility follows the caller's
+    now-playing sharing scope. Other media types are rejected.
+    """
+    reportActivity(sessionId: ID!, mediaType: MediaType!, mediaId: ID!, mediaFileId: ID,
+                   progressFraction: Float, progressLabel: String, playState: PlayState!,
+                   deviceId: ID!): Boolean!
+    "Ends an activity session of the calling user immediately; true also when it was already gone."
+    endActivity(sessionId: ID!): Boolean!
     "Admin only. Overrides where a game keeps its saves (Ludusavi placeholders, e.g. <winAppData>/Game/Saves); empty clears the override."
     updateGameSavePaths(gameId: ID!, savePaths: [String!]!): Game!
     "Copies an older save snapshot of the calling user to a new head version."
@@ -571,6 +583,16 @@ enum PlayState {
     PAUSED
 }
 
+"""
+What kind of session a now-playing entry is. PLAYBACK is a play-queue heartbeat; READING and GAME
+are activity sessions (reportActivity) without a queue: never controllable, never followable.
+"""
+enum ActivityKind {
+    PLAYBACK
+    READING
+    GAME
+}
+
 enum ServerActivityEventType {
     NODE_ACTIVITY
     QUEUE_STATS
@@ -717,6 +739,12 @@ type PlaybackSession {
     anchorServerTimeMs: Float
     "Repeat mode of the playing client; null for clients that don't report one."
     repeatMode: RepeatMode
+    "PLAYBACK for play-queue sessions; READING/GAME for activity sessions, which carry no timeline."
+    activityKind: ActivityKind!
+    "Reading progress of an activity session, 0.0-1.0; null for playback and games."
+    progressFraction: Float
+    "Position label of an activity session as the reading client rendered it (chapter, page); null otherwise."
+    progressLabel: String
 }
 
 type ServerActivitySnapshot {

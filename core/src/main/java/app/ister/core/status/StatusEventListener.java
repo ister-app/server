@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
 @RegisterReflectionForBinding({NodeActivityStatusData.class, QueueStatsStatusData.class,
         EventFailureStatusData.class, PlaybackStatusData.class, PlaybackCommandData.class,
         FollowerStatusData.class, DeviceCommandData.class, DevicePresenceData.class,
-        TranscodeActivityStatusData.class})
+        TranscodeActivityStatusData.class, app.ister.core.enums.ActivityKind.class})
 @RabbitListener(queues = "#{statusQueue.name}")
 public class StatusEventListener {
 
@@ -81,7 +81,11 @@ public class StatusEventListener {
 
     @RabbitHandler
     public void onPlayback(PlaybackStatusData data) {
-        playbackSessionRegistry.update(data);
+        if (data.isEnded()) {
+            playbackSessionRegistry.remove(data.getPlayQueueId());
+        } else {
+            playbackSessionRegistry.update(data);
+        }
         broadcaster.emitNowPlaying(playbackSessionRegistry.snapshot());
     }
 

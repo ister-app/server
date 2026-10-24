@@ -104,6 +104,19 @@ class StatusEventListenerTest {
     }
 
     @Test
+    void onPlaybackWithEndedDropsTheSessionInsteadOfUpdatingIt() {
+        java.util.UUID sessionId = java.util.UUID.randomUUID();
+        PlaybackStatusData data = PlaybackStatusData.builder().playQueueId(sessionId).ended(true).build();
+        when(playbackSessionRegistry.snapshot()).thenReturn(List.of());
+
+        subject.onPlayback(data);
+
+        verify(playbackSessionRegistry).remove(sessionId);
+        verify(playbackSessionRegistry, org.mockito.Mockito.never()).update(data);
+        verify(broadcaster).emitNowPlaying(List.of());
+    }
+
+    @Test
     void onPlaybackCommandOnlyBroadcasts() {
         PlaybackCommandData data = PlaybackCommandData.builder().build();
 

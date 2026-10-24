@@ -1,5 +1,6 @@
 package app.ister.api.dto;
 
+import app.ister.core.enums.ActivityKind;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayState;
 import app.ister.core.enums.RepeatMode;
@@ -37,7 +38,13 @@ public record PlaybackSession(
         /** Repeat mode of the playing client; null for clients that don't report one. */
         RepeatMode repeatMode,
         /** The media file the playing client opened; null when it doesn't report one. */
-        UUID mediaFileId) {
+        UUID mediaFileId,
+        /** PLAYBACK for play-queue sessions; READING/GAME for activity sessions (never null). */
+        ActivityKind activityKind,
+        /** Reading progress of an activity session, 0..1; null for playback and games. */
+        Double progressFraction,
+        /** Client-rendered position label of an activity session; null otherwise. */
+        String progressLabel) {
 
     public static PlaybackSession from(PlaybackStatusData data, boolean controllable, int followerCount) {
         return new PlaybackSession(data.getPlayQueueId(), data.getPlayQueueItemId(), data.getUserId(),
@@ -48,6 +55,12 @@ public record PlaybackSession(
                 data.getDeviceId(), data.getDeviceName(),
                 data.getAnchorPositionMs(),
                 data.getAnchorServerTimeMs() == null ? null : data.getAnchorServerTimeMs().doubleValue(),
-                data.getRepeatMode(), data.getMediaFileId());
+                data.getRepeatMode(), data.getMediaFileId(),
+                kindOf(data), data.getProgressFraction(), data.getProgressLabel());
+    }
+
+    /** Heartbeats from nodes that predate the field carry null; they are playback sessions. */
+    public static ActivityKind kindOf(PlaybackStatusData data) {
+        return data.getActivityKind() == null ? ActivityKind.PLAYBACK : data.getActivityKind();
     }
 }

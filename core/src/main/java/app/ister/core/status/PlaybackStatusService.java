@@ -64,4 +64,28 @@ public class PlaybackStatusService {
                 .mediaFileId(mediaFileId)
                 .build());
     }
+
+    /**
+     * Publishes an activity session (reading, gaming) built by the caller; stamps this node and
+     * the producer timestamp the registries order deliveries by.
+     */
+    public void publishActivity(PlaybackStatusData data) {
+        data.setNodeName(nodeName);
+        data.setTimestamp(Instant.now());
+        if (data.getPlayState() == null) {
+            data.setPlayState(PlayState.PLAYING);
+        }
+        messageSender.sendStatus(data);
+    }
+
+    /** Tells every node to drop an activity session right away (the sweeper is the fallback). */
+    public void publishActivityEnded(UUID sessionId, UUID userId) {
+        messageSender.sendStatus(PlaybackStatusData.builder()
+                .playQueueId(sessionId)
+                .userId(userId)
+                .ended(true)
+                .nodeName(nodeName)
+                .timestamp(Instant.now())
+                .build());
+    }
 }

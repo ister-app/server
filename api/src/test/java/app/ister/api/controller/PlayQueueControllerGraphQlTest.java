@@ -97,7 +97,7 @@ class PlayQueueControllerGraphQlTest {
     private app.ister.core.service.MediaLibraryResolver mediaLibraryResolver;
 
     @MockitoBean
-    private app.ister.core.service.DeviceService deviceService;
+    private DeviceNameResolver deviceNameResolver;
 
     @BeforeEach
     void authenticateAsUser() {

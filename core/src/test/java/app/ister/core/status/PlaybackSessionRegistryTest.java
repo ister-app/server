@@ -116,4 +116,14 @@ class PlaybackSessionRegistryTest {
 
         assertTrue(registry.removeExpired(TIMEOUT));
     }
+
+    @Test
+    void removeDropsTheSessionAndReportsWhetherItWasThere() {
+        UUID id = UUID.randomUUID();
+        registry.update(heartbeat(id, 1000, START));
+
+        assertTrue(registry.remove(id));
+        assertTrue(registry.snapshot().isEmpty());
+        assertFalse(registry.remove(id));
+    }
 }

@@ -3,6 +3,7 @@ package app.ister.api.controller;
 import app.ister.api.dto.PlaybackSession;
 import app.ister.api.dto.ServerActivityEvent;
 import app.ister.api.dto.ServerActivitySnapshot;
+import app.ister.core.enums.ActivityKind;
 import app.ister.core.eventdata.EventFailureStatusData;
 import app.ister.core.eventdata.NodeActivityStatusData;
 import app.ister.core.eventdata.PlaybackStatusData;
@@ -89,12 +90,15 @@ public class ServerStatusController {
 
     /** Filters the session list to what {@code viewerId} may see and stamps each with a
      *  per-viewer {@code controllable} flag. Uses only in-memory session data plus the sharing
-     *  service's per-owner cache, so it is safe to run off the request thread. */
+     *  service's per-owner cache, so it is safe to run off the request thread. Activity sessions
+     *  (reading, gaming) have no queue to control or follow, so they skip both lookups. */
     private List<PlaybackSession> visibleSessions(List<PlaybackStatusData> sessions, UUID viewerId) {
         return sessions.stream()
                 .filter(session -> playbackSharingService.canView(viewerId, session.getUserId()))
-                .map(session -> PlaybackSession.from(session, controllable(viewerId, session),
-                        followerRegistry.deviceCount(session.getPlayQueueId())))
+                .map(session -> PlaybackSession.kindOf(session) == ActivityKind.PLAYBACK
+                        ? PlaybackSession.from(session, controllable(viewerId, session),
+                                followerRegistry.deviceCount(session.getPlayQueueId()))
+                        : PlaybackSession.from(session, false, 0))
                 .toList();
     }
 

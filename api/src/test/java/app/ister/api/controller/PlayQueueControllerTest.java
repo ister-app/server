@@ -113,7 +113,7 @@ class PlayQueueControllerTest {
     private app.ister.core.service.MediaLibraryResolver mediaLibraryResolver;
 
     @Mock
-    private app.ister.core.service.DeviceService deviceService;
+    private DeviceNameResolver deviceNameResolver;
 
     @Mock
     private Authentication authentication;

@@ -1,5 +1,6 @@
 package app.ister.core.eventdata;
 
+import app.ister.core.enums.ActivityKind;
 import app.ister.core.enums.MediaType;
 import app.ister.core.enums.PlayState;
 import app.ister.core.enums.RemoteControlScope;
@@ -64,4 +65,14 @@ public class PlaybackStatusData {
     /** Server-clock instant (epoch ms) the anchor position was sampled at, as computed by the
      * playing client from its measured clock offset. */
     private Long anchorServerTimeMs;
+    /** PLAYBACK for play-queue heartbeats (null from older nodes means the same); READING/GAME for
+     * activity sessions reported through reportActivity, which have no queue to control or follow. */
+    private ActivityKind activityKind;
+    /** Reading progress of an activity session, 0..1; null for playback and games. */
+    private Double progressFraction;
+    /** Client-rendered position label of an activity session ("Chapter 3", "Page 12 of 48"). */
+    private String progressLabel;
+    /** True on the message endActivity publishes: every node drops the session instead of
+     * updating it, so a closed reader disappears at once instead of after the sweeper timeout. */
+    private boolean ended;
 }

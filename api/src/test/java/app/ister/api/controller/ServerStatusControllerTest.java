@@ -228,4 +228,37 @@ class ServerStatusControllerTest {
         assertEquals(1234L, snapshot.nowPlaying().getFirst().anchorPositionMs());
         assertEquals(1_760_000_000_000d, snapshot.nowPlaying().getFirst().anchorServerTimeMs());
     }
+
+    @Test
+    void activitySessionsAreNeverControllableAndCarryTheirProgress() {
+        UUID sessionId = UUID.randomUUID();
+        PlaybackStatusData reading = playback(sessionId);
+        reading.setActivityKind(app.ister.core.enums.ActivityKind.READING);
+        reading.setProgressFraction(0.4);
+        reading.setProgressLabel("Chapter 3");
+        playbackSessionRegistry.update(reading);
+        followerRegistry.update(app.ister.core.eventdata.FollowerStatusData.builder()
+                .playQueueId(sessionId).deviceId("device-a").userId(UUID.randomUUID()).active(true).build());
+
+        ServerActivitySnapshot snapshot = controller.serverActivitySnapshot(authentication);
+
+        var session = snapshot.nowPlaying().getFirst();
+        assertEquals(app.ister.core.enums.ActivityKind.READING, session.activityKind());
+        assertFalse(session.controllable(), "a reading session has no queue to control");
+        assertEquals(0, session.followerCount(), "a reading session cannot be followed");
+        assertEquals(0.4, session.progressFraction());
+        assertEquals("Chapter 3", session.progressLabel());
+        org.mockito.Mockito.verify(playbackSharingService, org.mockito.Mockito.never())
+                .canControl(any(), any(), any(), any());
+    }
+
+    @Test
+    void heartbeatsWithoutAKindArePlaybackSessions() {
+        playbackSessionRegistry.update(playback(UUID.randomUUID()));
+
+        ServerActivitySnapshot snapshot = controller.serverActivitySnapshot(authentication);
+
+        assertEquals(app.ister.core.enums.ActivityKind.PLAYBACK, snapshot.nowPlaying().getFirst().activityKind());
+        assertTrue(snapshot.nowPlaying().getFirst().controllable());
+    }
 }

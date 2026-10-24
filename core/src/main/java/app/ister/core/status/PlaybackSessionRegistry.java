@@ -55,6 +55,11 @@ public class PlaybackSessionRegistry {
         return sessions.values().removeIf(entry -> entry.receivedAt().isBefore(cutoff));
     }
 
+    /** Drops one session (an activity that ended explicitly); true when it was present. */
+    public boolean remove(java.util.UUID playQueueId) {
+        return sessions.remove(playQueueId) != null;
+    }
+
     public java.util.Optional<PlaybackStatusData> find(java.util.UUID playQueueId) {
         return java.util.Optional.ofNullable(sessions.get(playQueueId)).map(Entry::data);
     }

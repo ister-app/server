@@ -80,4 +80,42 @@ class PlaybackStatusServiceTest {
 
         assertEquals(PlayState.PLAYING, data.getPlayState());
     }
+
+    @Test
+    void publishActivityStampsNodeTimestampAndDefaultPlayState() {
+        UUID sessionId = UUID.randomUUID();
+        subject.publishActivity(PlaybackStatusData.builder()
+                .playQueueId(sessionId)
+                .activityKind(app.ister.core.enums.ActivityKind.READING)
+                .progressFraction(0.25)
+                .progressLabel("Chapter 2")
+                .build());
+
+        ArgumentCaptor<PlaybackStatusData> captor = ArgumentCaptor.forClass(PlaybackStatusData.class);
+        verify(messageSender).sendStatus(captor.capture());
+        PlaybackStatusData data = captor.getValue();
+        assertEquals("node1", data.getNodeName());
+        assertNotNull(data.getTimestamp());
+        assertEquals(PlayState.PLAYING, data.getPlayState());
+        assertEquals(app.ister.core.enums.ActivityKind.READING, data.getActivityKind());
+        assertEquals(0.25, data.getProgressFraction());
+        assertEquals("Chapter 2", data.getProgressLabel());
+        assertEquals(false, data.isEnded());
+    }
+
+    @Test
+    void publishActivityEndedSendsAnEndedMarkerForTheSession() {
+        UUID sessionId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        subject.publishActivityEnded(sessionId, userId);
+
+        ArgumentCaptor<PlaybackStatusData> captor = ArgumentCaptor.forClass(PlaybackStatusData.class);
+        verify(messageSender).sendStatus(captor.capture());
+        assertEquals(sessionId, captor.getValue().getPlayQueueId());
+        assertEquals(userId, captor.getValue().getUserId());
+        assertEquals(true, captor.getValue().isEnded());
+        assertEquals("node1", captor.getValue().getNodeName());
+        assertNotNull(captor.getValue().getTimestamp());
+    }
 }

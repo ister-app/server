@@ -12,9 +12,7 @@ import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.PlayQueueEntity;
 import app.ister.core.entity.PlayQueueItemEntity;
 import app.ister.core.entity.TrackEntity;
-import app.ister.core.enums.ImageType;
 import app.ister.core.enums.MediaType;
-import app.ister.core.enums.MetadataSource;
 import app.ister.core.enums.PlayState;
 import app.ister.core.enums.RemoteControlScope;
 import app.ister.core.enums.RepeatMode;
@@ -27,8 +25,6 @@ import app.ister.core.repository.ImageRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MovieRepository;
 import app.ister.core.repository.TrackRepository;
-import app.ister.core.entity.DeviceEntity;
-import app.ister.core.service.DeviceService;
 import app.ister.core.service.LibraryAccessService;
 import app.ister.core.service.MediaFileEpisodeService;
 import app.ister.core.service.MediaLibraryResolver;
@@ -51,15 +47,11 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Controller
 @Slf4j
@@ -98,15 +90,7 @@ public class PlayQueueController {
 
     private final MediaLibraryResolver mediaLibraryResolver;
 
-    private final DeviceService deviceService;
-
-    /** Short-lived (owner, device) → name cache: the heartbeat arrives every ~10s per session
-     * and the device name may not cost a query each time. A rename shows up within a minute. */
-    private final Map<String, DeviceNameCacheEntry> deviceNameCache = new ConcurrentHashMap<>();
-    private static final Duration DEVICE_NAME_CACHE_TTL = Duration.ofSeconds(60);
-
-    private record DeviceNameCacheEntry(String name, Instant expiresAt) {
-    }
+    private final DeviceNameResolver deviceNameResolver;
 
     @PreAuthorize("hasRole('user')")
     @QueryMapping
@@ -234,26 +218,11 @@ public class PlayQueueController {
                 controlScopeOverride,
                 controlAllowedUserIds,
                 deviceId,
-                deviceNameOf(queue.getUserEntity().getId(), deviceId),
+                deviceNameResolver.nameOf(queue.getUserEntity().getId(), deviceId),
                 state.anchorPositionMs(),
                 state.anchorServerTimeMs(),
                 state.repeatMode(),
                 currentFile);
-    }
-
-    /** Cached lookup of the owner's device name; null for clients that report no device id. */
-    private String deviceNameOf(UUID ownerId, UUID deviceId) {
-        if (deviceId == null) {
-            return null;
-        }
-        String key = ownerId + ":" + deviceId;
-        DeviceNameCacheEntry cached = deviceNameCache.get(key);
-        if (cached != null && cached.expiresAt().isAfter(Instant.now())) {
-            return cached.name();
-        }
-        String name = deviceService.findOwned(ownerId, deviceId).map(DeviceEntity::getName).orElse(null);
-        deviceNameCache.put(key, new DeviceNameCacheEntry(name, Instant.now().plus(DEVICE_NAME_CACHE_TTL)));
-        return name;
     }
 
     /**
@@ -304,12 +273,9 @@ public class PlayQueueController {
 
     /**
      * Cover art for the now-playing card: the movie poster, the episode still (show
-     * poster when the episode has none), or the album cover for a track. Falls back to
-     * any image when there is no COVER. Clients fetch the bytes via GET /images/{id}/download.
-     * Within a type, local artwork (shipped next to the media files) wins over scraped
-     * provider images — the same preference the clients apply when they resolve artwork
-     * themselves (ImageUtil.getImageByType), so a session card and the local mini player
-     * show the same cover.
+     * poster when the episode has none), or the album cover for a track; see
+     * {@link SessionArtworkPicker} for the choice within that list. Clients fetch the bytes
+     * via GET /images/{id}/download.
      */
     private UUID artworkOf(PlayQueueItemEntity item) {
         List<ImageEntity> images = switch (item.getType()) {
@@ -330,19 +296,7 @@ public class PlayQueueController {
                             .orElse(List.of());
             case BOOK, COMIC, GAME -> List.of();
         };
-        List<ImageEntity> covers =
-                images.stream().filter(image -> image.getType() == ImageType.COVER).toList();
-        List<ImageEntity> pool = covers.isEmpty() ? images : covers;
-        // An admin's choice first (ImageEntity.selected), then the automatic rule.
-        return pool.stream()
-                .filter(ImageEntity::isSelected)
-                .findFirst()
-                .or(() -> pool.stream()
-                        .filter(image -> image.getSource() == null || image.getSource() == MetadataSource.LOCAL_FILE)
-                        .findFirst())
-                .or(() -> pool.stream().findFirst())
-                .map(ImageEntity::getId)
-                .orElse(null);
+        return SessionArtworkPicker.pick(images);
     }
 
     /** Episode image when the feed provided one, otherwise the podcast cover. */
