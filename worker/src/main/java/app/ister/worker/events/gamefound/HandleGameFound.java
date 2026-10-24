@@ -107,7 +107,7 @@ public class HandleGameFound implements Handle<GameFoundData> {
             return false;
         }
         boolean changed = false;
-        Optional<String> title = ParamSfoParser.string(entries, "TITLE").map(t -> t.replace('\n', ' ').strip());
+        Optional<String> title = ParamSfoParser.title(entries);
         if (title.isPresent() && !Objects.equals(game.getTitle(), title.get())) {
             game.setTitle(title.get());
             changed = true;

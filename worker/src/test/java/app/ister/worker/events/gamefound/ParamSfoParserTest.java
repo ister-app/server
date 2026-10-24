@@ -8,6 +8,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -21,6 +22,19 @@ class ParamSfoParserTest {
         assertEquals("Demon's Souls", ParamSfoParser.string(entries, "TITLE").orElseThrow());
         assertEquals("BLUS30443", ParamSfoParser.string(entries, "TITLE_ID").orElseThrow());
         assertEquals(9L, entries.get("PARENTAL_LEVEL"));
+    }
+
+    @Test
+    void titleDropsThePatchVersionLineButKeepsTheRestOfTheName() {
+        assertEquals("Uncharted: Drake's Fortune™",
+                ParamSfoParser.title(ParamSfoParser.parse(sfo(Map.of("TITLE", "Uncharted: Drake's Fortune™\n1.02")))).orElseThrow());
+        assertEquals("Demon's Souls",
+                ParamSfoParser.title(ParamSfoParser.parse(sfo(Map.of("TITLE", "Demon's\nSouls ")))).orElseThrow(), "a name over two lines is folded");
+        assertEquals("Portal 2",
+                ParamSfoParser.title(ParamSfoParser.parse(sfo(Map.of("TITLE", "Portal\n2")))).orElseThrow(), "a bare number is part of the name");
+        assertEquals("1.02",
+                ParamSfoParser.title(ParamSfoParser.parse(sfo(Map.of("TITLE", "1.02")))).orElseThrow(), "a title that is only a version stays");
+        assertEquals(Optional.empty(), ParamSfoParser.title(ParamSfoParser.parse(sfo(Map.of("TITLE_ID", "BLUS30443")))));
     }
 
     @Test

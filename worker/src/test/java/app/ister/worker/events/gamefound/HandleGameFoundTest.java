@@ -119,6 +119,23 @@ class HandleGameFoundTest {
     // ---- PS3 folders: PARAM.SFO + ICON0.PNG ----
 
     @Test
+    void ps3PatchVersionInTheSfoTitleIsNotPartOfTheTitle() throws IOException {
+        GameEntity game = ps3Game("PS3_GAME/USRDIR/EBOOT.BIN");
+        game.setTitle("Uncharted: Drake's Fortune™ 1.02"); // what an older scan kept
+        byte[] sfo = ParamSfoParserTest.sfo(Map.of("TITLE", "Uncharted: Drake's Fortune™\n1.02", "TITLE_ID", "NPEA00363"));
+        when(gameRepository.findById(game.getId())).thenReturn(Optional.of(game));
+        when(fileAccess.open(libraryDir, ROOT + "/PS3_GAME/PARAM.SFO")).thenReturn(new ByteArrayInputStream(sfo));
+        when(imageRepository.findByGameEntityId(game.getId())).thenReturn(List.of());
+        when(fileAccess.exists(libraryDir, ROOT + "/PS3_GAME/ICON0.PNG")).thenReturn(false);
+        when(metadataProvider.enrich(game)).thenReturn(false);
+
+        subject.handle(event(game.getId()));
+
+        assertEquals("Uncharted: Drake's Fortune™", game.getTitle(), "a rescan cleans the stored title");
+        verify(gameRepository).save(same(game));
+    }
+
+    @Test
     void ps3TitleAndTitleIdComeFromParamSfoAndIconBecomesCover() throws IOException {
         GameEntity game = ps3Game("PS3_GAME/USRDIR/EBOOT.BIN");
         byte[] sfo = ParamSfoParserTest.sfo(Map.of("TITLE", "Demon's\nSouls ", "TITLE_ID", "BLUS30443"));

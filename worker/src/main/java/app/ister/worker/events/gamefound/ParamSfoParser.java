@@ -3,9 +3,12 @@ package app.ister.worker.events.gamefound;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * Reads a PlayStation {@code PARAM.SFO} (PSF format): a little-endian header, an index table and
@@ -67,6 +70,29 @@ public final class ParamSfoParser {
             // binary blobs and truncated ints are not needed
         }
         return result;
+    }
+
+    private static final Pattern VERSION_LINE = Pattern.compile("^v?\\d+(\\.\\d+)+$");
+
+    /**
+     * The game's title: {@code TITLE} with its lines joined. Some discs break the name over two
+     * lines; an updated HDD (PSN) game carries its patch version on a line of its own
+     * ({@code "Uncharted: Drake's Fortune™\n1.02"}), which is no part of the name and is dropped.
+     * A bare number stays ({@code "Portal\n2"} is Portal 2).
+     */
+    public static Optional<String> title(Map<String, Object> entries) {
+        return string(entries, "TITLE").map(raw -> {
+            List<String> lines = new ArrayList<>();
+            for (String line : raw.split("\\r?\\n")) {
+                if (!line.strip().isEmpty()) {
+                    lines.add(line.strip());
+                }
+            }
+            while (lines.size() > 1 && VERSION_LINE.matcher(lines.getLast()).matches()) {
+                lines.removeLast();
+            }
+            return String.join(" ", lines).replaceAll("\\s+", " ").strip();
+        }).filter(value -> !value.isEmpty());
     }
 
     public static Optional<String> string(Map<String, Object> entries, String key) {
