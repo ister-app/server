@@ -94,6 +94,7 @@ public class ActivitySessionController {
 
     @PreAuthorize("hasRole('user')")
     @MutationMapping
+    @SuppressWarnings("java:S3516") // the schema promises true, also for a session that is already gone
     public boolean endActivity(@Argument UUID sessionId, Authentication authentication) {
         Optional<PlaybackStatusData> current = playbackSessionRegistry.find(sessionId);
         if (current.isEmpty()) {

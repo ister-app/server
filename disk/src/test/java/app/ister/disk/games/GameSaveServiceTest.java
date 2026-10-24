@@ -177,8 +177,9 @@ class GameSaveServiceTest {
     void rejectsABodyThatOutgrowsItsDeclaredLength() {
         properties.setSaveMaxBytes(DataSize.ofBytes(4));
 
-        assertThatThrownBy(() -> service.store(user, game, new GameSaveService.Upload(null, false, null, null, null),
-                body("way more than four"), 4))
+        GameSaveService.Upload upload = new GameSaveService.Upload(null, false, null, null, null);
+        InputStream oversized = body("way more than four");
+        assertThatThrownBy(() -> service.store(user, game, upload, oversized, 4))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("larger than 4 bytes");
         assertThat(rows).isEmpty();
@@ -187,8 +188,9 @@ class GameSaveServiceTest {
 
     @Test
     void rejectsAChecksumMismatch() {
-        assertThatThrownBy(() -> service.store(user, game,
-                new GameSaveService.Upload(null, false, null, null, "00ff"), body("zip"), 3))
+        GameSaveService.Upload upload = new GameSaveService.Upload(null, false, null, null, "00ff");
+        InputStream zip = body("zip");
+        assertThatThrownBy(() -> service.store(user, game, upload, zip, 3))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("checksum");
         assertThat(rows).isEmpty();

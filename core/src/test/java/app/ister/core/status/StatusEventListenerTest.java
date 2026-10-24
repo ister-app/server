@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -112,7 +113,7 @@ class StatusEventListenerTest {
         subject.onPlayback(data);
 
         verify(playbackSessionRegistry).remove(sessionId);
-        verify(playbackSessionRegistry, org.mockito.Mockito.never()).update(data);
+        verify(playbackSessionRegistry, never()).update(data);
         verify(broadcaster).emitNowPlaying(List.of());
     }
 

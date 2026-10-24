@@ -113,12 +113,12 @@ public final class PgsParser {
         /** 6-bit length, or 14-bit when flag 0x40 says a second length byte follows. */
         int runLength(int flags) {
             int run = flags & 0x3F;
-            return (flags & 0x40) != 0 ? (run << 8) | next() : run;
+            return (flags & 0x40) == 0 ? run : (run << 8) | next();
         }
 
         /** The colour byte when flag 0x80 says one follows; colour 0 otherwise. */
         int runColor(int flags) {
-            return (flags & 0x80) != 0 ? next() : 0;
+            return (flags & 0x80) == 0 ? 0 : next();
         }
     }
 

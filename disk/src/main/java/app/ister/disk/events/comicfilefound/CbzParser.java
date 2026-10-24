@@ -111,6 +111,6 @@ public class CbzParser {
     private static int compareDigits(String a, String b) {
         String sa = a.replaceFirst("^0+(?=.)", "");
         String sb = b.replaceFirst("^0+(?=.)", "");
-        return sa.length() != sb.length() ? Integer.compare(sa.length(), sb.length()) : sa.compareTo(sb);
+        return sa.length() == sb.length() ? sa.compareTo(sb) : Integer.compare(sa.length(), sb.length());
     }
 }

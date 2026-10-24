@@ -69,11 +69,9 @@ public class TmdbArtworkProvider implements RemoteArtworkProvider {
                         .map(s -> s.getTmdbId() == null ? List.<RemoteImageCandidate>of() : showImages(s.getTmdbId(), type))
                         .orElse(List.of());
                 case EPISODE -> episodeRepository.findById(target.id())
-                        .map(e -> episodeImages(e, type))
+                        .map(this::episodeImages)
                         .orElse(List.of());
-                case PERSON -> type != ImageType.COVER ? List.<RemoteImageCandidate>of() : personRepository.findById(target.id())
-                        .map(p -> p.getTmdbId() == null ? List.<RemoteImageCandidate>of() : personImages(p.getTmdbId().intValue()))
-                        .orElse(List.of());
+                case PERSON -> type == ImageType.COVER ? personCandidates(target) : List.of();
                 default -> List.of();
             };
         } catch (RuntimeException e) {
@@ -114,7 +112,7 @@ public class TmdbArtworkProvider implements RemoteArtworkProvider {
     }
 
     /** An episode has stills only; TMDB offers them for the background slot, and the scan stores them as COVER too. */
-    private List<RemoteImageCandidate> episodeImages(EpisodeEntity episode, ImageType type) {
+    private List<RemoteImageCandidate> episodeImages(EpisodeEntity episode) {
         Integer showTmdbId = episode.getShowEntity() == null ? null : episode.getShowEntity().getTmdbId();
         if (showTmdbId == null || episode.getSeasonEntity() == null) {
             return List.of();
@@ -127,6 +125,12 @@ public class TmdbArtworkProvider implements RemoteArtworkProvider {
         return body.getStills().stream()
                 .map(s -> candidate(s.getFilePath(), s.getWidth(), s.getHeight(), s.getIso6391(), s.getVoteAverage()))
                 .toList();
+    }
+
+    private List<RemoteImageCandidate> personCandidates(ImageTarget target) {
+        return personRepository.findById(target.id())
+                .map(p -> p.getTmdbId() == null ? List.<RemoteImageCandidate>of() : personImages(p.getTmdbId().intValue()))
+                .orElse(List.of());
     }
 
     private List<RemoteImageCandidate> personImages(int tmdbId) {
@@ -168,7 +172,7 @@ public class TmdbArtworkProvider implements RemoteArtworkProvider {
         try {
             String iso3 = Locale.forLanguageTag(iso6391.toString()).getISO3Language();
             return iso3.isEmpty() ? null : iso3;
-        } catch (RuntimeException e) {
+        } catch (RuntimeException _) {
             return null;
         }
     }

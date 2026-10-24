@@ -133,7 +133,8 @@ class ArtworkAdminServiceImplTest {
     @Test
     void selectVideoFrameOnlyForVideoItems() {
         ImageTarget album = new ImageTarget(ImageTarget.Kind.ALBUM, UUID.randomUUID());
-        assertThatThrownBy(() -> subject.selectVideoFrame(album, ImageType.COVER, UUID.randomUUID(), 1000))
+        UUID mediaFileId = UUID.randomUUID();
+        assertThatThrownBy(() -> subject.selectVideoFrame(album, ImageType.COVER, mediaFileId, 1000))
                 .isInstanceOf(IllegalArgumentException.class);
         verify(createBackground, never()).createBackground(any(), any(), any(), any(Long.class));
     }
@@ -144,7 +145,8 @@ class ArtworkAdminServiceImplTest {
         scanned.setSource(MetadataSource.TMDB);
         when(imageRepository.findById(scanned.getId())).thenReturn(Optional.of(scanned));
 
-        assertThatThrownBy(() -> subject.deleteUserImage(scanned.getId())).isInstanceOf(IllegalArgumentException.class);
+        UUID scannedId = scanned.getId();
+        assertThatThrownBy(() -> subject.deleteUserImage(scannedId)).isInstanceOf(IllegalArgumentException.class);
         verify(imageRepository, never()).delete(any());
 
         ImageEntity uploaded = image(ImageType.COVER, true);
@@ -168,9 +170,8 @@ class ArtworkAdminServiceImplTest {
     }
 
     private ImageEntity image(ImageType type, boolean selected) {
-        ImageEntity image = ImageEntity.builder().id(UUID.randomUUID()).type(type).selected(selected)
+        return ImageEntity.builder().id(UUID.randomUUID()).type(type).selected(selected)
                 .movieEntityId(movieId).directoryEntityId(cacheDir.getId()).path("/cache/" + UUID.randomUUID() + ".jpg").build();
-        return image;
     }
 
     private static byte[] png() throws IOException {

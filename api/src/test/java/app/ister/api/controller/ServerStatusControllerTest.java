@@ -34,6 +34,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ServerStatusControllerTest {
@@ -248,7 +250,7 @@ class ServerStatusControllerTest {
         assertEquals(0, session.followerCount(), "a reading session cannot be followed");
         assertEquals(0.4, session.progressFraction());
         assertEquals("Chapter 3", session.progressLabel());
-        org.mockito.Mockito.verify(playbackSharingService, org.mockito.Mockito.never())
+        verify(playbackSharingService, never())
                 .canControl(any(), any(), any(), any());
     }
 

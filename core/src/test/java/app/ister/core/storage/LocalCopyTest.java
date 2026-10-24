@@ -138,7 +138,7 @@ class LocalCopyTest {
             assertEquals(expectedTarget(URI), handle.path());
             assertEquals("epub bytes", Files.readString(handle.path()));
         }
-        verify(store).copyToLocal(eq(KEY), eq(expectedTarget(URI)));
+        verify(store).copyToLocal(KEY, expectedTarget(URI));
     }
 
     @Test
@@ -244,10 +244,12 @@ class LocalCopyTest {
         when(registry.forDirectory(s3Directory)).thenReturn(store);
         AtomicInteger downloads = new AtomicInteger();
         CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch othersStarted = new CountDownLatch(3);
         doAnswer(invocation -> {
             downloads.incrementAndGet();
             started.countDown();
-            Thread.sleep(50);
+            // keep the download in flight until the other readers are on their way to the same file
+            assertTrue(othersStarted.await(10, TimeUnit.SECONDS));
             Path target = invocation.getArgument(1);
             Files.createDirectories(target.getParent());
             Files.writeString(target, "epub bytes");
@@ -257,17 +259,20 @@ class LocalCopyTest {
         ExecutorService pool = Executors.newFixedThreadPool(4);
         try {
             List<Future<Path>> futures = List.of(
-                    pool.submit(() -> readThrough()),
+                    pool.submit(this::readThrough),
                     pool.submit(() -> {
                         started.await();
+                        othersStarted.countDown();
                         return readThrough();
                     }),
                     pool.submit(() -> {
                         started.await();
+                        othersStarted.countDown();
                         return readThrough();
                     }),
                     pool.submit(() -> {
                         started.await();
+                        othersStarted.countDown();
                         return readThrough();
                     }));
             for (Future<Path> future : futures) {

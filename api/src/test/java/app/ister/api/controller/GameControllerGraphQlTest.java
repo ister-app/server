@@ -165,11 +165,13 @@ class GameControllerGraphQlTest {
     void gameByIdIsNullWhenTheLibraryIsNotVisible() {
         when(libraryAccessService.canAccess(any(LibraryEntity.class), any())).thenReturn(false);
 
-        graphQlTester.document("""
+        Map<String, Object> data = graphQlTester.document("""
                         query($id: ID!) { gameById(id: $id) { id } }""")
                 .variable("id", gameId)
                 .execute()
-                .path("gameById").valueIsNull();
+                .path("$.data").entity(MAP).get();
+        assertTrue(data.containsKey("gameById"));
+        assertNull(data.get("gameById"));
     }
 
     // ---- Game scalar fields ------------------------------------------------------------------
@@ -202,12 +204,14 @@ class GameControllerGraphQlTest {
     void titleFromParamSfoWinsOverThePathName() {
         game.setTitle("Chrono Trigger");
 
-        graphQlTester.document("""
+        Map<String, Object> result = graphQlTester.document("""
                         query($id: ID!) { gameById(id: $id) { title steamAppId } }""")
                 .variable("id", gameId)
                 .execute()
-                .path("gameById.title").entity(String.class).isEqualTo("Chrono Trigger")
-                .path("gameById.steamAppId").valueIsNull();
+                .path("gameById").entity(MAP).get();
+        assertEquals("Chrono Trigger", result.get("title"));
+        assertTrue(result.containsKey("steamAppId"));
+        assertNull(result.get("steamAppId"));
     }
 
     @Test
@@ -287,11 +291,11 @@ class GameControllerGraphQlTest {
     void imagesAreEmptyForAGameWithoutArtwork() {
         when(imageRepository.findByGameEntityIdIn(List.of(gameId))).thenReturn(List.of());
 
-        graphQlTester.document("""
+        assertEquals(List.of(), graphQlTester.document("""
                         query($id: ID!) { gameById(id: $id) { images { id } } }""")
                 .variable("id", gameId)
                 .execute()
-                .path("gameById.images").entityList(Object.class).hasSize(0);
+                .path("gameById.images").entityList(Object.class).get());
     }
 
     @Test
@@ -449,10 +453,10 @@ class GameControllerGraphQlTest {
         when(libraryAccessService.allowedLibraryIds(any())).thenReturn(Optional.empty());
         when(gameRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(game)));
 
-        graphQlTester.document("""
+        assertEquals(gameId.toString(), graphQlTester.document("""
                         query { games { content { id } } }""")
                 .execute()
-                .path("games.content[0].id").entity(String.class).isEqualTo(gameId.toString());
+                .path("games.content[0].id").entity(String.class).get());
     }
 
     @Test
@@ -462,10 +466,10 @@ class GameControllerGraphQlTest {
         when(gameRepository.findByLibraryEntityIdInAndPlatform(eq(allowed), eq(GamePlatform.PS3), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()));
 
-        graphQlTester.document("""
+        assertEquals(0, graphQlTester.document("""
                         query { games(platform: PS3) { content { id } totalElements } }""")
                 .execute()
-                .path("games.totalElements").entity(Integer.class).isEqualTo(0);
+                .path("games.totalElements").entity(Integer.class).get());
     }
 
     // ---- gamePlatforms / recentAchievements ---------------------------------------------------

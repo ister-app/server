@@ -199,8 +199,9 @@ class ActivitySessionControllerTest {
 
     @Test
     void playbackMediaTypesAreRejected() {
+        UUID movieId = UUID.randomUUID();
         assertThrows(IllegalArgumentException.class, () -> subject.reportActivity(sessionId, MediaType.MOVIE,
-                UUID.randomUUID(), null, null, null, PlayState.PLAYING, deviceId, authentication));
+                movieId, null, null, null, PlayState.PLAYING, deviceId, authentication));
         verify(playbackStatusService, never()).publishActivity(any());
     }
 
@@ -209,8 +210,9 @@ class ActivitySessionControllerTest {
         when(playbackSessionRegistry.find(sessionId)).thenReturn(Optional.of(
                 PlaybackStatusData.builder().playQueueId(sessionId).userId(UUID.randomUUID()).build()));
 
+        UUID gameId = UUID.randomUUID();
         assertThrows(AccessDeniedException.class, () -> subject.reportActivity(sessionId, MediaType.GAME,
-                UUID.randomUUID(), null, null, null, PlayState.PLAYING, deviceId, authentication));
+                gameId, null, null, null, PlayState.PLAYING, deviceId, authentication));
         verify(playbackStatusService, never()).publishActivity(any());
     }
 

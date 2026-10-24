@@ -54,6 +54,7 @@ public class ArtworkAdminServiceImpl implements ArtworkAdminService {
     private static final String USER_AGENT = "IsterServer/1.0 (info@ister.app)";
     private static final HttpClient HTTP_CLIENT = JdkHttpClients.httpClient(Duration.ofSeconds(10));
     private static final Duration DOWNLOAD_TIMEOUT = Duration.ofMinutes(2);
+    private static final String IMAGE_JPEG = "image/jpeg";
 
     private final ImageRepository imageRepository;
     private final MediaFileRepository mediaFileRepository;
@@ -95,7 +96,7 @@ public class ArtworkAdminServiceImpl implements ArtworkAdminService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = IOException.class)
     public ImageEntity selectRemote(ImageTarget target, ImageType type, String sourceUri) throws IOException {
         String url = providers.stream()
                 .map(p -> p.downloadUrl(sourceUri))
@@ -112,14 +113,14 @@ public class ArtworkAdminServiceImpl implements ArtworkAdminService {
         Path downloaded = tempFile("artwork-", ".jpg");
         try {
             download(url, downloaded);
-            return store(target, type, downloaded, "image/jpeg", "jpg", sourceUri, MetadataSource.fromSourceUri(sourceUri).orElse(null));
+            return store(target, type, downloaded, IMAGE_JPEG, "jpg", sourceUri, MetadataSource.fromSourceUri(sourceUri).orElse(null));
         } finally {
             Files.deleteIfExists(downloaded);
         }
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = IOException.class)
     public ImageEntity selectVideoFrame(ImageTarget target, ImageType type, UUID mediaFileId, long positionMs) throws IOException {
         if (!target.hasVideo()) {
             throw new IllegalArgumentException("Only movies and episodes have a video to take a frame from");
@@ -144,19 +145,19 @@ public class ArtworkAdminServiceImpl implements ArtworkAdminService {
                 throw new IOException("ffmpeg produced no frame at " + positionMs + "ms");
             }
             String sourceUri = "frame://" + mediaFileId + "@" + positionMs;
-            return store(target, type, still, "image/jpeg", "jpg", sourceUri, MetadataSource.USER);
+            return store(target, type, still, IMAGE_JPEG, "jpg", sourceUri, MetadataSource.USER);
         } finally {
             Files.deleteIfExists(still);
         }
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = IOException.class)
     public ImageEntity storeUpload(ImageTarget target, ImageType type, byte[] body, String contentType, String sourceUri) throws IOException {
         String extension = switch (contentType) {
             case "image/png" -> "png";
             case "image/webp" -> "webp";
-            case "image/jpeg" -> "jpg";
+            case IMAGE_JPEG -> "jpg";
             default -> throw new IllegalArgumentException("Unsupported image type " + contentType);
         };
         Path uploaded = tempFile("upload-", "." + extension);

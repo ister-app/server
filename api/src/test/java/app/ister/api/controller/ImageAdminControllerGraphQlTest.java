@@ -27,8 +27,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /** Schema wiring and admin gating of the artwork API; the work itself is mocked ({@link ArtworkAdminService}). */
@@ -66,7 +64,7 @@ class ImageAdminControllerGraphQlTest {
         ImageEntity cover = image(ImageType.COVER, true, "TMDB://https://image.tmdb.org/t/p/original/a.jpg");
         ImageEntity background = image(ImageType.BACKGROUND, false, "file:///m/background.jpg");
         when(imageRepository.findByMovieEntityId(movieId)).thenReturn(List.of(cover, background));
-        when(provider.candidates(eq(new ImageTarget(ImageTarget.Kind.MOVIE, movieId)), eq(ImageType.COVER)))
+        when(provider.candidates(new ImageTarget(ImageTarget.Kind.MOVIE, movieId), ImageType.COVER))
                 .thenReturn(List.of(new RemoteImageCandidate("https://image.tmdb.org/t/p/w500/b.jpg",
                         "TMDB://https://image.tmdb.org/t/p/original/b.jpg", MetadataSource.TMDB, 2000, 3000, "eng", 5.2)));
 
@@ -130,14 +128,14 @@ class ImageAdminControllerGraphQlTest {
         when(artworkAdminService.selectVideoFrame(new ImageTarget(ImageTarget.Kind.MOVIE, movieId), ImageType.BACKGROUND, mediaFileId, 754000L))
                 .thenReturn(frame);
 
-        graphQlTester.document("""
+        GraphQlTester.Response response = graphQlTester.document("""
                         mutation($m: ID!, $f: ID!) {
                           selectVideoFrame(target: {movieId: $m}, type: BACKGROUND, mediaFileId: $f, positionMs: 754000) { id selected source }
                         }""")
                 .variable("m", movieId).variable("f", mediaFileId)
-                .execute()
-                .path("selectVideoFrame.selected").entity(Boolean.class).isEqualTo(true)
-                .path("selectVideoFrame.source").entity(String.class).isEqualTo("USER");
+                .execute();
+        assertEquals(true, response.path("selectVideoFrame.selected").entity(Boolean.class).get());
+        assertEquals("USER", response.path("selectVideoFrame.source").entity(String.class).get());
     }
 
     @Test
@@ -147,18 +145,18 @@ class ImageAdminControllerGraphQlTest {
                 .thenReturn(picked);
         when(artworkAdminService.select(picked.getId())).thenReturn(picked);
 
-        graphQlTester.document("""
+        assertEquals(picked.getId().toString(), graphQlTester.document("""
                         mutation($id: ID!, $uri: String!) {
                           selectRemoteImage(target: {showId: $id}, type: COVER, sourceUri: $uri) { id }
                         }""")
                 .variable("id", movieId).variable("uri", picked.getSourceUri())
                 .execute()
-                .path("selectRemoteImage.id").entity(String.class).isEqualTo(picked.getId().toString());
+                .path("selectRemoteImage.id").entity(String.class).get());
 
-        graphQlTester.document("mutation($id: ID!) { selectImage(imageId: $id) { id selected } }")
+        assertEquals(true, graphQlTester.document("mutation($id: ID!) { selectImage(imageId: $id) { id selected } }")
                 .variable("id", picked.getId())
                 .execute()
-                .path("selectImage.selected").entity(Boolean.class).isEqualTo(true);
+                .path("selectImage.selected").entity(Boolean.class).get());
     }
 
     @Test
@@ -187,9 +185,8 @@ class ImageAdminControllerGraphQlTest {
     }
 
     private ImageEntity image(ImageType type, boolean selected, String sourceUri) {
-        ImageEntity image = ImageEntity.builder().id(UUID.randomUUID()).type(type).selected(selected)
+        return ImageEntity.builder().id(UUID.randomUUID()).type(type).selected(selected)
                 .sourceUri(sourceUri).source(MetadataSource.fromSourceUri(sourceUri).orElse(null))
                 .movieEntityId(movieId).path("/cache/x.jpg").build();
-        return image;
     }
 }

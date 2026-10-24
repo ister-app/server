@@ -60,6 +60,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -202,7 +203,8 @@ class GameControllerTest {
         when(gameRepository.findById(game.getId())).thenReturn(Optional.of(game));
         when(libraryAccessService.canAccess(game.getLibraryEntity(), authentication)).thenReturn(false);
 
-        assertThrows(NoSuchElementException.class, () -> subject.recordGamePlayed(game.getId(), 1000, authentication));
+        UUID gameId = game.getId();
+        assertThrows(NoSuchElementException.class, () -> subject.recordGamePlayed(gameId, 1000, authentication));
         verifyNoInteractions(watchStatusService, continueWatchingService);
     }
 
@@ -213,7 +215,8 @@ class GameControllerTest {
         UUID unknown = UUID.randomUUID();
         when(gameRepository.findById(unknown)).thenReturn(Optional.empty());
 
-        assertThrows(NoSuchElementException.class, () -> subject.updateGameSavePaths(unknown, List.of("<home>/x")));
+        List<String> paths = List.of("<home>/x");
+        assertThrows(NoSuchElementException.class, () -> subject.updateGameSavePaths(unknown, paths));
         verify(gameRepository, never()).save(any());
     }
 
@@ -230,13 +233,13 @@ class GameControllerTest {
         GameSaveEntity head = GameSaveEntity.builder().version(5).build();
         when(gameSaveRepository.findByUserEntityIdAndGameEntityIdAndVersion(user.getId(), game.getId(), 2)).thenReturn(Optional.of(source));
         when(gameSaveRepository.findFirstByUserEntityIdAndGameEntityIdOrderByVersionDesc(user.getId(), game.getId())).thenReturn(Optional.of(head));
-        CacheStore store = org.mockito.Mockito.mock(CacheStore.class);
+        CacheStore store = mock(CacheStore.class);
         when(cacheDirectoryResolver.store()).thenReturn(store);
         when(store.directory()).thenReturn(cacheDir);
         InputStream body = new ByteArrayInputStream(new byte[17]);
         when(fileAccess.open(sourceDir, "/cache/saves/old/2.zip")).thenReturn(body);
         String expectedKey = "saves/" + user.getId() + "/" + game.getId() + "/6.zip";
-        when(store.write(eq(expectedKey), eq(body), eq(17L), eq("application/zip"))).thenReturn("/cache/" + expectedKey);
+        when(store.write(expectedKey, body, 17L, "application/zip")).thenReturn("/cache/" + expectedKey);
         when(gameSaveRepository.save(any(GameSaveEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         GameSaveEntity restored = subject.restoreGameSave(game.getId(), 2, authentication);
@@ -260,7 +263,7 @@ class GameControllerTest {
                 .sizeBytes(1).sha256("x").build();
         when(gameSaveRepository.findByUserEntityIdAndGameEntityIdAndVersion(user.getId(), game.getId(), 1)).thenReturn(Optional.of(source));
         when(gameSaveRepository.findFirstByUserEntityIdAndGameEntityIdOrderByVersionDesc(user.getId(), game.getId())).thenReturn(Optional.empty());
-        CacheStore store = org.mockito.Mockito.mock(CacheStore.class);
+        CacheStore store = mock(CacheStore.class);
         when(cacheDirectoryResolver.store()).thenReturn(store);
         when(store.directory()).thenReturn(dir);
         when(fileAccess.open(any(), anyString())).thenReturn(InputStream.nullInputStream());
@@ -279,7 +282,8 @@ class GameControllerTest {
         when(userService.getOrCreateUser(authentication)).thenReturn(user);
         when(gameSaveRepository.findByUserEntityIdAndGameEntityIdAndVersion(user.getId(), game.getId(), 9)).thenReturn(Optional.empty());
 
-        assertThrows(NoSuchElementException.class, () -> subject.restoreGameSave(game.getId(), 9, authentication));
+        UUID gameId = game.getId();
+        assertThrows(NoSuchElementException.class, () -> subject.restoreGameSave(gameId, 9, authentication));
         verifyNoInteractions(cacheDirectoryResolver, fileAccess);
     }
 

@@ -72,7 +72,7 @@ public final class ParamSfoParser {
         return result;
     }
 
-    private static final Pattern VERSION_LINE = Pattern.compile("^v?\\d+(\\.\\d+)+$");
+    private static final Pattern VERSION_LINE = Pattern.compile("^v?\\d++(?:\\.\\d++)++$");
 
     /**
      * The game's title: {@code TITLE} with its lines joined. Some discs break the name over two

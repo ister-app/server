@@ -47,7 +47,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.ArgumentMatchers.startsWith;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -139,7 +138,7 @@ class HandleGameFoundTest {
     void ps3TitleAndTitleIdComeFromParamSfoAndIconBecomesCover() throws IOException {
         GameEntity game = ps3Game("PS3_GAME/USRDIR/EBOOT.BIN");
         byte[] sfo = ParamSfoParserTest.sfo(Map.of("TITLE", "Demon's\nSouls ", "TITLE_ID", "BLUS30443"));
-        byte[] png = new byte[]{(byte) 0x89, 'P', 'N', 'G'};
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G'};
         when(gameRepository.findById(game.getId())).thenReturn(Optional.of(game));
         when(fileAccess.open(libraryDir, ROOT + "/PS3_GAME/PARAM.SFO")).thenReturn(new ByteArrayInputStream(sfo));
         when(imageRepository.findByGameEntityId(game.getId())).thenReturn(List.of());

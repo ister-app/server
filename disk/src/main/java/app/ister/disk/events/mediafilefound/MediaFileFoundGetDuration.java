@@ -60,7 +60,6 @@ public class MediaFileFoundGetDuration {
         if (longList.isEmpty()) {
             return 0L;
         } else {
-            Collections.sort(longList);
             return Collections.max(longList);
         }
 
