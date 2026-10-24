@@ -1,5 +1,33 @@
 # Changelog
 
+## server v5.5.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `5.5.0` |
+| `ghcr.io/ister-app/migrations` | `5.5.0` |
+
+### Features
+
+- feat(games): drop stale achievement definitions when a client reports a complete set ([`7f662401`](https://github.com/ister-app/server/commit/7f662401))
+
+### Fixes
+
+- fix(http): keep blocking socket reads off virtual threads ([`8cab2996`](https://github.com/ister-app/server/commit/8cab2996))
+- fix(build): compile the AOT test sources in a forked javac ([`2d7bf994`](https://github.com/ister-app/server/commit/2d7bf994))
+
+### Dependency updates
+
+- fix(deps): update dependencies ([`3e5edcf1`](https://github.com/ister-app/server/commit/3e5edcf1))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:5.5.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v5.4.0...v5.5.0
+
 ## server v5.4.0
 
 | Image | Tag |
