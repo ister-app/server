@@ -169,6 +169,20 @@ already-narrow source, an animated gif, no AWT in the native image — falls bac
 file rather than an error, and an unknown `?width=` on an older server is simply ignored. The ETag
 carries a `-w{width}` suffix so each variant revalidates on its own.
 
+## Admin artwork
+
+Admins change what an item shows ([chapter 3](03-media-types-and-metadata.md#artwork-chosen-by-an-admin-migration-v54)).
+GraphQL (`ImageAdminController`, every root field `hasRole('admin')`): `imageCandidates(target,
+type)` lists the stored images of that type plus TMDB's alternatives; `selectImage`,
+`selectRemoteImage`, `selectVideoFrame` and `clearSelectedImage` set or drop the choice,
+`deleteImage` removes an uploaded or grabbed image. `target` is an `ImageTargetInput` with exactly
+one id (`movieId`, `showId`, `episodeId`, `albumId`, `personId`, `bookId`, `podcastId`, `gameId`,
+`seriesId`); `Image.selected` tells clients which row won. The binary twin is
+`POST /artwork/upload?type=COVER|BACKGROUND&movieId=…` (disk module, `ArtworkUploadController`)
+with the image as the raw body (`image/jpeg`, `image/png`, `image/webp`, 20 MB max); it answers
+`{"imageId": …}`. Bearer JWT only, like the library upload, and deliberately not under `/images/`,
+where a stream token logs a caller in.
+
 ## Epub reading
 
 The client's epub reader loads books lazily through

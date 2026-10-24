@@ -7,6 +7,7 @@ import app.ister.core.config.LanguageProperties;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.PersonEntity;
 import app.ister.core.enums.EventType;
+import app.ister.core.entity.ImageEntity;
 import app.ister.core.enums.ImageType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.enums.MetadataSource;
@@ -69,7 +70,8 @@ public class HandlePersonFound implements Handle<PersonFoundData> {
             ActivityContext.subject(person.getName());
             ActivityContext.context(ActivitySubjects.PERSON, person.getId().toString(), person.getName());
             boolean hasMetadata = !metadataRepository.findByPersonEntityId(person.getId()).isEmpty();
-            boolean hasImage = !imageRepository.findByPersonEntityId(person.getId()).isEmpty();
+            // An admin-selected image does not count as "has image": the automatic portrait is still fetched.
+            boolean hasImage = !imageRepository.findByPersonEntityId(person.getId()).stream().allMatch(ImageEntity::isSelected);
             boolean needsBirthYear = person.getBirthYear() == null;
             // Still call the metadata source when the birth year is missing even if metadata+image
             // exist: that year is what links a music artist to the same person as a TMDB actor.

@@ -3,6 +3,7 @@ package app.ister.worker.events.analyzedata;
 import app.ister.core.Handle;
 import app.ister.core.MessageQueue;
 import app.ister.core.entity.DirectoryEntity;
+import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.NodeEntity;
@@ -34,6 +35,9 @@ import static app.ister.core.utils.AfterCommitPublisher.publishAfterCommit;
  * The FORCE refresh flow: deletes stored metadata/artwork/stream info first, then re-emits the
  * {@code *_FOUND} events so everything is re-fetched from the metadata services. Contrast with the
  * metadata backfill ({@code METADATA_BACKFILL_REQUESTED}), which only dispatches missing items.
+ *
+ * <p>An image the admin selected ({@code ImageEntity.selected}) is kept: the refresh deletes the
+ * other rows of the item and refetches, and the choice stays on top.
  *
  * <p>Deleting an ImageEntity row leaves its cache file behind on the node that downloaded it —
  * unlinking here would be unsafe (this handler may run on any node); the daily
@@ -93,7 +97,7 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
         } else if (data.getEpisodeId() != null) {
             episodeRepository.findById(data.getEpisodeId()).ifPresent(episodeEntity -> {
                 metadataRepository.deleteAll(metadataRepository.findByEpisodeEntityId(data.getEpisodeId()));
-                imageRepository.deleteAll(imageRepository.findByEpisodeEntityId(data.getEpisodeId()));
+                deleteUnselected(imageRepository.findByEpisodeEntityId(data.getEpisodeId()));
                 List<MediaFileEntity> mediaFiles = mediaFileRepository.findByEpisodeEntityId(data.getEpisodeId());
                 mediaFiles.forEach(mediaFileEntity -> mediaFileStreamRepository.deleteAllByMediaFileEntityId(mediaFileEntity.getId()));
                 // The *_FOUND consumer checks for existing metadata/image rows; publish only after
@@ -104,7 +108,7 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
         } else if (data.getMovieId() != null) {
             movieRepository.findById(data.getMovieId()).ifPresent(movieEntity -> {
                 metadataRepository.deleteAll(metadataRepository.findByMovieEntityId(data.getMovieId()));
-                imageRepository.deleteAll(imageRepository.findByMovieEntityId(data.getMovieId()));
+                deleteUnselected(imageRepository.findByMovieEntityId(data.getMovieId()));
                 List<MediaFileEntity> mediaFiles = mediaFileRepository.findByMovieEntityId(data.getMovieId());
                 mediaFiles.forEach(mediaFileEntity -> mediaFileStreamRepository.deleteAllByMediaFileEntityId(mediaFileEntity.getId()));
                 publishAfterCommit(() -> dispatcher.movieFound(data.getMovieId()));
@@ -116,7 +120,7 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
     private void handlePerson(AnalyzeData data) {
         personRepository.findById(data.getPersonId()).ifPresent(person -> {
             metadataRepository.deleteAll(metadataRepository.findByPersonEntityId(person.getId()));
-            imageRepository.deleteAll(imageRepository.findByPersonEntityId(person.getId()));
+            deleteUnselected(imageRepository.findByPersonEntityId(person.getId()));
             // Node-scoped for the disk handler (artist.nfo / folder artwork) AND global for the
             // worker's enrichment handler (MusicBrainz/Open Library/Wikipedia) — the node-scoped
             // send alone never reaches the external lookup.
@@ -137,7 +141,7 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
     private void handleAlbum(AnalyzeData data) {
         albumRepository.findById(data.getAlbumId()).ifPresent(album -> {
             metadataRepository.deleteAll(metadataRepository.findByAlbumEntityId(album.getId()));
-            imageRepository.deleteAll(imageRepository.findByAlbumEntityId(album.getId()));
+            deleteUnselected(imageRepository.findByAlbumEntityId(album.getId()));
             directoryRepository.findByLibraryEntityAndDirectoryType(album.getLibraryEntity(), DirectoryType.LIBRARY)
                     .stream()
                     .flatMap(dir -> nodeNamesOf(dir).stream())
@@ -173,7 +177,7 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
     private void handleBook(AnalyzeData data) {
         bookRepository.findById(data.getBookId()).ifPresent(book -> {
             metadataRepository.deleteAll(metadataRepository.findByBookEntityId(book.getId()));
-            imageRepository.deleteAll(imageRepository.findByBookEntityId(book.getId()));
+            deleteUnselected(imageRepository.findByBookEntityId(book.getId()));
             Map<UUID, DirectoryEntity> directories = directoriesById();
             List<MediaFileEntity> epubs = mediaFileRepository.findByBookEntityId(book.getId()).stream()
                     .filter(m -> m.getDirectoryEntityId() != null)
@@ -195,11 +199,11 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
     private void handleSeries(AnalyzeData data) {
         seriesRepository.findById(data.getSeriesId()).ifPresent(series -> {
             metadataRepository.deleteAll(metadataRepository.findBySeriesEntityId(series.getId()));
-            imageRepository.deleteAll(imageRepository.findBySeriesEntityId(series.getId()));
+            deleteUnselected(imageRepository.findBySeriesEntityId(series.getId()));
             publishAfterCommit(() -> dispatcher.comicSeriesFound(series.getId()));
             Map<UUID, DirectoryEntity> directories = directoriesById();
             bookRepository.findBySeriesEntityId(series.getId()).forEach(volume -> {
-                imageRepository.deleteAll(imageRepository.findByBookEntityId(volume.getId()));
+                deleteUnselected(imageRepository.findByBookEntityId(volume.getId()));
                 mediaFileRepository.findByBookEntityId(volume.getId()).stream()
                         .filter(m -> m.getDirectoryEntityId() != null)
                         .forEach(m -> Optional.ofNullable(directories.get(m.getDirectoryEntityId()))
@@ -237,7 +241,7 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
     private void handleShow(AnalyzeData data) {
         showRepository.findById(data.getShowId()).ifPresent(showEntity -> {
             metadataRepository.deleteAll(metadataRepository.findByShowEntityId(data.getShowId()));
-            imageRepository.deleteAll(imageRepository.findByShowEntityId(data.getShowId()));
+            deleteUnselected(imageRepository.findByShowEntityId(data.getShowId()));
             publishAfterCommit(() -> dispatcher.showFound(data.getShowId()));
             episodeRepository.findByShowEntityId(data.getShowId(), Sort.by("number"))
                     .forEach(episode -> publishAfterCommit(() -> messageSender.sendAnalyzeData(
@@ -262,6 +266,11 @@ public class AnalyzeDataHandle implements Handle<AnalyzeData> {
                                 .directoryId(dir.getId())
                                 .build(),
                         dir.getName()))));
+    }
+
+    /** Drops an item's images except the admin's choice, which a refresh must never undo. */
+    private void deleteUnselected(List<ImageEntity> images) {
+        imageRepository.deleteAll(images.stream().filter(image -> !image.isSelected()).toList());
     }
 
     private Map<UUID, DirectoryEntity> directoriesById() {

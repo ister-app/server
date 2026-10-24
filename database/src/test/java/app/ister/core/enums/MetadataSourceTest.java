@@ -22,6 +22,14 @@ class MetadataSourceTest {
     }
 
     @Test
+    void adminAddedImagesAreUserSourced() {
+        assertEquals(Optional.of(MetadataSource.USER),
+                MetadataSource.fromSourceUri("upload://0b1a9c2e-0000-0000-0000-000000000000/7f3c"));
+        assertEquals(Optional.of(MetadataSource.USER),
+                MetadataSource.fromSourceUri("frame://0b1a9c2e-0000-0000-0000-000000000000@754000"));
+    }
+
+    @Test
     void hostOverridesSchemeForCoverArtAndWikimediaDownloads() {
         assertEquals(Optional.of(MetadataSource.COVER_ART_ARCHIVE),
                 MetadataSource.fromSourceUri("MusicBrainz://https://coverartarchive.org/release-group/x/front"));

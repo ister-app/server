@@ -251,6 +251,43 @@ downloads ouder dan `podcast-retention-days` (default 30), behalve als iemand mi
 zit — de afleverings-rij blijft bestaan en kan opnieuw downloaden. Zoeken in de podcastdirectory
 loopt via de gratis iTunes Search API (`ItunesSearchService`, api-module).
 
+## Door een beheerder gekozen artwork (migratie V54)
+
+Scans en providers bepalen de artwork van een item automatisch: één `COVER` en één `BACKGROUND`
+per taal van TMDB (`posterPath`/`backdropPath`), de release-group-hoes van MusicBrainz, een
+Wikipedia-portret, een `folder.jpg` naast de bestanden, of — als een film of aflevering niets anders
+heeft — een frame dat ffmpeg uit het midden van de video pakt (`HandleMediaFileFound`). Clients
+kiezen zelf tussen die rijen (eerst een lokaal bestand, dan de laagste id;
+`ImageUtil.getImageByType` in de player, gespiegeld door `PlayQueueController.artworkOf`). Een
+beheerder kan dat overrulen:
+
+- **`ImageEntity.selected`** markeert dé afbeelding voor item en type (hoogstens één per
+  item+type). Clients en de server-side keuzes proberen eerst een geselecteerde afbeelding. De vlag
+  staat op de rij: de keuze *is* een rij, er is geen aparte override-tabel.
+- **Een geforceerde refresh behoudt haar.** `AnalyzeDataHandle` verwijdert de afbeeldingen van een
+  item behalve de geselecteerde voordat het `*_FOUND` opnieuw uitstuurt;
+  `HandleAlbumFound`/`HandlePersonFound` zien "alleen nog een geselecteerde afbeelding" als "nog
+  geen afbeelding", zodat de automatische hoes naast de keuze toch opnieuw wordt opgehaald.
+- **Waar nieuwe afbeeldingen vandaan komen** (`ArtworkAdminService`, disk-module; GraphQL in
+  `ImageAdminController`, [hoofdstuk 7](07-api-and-auth.md#beheerders-artwork)):
+  - een opgeslagen afbeelding (`selectImage`), bv. het gegenereerde videoframe boven de TMDB-still;
+  - een provider-alternatief (`imageCandidates.remote` → `selectRemoteImage`): `TmdbArtworkProvider`
+    (worker, een `RemoteArtworkProvider`) somt TMDB's volledige poster-/backdrop-/still-/profielsets
+    op voor films, shows, afleveringen en personen, met dezelfde `TMDB://<originele url>`-sourceUri
+    als de scan, zodat een kandidaat die de server al heeft wordt herkend en zonder download
+    geselecteerd. Alleen TMDB's eigen beeldhost wordt gedownload: de sourceUri is beheerdersinvoer;
+  - een frame uit de video van het item op een positie (`selectVideoFrame`): dezelfde ffmpeg-aanroep
+    als de automatische still, via `MediaFileInputResolver`, dus ook op een node die het bestand niet
+    heeft. De positie is de tijdlijn van het mediabestand zelf;
+  - een upload (`POST /artwork/upload`, jpeg/png/webp).
+
+  Deze rijen worden direct aangemaakt — niet via `IMAGE_FOUND`, de beheerder wacht — onder
+  `artwork/<uuid>.<ext>` in de cache-store van de node, met de blur-hash inline berekend (de sweep
+  draait alleen bij een metadata-refresh). Uploads en frames krijgen `sourceUri`
+  `upload://<user>/<uuid>` of `frame://<mediaFileId>@<ms>` en dus `MetadataSource.USER` (geen
+  bronvermelding); alleen die kunnen weer verwijderd worden (`deleteImage`). `clearSelectedImage`
+  geeft het slot terug aan de automatische regel.
+
 ## NFO-bestanden
 
 `HandleNfoFileFound` (disk) parst XML-NFO-bestanden naar metadata: titel, beschrijving en

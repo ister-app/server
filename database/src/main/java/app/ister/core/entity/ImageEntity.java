@@ -47,6 +47,14 @@ public class ImageEntity extends FileFromPathEntity {
 
     private String blurHash;
 
+    /**
+     * Chosen by an admin as the image to show for its item and type (at most one per item+type;
+     * see {@code ArtworkAdminService}). Clients and the server-side artwork pickers try a selected
+     * image first; a forced metadata refresh keeps selected rows and only refetches the rest.
+     */
+    @Column(nullable = false)
+    private boolean selected;
+
     @Getter(onMethod = @__(@JsonBackReference))
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "movie_entity_id", referencedColumnName = "id", insertable = false, updatable = false)

@@ -6,6 +6,7 @@ import app.ister.core.entity.PersonEntity;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.LibraryEntity;
+import app.ister.core.entity.ImageEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MovieEntity;
 import app.ister.core.entity.NodeEntity;
@@ -14,6 +15,7 @@ import app.ister.core.entity.ShowEntity;
 import app.ister.core.entity.TrackEntity;
 import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
+import app.ister.core.enums.ImageType;
 import app.ister.core.enums.LibraryType;
 import app.ister.core.eventdata.AnalyzeData;
 import app.ister.core.repository.AlbumRepository;
@@ -321,6 +323,22 @@ class AnalyzeDataHandleTest {
         verify(messageSender).sendAnalyzeData(captor.capture(), eq("movies"));
         assertEquals(movieId, captor.getValue().getMovieId());
         assertEquals(dir.getId(), captor.getValue().getDirectoryId());
+    }
+
+    @Test
+    void handleMovieIdKeepsTheAdminSelectedImage() {
+        UUID movieId = UUID.randomUUID();
+        MovieEntity movie = MovieEntity.builder().id(movieId).build();
+        ImageEntity scanned = ImageEntity.builder().id(UUID.randomUUID()).type(ImageType.COVER).build();
+        ImageEntity chosen = ImageEntity.builder().id(UUID.randomUUID()).type(ImageType.BACKGROUND).selected(true).build();
+        when(movieRepository.findById(movieId)).thenReturn(Optional.of(movie));
+        when(imageRepository.findByMovieEntityId(movieId)).thenReturn(List.of(scanned, chosen));
+        when(mediaFileRepository.findByMovieEntityId(movieId)).thenReturn(List.of());
+        when(directoryRepository.findAll()).thenReturn(List.of());
+
+        subject.handle(AnalyzeData.builder().eventType(EventType.ANALYZE_DATA).movieId(movieId).build());
+
+        verify(imageRepository).deleteAll(List.of(scanned));
     }
 
     @Test

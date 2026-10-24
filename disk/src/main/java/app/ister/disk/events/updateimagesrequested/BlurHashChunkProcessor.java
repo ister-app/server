@@ -50,7 +50,7 @@ public class BlurHashChunkProcessor {
     private long chunkSeconds = 120;
 
     /** Blur-hashes describe a few gradients; encoding a poster at full size is wasted CPU. */
-    static final int ENCODE_MAX_SIDE = 96;
+    public static final int ENCODE_MAX_SIDE = 96;
 
     /**
      * A processed chunk. {@code lastId} is the id of the final image, in the database's ordering,
@@ -100,7 +100,7 @@ public class BlurHashChunkProcessor {
      * Nearest-neighbour downscale to at most {@code maxSide} pixels on the long side. Plain pixel
      * sampling on purpose: no Graphics2D, which keeps it safe in the native image.
      */
-    static BufferedImage downscale(BufferedImage source, int maxSide) {
+    public static BufferedImage downscale(BufferedImage source, int maxSide) {
         int longSide = Math.max(source.getWidth(), source.getHeight());
         if (longSide <= maxSide) {
             return source;

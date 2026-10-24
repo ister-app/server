@@ -182,6 +182,20 @@ gif, geen AWT in de native image — valt terug op het originele bestand in plaa
 een onbekende `?width=` op een oudere server wordt simpelweg genegeerd. De ETag krijgt een
 `-w{breedte}`-achtervoegsel zodat elke variant zelfstandig hervalideert.
 
+## Beheerders-artwork
+
+Beheerders bepalen wat een item toont ([hoofdstuk 3](03-media-types-and-metadata.md#door-een-beheerder-gekozen-artwork-migratie-v54)).
+GraphQL (`ImageAdminController`, elk root-field `hasRole('admin')`): `imageCandidates(target, type)`
+somt de opgeslagen afbeeldingen van dat type plus de TMDB-alternatieven op; `selectImage`,
+`selectRemoteImage`, `selectVideoFrame` en `clearSelectedImage` zetten of laten de keuze los,
+`deleteImage` verwijdert een geüploade of gegrepen afbeelding. `target` is een `ImageTargetInput`
+met precies één id (`movieId`, `showId`, `episodeId`, `albumId`, `personId`, `bookId`,
+`podcastId`, `gameId`, `seriesId`); `Image.selected` vertelt clients welke rij gewonnen heeft. De
+binaire tegenhanger is `POST /artwork/upload?type=COVER|BACKGROUND&movieId=…` (disk-module,
+`ArtworkUploadController`) met de afbeelding als rauwe body (`image/jpeg`, `image/png`,
+`image/webp`, max. 20 MB); het antwoord is `{"imageId": …}`. Uitsluitend bearer-JWT, zoals de
+library-upload, en bewust niet onder `/images/`, waar een stream-token een aanroeper inlogt.
+
 ## Epub lezen
 
 De epub-lezer van de client laadt boeken lazy via

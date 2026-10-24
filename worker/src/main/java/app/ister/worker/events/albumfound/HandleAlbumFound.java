@@ -5,6 +5,7 @@ import app.ister.core.status.ActivityContext;
 import app.ister.core.Handle;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.enums.EventType;
+import app.ister.core.entity.ImageEntity;
 import app.ister.core.enums.ImageType;
 import app.ister.core.eventdata.AlbumFoundData;
 import app.ister.core.enums.SearchEntityType;
@@ -57,7 +58,9 @@ public class HandleAlbumFound implements Handle<AlbumFoundData> {
             String albumName = album.getName();
             ActivityContext.report(ActivitySubjects.describe(album, ActivitySubjects.empty()).withTitle(albumName));
 
-            if (imageRepository.findByAlbumEntityId(album.getId()).isEmpty()) {
+            // A selected (admin-chosen) image does not count: after a forced refresh it is the only
+            // row left and the automatic cover must still be fetched next to it.
+            if (imageRepository.findByAlbumEntityId(album.getId()).stream().allMatch(ImageEntity::isSelected)) {
                 musicBrainzService.getCoverArtUrl(artistName, albumName).ifPresentOrElse(
                         url -> {
                             try {

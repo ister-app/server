@@ -333,9 +333,13 @@ public class PlayQueueController {
         List<ImageEntity> covers =
                 images.stream().filter(image -> image.getType() == ImageType.COVER).toList();
         List<ImageEntity> pool = covers.isEmpty() ? images : covers;
+        // An admin's choice first (ImageEntity.selected), then the automatic rule.
         return pool.stream()
-                .filter(image -> image.getSource() == null || image.getSource() == MetadataSource.LOCAL_FILE)
+                .filter(ImageEntity::isSelected)
                 .findFirst()
+                .or(() -> pool.stream()
+                        .filter(image -> image.getSource() == null || image.getSource() == MetadataSource.LOCAL_FILE)
+                        .findFirst())
                 .or(() -> pool.stream().findFirst())
                 .map(ImageEntity::getId)
                 .orElse(null);

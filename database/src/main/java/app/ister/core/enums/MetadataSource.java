@@ -20,7 +20,12 @@ public enum MetadataSource {
     WIKIDATA("wikidata", "Wikidata", "https://www.wikidata.org"),
     OPEN_LIBRARY("openlibrary", "Open Library", "https://openlibrary.org"),
     PODCAST_FEED("feed", "Podcast feed", null),
-    LOCAL_FILE("file", "Local file", null);
+    LOCAL_FILE("file", "Local file", null),
+    /**
+     * Added by an admin through the artwork API: an upload ({@code upload://<user>/<uuid>}) or a
+     * frame grabbed from the item's own video ({@code frame://<mediaFileId>@<ms>}). No attribution.
+     */
+    USER(null, "User", null);
 
     private final String scheme;
     private final String displayName;
@@ -55,6 +60,9 @@ public enum MetadataSource {
             return Optional.of(WIKIMEDIA_COMMONS);
         }
         String scheme = lower.substring(0, schemeEnd);
+        if (scheme.equals("upload") || scheme.equals("frame")) {
+            return Optional.of(USER);
+        }
         for (MetadataSource source : values()) {
             if (scheme.equals(source.scheme)) {
                 return Optional.of(source);

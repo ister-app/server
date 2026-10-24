@@ -1,4 +1,9 @@
 type Query {
+    """
+    Admin only. What an item's artwork of one type could be: the images the server has (local
+    files, the scan's download, the generated video frame, uploads) plus the alternatives TMDB offers.
+    """
+    imageCandidates(target: ImageTargetInput!, type: ImageType!): ImageCandidates!
     "Admin only. Number of events whose handler kept failing and that wait in the dead-letter queue."
     deadLetterCount: Int!
     """
@@ -126,6 +131,53 @@ enum MetadataSource {
     OPEN_LIBRARY
     PODCAST_FEED
     LOCAL_FILE
+    "Added by an admin through the artwork API: an upload or a frame from the item's own video."
+    USER
+}
+
+"The two artwork slots an admin can fill; Image.type also knows ICON (achievements) and UNKNOWN."
+enum ImageType {
+    COVER
+    BACKGROUND
+}
+
+"""
+The item an artwork action is about: exactly one id must be set.
+"""
+input ImageTargetInput {
+    movieId: ID
+    showId: ID
+    episodeId: ID
+    albumId: ID
+    personId: ID
+    bookId: ID
+    podcastId: ID
+    gameId: ID
+    seriesId: ID
+}
+
+"""
+An image a metadata provider (TMDB) offers for an item that the server has not stored. previewUrl
+is a reduced-size variant for the picker; sourceUri is the provenance key the stored row gets, so a
+client can match it against Image.sourceUri to show "already on the server".
+"""
+type RemoteImageCandidate {
+    previewUrl: String!
+    sourceUri: String!
+    source: MetadataSource!
+    width: Int
+    height: Int
+    "ISO 639-3, or null for text-less artwork."
+    language: String
+    "The provider's own rating of the image, when it has one."
+    score: Float
+}
+
+type ImageCandidates {
+    "Every image the server has for the item and type, in id order; at most one is selected."
+    current: [Image!]!
+    "Alternatives the item's metadata provider offers; empty for items without a provider link."
+    remote: [RemoteImageCandidate!]!
 }
 
 type Attribution {
@@ -148,6 +200,22 @@ enum MetadataRefreshMode {
 }
 
 type Mutation {
+    "Admin only. Marks a stored image as the one to show for its item and type; clears the previous choice."
+    selectImage(imageId: ID!): Image!
+    """
+    Admin only. Downloads a provider alternative (a RemoteImageCandidate's sourceUri), stores it in
+    the cache and selects it. A candidate the server already has is selected without a download.
+    """
+    selectRemoteImage(target: ImageTargetInput!, type: ImageType!, sourceUri: String!): Image!
+    """
+    Admin only. Grabs one frame of the media file at positionMs (the file's own timeline) with
+    ffmpeg, stores it and selects it. Movies and episodes only.
+    """
+    selectVideoFrame(target: ImageTargetInput!, type: ImageType!, mediaFileId: ID!, positionMs: Int!): Image!
+    "Admin only. Drops the choice for an item and type: the automatic rule (local file, then lowest id) applies again."
+    clearSelectedImage(target: ImageTargetInput!, type: ImageType!): Boolean!
+    "Admin only. Deletes an image the admin added (source USER: upload or video frame). Scanned and provider images cannot be deleted."
+    deleteImage(imageId: ID!): Boolean!
     """
     Admin only. Scans the library folders for newly added files, optionally limited to one
     library. Cheap: already-known files are skipped. Does not re-fetch metadata for existing
@@ -1087,6 +1155,11 @@ type Image {
     show: Show
     blurHash: String
     directory: Directory!
+    """
+    Chosen by an admin as the one to show for its item and type (at most one per item+type).
+    Clients try a selected image first; a forced metadata refresh keeps it.
+    """
+    selected: Boolean!
 }
 
 type MediaFile {

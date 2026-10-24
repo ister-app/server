@@ -249,6 +249,40 @@ older than `podcast-retention-days` (default 30) unless someone is mid-episode �
 survives and can re-download. Directory search uses the free iTunes Search API
 (`ItunesSearchService`, api module).
 
+## Artwork chosen by an admin (migration V54)
+
+Scans and providers decide an item's artwork automatically: one `COVER` and one `BACKGROUND` per
+language from TMDB (`posterPath`/`backdropPath`), the MusicBrainz release-group cover, a Wikipedia
+portrait, a `folder.jpg` next to the files, or — when a movie or episode has nothing else — a frame
+ffmpeg grabs from the middle of the video (`HandleMediaFileFound`). Clients pick among those rows
+themselves (a local file first, then the lowest id; `ImageUtil.getImageByType` in the player,
+mirrored by `PlayQueueController.artworkOf`). An admin can overrule that:
+
+- **`ImageEntity.selected`** marks the one image to show for its item and type (at most one per
+  item+type). Clients and the server-side pickers try a selected image first. The flag lives on the
+  row: the choice *is* a row, there is no separate override table.
+- **A forced refresh keeps it.** `AnalyzeDataHandle` deletes an item's images except the selected
+  ones before re-emitting `*_FOUND`; `HandleAlbumFound`/`HandlePersonFound` treat "only a selected
+  image left" as "no image yet", so the automatic cover is still refetched next to the choice.
+- **Where new images come from** (`ArtworkAdminService`, disk module; GraphQL in
+  `ImageAdminController`, [chapter 7](07-api-and-auth.md#admin-artwork)):
+  - a stored image (`selectImage`), e.g. the generated video frame over the TMDB still;
+  - a provider alternative (`imageCandidates.remote` → `selectRemoteImage`): `TmdbArtworkProvider`
+    (worker, a `RemoteArtworkProvider`) lists TMDB's full poster/backdrop/still/profile sets for
+    movies, shows, episodes and people, with the same `TMDB://<original url>` sourceUri the scan
+    uses so a candidate the server already has is recognised and selected without a download. Only
+    TMDB's own image host is downloaded: the sourceUri is admin input;
+  - a frame from the item's own video at a position (`selectVideoFrame`): the same ffmpeg call as
+    the automatic still, through `MediaFileInputResolver`, so it works on a node that does not hold
+    the file. The position is the media file's own timeline;
+  - an upload (`POST /artwork/upload`, jpeg/png/webp).
+
+  These rows are created directly — not through `IMAGE_FOUND`, the admin is waiting — under
+  `artwork/<uuid>.<ext>` in the node's cache store, with the blur-hash computed inline (the sweep
+  only runs on a metadata refresh). Uploads and frames get `sourceUri` `upload://<user>/<uuid>` or
+  `frame://<mediaFileId>@<ms>` and thus `MetadataSource.USER` (no attribution); only those can be
+  deleted again (`deleteImage`). `clearSelectedImage` hands the slot back to the automatic rule.
+
 ## NFO files
 
 `HandleNfoFileFound` (disk) parses XML NFO files into metadata: title, description, release date for

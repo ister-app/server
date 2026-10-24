@@ -139,9 +139,12 @@ public class SeriesController {
     /** The series' own artwork (folder.jpg, wiki thumbnail) wins; else the first book's cover. */
     @SchemaMapping(typeName = "Series", field = "cover")
     public ImageEntity cover(SeriesEntity seriesEntity) {
-        Optional<ImageEntity> own = imageRepository.findBySeriesEntityId(seriesEntity.getId()).stream()
+        List<ImageEntity> ownCovers = imageRepository.findBySeriesEntityId(seriesEntity.getId()).stream()
                 .filter(image -> image.getType() == ImageType.COVER)
-                .findFirst();
+                .toList();
+        // The admin's selected cover first, then the first stored one.
+        Optional<ImageEntity> own = ownCovers.stream().filter(ImageEntity::isSelected).findFirst()
+                .or(() -> ownCovers.stream().findFirst());
         return own.orElseGet(() -> seriesEntity.getBookEntities().stream()
                 .flatMap(book -> imageRepository.findByBookEntityId(book.getId()).stream())
                 .filter(image -> image.getType() == ImageType.COVER)
