@@ -7,6 +7,8 @@ import app.ister.core.enums.DirectoryType;
 import app.ister.core.enums.EventType;
 import app.ister.core.enums.GameForm;
 import app.ister.core.enums.GamePlatform;
+import app.ister.core.enums.ImageType;
+import app.ister.core.enums.MetadataSource;
 import app.ister.core.eventdata.NewDirectoriesScanRequestedData;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.GameRepository;
@@ -38,6 +40,8 @@ import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -111,6 +115,13 @@ class GameLibraryScanIntegrationTest {
 
     private static HttpServer manifestServer;
 
+    /** Steam's store artwork for the Steam game, as the stub CDN serves it. */
+    private static byte[] steamArtwork() throws IOException {
+        ByteArrayOutputStream jpeg = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(6, 9, BufferedImage.TYPE_INT_RGB), "jpg", jpeg);
+        return jpeg.toByteArray();
+    }
+
     @Autowired
     private MessageSender messageSender;
     @Autowired
@@ -135,6 +146,14 @@ class GameLibraryScanIntegrationTest {
             exchange.getResponseBody().write(body);
             exchange.close();
         });
+        // Steam's CDN: the Steam game's cover and hero, so the test never reaches the internet.
+        byte[] artwork = steamArtwork();
+        manifestServer.createContext("/steam/apps/413150/", exchange -> {
+            exchange.getResponseHeaders().add("Content-Type", "image/jpeg");
+            exchange.sendResponseHeaders(200, artwork.length);
+            exchange.getResponseBody().write(artwork);
+            exchange.close();
+        });
         // Started from a daemon thread: the JDK server's dispatcher thread inherits that, so the
         // stub can never keep a JVM alive — Spring's test-AOT processing runs this method too
         // and would otherwise hang forever after it is done.
@@ -144,6 +163,8 @@ class GameLibraryScanIntegrationTest {
         starter.join();
         registry.add("app.ister.worker.ludusavi.manifest-url",
                 () -> "http://127.0.0.1:" + manifestServer.getAddress().getPort() + "/manifest.yaml");
+        registry.add("app.ister.worker.steam-artwork.cdn-base",
+                () -> "http://127.0.0.1:" + manifestServer.getAddress().getPort() + "/steam/apps");
     }
 
     @AfterAll
@@ -243,6 +264,14 @@ class GameLibraryScanIntegrationTest {
             assertEquals("STEAM_ID", steam.getManifestMatchedBy(), "Ludusavi matched on the Steam app id");
         });
         GameEntity steam = gameByName("Stardew Valley");
+        // No cover in its folder: Steam's store artwork (the stub CDN) fills both slots.
+        Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+            var images = imageRepository.findByGameEntityId(steam.getId());
+            assertTrue(images.stream().anyMatch(i -> i.getType() == ImageType.COVER && i.getSource() == MetadataSource.STEAM),
+                    "Steam cover");
+            assertTrue(images.stream().anyMatch(i -> i.getType() == ImageType.BACKGROUND && i.getSource() == MetadataSource.STEAM),
+                    "Steam background");
+        });
         assertEquals(GameForm.STEAM, steam.getForm());
         assertEquals(413150L, steam.getSteamAppId());
         assertEquals("Stardew Valley", steam.getSteamInstallDir());
