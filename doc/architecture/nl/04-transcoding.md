@@ -131,7 +131,11 @@ scheduler/prefetch stuurt later opnieuw — zodra interactieve playback een slot
 heeft. Achtergrond-FFmpeg draait daarnaast met OS-niceness (`app.ister.server.background-nice`, default 10, 0 = uit; dezelfde `BackgroundFfmpeg`-wrapper bedient de analyse-handlers in disk)
 via een bij startup gegenereerd wrapper-script, met terugval op normale prioriteit als `nice`
 ontbreekt. Een succesvolle pass schrijft een `done_<segmentPrefix>`-marker; alleen die marker (niet
-de enkele aanwezigheid van segmenten) laat een latere pre-transcode de pass overslaan.
+de enkele aanwezigheid van segmenten) laat een latere pre-transcode de pass overslaan. Diezelfde
+marker houdt de administratie van afgeronde passes in het geheugen eerlijk: een her-analyse wist de
+cache-dir vanuit de disk-module, die daar niet bij kan, dus een afgeronde pass waarvan de marker
+verdwenen is wordt vergeten en bij de volgende segment-request opnieuw gestart, in plaats van tot
+een herstart "segment not produced" te antwoorden.
 
 ## Crop-detectie en transcoderen
 

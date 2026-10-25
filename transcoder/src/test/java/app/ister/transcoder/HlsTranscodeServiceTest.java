@@ -214,11 +214,34 @@ class HlsTranscodeServiceTest {
     }
 
     @Test
-    void hasCompletedPassReturnsTrueWhenNormallyCompleted() {
+    void hasCompletedPassReturnsTrueWhenNormallyCompleted() throws IOException {
         String key = "test_video_720p";
+        Files.createDirectories(tempDir.resolve("test"));
+        Files.writeString(tempDir.resolve("test").resolve("done_seg_video_720p_"), "");
         activeGenerations().put(key, CompletableFuture.completedFuture(null));
 
         assertTrue(service.hasCompletedPass(key));
+    }
+
+    @Test
+    void hasCompletedPassForgetsPassWhoseOutputWasWipedFromDisk() throws IOException {
+        // Re-analysis deletes the cache dir; the playlists come back, the segments and marker do not.
+        UUID id = UUID.randomUUID();
+        Files.createDirectories(tempDir.resolve(id.toString()));
+        String key = id + "_audio_1_copy";
+        activeGenerations().put(key, CompletableFuture.completedFuture(null));
+
+        assertFalse(service.hasCompletedPass(key));
+        assertFalse(activeGenerations().containsKey(key));
+    }
+
+    @Test
+    void segmentPrefixOfMapsPassKeysToTheirSegmentPrefix() {
+        UUID id = UUID.randomUUID();
+        assertEquals("seg_video_720p_", HlsTranscodeService.segmentPrefixOf(id + "_video_720p"));
+        assertEquals("seg_audio_1_copy_", HlsTranscodeService.segmentPrefixOf(id + "_audio_1_copy"));
+        assertNull(HlsTranscodeService.segmentPrefixOf(id + "_sub_x"));
+        assertNull(HlsTranscodeService.segmentPrefixOf("nokey"));
     }
 
     @Test
@@ -362,6 +385,30 @@ class HlsTranscodeServiceTest {
         activeGenerations().put(key, CompletableFuture.failedFuture(new RuntimeException("crash")));
 
         assertThrows(IOException.class, () -> service.waitForSegment(seg, key));
+    }
+
+    @Test
+    void waitForSegmentServesSegmentOfANewPassAfterTheOldOutputWasWiped() throws IOException {
+        UUID id = UUID.randomUUID();
+        Path dir = Files.createDirectories(tempDir.resolve(id.toString()));
+        Path seg = dir.resolve("seg_audio_1_copy_00003.ts");
+        String key = id + "_audio_1_copy";
+        activeGenerations().put(key, CompletableFuture.completedFuture(null));
+        // The restarted pass writes the segment and its marker while the request polls.
+        Thread.startVirtualThread(() -> {
+            try {
+                Thread.sleep(300);
+                CompletableFuture<Void> rerun = new CompletableFuture<>();
+                activeGenerations().put(key, rerun);
+                Files.writeString(seg, "data");
+                Files.writeString(dir.resolve("done_seg_audio_1_copy_"), "");
+                rerun.complete(null);
+            } catch (IOException | InterruptedException e) {
+                throw new IllegalStateException(e);
+            }
+        });
+
+        assertEquals(seg, service.waitForSegment(seg, key));
     }
 
     @Test

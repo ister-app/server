@@ -124,7 +124,10 @@ scheduler/prefetch will resend — as soon as interactive playback needs a slot 
 FFmpeg additionally runs under OS niceness (`app.ister.server.background-nice`, default 10, 0 = off; the same `BackgroundFfmpeg` wrapper serves the analysis handlers in disk) via a wrapper
 script generated at startup, falling back to normal priority when `nice` is missing. A successful
 pass writes a `done_<segmentPrefix>` marker; only that marker (not the mere presence of segments)
-lets a later pre-transcode skip the pass.
+lets a later pre-transcode skip the pass. The marker is also what keeps the in-memory record of a
+finished pass honest: a re-analysis wipes the cache dir from the disk module, which cannot reach
+that record, so a completed pass whose marker is gone is forgotten and restarted on the next
+segment request instead of answering "segment not produced" until a restart.
 
 ## Crop detection and transcoding
 

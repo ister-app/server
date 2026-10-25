@@ -312,7 +312,35 @@ public class HlsTranscodeService {
 
     public boolean hasCompletedPass(String key) {
         CompletableFuture<Void> cf = activeGenerations.get(key);
-        return cf != null && cf.isDone() && !cf.isCompletedExceptionally();
+        return cf != null && cf.isDone() && !cf.isCompletedExceptionally() && !forgetIfWipedFromDisk(key, cf);
+    }
+
+    /**
+     * A pass that completed normally always left its done marker behind (it is written before the
+     * future completes). A missing marker means the cache dir was wiped underneath the in-memory
+     * record — by a re-analysis in disk ({@code HandleAnalyzeDataDisk.deleteHlsCache}), which cannot
+     * reach this bookkeeping. The record is forgotten so the next request starts a fresh pass,
+     * instead of answering "segment not produced" for every segment until the next restart.
+     *
+     * @return true when the record was stale (and is now removed)
+     */
+    private boolean forgetIfWipedFromDisk(String key, CompletableFuture<Void> cf) {
+        String segmentPrefix = segmentPrefixOf(key);
+        if (segmentPrefix == null) return false; // not a pass key: nothing on disk to judge by
+        Path cacheDir = Path.of(tmpDir, key.substring(0, key.indexOf('_')));
+        if (hasDoneMarker(cacheDir, segmentPrefix)) return false;
+        if (activeGenerations.remove(key, cf)) {
+            log.info("Pass {} completed but its output was removed from disk; it will be restarted", key);
+        }
+        return true;
+    }
+
+    /** {@code <mediaFileId>_video_<label>} / {@code <mediaFileId>_audio_<idx>_<label>} → its segment prefix, else null. */
+    static String segmentPrefixOf(String generationKey) {
+        int sep = generationKey.indexOf('_');
+        if (sep < 0) return null;
+        String rest = generationKey.substring(sep + 1);
+        return rest.startsWith("video_") || rest.startsWith("audio_") ? "seg_" + rest + "_" : null;
     }
 
     public boolean hasFailedPass(String key) {
@@ -1054,7 +1082,10 @@ public class HlsTranscodeService {
 
             CompletableFuture<Void> future = activeGenerations.get(generationKey);
 
-            if (future != null && future.isDone()) {
+            // A stale record (output wiped from disk) is dropped and polling continues: the
+            // caller's pass request starts a new pass under the same key.
+            if (future != null && future.isDone()
+                    && (future.isCompletedExceptionally() || !forgetIfWipedFromDisk(generationKey, future))) {
                 return resolveCompletedSegment(future, segmentPath, generationKey);
             }
 
