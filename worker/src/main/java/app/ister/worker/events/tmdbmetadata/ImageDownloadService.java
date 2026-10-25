@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.UUID;
 
 @Service
@@ -25,13 +26,24 @@ public class ImageDownloadService {
     public void downloadAndSave(String imageUrl, ImageType imageType, String language,
                                 String sourceUri,
                                 ImageSave.MediaEntityRef ref) throws IOException {
+        downloadAndSave(imageUrl, imageType, language, sourceUri, ref, null);
+    }
+
+    /** {@code timeout} bounds the download; null keeps {@link ImageDownload}'s default. */
+    public void downloadAndSave(String imageUrl, ImageType imageType, String language,
+                                String sourceUri,
+                                ImageSave.MediaEntityRef ref, Duration timeout) throws IOException {
         CacheStore cacheStore = cacheDirectoryResolver.store();
         String relativeKey = UUID.randomUUID() + ".jpg";
         // Downloaded to tmp first: the cache may be a bucket, and the store wants a finished file.
         Files.createDirectories(Path.of(tmpDir));
         Path downloaded = Files.createTempFile(Path.of(tmpDir), "artwork-", ".jpg");
         try {
-            imageDownload.download(imageUrl, downloaded.toString());
+            if (timeout == null) {
+                imageDownload.download(imageUrl, downloaded.toString());
+            } else {
+                imageDownload.download(imageUrl, downloaded.toString(), timeout);
+            }
             String storedPath = cacheStore.write(relativeKey, downloaded, "image/jpeg");
             imageSave.save(cacheStore.directory(), storedPath, imageType, language, sourceUri, ref);
         } finally {

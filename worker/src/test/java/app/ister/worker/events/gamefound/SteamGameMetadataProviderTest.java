@@ -12,8 +12,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
@@ -61,9 +64,9 @@ class SteamGameMetadataProviderTest {
         String cover = CDN + "/2950340/library_600x900.jpg";
         String hero = CDN + "/2950340/library_hero.jpg";
         verify(imageDownloadService).downloadAndSave(eq(cover), eq(ImageType.COVER), isNull(), eq("steam://" + cover),
-                argThat(ref -> ref.game() == game));
+                argThat(ref -> ref.game() == game), eq(Duration.ofSeconds(15)));
         verify(imageDownloadService).downloadAndSave(eq(hero), eq(ImageType.BACKGROUND), isNull(), eq("steam://" + hero),
-                argThat(ref -> ref.game() == game));
+                argThat(ref -> ref.game() == game), eq(Duration.ofSeconds(15)));
         assertEquals(MetadataSource.STEAM, MetadataSource.fromSourceUri("steam://" + cover).orElseThrow());
     }
 
@@ -94,10 +97,39 @@ class SteamGameMetadataProviderTest {
         GameEntity game = steamGame(620L);
         when(imageRepository.findByGameEntityId(game.getId())).thenReturn(List.of());
         doThrow(new IOException("HTTP 404")).when(imageDownloadService)
-                .downloadAndSave(eq(CDN + "/620/library_600x900.jpg"), any(), any(), any(), any());
+                .downloadAndSave(eq(CDN + "/620/library_600x900.jpg"), any(), any(), any(), any(), any());
 
         subject.enrich(game);
 
-        verify(imageDownloadService).downloadAndSave(eq(CDN + "/620/library_hero.jpg"), eq(ImageType.BACKGROUND), any(), any(), any());
+        verify(imageDownloadService).downloadAndSave(eq(CDN + "/620/library_hero.jpg"), eq(ImageType.BACKGROUND), any(), any(), any(), any());
+    }
+
+    @Test
+    void insideATransactionTheDownloadsWaitForTheCommit() throws IOException {
+        GameEntity game = steamGame(620L);
+        when(imageRepository.findByGameEntityId(game.getId())).thenReturn(List.of());
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            subject.enrich(game);
+            verifyNoInteractions(imageDownloadService);
+
+            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+            verify(imageDownloadService).downloadAndSave(eq(CDN + "/620/library_600x900.jpg"), eq(ImageType.COVER), any(), any(), any(), any());
+            verify(imageDownloadService).downloadAndSave(eq(CDN + "/620/library_hero.jpg"), eq(ImageType.BACKGROUND), any(), any(), any(), any());
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void aRuntimeFailureOfTheCacheStoreIsSwallowed() throws IOException {
+        GameEntity game = steamGame(620L);
+        when(imageRepository.findByGameEntityId(game.getId())).thenReturn(List.of());
+        doThrow(new IllegalStateException("no cache directory")).when(imageDownloadService)
+                .downloadAndSave(any(), any(), any(), any(), any(), any());
+
+        subject.enrich(game);
+
+        verify(imageDownloadService).downloadAndSave(eq(CDN + "/620/library_hero.jpg"), eq(ImageType.BACKGROUND), any(), any(), any(), any());
     }
 }

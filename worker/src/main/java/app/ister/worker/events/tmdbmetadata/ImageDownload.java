@@ -28,10 +28,15 @@ public class ImageDownload {
     private static final HttpClient HTTP_CLIENT = JdkHttpClients.httpClient(CONNECT_TIMEOUT);
 
     public void download(String imageUrl, String toPath) throws IOException {
+        download(imageUrl, toPath, REQUEST_TIMEOUT);
+    }
+
+    /** With a caller's own bound on the whole request, for downloads that are only nice to have. */
+    public void download(String imageUrl, String toPath, Duration timeout) throws IOException {
         Path target = Path.of(toPath);
         HttpRequest request = HttpRequest.newBuilder(URI.create(imageUrl))
                 .header("User-Agent", USER_AGENT)
-                .timeout(REQUEST_TIMEOUT)
+                .timeout(timeout)
                 .GET()
                 .build();
         HttpResponse<Path> response;
