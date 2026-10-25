@@ -232,7 +232,8 @@ steam/Stardew Valley (2016)/Stardew Valley/Stardew Valley.exe
 - **Steam**: de gamemap bevat de `appmanifest_<appid>.acf` uit een Steam-bibliotheek **én** de
   installatiemap die hij noemt (`installdir`), gekopieerd uit `steamapps/common`. Beide zijn
   verplicht; de player zet ze terug in een lokale Steam-bibliotheek en start de game via Steam, dus
-  het spelende Steam-account moet de game bezitten.
+  het spelende Steam-account moet de game bezitten. Zonder `cover.jpg` in de map komen de cover en
+  achtergrond uit Steams winkel-artwork voor de app-id.
 - Artwork: `.jpg`/`.jpeg`/`.png` met `cover`, `folder`, `poster` of `background` in de naam, direct
   in de gamemap.
 

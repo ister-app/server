@@ -52,5 +52,6 @@ class MetadataBackfillHandleTest {
         verify(metadataBackfillService).applyBookSeriesHeuristics(libraryId);
         verify(metadataBackfillService).dispatchBookSeriesNfoEvents(libraryId);
         verify(metadataBackfillService).dispatchMissingComicMetadataEvents(libraryId);
+        verify(metadataBackfillService).dispatchMissingGameArtworkEvents(libraryId);
     }
 }

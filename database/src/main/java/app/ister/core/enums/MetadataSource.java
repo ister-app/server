@@ -21,6 +21,8 @@ public enum MetadataSource {
     OPEN_LIBRARY("openlibrary", "Open Library", "https://openlibrary.org"),
     PODCAST_FEED("feed", "Podcast feed", null),
     LOCAL_FILE("file", "Local file", null),
+    /** Steam's public CDN artwork for a Steam game ({@code steam://https://cdn...}). */
+    STEAM("steam", "Steam", "https://store.steampowered.com"),
     /**
      * Added by an admin through the artwork API: an upload ({@code upload://<user>/<uuid>}) or a
      * frame grabbed from the item's own video ({@code frame://<mediaFileId>@<ms>}). No attribution.

@@ -3,8 +3,8 @@ package app.ister.worker.events.gamefound;
 import app.ister.core.entity.GameEntity;
 
 /**
- * A source of game metadata (description, release year, cover) by title and platform. Phase 1
- * ships without one ({@link NoopGameMetadataProvider}); IGDB can slot in behind the same call.
+ * A source of game metadata (description, release year, cover) by title and platform. Today that
+ * is Steam's artwork ({@link SteamGameMetadataProvider}); IGDB can slot in behind the same call.
  */
 public interface GameMetadataProvider {
 

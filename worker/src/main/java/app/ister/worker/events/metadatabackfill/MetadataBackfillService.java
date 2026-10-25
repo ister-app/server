@@ -12,6 +12,7 @@ import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.GameRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.MovieRepository;
@@ -62,6 +63,7 @@ public class MetadataBackfillService {
     private final TrackRepository trackRepository;
     private final BookRepository bookRepository;
     private final SeriesRepository seriesRepository;
+    private final GameRepository gameRepository;
     private final BookSeriesService bookSeriesService;
     private final MediaFileRepository mediaFileRepository;
     private final MetadataRepository metadataRepository;
@@ -231,6 +233,18 @@ public class MetadataBackfillService {
                 .filter(m -> m.getDirectoryEntityId() != null)
                 .forEach(m -> Optional.ofNullable(directories.get(m.getDirectoryEntityId()))
                         .ifPresent(dir -> dispatcher.comicVolumeFileFound(dir, volume.getId(), m))));
+    }
+
+    /**
+     * Games without any artwork: their enrichment runs again, which is where a PS3 game's
+     * ICON0.PNG and a Steam game's store artwork are picked up (an unchanged game is never
+     * re-enriched by a scan).
+     */
+    @Transactional(readOnly = true)
+    public void dispatchMissingGameArtworkEvents(UUID libraryId) {
+        gameRepository.findWithoutImages().stream()
+                .filter(g -> inLibrary(libraryId, g.getLibraryEntity()))
+                .forEach(game -> dispatcher.gameFound(game.getId()));
     }
 
     private void sendNfoFileFoundForBook(BookEntity book, Map<UUID, DirectoryEntity> directories) {

@@ -10,6 +10,7 @@ import app.ister.core.eventdata.ComicFileFoundData;
 import app.ister.core.eventdata.ComicSeriesFoundData;
 import app.ister.core.eventdata.EpisodeFoundData;
 import app.ister.core.eventdata.EpubFileFoundData;
+import app.ister.core.eventdata.GameFoundData;
 import app.ister.core.eventdata.MovieFoundData;
 import app.ister.core.eventdata.NfoFileFoundData;
 import app.ister.core.eventdata.PersonFoundData;
@@ -75,6 +76,12 @@ public class FoundEventDispatcher {
     public void bookFound(UUID bookId) {
         messageSender.sendBookFound(
                 BookFoundData.builder().eventType(EventType.BOOK_FOUND).bookId(bookId).build());
+    }
+
+    /** Re-runs the game enrichment (PARAM.SFO, save paths, Steam artwork) in the worker. */
+    public void gameFound(UUID gameId) {
+        messageSender.sendGameFound(
+                GameFoundData.builder().eventType(EventType.GAME_FOUND).gameId(gameId).build());
     }
 
     public void comicSeriesFound(UUID seriesId) {

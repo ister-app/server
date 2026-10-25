@@ -50,5 +50,6 @@ public class MetadataBackfillHandle implements Handle<MetadataBackfillRequestedD
         metadataBackfillService.applyBookSeriesHeuristics(libraryId);
         metadataBackfillService.dispatchBookSeriesNfoEvents(libraryId);
         metadataBackfillService.dispatchMissingComicMetadataEvents(libraryId);
+        metadataBackfillService.dispatchMissingGameArtworkEvents(libraryId);
     }
 }

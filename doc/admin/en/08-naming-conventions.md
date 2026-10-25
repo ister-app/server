@@ -223,7 +223,8 @@ steam/Stardew Valley (2016)/Stardew Valley/Stardew Valley.exe
 - **Steam**: the game folder holds the `appmanifest_<appid>.acf` from a Steam library **and** the
   install folder it names (`installdir`), copied from `steamapps/common`. Both are required; the
   player restores them into a local Steam library and starts the game through Steam, so the Steam
-  account playing must own the game.
+  account playing must own the game. Without a `cover.jpg` in the folder, the cover and background
+  come from Steam's store artwork for the app id.
 - Artwork: `.jpg`/`.jpeg`/`.png` whose name contains `cover`, `folder`, `poster` or `background`,
   directly in the game folder.
 

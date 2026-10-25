@@ -199,8 +199,9 @@ app-id → entry, genormaliseerde titel → entry); de matching is strikt (app-i
 genormaliseerde titel — een verkeerde map is erger dan geen synchronisatie). Het resultaat komt in
 `manifest_save_paths` (JSON, `GameSavePaths`: padsjablonen met Ludusavi-placeholders zoals
 `<winAppData>`, plus een `os`), `manifest_matched_by` en `steam_cloud`; de `save_paths`-override van
-een beheerder wint altijd. `GameMetadataProvider` is de seam voor een externe bron (IGDB) — nu
-`NoopGameMetadataProvider`.
+een beheerder wint altijd. `GameMetadataProvider` is de seam voor een externe bron: `SteamGameMetadataProvider` geeft een
+Steam-game zonder artwork een cover en achtergrond van Steams publieke CDN (op app-id,
+`steam://`-sourceUri); IGDB kan later volgen.
 
 **Manifest en bestanden** (`GameResourceController`, disk): `GET /game/{id}/manifest` somt elk
 bestand op (pad, grootte, `lastModified`, entry-vlag) plus een `version` en `updatedAt` (de nieuwste

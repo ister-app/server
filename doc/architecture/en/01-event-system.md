@@ -108,7 +108,7 @@ cache-directory queue is always consumed by its owner, offloaded or not. The dep
 | `HandlePersonFound` | worker | `PERSON_FOUND` (global queue) | — |
 | `HandleAlbumFound` | worker | `ALBUM_FOUND` (global queue) | `IMAGE_FOUND` |
 | `HandleBookFound` | worker | `BOOK_FOUND` | `IMAGE_FOUND` (Open Library cover, only when none exists yet) |
-| `HandleGameFound` | worker | `GAME_FOUND` | `IMAGE_FOUND` (PS3 `ICON0.PNG` cover, only when none exists yet), `SEARCH_INDEX_REQUESTED` |
+| `HandleGameFound` | worker | `GAME_FOUND` | `IMAGE_FOUND` (PS3 `ICON0.PNG` cover / Steam CDN cover + background, only when none exists yet), `SEARCH_INDEX_REQUESTED` |
 | `HandleComicSeriesFound` | worker | `COMIC_SERIES_FOUND` | `IMAGE_FOUND` (Wikipedia thumbnail, only when no local artwork) |
 | `HandlePodcastRefreshRequested` | worker | `PODCAST_REFRESH_REQUESTED` | `IMAGE_FOUND` (feed cover), `PODCAST_EPISODE_DOWNLOAD_REQUESTED` (newest N) |
 | `HandleContinueWatchingRebuildRequested` | worker | `CONTINUE_WATCHING_REBUILD_REQUESTED` | — |

@@ -131,6 +131,8 @@ enum MetadataSource {
     OPEN_LIBRARY
     PODCAST_FEED
     LOCAL_FILE
+    "Steam's public artwork of a Steam game."
+    STEAM
     "Added by an admin through the artwork API: an upload or a frame from the item's own video."
     USER
 }

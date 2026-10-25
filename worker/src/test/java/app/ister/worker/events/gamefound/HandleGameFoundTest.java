@@ -450,13 +450,6 @@ class HandleGameFoundTest {
     }
 
     @Test
-    void noopProviderNeverReportsAChange() {
-        GameEntity game = pcGame(GameForm.ROM, "Super Metroid", null);
-        assertFalse(new NoopGameMetadataProvider().enrich(game));
-        assertNull(game.getTitle());
-    }
-
-    @Test
     void providerChangeIsSavedTogetherWithTheManifestResult() {
         GameEntity game = pcGame(GameForm.STEAM, "Stardew Valley", null);
         game.setSteamAppId(413150L);

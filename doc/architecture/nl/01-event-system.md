@@ -110,7 +110,7 @@ helper-schijven met de `TRANSCODE`-job.
 | `HandlePersonFound` | worker | `PERSON_FOUND` (globale queue) | — |
 | `HandleAlbumFound` | worker | `ALBUM_FOUND` (globale queue) | `IMAGE_FOUND` |
 | `HandleBookFound` | worker | `BOOK_FOUND` | `IMAGE_FOUND` (Open Library-cover, alleen als er nog geen is) |
-| `HandleGameFound` | worker | `GAME_FOUND` | `IMAGE_FOUND` (PS3-`ICON0.PNG`-cover, alleen als er nog geen is), `SEARCH_INDEX_REQUESTED` |
+| `HandleGameFound` | worker | `GAME_FOUND` | `IMAGE_FOUND` (PS3-`ICON0.PNG`-cover / Steam-CDN-cover + -achtergrond, alleen als er nog geen is), `SEARCH_INDEX_REQUESTED` |
 | `HandleComicSeriesFound` | worker | `COMIC_SERIES_FOUND` | `IMAGE_FOUND` (Wikipedia-thumbnail, alleen zonder lokale artwork) |
 | `HandlePodcastRefreshRequested` | worker | `PODCAST_REFRESH_REQUESTED` | `IMAGE_FOUND` (feed-cover), `PODCAST_EPISODE_DOWNLOAD_REQUESTED` (nieuwste N) |
 | `HandleContinueWatchingRebuildRequested` | worker | `CONTINUE_WATCHING_REBUILD_REQUESTED` | — |

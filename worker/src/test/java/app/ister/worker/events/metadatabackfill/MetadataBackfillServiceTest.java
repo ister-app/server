@@ -3,6 +3,7 @@ package app.ister.worker.events.metadatabackfill;
 import app.ister.core.entity.AlbumEntity;
 import app.ister.core.entity.BookEntity;
 import app.ister.core.entity.DirectoryEntity;
+import app.ister.core.entity.GameEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
 import app.ister.core.entity.MetadataEntity;
@@ -16,6 +17,7 @@ import app.ister.core.repository.AlbumRepository;
 import app.ister.core.repository.BookRepository;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.EpisodeRepository;
+import app.ister.core.repository.GameRepository;
 import app.ister.core.repository.MediaFileRepository;
 import app.ister.core.repository.MetadataRepository;
 import app.ister.core.repository.MovieRepository;
@@ -66,6 +68,8 @@ class MetadataBackfillServiceTest {
     private BookRepository bookRepository;
     @Mock
     private SeriesRepository seriesRepository;
+    @Mock
+    private GameRepository gameRepository;
     @Mock
     private BookSeriesService bookSeriesService;
     @Mock
@@ -265,5 +269,21 @@ class MetadataBackfillServiceTest {
 
         verify(dispatcher).comicSeriesFound(series.getId());
         verify(dispatcher).comicVolumeFileFound(dir, volume.getId(), cbz);
+    }
+
+    @Test
+    void dispatchesGamesWithoutArtworkInTheLibrary() {
+        LibraryEntity games = LibraryEntity.builder().id(UUID.randomUUID()).libraryType(LibraryType.GAME).name("Games").build();
+        LibraryEntity other = LibraryEntity.builder().id(UUID.randomUUID()).libraryType(LibraryType.GAME).name("Other").build();
+        GameEntity lego = GameEntity.builder().libraryEntity(games).name("LEGO Harry Potter Collection").steamAppId(2950340L).build();
+        lego.setId(UUID.randomUUID());
+        GameEntity elsewhere = GameEntity.builder().libraryEntity(other).name("Portal 2").steamAppId(620L).build();
+        elsewhere.setId(UUID.randomUUID());
+        when(gameRepository.findWithoutImages()).thenReturn(List.of(lego, elsewhere));
+
+        subject.dispatchMissingGameArtworkEvents(games.getId());
+
+        verify(dispatcher).gameFound(lego.getId());
+        verify(dispatcher, never()).gameFound(elsewhere.getId());
     }
 }
