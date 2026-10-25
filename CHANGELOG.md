@@ -1,5 +1,31 @@
 # Changelog
 
+## server v5.6.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `5.6.0` |
+| `ghcr.io/ister-app/migrations` | `5.6.0` |
+
+### Features
+
+- feat(status): show reading and gaming as activity sessions in now playing ([`87af9da9`](https://github.com/ister-app/server/commit/87af9da9))
+- feat(artwork): let admins choose, upload or grab an item's cover and background ([`316299cc`](https://github.com/ister-app/server/commit/316299cc))
+
+### Fixes
+
+- fix: resolve open SonarCloud issues ([`1c9827e6`](https://github.com/ister-app/server/commit/1c9827e6))
+- fix(games): drop the patch version a PARAM.SFO carries in its title ([`32598397`](https://github.com/ister-app/server/commit/32598397))
+- fix(games): give a changed achievement icon a new image id ([`31b8e854`](https://github.com/ister-app/server/commit/31b8e854))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:5.6.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v5.5.0...v5.6.0
+
 ## server v5.5.0
 
 | Image | Tag |
