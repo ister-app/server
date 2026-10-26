@@ -1,5 +1,33 @@
 # Changelog
 
+## server v5.7.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `5.7.0` |
+| `ghcr.io/ister-app/migrations` | `5.7.0` |
+
+### Features
+
+- feat(games): fetch Steam store artwork for games without any ([`03e0c2ff`](https://github.com/ister-app/server/commit/03e0c2ff))
+
+### Fixes
+
+- fix(transcoder): restart a completed pass whose output was wiped from disk ([`9df66d10`](https://github.com/ister-app/server/commit/9df66d10))
+- fix(games): fetch Steam artwork after the GAME_FOUND commit ([`30b14bbd`](https://github.com/ister-app/server/commit/30b14bbd))
+
+### Other
+
+- test(games): serve the Steam artwork from the stub CDN ([`fc0b5126`](https://github.com/ister-app/server/commit/fc0b5126))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:5.7.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v5.6.0...v5.7.0
+
 ## server v5.6.0
 
 | Image | Tag |
