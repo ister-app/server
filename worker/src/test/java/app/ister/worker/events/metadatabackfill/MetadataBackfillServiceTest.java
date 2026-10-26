@@ -279,7 +279,7 @@ class MetadataBackfillServiceTest {
         lego.setId(UUID.randomUUID());
         GameEntity elsewhere = GameEntity.builder().libraryEntity(other).name("Portal 2").steamAppId(620L).build();
         elsewhere.setId(UUID.randomUUID());
-        when(gameRepository.findWithoutImages()).thenReturn(List.of(lego, elsewhere));
+        when(gameRepository.findWithoutArtwork()).thenReturn(List.of(lego, elsewhere));
 
         subject.dispatchMissingGameArtworkEvents(games.getId());
 

@@ -235,6 +235,24 @@ class HandleGameFoundTest {
     }
 
     @Test
+    void ps3TrophyIconsDoNotStopTheIconBecomingTheCover() throws IOException {
+        GameEntity game = ps3Game("PS3_GAME/USRDIR/EBOOT.BIN");
+        when(gameRepository.findById(game.getId())).thenReturn(Optional.of(game));
+        when(fileAccess.open(libraryDir, ROOT + "/PS3_GAME/PARAM.SFO")).thenThrow(new IOException("disk gone"));
+        when(imageRepository.findByGameEntityId(game.getId()))
+                .thenReturn(List.of(ImageEntity.builder().id(UUID.randomUUID()).type(ImageType.ICON).build()));
+        when(fileAccess.exists(libraryDir, ROOT + "/PS3_GAME/ICON0.PNG")).thenReturn(true);
+        when(fileAccess.open(libraryDir, ROOT + "/PS3_GAME/ICON0.PNG")).thenReturn(new ByteArrayInputStream(new byte[]{1}));
+        when(cacheDirectoryResolver.store()).thenReturn(cacheStore);
+        when(cacheStore.directory()).thenReturn(cacheDir);
+        when(cacheStore.write(anyString(), any(byte[].class), eq("image/png"))).thenReturn("/cache/games/x.png");
+
+        subject.handle(event(game.getId()));
+
+        verify(imageSave).save(same(cacheDir), eq("/cache/games/x.png"), eq(ImageType.COVER), isNull(), anyString(), any());
+    }
+
+    @Test
     void ps3UnreadableSfoIsLoggedNotFatal() throws IOException {
         GameEntity game = ps3Game("PS3_GAME/USRDIR/EBOOT.BIN");
         when(gameRepository.findById(game.getId())).thenReturn(Optional.of(game));

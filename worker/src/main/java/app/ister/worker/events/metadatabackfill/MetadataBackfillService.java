@@ -242,7 +242,7 @@ public class MetadataBackfillService {
      */
     @Transactional(readOnly = true)
     public void dispatchMissingGameArtworkEvents(UUID libraryId) {
-        gameRepository.findWithoutImages().stream()
+        gameRepository.findWithoutArtwork().stream()
                 .filter(g -> inLibrary(libraryId, g.getLibraryEntity()))
                 .forEach(game -> dispatcher.gameFound(game.getId()));
     }

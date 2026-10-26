@@ -18,7 +18,8 @@ import java.time.Duration;
  * Artwork for Steam games from Steam's public CDN, keyed by app id: the 600x900 library capsule as
  * the cover and the library hero as the background. Only a game without any artwork gets them, so
  * a cover in the game folder (or an admin's choice) always wins and a rescan does not fetch them
- * again. Other games, and Steam games without an app id, are left alone.
+ * again; achievement icons do not count as artwork ({@link GameArtwork}). Other games, and Steam
+ * games without an app id, are left alone.
  *
  * <p>The downloads run after the GAME_FOUND transaction commits, with a short timeout of their
  * own: a slow CDN then only delays the artwork, not the save paths and title stored with it, and
@@ -49,7 +50,7 @@ public class SteamGameMetadataProvider implements GameMetadataProvider {
     @Override
     public boolean enrich(GameEntity game) {
         Long appId = game.getSteamAppId();
-        if (!enabled || appId == null || !imageRepository.findByGameEntityId(game.getId()).isEmpty()) {
+        if (!enabled || appId == null || GameArtwork.present(imageRepository.findByGameEntityId(game.getId()))) {
             return false;
         }
         Runnable downloads = () -> {

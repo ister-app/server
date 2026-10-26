@@ -122,7 +122,7 @@ public class HandleGameFound implements Handle<GameFoundData> {
 
     /** ICON0.PNG becomes the cover when the game folder has no artwork of its own. */
     private void saveIconIfNoArtwork(GameEntity game) {
-        if (!imageRepository.findByGameEntityId(game.getId()).isEmpty()) {
+        if (GameArtwork.present(imageRepository.findByGameEntityId(game.getId()))) {
             return;
         }
         Optional<String> iconPath = ps3File(game, "ICON0.PNG");

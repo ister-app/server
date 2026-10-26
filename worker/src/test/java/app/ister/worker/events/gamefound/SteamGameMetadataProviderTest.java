@@ -81,6 +81,17 @@ class SteamGameMetadataProviderTest {
     }
 
     @Test
+    void achievementIconsAreNotArtwork() throws IOException {
+        GameEntity game = steamGame(2950340L);
+        when(imageRepository.findByGameEntityId(game.getId()))
+                .thenReturn(List.of(ImageEntity.builder().type(ImageType.ICON).sourceUri("achievement://x/STEAM/ACH_1").build()));
+
+        subject.enrich(game);
+
+        verify(imageDownloadService).downloadAndSave(eq(CDN + "/2950340/library_600x900.jpg"), eq(ImageType.COVER), any(), any(), any(), any());
+    }
+
+    @Test
     void gamesWithoutAnAppIdAreLeftAlone() {
         subject.enrich(steamGame(null));
         verifyNoInteractions(imageRepository, imageDownloadService);

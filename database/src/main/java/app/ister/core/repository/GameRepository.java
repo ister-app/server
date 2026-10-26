@@ -37,9 +37,13 @@ public interface GameRepository extends JpaRepository<GameEntity, UUID> {
 
     long countByLibraryEntityId(UUID libraryId);
 
-    /** Games without any artwork row: the image refresh looks for covers for these. */
-    @Query("select g from GameEntity g where g.imageEntities is empty")
-    List<GameEntity> findWithoutImages();
+    /**
+     * Games without any artwork: the image refresh looks for covers for these. Achievement icons
+     * (ICON images) hang off the game too but are not artwork.
+     */
+    @Query("select g from GameEntity g where not exists (select i from ImageEntity i where i.gameEntity = g"
+            + " and (i.type is null or i.type <> app.ister.core.enums.ImageType.ICON))")
+    List<GameEntity> findWithoutArtwork();
 
     @Query("select g.id from GameEntity g where g.libraryEntity.id = :libraryId")
     List<UUID> findIdsByLibraryEntityId(@Param("libraryId") UUID libraryId);

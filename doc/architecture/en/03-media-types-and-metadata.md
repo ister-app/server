@@ -199,7 +199,8 @@ than no sync). The result lands in `manifest_save_paths` (JSON, `GameSavePaths`:
 with Ludusavi placeholders like `<winAppData>`, plus an `os`), `manifest_matched_by` and
 `steam_cloud`; an admin's `save_paths` override always wins. `GameMetadataProvider` is the seam
 for an external source: `SteamGameMetadataProvider` gives a Steam game without artwork its cover
-and background from Steam's public CDN (by app id, `steam://` sourceUri); IGDB could follow.
+and background from Steam's public CDN (by app id, `steam://` sourceUri; achievement icons do not
+count as artwork); IGDB could follow.
 
 **Manifest and files** (`GameResourceController`, disk): `GET /game/{id}/manifest` lists every
 file (path, size, `lastModified`, entry flag) plus a `version` and `updatedAt` (the newest file

@@ -201,7 +201,7 @@ genormaliseerde titel — een verkeerde map is erger dan geen synchronisatie). H
 `<winAppData>`, plus een `os`), `manifest_matched_by` en `steam_cloud`; de `save_paths`-override van
 een beheerder wint altijd. `GameMetadataProvider` is de seam voor een externe bron: `SteamGameMetadataProvider` geeft een
 Steam-game zonder artwork een cover en achtergrond van Steams publieke CDN (op app-id,
-`steam://`-sourceUri); IGDB kan later volgen.
+`steam://`-sourceUri; achievement-iconen tellen niet als artwork); IGDB kan later volgen.
 
 **Manifest en bestanden** (`GameResourceController`, disk): `GET /game/{id}/manifest` somt elk
 bestand op (pad, grootte, `lastModified`, entry-vlag) plus een `version` en `updatedAt` (de nieuwste
