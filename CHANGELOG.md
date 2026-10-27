@@ -1,5 +1,24 @@
 # Changelog
 
+## server v5.7.1
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `5.7.1` |
+| `ghcr.io/ister-app/migrations` | `5.7.1` |
+
+### Fixes
+
+- fix(games): achievement icons no longer count as a game's artwork ([`99c3ac12`](https://github.com/ister-app/server/commit/99c3ac12))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:5.7.1
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v5.7.0...v5.7.1
+
 ## server v5.7.0
 
 | Image | Tag |
