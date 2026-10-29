@@ -74,6 +74,13 @@ administration — the details are in [chapter 09](09-users-sharing-and-access.m
   writable and can grow while people stream.
 - `./media/` — your media, mounted read-mostly; the server writes nothing into it.
 
+The server image runs as **UID/GID 1000**, not root. Docker creates a missing bind-mount
+directory as root, so create `cache-data/` and `transcode-tmp/` yourself and give them to 1000
+(`mkdir -p cache-data transcode-tmp && sudo chown 1000:1000 cache-data transcode-tmp`); an
+existing installation needs the same `chown -R` once when upgrading. `./media/` only has to be
+readable for 1000. With VAAPI, add the host's `render` group to the container (`group_add`)
+so it can open `/dev/dri/renderD128`.
+
 ## The images
 
 Two images are published to GHCR, always tagged **in lockstep**:

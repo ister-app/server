@@ -94,6 +94,11 @@ services:
 #      HLS_HWACCEL_DEVICE: /dev/dri/renderD128
       # NVDEC (NVIDIA):
 #      HLS_HWACCEL: nvdec
+    # The image runs as UID/GID 1000. Docker creates a missing bind-mount directory as
+    # root, which the server then cannot write to, so create them first:
+    #   mkdir -p cache-data transcode-tmp && sudo chown 1000:1000 cache-data transcode-tmp
+    # Media only needs to be readable for 1000. For VAAPI, also add the host's `render`
+    # group (getent group render) under group_add.
     volumes:
       # Your media. The quick start scans ./media/shows/ as the "shows" library.
       - ./media/:/media/:Z

@@ -12,5 +12,12 @@ RUN dnf install -y \
     libva-intel-driver \
     intel-media-driver \
     && dnf clean all
+# Runs as UID/GID 1000, not root (same user as Dockerfile). /cache and /tmp/ister are
+# the default mount points (docker-compose.yml), created here so a named volume starts
+# out owned by that user. A bind mount keeps the owner it has on the host: chown it to 1000.
+RUN useradd --uid 1000 --user-group --home-dir /home/app --no-create-home ister \
+    && mkdir -p /cache /tmp/ister \
+    && chown ister:ister /home/app /cache /tmp/ister
 COPY ./server/build/native/nativeCompile /home/app
+USER 1000:1000
 ENTRYPOINT ["/home/app/server"]

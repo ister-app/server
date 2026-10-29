@@ -77,6 +77,13 @@ zetten; `user` geeft toegang, `admin` geeft beheer — de details staan in
   schrijfbaar zijn en kan groeien terwijl er gestreamd wordt.
 - `./media/` — je media, vrijwel alleen-lezen gemount; de server schrijft er niets in.
 
+Het server-image draait als **UID/GID 1000**, niet als root. Docker maakt een ontbrekende
+bind-mount-map aan als root, dus maak `cache-data/` en `transcode-tmp/` zelf aan en geef ze aan
+1000 (`mkdir -p cache-data transcode-tmp && sudo chown 1000:1000 cache-data transcode-tmp`); een
+bestaande installatie heeft bij de upgrade eenmalig dezelfde `chown -R` nodig. `./media/` hoeft
+alleen leesbaar te zijn voor 1000. Met VAAPI voeg je de `render`-groep van de host toe aan de
+container (`group_add`), zodat hij `/dev/dri/renderD128` kan openen.
+
 ## De images
 
 Twee images worden gepubliceerd op GHCR, altijd **in lockstep** getagd:
