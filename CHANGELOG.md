@@ -1,5 +1,24 @@
 # Changelog
 
+## server v6.0.0
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `6.0.0` |
+| `ghcr.io/ister-app/migrations` | `6.0.0` |
+
+### Breaking changes
+
+- feat(docker)!: run the server image as UID 1000 instead of root ([`ae4d1e7e`](https://github.com/ister-app/server/commit/ae4d1e7e))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:6.0.0
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v5.7.1...v6.0.0
+
 ## server v5.7.1
 
 | Image | Tag |
