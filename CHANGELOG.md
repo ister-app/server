@@ -1,5 +1,24 @@
 # Changelog
 
+## server v6.0.1
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `6.0.1` |
+| `ghcr.io/ister-app/migrations` | `6.0.1` |
+
+### Fixes
+
+- fix(scanner): create shows, seasons and episodes race-free ([`aa61125b`](https://github.com/ister-app/server/commit/aa61125b))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:6.0.1
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v6.0.0...v6.0.1
+
 ## server v6.0.0
 
 | Image | Tag |
