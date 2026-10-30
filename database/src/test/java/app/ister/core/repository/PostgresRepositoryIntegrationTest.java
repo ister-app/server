@@ -120,6 +120,9 @@ class PostgresRepositoryIntegrationTest {
     private EpisodeRepository episodeRepository;
 
     @Autowired
+    private SeasonRepository seasonRepository;
+
+    @Autowired
     private ImageRepository imageRepository;
 
     @Autowired
@@ -287,6 +290,36 @@ class PostgresRepositoryIntegrationTest {
         assertEquals(volumeId, bookRepository
                 .findBySeriesEntityAndNameAndPathYear(series, "aot_vol27", 0)
                 .orElseThrow().getId());
+    }
+
+    /**
+     * The show/season/episode insert-ignore upserts the scanner's parallel consumers race on:
+     * the first insert reports 1, the duplicate 0 and leaves the winner's row alone.
+     */
+    @Test
+    void showSeasonEpisodeInsertIgnoreUpsertsReportInsertedVersusLostRace() {
+        LibraryEntity library = em.persist(LibraryEntity.builder()
+                .name("shows").libraryType(LibraryType.SHOW).build());
+        em.flush();
+
+        UUID showId = UUID.randomUUID();
+        assertEquals(1, showRepository.insertShowIfAbsent(showId, library.getId(), "Cicada", 2021));
+        assertEquals(0, showRepository.insertShowIfAbsent(UUID.randomUUID(), library.getId(), "Cicada", 2021),
+                "duplicate must be a no-op");
+        ShowEntity show = showRepository.findByLibraryEntityAndNameAndReleaseYear(library, "Cicada", 2021).orElseThrow();
+        assertEquals(showId, show.getId(), "the first insert's row must survive the lost race");
+
+        UUID seasonId = UUID.randomUUID();
+        assertEquals(1, seasonRepository.insertSeasonIfAbsent(seasonId, showId, 1));
+        assertEquals(0, seasonRepository.insertSeasonIfAbsent(UUID.randomUUID(), showId, 1));
+        SeasonEntity season = seasonRepository.findByShowEntityAndNumber(show, 1).orElseThrow();
+        assertEquals(seasonId, season.getId());
+
+        UUID episodeId = UUID.randomUUID();
+        assertEquals(1, episodeRepository.insertEpisodeIfAbsent(episodeId, showId, seasonId, 1));
+        assertEquals(0, episodeRepository.insertEpisodeIfAbsent(UUID.randomUUID(), showId, seasonId, 1));
+        assertEquals(episodeId, episodeRepository
+                .findByShowEntityAndSeasonEntityAndNumber(show, season, 1).orElseThrow().getId());
     }
 
     @Test

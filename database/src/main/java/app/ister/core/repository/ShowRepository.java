@@ -6,6 +6,7 @@ import app.ister.core.entity.ShowEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -16,6 +17,24 @@ import java.util.UUID;
 
 public interface ShowRepository extends JpaRepository<ShowEntity, UUID> {
     Optional<ShowEntity> findByLibraryEntityAndNameAndReleaseYear(LibraryEntity libraryEntity, String name, int releaseYear);
+
+    /**
+     * Race-safe show create: the media file, its nfo and the show's tvshow.nfo are scanned by
+     * parallel consumers that all try to create the same show, so a find-then-save loses on the
+     * {@code (library_entity_id, name, release_year)} unique constraint and poisons the whole
+     * transaction. Returns 1 when this call inserted the row, 0 when a concurrent transaction beat
+     * it to it.
+     */
+    @Modifying
+    @Query(value = """
+            INSERT INTO show_entity (id, date_created, date_updated, library_entity_id, name, release_year)
+            VALUES (:id, now(), now(), :libraryId, :name, :releaseYear)
+            ON CONFLICT (library_entity_id, name, release_year) DO NOTHING
+            """, nativeQuery = true)
+    int insertShowIfAbsent(@Param("id") UUID id,
+                           @Param("libraryId") UUID libraryId,
+                           @Param("name") String name,
+                           @Param("releaseYear") int releaseYear);
 
     Page<ShowEntity> findByLibraryEntity(LibraryEntity libraryEntity, Pageable pageable);
 

@@ -11,6 +11,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -24,6 +25,18 @@ import java.util.UUID;
 public interface EpisodeRepository extends JpaRepository<EpisodeEntity, UUID> {
 
     Optional<EpisodeEntity> findByShowEntityAndSeasonEntityAndNumber(ShowEntity showEntity, SeasonEntity seasonEntity, int number);
+
+    /** Race-safe episode create, see {@link ShowRepository#insertShowIfAbsent}. 1 = inserted, 0 = lost the race. */
+    @Modifying
+    @Query(value = """
+            INSERT INTO episode_entity (id, date_created, date_updated, show_entity_id, season_entity_id, number)
+            VALUES (:id, now(), now(), :showId, :seasonId, :number)
+            ON CONFLICT (show_entity_id, season_entity_id, number) DO NOTHING
+            """, nativeQuery = true)
+    int insertEpisodeIfAbsent(@Param("id") UUID id,
+                              @Param("showId") UUID showId,
+                              @Param("seasonId") UUID seasonId,
+                              @Param("number") int number);
 
     Page<EpisodeEntity> findAll(Pageable pageable);
 

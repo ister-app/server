@@ -75,16 +75,25 @@ public class ScannerHelperService {
      * - Else create and return it.
      */
     public ShowEntity getOrCreateShow(LibraryEntity libraryEntity, String showName, int releaseYear) {
-        return showRepository.findByLibraryEntityAndNameAndReleaseYear(libraryEntity, showName, releaseYear)
-                .orElseGet(() -> {
-                    ShowEntity showEntity = ShowEntity.builder()
-                            .libraryEntity(libraryEntity)
-                            .name(showName)
-                            .releaseYear(releaseYear).build();
-                    showRepository.save(showEntity);
-                    serverEventService.createShowFoundEvent(showEntity.getId());
-                    return showEntity;
-                });
+        Optional<ShowEntity> existing =
+                showRepository.findByLibraryEntityAndNameAndReleaseYear(libraryEntity, showName, releaseYear);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        // Insert-ignore like getOrCreateComicSeries: an episode file, its nfo and tvshow.nfo are
+        // scanned by parallel consumers, and the losing save() poisoned its transaction. With show,
+        // season and episode each racing, a message could lose a different race on every retry and
+        // end up dead-lettered — the episode's media file then never got indexed.
+        boolean inserted = showRepository.insertShowIfAbsent(
+                UUID.randomUUID(), libraryEntity.getId(), showName, releaseYear) == 1;
+        ShowEntity showEntity = showRepository
+                .findByLibraryEntityAndNameAndReleaseYear(libraryEntity, showName, releaseYear)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Show vanished right after upsert: " + showName + " (" + releaseYear + ")"));
+        if (inserted) {
+            serverEventService.createShowFoundEvent(showEntity.getId());
+        }
+        return showEntity;
     }
 
     /**
@@ -94,14 +103,15 @@ public class ScannerHelperService {
      */
     public SeasonEntity getOrCreateSeason(LibraryEntity libraryEntity, String showName, int releaseYear, int seasonNumber) {
         ShowEntity showEntity = getOrCreateShow(libraryEntity, showName, releaseYear);
+        Optional<SeasonEntity> existing = seasonRepository.findByShowEntityAndNumber(showEntity, seasonNumber);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        // Insert-ignore for the same reason as getOrCreateShow.
+        seasonRepository.insertSeasonIfAbsent(UUID.randomUUID(), showEntity.getId(), seasonNumber);
         return seasonRepository.findByShowEntityAndNumber(showEntity, seasonNumber)
-                .orElseGet(() -> {
-                    SeasonEntity seasonEntity = SeasonEntity.builder()
-                            .showEntity(showEntity)
-                            .number(seasonNumber).build();
-                    seasonRepository.save(seasonEntity);
-                    return seasonEntity;
-                });
+                .orElseThrow(() -> new IllegalStateException(
+                        "Season vanished right after upsert: " + showName + " season " + seasonNumber));
     }
 
     /**
@@ -407,18 +417,24 @@ public class ScannerHelperService {
     public EpisodeEntity getOrCreateEpisode(LibraryEntity libraryEntity, String showName, int releaseYear, int seasonNumber, int episodeNumber) {
         ShowEntity showEntity = getOrCreateShow(libraryEntity, showName, releaseYear);
         SeasonEntity seasonEntity = getOrCreateSeason(libraryEntity, showName, releaseYear, seasonNumber);
-        return episodeRepository.findByShowEntityAndSeasonEntityAndNumber(showEntity, seasonEntity, episodeNumber)
-                .orElseGet(() -> {
-                    EpisodeEntity episodeEntity = EpisodeEntity.builder()
-                            .showEntity(showEntity)
-                            .seasonEntity(seasonEntity)
-                            .number(episodeNumber).build();
-                    episodeRepository.save(episodeEntity);
-                    serverEventService.createEpisodeFoundEvent(episodeEntity.getId());
-                    // A new episode of a show someone had watched to the end puts that show back in
-                    // their continue-watching list, instead of only after the nightly rebuild.
-                    continueWatchingService.recomputeForShow(showEntity.getId());
-                    return episodeEntity;
-                });
+        Optional<EpisodeEntity> existing =
+                episodeRepository.findByShowEntityAndSeasonEntityAndNumber(showEntity, seasonEntity, episodeNumber);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        // Insert-ignore for the same reason as getOrCreateShow; only the winner fires the events.
+        boolean inserted = episodeRepository.insertEpisodeIfAbsent(
+                UUID.randomUUID(), showEntity.getId(), seasonEntity.getId(), episodeNumber) == 1;
+        EpisodeEntity episodeEntity = episodeRepository
+                .findByShowEntityAndSeasonEntityAndNumber(showEntity, seasonEntity, episodeNumber)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Episode vanished right after upsert: " + showName + " s" + seasonNumber + "e" + episodeNumber));
+        if (inserted) {
+            serverEventService.createEpisodeFoundEvent(episodeEntity.getId());
+            // A new episode of a show someone had watched to the end puts that show back in
+            // their continue-watching list, instead of only after the nightly rebuild.
+            continueWatchingService.recomputeForShow(showEntity.getId());
+        }
+        return episodeEntity;
     }
 }

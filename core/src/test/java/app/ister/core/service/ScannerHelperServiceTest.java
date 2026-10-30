@@ -88,21 +88,34 @@ class ScannerHelperServiceTest {
                 .thenReturn(Optional.of(existing));
 
         assertEquals(existing, subject.getOrCreateShow(library, "Show", 2024));
-        verify(showRepository, never()).save(any());
+        verify(showRepository, never()).insertShowIfAbsent(any(), any(), any(), anyInt());
         verifyNoInteractions(serverEventService);
     }
 
     @Test
     void getOrCreateShowCreatesNewShow() {
+        ShowEntity created = ShowEntity.builder().name("Show").releaseYear(2024).build();
+        created.setId(UUID.randomUUID());
+        // Not there before the insert-ignore, there after it.
         when(showRepository.findByLibraryEntityAndNameAndReleaseYear(library, "Show", 2024))
-                .thenReturn(Optional.empty());
+                .thenReturn(Optional.empty(), Optional.of(created));
+        when(showRepository.insertShowIfAbsent(any(), any(), eq("Show"), eq(2024))).thenReturn(1);
 
-        ShowEntity result = subject.getOrCreateShow(library, "Show", 2024);
+        assertEquals(created, subject.getOrCreateShow(library, "Show", 2024));
+        verify(serverEventService).createShowFoundEvent(created.getId());
+    }
 
-        assertEquals("Show", result.getName());
-        assertEquals(2024, result.getReleaseYear());
-        verify(showRepository).save(result);
-        verify(serverEventService).createShowFoundEvent(result.getId());
+    /** The consumer that loses the insert race re-reads the winner's row and fires no event. */
+    @Test
+    void getOrCreateShowLostRaceReturnsTheWinnersRowWithoutEvent() {
+        ShowEntity winner = ShowEntity.builder().name("Show").releaseYear(2024).build();
+        winner.setId(UUID.randomUUID());
+        when(showRepository.findByLibraryEntityAndNameAndReleaseYear(library, "Show", 2024))
+                .thenReturn(Optional.empty(), Optional.of(winner));
+        when(showRepository.insertShowIfAbsent(any(), any(), eq("Show"), eq(2024))).thenReturn(0);
+
+        assertEquals(winner, subject.getOrCreateShow(library, "Show", 2024));
+        verifyNoInteractions(serverEventService);
     }
 
     @Test
@@ -115,21 +128,21 @@ class ScannerHelperServiceTest {
                 .thenReturn(Optional.of(existing));
 
         assertEquals(existing, subject.getOrCreateSeason(library, "Show", 2024, 1));
-        verify(seasonRepository, never()).save(any());
+        verify(seasonRepository, never()).insertSeasonIfAbsent(any(), any(), anyInt());
     }
 
     @Test
     void getOrCreateSeasonCreatesNewSeason() {
         ShowEntity show = ShowEntity.builder().build();
+        show.setId(UUID.randomUUID());
+        SeasonEntity created = SeasonEntity.builder().showEntity(show).number(1).build();
         when(showRepository.findByLibraryEntityAndNameAndReleaseYear(library, "Show", 2024))
                 .thenReturn(Optional.of(show));
         when(seasonRepository.findByShowEntityAndNumber(show, 1))
-                .thenReturn(Optional.empty());
+                .thenReturn(Optional.empty(), Optional.of(created));
 
-        SeasonEntity result = subject.getOrCreateSeason(library, "Show", 2024, 1);
-
-        assertEquals(1, result.getNumber());
-        verify(seasonRepository).save(result);
+        assertEquals(created, subject.getOrCreateSeason(library, "Show", 2024, 1));
+        verify(seasonRepository).insertSeasonIfAbsent(any(), eq(show.getId()), eq(1));
     }
 
     @Test
@@ -145,26 +158,52 @@ class ScannerHelperServiceTest {
                 .thenReturn(Optional.of(existing));
 
         assertEquals(existing, subject.getOrCreateEpisode(library, "Show", 2024, 1, 1));
-        verify(episodeRepository, never()).save(any());
+        verify(episodeRepository, never()).insertEpisodeIfAbsent(any(), any(), any(), anyInt());
         verifyNoInteractions(serverEventService);
     }
 
     @Test
     void getOrCreateEpisodeCreatesNewEpisode() {
         ShowEntity show = ShowEntity.builder().build();
+        show.setId(UUID.randomUUID());
         SeasonEntity season = SeasonEntity.builder().number(1).build();
+        season.setId(UUID.randomUUID());
+        EpisodeEntity created = EpisodeEntity.builder().showEntity(show).seasonEntity(season).number(1).build();
+        created.setId(UUID.randomUUID());
         when(showRepository.findByLibraryEntityAndNameAndReleaseYear(library, "Show", 2024))
                 .thenReturn(Optional.of(show));
         when(seasonRepository.findByShowEntityAndNumber(show, 1))
                 .thenReturn(Optional.of(season));
         when(episodeRepository.findByShowEntityAndSeasonEntityAndNumber(show, season, 1))
-                .thenReturn(Optional.empty());
+                .thenReturn(Optional.empty(), Optional.of(created));
+        when(episodeRepository.insertEpisodeIfAbsent(any(), eq(show.getId()), eq(season.getId()), eq(1)))
+                .thenReturn(1);
 
-        EpisodeEntity result = subject.getOrCreateEpisode(library, "Show", 2024, 1, 1);
+        assertEquals(created, subject.getOrCreateEpisode(library, "Show", 2024, 1, 1));
+        verify(serverEventService).createEpisodeFoundEvent(created.getId());
+        verify(continueWatchingService).recomputeForShow(show.getId());
+    }
 
-        assertEquals(1, result.getNumber());
-        verify(episodeRepository).save(result);
-        verify(serverEventService).createEpisodeFoundEvent(result.getId());
+    /** Losing the episode race (an nfo and the media file at once) re-reads the winner, no events. */
+    @Test
+    void getOrCreateEpisodeLostRaceReturnsTheWinnersRowWithoutEvent() {
+        ShowEntity show = ShowEntity.builder().build();
+        show.setId(UUID.randomUUID());
+        SeasonEntity season = SeasonEntity.builder().number(1).build();
+        season.setId(UUID.randomUUID());
+        EpisodeEntity winner = EpisodeEntity.builder().showEntity(show).seasonEntity(season).number(1).build();
+        winner.setId(UUID.randomUUID());
+        when(showRepository.findByLibraryEntityAndNameAndReleaseYear(library, "Show", 2024))
+                .thenReturn(Optional.of(show));
+        when(seasonRepository.findByShowEntityAndNumber(show, 1))
+                .thenReturn(Optional.of(season));
+        when(episodeRepository.findByShowEntityAndSeasonEntityAndNumber(show, season, 1))
+                .thenReturn(Optional.empty(), Optional.of(winner));
+        when(episodeRepository.insertEpisodeIfAbsent(any(), any(), any(), anyInt())).thenReturn(0);
+
+        assertEquals(winner, subject.getOrCreateEpisode(library, "Show", 2024, 1, 1));
+        verifyNoInteractions(serverEventService);
+        verify(continueWatchingService, never()).recomputeForShow(any());
     }
 
     @Test
