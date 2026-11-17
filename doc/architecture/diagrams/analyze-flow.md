@@ -88,8 +88,7 @@ flowchart TD
 
     D -->|"clears HLS cache"| D1["MEDIA_FILE_FOUND\nor AUDIO_FILE_FOUND"]
     D --> D2["NFO_FILE_FOUND"]
-    D --> D3["SUBTITLE_FILE_FOUND"]
 
     W2 & W3 & W4 & W5 & W6 & W7 -->|"further processing"| FLOWS["→ analyze-flow handlers\n(TMDB / MusicBrainz / disk)"]
-    D1 & D2 & D3 -->|"further processing"| FLOWS2["→ scan-flow handlers\n(ffprobe / NFO / subtitles)"]
+    D1 & D2 -->|"further processing"| FLOWS2["→ scan-flow handlers\n(ffprobe / NFO; sidecar subtitles are re-linked by MEDIA_FILE_FOUND)"]
 ```

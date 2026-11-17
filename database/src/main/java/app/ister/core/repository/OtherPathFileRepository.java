@@ -4,6 +4,7 @@ import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.MediaFileStreamEntity;
 import app.ister.core.entity.MetadataEntity;
 import app.ister.core.entity.OtherPathFileEntity;
+import app.ister.core.enums.PathFileType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,6 +20,9 @@ public interface OtherPathFileRepository extends JpaRepository<OtherPathFileEnti
     Optional<OtherPathFileEntity> findByDirectoryEntityAndPath(DirectoryEntity directoryEntity, String path);
 
     List<OtherPathFileEntity> findByDirectoryEntity(DirectoryEntity directoryEntity);
+
+    /** The files of one type in a directory whose path starts with {@code pathPrefix} (the sidecar subtitles of a media file). */
+    List<OtherPathFileEntity> findByDirectoryEntityIdAndPathFileTypeAndPathStartingWith(UUID directoryEntityId, PathFileType pathFileType, String pathPrefix);
 
     /** Which of the given paths are already known in a directory (upload preview: "exists" check). */
     @Query("SELECT o.path FROM OtherPathFileEntity o WHERE o.directoryEntityId = :directoryEntityId AND o.path IN :paths")

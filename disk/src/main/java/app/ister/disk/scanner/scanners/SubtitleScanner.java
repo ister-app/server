@@ -45,16 +45,25 @@ public class SubtitleScanner implements Scanner {
                     .pathFileType(PathFileType.SUBTITLE)
                     .path(path).build();
             otherPathFileRepository.save(entity);
-            SubtitleFileFoundData data = SubtitleFileFoundData.builder()
-                    .directoryEntityUUID(directoryEntity.getId())
-                    .eventType(EventType.SUBTITLE_FILE_FOUND)
-                    .path(path).build();
-            String directoryName = directoryEntity.getName();
-            // After commit: the handler reads the row saved above.
-            publishAfterCommit(() -> messageSender.sendSubtitleFileFound(data, directoryName));
+            publishSubtitleFileFound(directoryEntity, path);
             return Optional.of(entity);
         } else {
+            if (otherPathFileEntity.get().getMediaFileStreamEntity() == null) {
+                // Known but not linked to a media file (it used to lose the race against the
+                // media file's scan and analysis): a rescan gives it another go. Idempotent.
+                publishSubtitleFileFound(directoryEntity, path);
+            }
             return Optional.of(otherPathFileEntity.get());
         }
+    }
+
+    /** After commit: the handler reads the row this scan saved. */
+    private void publishSubtitleFileFound(DirectoryEntity directoryEntity, String path) {
+        SubtitleFileFoundData data = SubtitleFileFoundData.builder()
+                .directoryEntityUUID(directoryEntity.getId())
+                .eventType(EventType.SUBTITLE_FILE_FOUND)
+                .path(path).build();
+        String directoryName = directoryEntity.getName();
+        publishAfterCommit(() -> messageSender.sendSubtitleFileFound(data, directoryName));
     }
 }

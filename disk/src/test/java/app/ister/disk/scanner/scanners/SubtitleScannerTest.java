@@ -69,10 +69,11 @@ class SubtitleScannerTest {
     }
 
     @Test
-    void analyzeReturnsExistingEntityWhenAlreadyExists() {
+    void analyzeLeavesAnAlreadyLinkedSubtitleAlone() {
         DirectoryEntity directoryEntity = DirectoryEntity.builder().id(UUID.randomUUID()).name("disk1").build();
         String path = "/disk/shows/Show (2024)/Season 01/s01e01.nl.srt";
-        OtherPathFileEntity existing = OtherPathFileEntity.builder().path(path).build();
+        OtherPathFileEntity existing = OtherPathFileEntity.builder().path(path)
+                .mediaFileStreamEntity(app.ister.core.entity.MediaFileStreamEntity.builder().build()).build();
 
         when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path)).thenReturn(Optional.of(existing));
 
@@ -80,5 +81,21 @@ class SubtitleScannerTest {
 
         assertTrue(result.isPresent());
         verify(otherPathFileRepository, never()).save(any());
+        verify(messageSender, never()).sendSubtitleFileFound(any(), any());
+    }
+
+    /** A known subtitle without a stream lost the race against its media file once: a rescan retries it. */
+    @Test
+    void analyzeRetriesAKnownSubtitleThatWasNeverLinked() {
+        DirectoryEntity directoryEntity = DirectoryEntity.builder().id(UUID.randomUUID()).name("disk1").build();
+        String path = "/disk/shows/Show (2024)/Season 01/s01e01.nl.srt";
+        OtherPathFileEntity existing = OtherPathFileEntity.builder().path(path).build();
+
+        when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path)).thenReturn(Optional.of(existing));
+
+        subject.analyze(directoryEntity, path, true, 0L);
+
+        verify(otherPathFileRepository, never()).save(any());
+        verify(messageSender).sendSubtitleFileFound(any(), eq("disk1"));
     }
 }

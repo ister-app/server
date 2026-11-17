@@ -73,6 +73,9 @@ class HandleMediaFileFoundTest {
     @Mock
     private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
+    @Mock
+    private app.ister.disk.events.subtitlefilefound.SidecarSubtitleLinker sidecarSubtitleLinker;
+
     @InjectMocks
     private HandleMediaFileFound subject;
 
@@ -124,6 +127,12 @@ class HandleMediaFileFoundTest {
         subject.handle(mediaFileFoundData);
 
         verify(mediaFileRepositoryMock).save(mediaFileEntity);
+        // Persisting replaces every stream row of the file, sidecar subtitles included: they are
+        // linked again afterwards, in the same transaction.
+        var order = org.mockito.Mockito.inOrder(mediaFileStreamRepositoryMock, sidecarSubtitleLinker);
+        order.verify(mediaFileStreamRepositoryMock).deleteAllByMediaFileEntityId(mediaFileEntity.getId());
+        order.verify(mediaFileStreamRepositoryMock).saveAll(List.of(mediaFileStreamEntity));
+        order.verify(sidecarSubtitleLinker).linkAllFor(directoryEntity, mediaFileEntity);
     }
 
     /**

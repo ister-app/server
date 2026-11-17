@@ -49,7 +49,7 @@ alleen film-/show-libraries draaien de `SubtitleScanner` en `MediaFileScanner`:
 | Audio | `AUDIO_FILE_FOUND` | ffprobe, ID3-tags (titel/tracknr, track-credits uit de `artist`-tag — primaire artiest plus `feat.`-gasten — met de pad-artiest als fallback), embedded cover, HLS-cache leegmaken |
 | `.epub` (BOOK-library) | `EPUB_FILE_FOUND` | OPF: titel/taal/beschrijving, media overlays uit de inhoud, cover uit de zip |
 | `.cbz`/`.pdf`/`.epub` (COMIC-library) | `COMIC_FILE_FOUND` (epubs hergebruiken `EPUB_FILE_FOUND`) | paginatelling, `ComicInfo.xml`, cover extraheren |
-| `.srt` | `SUBTITLE_FILE_FOUND` | SRT als `EXTERNAL_SUBTITLE`-stream aan de episode koppelen |
+| `.srt` | `SUBTITLE_FILE_FOUND` | SRT als `EXTERNAL_SUBTITLE`-stream aan de episode koppelen (`SidecarSubtitleLinker`); `MEDIA_FILE_FOUND` koppelt de sidecars opnieuw bij het wegschrijven, dus de volgorde waarin de twee bestanden gescand worden maakt niet uit |
 | Afbeelding | `IMAGE_FOUND` | `ImageEntity` opslaan, koppelen aan show/movie/episode/etc. |
 | `.nfo` | `NFO_FILE_FOUND` | XML parsen: titel, beschrijving, releasedatum, biografie/review |
 
@@ -333,7 +333,8 @@ naar zijn afleveringen, een persoon naar zijn albums *én* boeken, een album naa
 vuurt de `*_FOUND`-events opnieuw af (personen krijgen zowel de globale send voor de externe
 verrijking als de node-scoped send voor de artist.nfo-herparse); `HandleAnalyzeDataDisk` (disk)
 wist de HLS-cache en stuurt de bestandsniveau-events opnieuw
-(`MEDIA_FILE_FOUND`/`AUDIO_FILE_FOUND`, `NFO_FILE_FOUND`, `SUBTITLE_FILE_FOUND`). Verwijderde
+(`MEDIA_FILE_FOUND`/`AUDIO_FILE_FOUND`, `NFO_FILE_FOUND`; sidecar-ondertitels worden opnieuw
+gekoppeld door de opnieuw afgevuurde `MEDIA_FILE_FOUND`). Verwijderde
 image-rijen laten hun cachebestanden achter (cross-node unlinken is onveilig); de dagelijkse
 cache-opschoning ruimt ze op.
 

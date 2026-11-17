@@ -20,6 +20,9 @@ public interface MediaFileStreamRepository extends JpaRepository<MediaFileStream
 
     List<MediaFileStreamEntity> findByMediaFileEntity_IdAndCodecType(UUID mediaFileId, StreamCodecType codecType);
 
+    /** The row behind the {@code (media_file_entity_id, stream_index, path)} unique key, e.g. right after an {@link #upsert}. */
+    Optional<MediaFileStreamEntity> findByMediaFileEntity_IdAndStreamIndexAndPath(UUID mediaFileId, int streamIndex, String path);
+
     /**
      * All non-null stream file paths (e.g. extracted {@code .srt} subtitles cached on disk). Used
      * by the cache-cleanup sweep to keep referenced subtitle files while removing zombies.

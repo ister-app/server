@@ -3,14 +3,10 @@ package app.ister.disk.events.subtitlefilefound;
 import app.ister.core.status.ActivityContext;
 import app.ister.core.status.ActivitySubjects;
 import app.ister.core.entity.DirectoryEntity;
-import app.ister.core.entity.MediaFileStreamEntity;
 import app.ister.core.enums.EventType;
-import app.ister.core.enums.StreamCodecType;
 import app.ister.core.eventdata.SubtitleFileFoundData;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.MediaFileRepository;
-import app.ister.core.repository.MediaFileStreamRepository;
-import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.ScannerHelperService;
 import app.ister.core.Handle;
 import app.ister.disk.scanner.PathObject;
@@ -30,8 +26,7 @@ public class HandleSubtitleFileFound implements Handle<SubtitleFileFoundData> {
     private final DirectoryRepository directoryRepository;
     private final ScannerHelperService scannerHelperService;
     private final MediaFileRepository mediaFileRepository;
-    private final MediaFileStreamRepository mediaFileStreamRepository;
-    private final OtherPathFileRepository otherPathFileRepository;
+    private final SidecarSubtitleLinker sidecarSubtitleLinker;
 
     @Override
     public EventType handles() {
@@ -61,21 +56,11 @@ public class HandleSubtitleFileFound implements Handle<SubtitleFileFoundData> {
 
     private void analyzeSubtitleFile(DirectoryEntity directoryEntity, String path, PathObject pathObject) {
         var episode = scannerHelperService.getOrCreateEpisode(directoryEntity.getLibraryEntity(), pathObject.getName(), pathObject.getYear(), pathObject.getSeason(), pathObject.getEpisode());
-        mediaFileRepository.findByEpisodeEntityId(episode.getId()).forEach(mediaFileEntity -> {
-            if (directoryEntity.getId().equals(mediaFileEntity.getDirectoryEntityId()) && mediaFileAndSubtitleFileBelongTogether(mediaFileEntity.getPath(), path)
-                    && !mediaFileStreamRepository.existsByMediaFileEntityAndStreamIndexAndPath(mediaFileEntity, 0, path)) {
-                var saved = mediaFileStreamRepository.save(MediaFileStreamEntity.builder()
-                        .mediaFileEntity(mediaFileEntity)
-                        .codecName("subtitle srt")
-                        .codecType(StreamCodecType.EXTERNAL_SUBTITLE)
-                        .language(SubtitleFilePathParser.langCodeToIso3(path))
-                        .path(path)
-                        .build());
-                otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, path).ifPresent(f -> {
-                    f.setMediaFileStreamEntity(saved);
-                    otherPathFileRepository.save(f);
-                });
-            }
-        });
+        // Only the media files that are already there: one that is scanned later links this
+        // subtitle itself when its analysis persists (SidecarSubtitleLinker.linkAllFor).
+        mediaFileRepository.findByEpisodeEntityId(episode.getId()).stream()
+                .filter(mediaFileEntity -> directoryEntity.getId().equals(mediaFileEntity.getDirectoryEntityId())
+                        && mediaFileAndSubtitleFileBelongTogether(mediaFileEntity.getPath(), path))
+                .forEach(mediaFileEntity -> sidecarSubtitleLinker.link(directoryEntity, mediaFileEntity, path));
     }
 }

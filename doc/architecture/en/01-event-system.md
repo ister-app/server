@@ -95,7 +95,7 @@ cache-directory queue is always consumed by its owner, offloaded or not. The dep
 | `HandleImageFound` | disk | `IMAGE_FOUND` | — |
 | `HandleNfoFileFound` | disk | `NFO_FILE_FOUND` | — |
 | `HandleUpdateImagesRequested` | disk | `UPDATE_IMAGES_REQUESTED` | `UPDATE_IMAGES_REQUESTED` (next chunk) |
-| `HandleAnalyzeDataDisk` | disk | `ANALYZE_DATA` | `MEDIA_FILE_FOUND` / `AUDIO_FILE_FOUND` / `NFO_FILE_FOUND` / `SUBTITLE_FILE_FOUND` |
+| `HandleAnalyzeDataDisk` | disk | `ANALYZE_DATA` | `MEDIA_FILE_FOUND` / `AUDIO_FILE_FOUND` / `NFO_FILE_FOUND` |
 | `HandlePreTranscodeRecentlyWatched` | disk | `PRE_TRANSCODE_RECENTLY_WATCHED` | `TRANSCODE_REQUESTED`, `MEDIA_FILE_FOUND` (for files without analyzed streams) |
 | `HandlePersonFound` | disk | `PERSON_FOUND` (node-scoped queue) | `NFO_FILE_FOUND` |
 | `HandleAlbumFound` | disk | `ALBUM_FOUND` (node-scoped queue) | `NFO_FILE_FOUND`, `FILE_SCAN_REQUESTED` (re-ingest of local album artwork such as `cover.jpg`) |

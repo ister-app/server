@@ -38,7 +38,7 @@ public class SubtitleFilePathParser {
         return subtitleFilePath.contains(removeExtension(mediaFilePath));
     }
 
-    private static String removeExtension(String string) {
+    static String removeExtension(String string) {
         return string.replaceFirst("[.][^.]+$", "");
     }
 }

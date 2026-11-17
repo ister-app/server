@@ -48,7 +48,7 @@ MUSIC uses audio/image/nfo, BOOK adds `EpubScanner`; only movie/show libraries r
 | Audio | `AUDIO_FILE_FOUND` | ffprobe, ID3 tags (title/track no, track credits from the `artist` tag — primary artist plus `feat.` guests — with the path artist as fallback), embedded cover, clear the HLS cache |
 | `.epub` (BOOK library) | `EPUB_FILE_FOUND` | OPF title/language/description, media overlays from content, cover from the zip |
 | `.cbz`/`.pdf`/`.epub` (COMIC library) | `COMIC_FILE_FOUND` (epubs reuse `EPUB_FILE_FOUND`) | page count, `ComicInfo.xml`, cover extraction |
-| `.srt` | `SUBTITLE_FILE_FOUND` | link SRT to episode as an `EXTERNAL_SUBTITLE` stream |
+| `.srt` | `SUBTITLE_FILE_FOUND` | link SRT to episode as an `EXTERNAL_SUBTITLE` stream (`SidecarSubtitleLinker`); `MEDIA_FILE_FOUND` links the sidecars again when it persists, so the order in which the two files are scanned does not matter |
 | Image | `IMAGE_FOUND` | save `ImageEntity`, link to show/movie/episode/etc. |
 | `.nfo` | `NFO_FILE_FOUND` | parse XML: title, description, release date, biography/review |
 
@@ -313,7 +313,8 @@ own write transaction. The per-type pipelines are covered in
 albums *and* books, an album to its tracks — re-firing the `*_FOUND` events (persons get both the
 global send for the external enrichment and the node-scoped send for the artist.nfo re-parse);
 `HandleAnalyzeDataDisk` (disk) clears the HLS cache and re-emits the file-level events
-(`MEDIA_FILE_FOUND`/`AUDIO_FILE_FOUND`, `NFO_FILE_FOUND`, `SUBTITLE_FILE_FOUND`). Deleted image
+(`MEDIA_FILE_FOUND`/`AUDIO_FILE_FOUND`, `NFO_FILE_FOUND`; sidecar subtitles are linked again by
+the re-fired `MEDIA_FILE_FOUND`). Deleted image
 rows leave their cache files behind (unlinking cross-node is unsafe); the daily cache cleanup
 reclaims them.
 

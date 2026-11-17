@@ -4,15 +4,10 @@ import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.entity.EpisodeEntity;
 import app.ister.core.entity.LibraryEntity;
 import app.ister.core.entity.MediaFileEntity;
-import app.ister.core.entity.MediaFileStreamEntity;
-import app.ister.core.entity.OtherPathFileEntity;
 import app.ister.core.enums.EventType;
-import app.ister.core.enums.PathFileType;
 import app.ister.core.eventdata.SubtitleFileFoundData;
 import app.ister.core.repository.DirectoryRepository;
 import app.ister.core.repository.MediaFileRepository;
-import app.ister.core.repository.MediaFileStreamRepository;
-import app.ister.core.repository.OtherPathFileRepository;
 import app.ister.core.service.ScannerHelperService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,10 +43,7 @@ class HandleSubtitleFileFoundTest {
     private MediaFileRepository mediaFileRepository;
 
     @Mock
-    private MediaFileStreamRepository mediaFileStreamRepository;
-
-    @Mock
-    private OtherPathFileRepository otherPathFileRepository;
+    private SidecarSubtitleLinker sidecarSubtitleLinker;
 
     @Test
     void handles() {
@@ -79,69 +72,55 @@ class HandleSubtitleFileFoundTest {
         subject.handle(data);
 
         // A non-episode path must not touch the episode/stream/other-file collaborators.
-        verifyNoInteractions(scannerHelperService, mediaFileStreamRepository, otherPathFileRepository);
+        verifyNoInteractions(scannerHelperService, sidecarSubtitleLinker);
     }
 
     @Test
-    void handleWithEpisodePathThatMatchesMediaFile() {
+    void handleLinksTheSubtitleToTheMatchingMediaFileOfItsDirectory() {
         UUID dirId = UUID.randomUUID();
         LibraryEntity library = LibraryEntity.builder().build();
         DirectoryEntity directoryEntity = DirectoryEntity.builder().id(dirId).libraryEntity(library).build();
-        MediaFileEntity mediaFileEntity = MediaFileEntity.builder()
-                .path("/disk/shows/Show (2024)/Season 01/s01e01.mkv")
-                .build();
-        mediaFileEntity.setDirectoryEntity(directoryEntity);
+        MediaFileEntity matching = MediaFileEntity.builder()
+                .path("/disk/shows/Show (2024)/Season 01/s01e01.mkv").build();
+        matching.setDirectoryEntity(directoryEntity);
+        MediaFileEntity otherCut = MediaFileEntity.builder()
+                .path("/disk/shows/Show (2024)/Season 01/s01e01 - extended.mkv").build();
+        otherCut.setDirectoryEntity(directoryEntity);
+        MediaFileEntity otherDirectory = MediaFileEntity.builder()
+                .path("/disk/shows/Show (2024)/Season 01/s01e01.mkv").build();
+        otherDirectory.setDirectoryEntity(DirectoryEntity.builder().id(UUID.randomUUID()).build());
         UUID episodeId = UUID.randomUUID();
-        EpisodeEntity episodeEntity = EpisodeEntity.builder().id(episodeId).build();
-        SubtitleFileFoundData data = SubtitleFileFoundData.builder()
-                .directoryEntityUUID(dirId)
-                .path("/disk/shows/Show (2024)/Season 01/s01e01.nl.srt")
-                .build();
-
-        when(directoryRepository.findById(dirId)).thenReturn(Optional.of(directoryEntity));
-        when(scannerHelperService.getOrCreateEpisode(any(), any(), anyInt(), anyInt(), anyInt()))
-                .thenReturn(episodeEntity);
-        when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(mediaFileEntity));
-        when(mediaFileStreamRepository.save(any())).thenReturn(MediaFileStreamEntity.builder().build());
-
-        subject.handle(data);
-
-        verify(mediaFileStreamRepository).save(any());
-    }
-
-    @Test
-    void handleWithEpisodePathSetsMediaFileStreamFkOnOtherPathFile() {
-        UUID dirId = UUID.randomUUID();
-        LibraryEntity library = LibraryEntity.builder().build();
-        DirectoryEntity directoryEntity = DirectoryEntity.builder().id(dirId).libraryEntity(library).build();
-        MediaFileEntity mediaFileEntity = MediaFileEntity.builder()
-                .path("/disk/shows/Show (2024)/Season 01/s01e01.mkv")
-                .build();
-        mediaFileEntity.setDirectoryEntity(directoryEntity);
-        UUID episodeId = UUID.randomUUID();
-        EpisodeEntity episodeEntity = EpisodeEntity.builder().id(episodeId).build();
         String subtitlePath = "/disk/shows/Show (2024)/Season 01/s01e01.nl.srt";
-        MediaFileStreamEntity savedStream = MediaFileStreamEntity.builder().build();
-        OtherPathFileEntity otherFile = OtherPathFileEntity.builder()
-                .path(subtitlePath)
-                .pathFileType(PathFileType.SUBTITLE)
-                .build();
         SubtitleFileFoundData data = SubtitleFileFoundData.builder()
-                .directoryEntityUUID(dirId)
-                .path(subtitlePath)
-                .build();
+                .directoryEntityUUID(dirId).path(subtitlePath).build();
 
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(directoryEntity));
         when(scannerHelperService.getOrCreateEpisode(any(), any(), anyInt(), anyInt(), anyInt()))
-                .thenReturn(episodeEntity);
-        when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(mediaFileEntity));
-        when(mediaFileStreamRepository.save(any())).thenReturn(savedStream);
-        when(otherPathFileRepository.findByDirectoryEntityAndPath(directoryEntity, subtitlePath))
-                .thenReturn(Optional.of(otherFile));
+                .thenReturn(EpisodeEntity.builder().id(episodeId).build());
+        when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of(matching, otherCut, otherDirectory));
 
         subject.handle(data);
 
-        verify(otherPathFileRepository).save(otherFile);
-        assertEquals(savedStream, otherFile.getMediaFileStreamEntity());
+        verify(sidecarSubtitleLinker).link(directoryEntity, matching, subtitlePath);
+        verifyNoMoreInteractions(sidecarSubtitleLinker);
+    }
+
+    /** The media file is scanned later; its own analysis links the subtitle then. */
+    @Test
+    void handleLinksNothingWhileTheMediaFileIsNotThereYet() {
+        UUID dirId = UUID.randomUUID();
+        DirectoryEntity directoryEntity = DirectoryEntity.builder().id(dirId).libraryEntity(LibraryEntity.builder().build()).build();
+        UUID episodeId = UUID.randomUUID();
+        SubtitleFileFoundData data = SubtitleFileFoundData.builder()
+                .directoryEntityUUID(dirId).path("/disk/shows/Show (2024)/Season 01/s01e01.nl.srt").build();
+
+        when(directoryRepository.findById(dirId)).thenReturn(Optional.of(directoryEntity));
+        when(scannerHelperService.getOrCreateEpisode(any(), any(), anyInt(), anyInt(), anyInt()))
+                .thenReturn(EpisodeEntity.builder().id(episodeId).build());
+        when(mediaFileRepository.findByEpisodeEntityId(episodeId)).thenReturn(List.of());
+
+        subject.handle(data);
+
+        verifyNoInteractions(sidecarSubtitleLinker);
     }
 }

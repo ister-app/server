@@ -112,8 +112,6 @@ class HandleAnalyzeDataDiskTest {
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
         when(mediaFileEpisodeService.filesForEpisode(episodeId)).thenReturn(List.of(mf));
-        when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
-                .thenReturn(List.of());
 
         subject.handle(data);
 
@@ -142,8 +140,6 @@ class HandleAnalyzeDataDiskTest {
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(movieRepository.findById(movieId)).thenReturn(Optional.of(movie));
         when(mediaFileRepository.findByMovieEntityId(movieId)).thenReturn(List.of(mf));
-        when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
-                .thenReturn(List.of());
 
         subject.handle(data);
 
@@ -217,11 +213,6 @@ class HandleAnalyzeDataDiskTest {
         DirectoryEntity dir = DirectoryEntity.builder().id(dirId).name("shows").build();
         MediaFileEntity mf = MediaFileEntity.builder().id(mediaFileId).path("/shows/episode.mkv").build();
         mf.setDirectoryEntity(dir);
-        MediaFileStreamEntity stream = MediaFileStreamEntity.builder().build();
-        OtherPathFileEntity subtitleFile = OtherPathFileEntity.builder()
-                .path("/shows/episode.en.srt")
-                .pathFileType(PathFileType.SUBTITLE)
-                .build();
         EpisodeEntity episode = EpisodeEntity.builder().id(episodeId).build();
 
         AnalyzeData data = AnalyzeData.builder()
@@ -233,43 +224,11 @@ class HandleAnalyzeDataDiskTest {
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
         when(mediaFileEpisodeService.filesForEpisode(episodeId)).thenReturn(List.of(mf));
-        when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
-                .thenReturn(List.of(stream));
-        when(otherPathFileRepository.findByMediaFileStreamEntity(stream)).thenReturn(Optional.of(subtitleFile));
 
         subject.handle(data);
 
-        verify(messageSender).sendSubtitleFileFound(any(), eq("shows"));
-    }
-
-    @Test
-    void handleDoesNotSendSubtitleFileFoundWhenNoOtherPathFileForStream() {
-        ReflectionTestUtils.setField(subject, "tmpDir", "/nonexistent-tmp-dir");
-        UUID dirId = UUID.randomUUID();
-        UUID episodeId = UUID.randomUUID();
-        UUID mediaFileId = UUID.randomUUID();
-
-        DirectoryEntity dir = DirectoryEntity.builder().id(dirId).name("shows").build();
-        MediaFileEntity mf = MediaFileEntity.builder().id(mediaFileId).path("/shows/episode.mkv").build();
-        mf.setDirectoryEntity(dir);
-        MediaFileStreamEntity stream = MediaFileStreamEntity.builder().build();
-        EpisodeEntity episode = EpisodeEntity.builder().id(episodeId).build();
-
-        AnalyzeData data = AnalyzeData.builder()
-                .eventType(EventType.ANALYZE_DATA)
-                .directoryId(dirId)
-                .episodeId(episodeId)
-                .build();
-
-        when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
-        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
-        when(mediaFileEpisodeService.filesForEpisode(episodeId)).thenReturn(List.of(mf));
-        when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
-                .thenReturn(List.of(stream));
-        when(otherPathFileRepository.findByMediaFileStreamEntity(stream)).thenReturn(Optional.empty());
-
-        subject.handle(data);
-
+        // Sidecar subtitles are linked again by the re-fired MEDIA_FILE_FOUND, not by an event from here.
+        verify(messageSender).sendMediaFileFound(any(), eq("shows"));
         verify(messageSender, never()).sendSubtitleFileFound(any(), any());
     }
 
@@ -300,8 +259,6 @@ class HandleAnalyzeDataDiskTest {
         when(directoryRepository.findById(dirId)).thenReturn(Optional.of(dir));
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
         when(mediaFileEpisodeService.filesForEpisode(episodeId)).thenReturn(List.of(mf));
-        when(mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mediaFileId, StreamCodecType.EXTERNAL_SUBTITLE))
-                .thenReturn(List.of());
 
         subject.handle(data);
 

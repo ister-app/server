@@ -19,6 +19,7 @@ import app.ister.core.storage.SourceUris;
 import app.ister.core.status.ActivityContext;
 import app.ister.core.status.ActivitySubjects;
 import app.ister.core.utils.AfterCommitPublisher;
+import app.ister.disk.events.subtitlefilefound.SidecarSubtitleLinker;
 import app.ister.core.utils.BackgroundFfmpeg;
 import app.ister.core.Handle;
 import com.github.kokorin.jaffree.process.JaffreeAbnormalExitException;
@@ -54,6 +55,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
     private final MediaFileFoundDetectCrop mediaFileFoundDetectCrop;
     private final MessageSender messageSender;
     private final MediaFileInputResolver inputResolver;
+    private final SidecarSubtitleLinker sidecarSubtitleLinker;
     private final CacheDirectoryResolver cacheDirectoryResolver;
     private final TransactionTemplate transactionTemplate;
 
@@ -78,6 +80,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
                                 MediaFileFoundDetectCrop mediaFileFoundDetectCrop,
                                 MessageSender messageSender,
                                 MediaFileInputResolver inputResolver,
+                                SidecarSubtitleLinker sidecarSubtitleLinker,
                                 CacheDirectoryResolver cacheDirectoryResolver,
                                 BackgroundFfmpeg backgroundFfmpeg,
                                 PlatformTransactionManager transactionManager) {
@@ -97,6 +100,7 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
         this.mediaFileFoundDetectCrop = mediaFileFoundDetectCrop;
         this.messageSender = messageSender;
         this.inputResolver = inputResolver;
+        this.sidecarSubtitleLinker = sidecarSubtitleLinker;
         this.cacheDirectoryResolver = cacheDirectoryResolver;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
@@ -224,6 +228,9 @@ public class HandleMediaFileFound implements Handle<MediaFileFoundData> {
         mediaFileStreamRepository.flush();
         mediaFileRepository.save(mediaFileEntity);
         mediaFileStreamRepository.saveAll(analysis.streams());
+        // The delete above also took the sidecar subtitles (s01e01.nl.srt) that were linked while
+        // the analysis ran, and one scanned before this file's row existed was never linked at all.
+        sidecarSubtitleLinker.linkAllFor(directoryEntity, mediaFileEntity);
         if (analysis.parts().size() >= 2) {
             mediaFileEpisodeRepository.saveAll(analysis.parts());
         }

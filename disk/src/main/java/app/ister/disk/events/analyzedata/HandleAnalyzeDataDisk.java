@@ -6,11 +6,9 @@ import app.ister.core.status.ActivitySubjects;
 import app.ister.core.Handle;
 import app.ister.core.entity.*;
 import app.ister.core.enums.EventType;
-import app.ister.core.enums.StreamCodecType;
 import app.ister.core.eventdata.AnalyzeData;
 import app.ister.core.eventdata.MediaFileFoundData;
 import app.ister.core.eventdata.NfoFileFoundData;
-import app.ister.core.eventdata.SubtitleFileFoundData;
 import app.ister.core.repository.*;
 import app.ister.core.service.MediaFileEpisodeService;
 import app.ister.core.service.MessageSender;
@@ -112,15 +110,9 @@ public class HandleAnalyzeDataDisk implements Handle<AnalyzeData> {
                                 NfoFileFoundData.builder().eventType(EventType.NFO_FILE_FOUND)
                                         .directoryEntityUUID(dir.getId()).path(f.getPath()).build(),
                                 dir.getName())));
-
-        localFiles.forEach(mf ->
-                mediaFileStreamRepository.findByMediaFileEntity_IdAndCodecType(mf.getId(), StreamCodecType.EXTERNAL_SUBTITLE)
-                        .forEach(stream ->
-                                otherPathFileRepository.findByMediaFileStreamEntity(stream).ifPresent(f ->
-                                        messageSender.sendSubtitleFileFound(
-                                                SubtitleFileFoundData.builder().eventType(EventType.SUBTITLE_FILE_FOUND)
-                                                        .directoryEntityUUID(dir.getId()).path(f.getPath()).build(),
-                                                dir.getName()))));
+        // Sidecar subtitles need no event of their own: the re-fired MEDIA_FILE_FOUND links them
+        // again when it persists (SidecarSubtitleLinker). Looking them up here found nothing
+        // anyway, their stream rows were deleted a few lines up.
     }
 
     private void deleteHlsCache(UUID mediaFileId) {
