@@ -12,6 +12,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -42,6 +44,35 @@ class MediaFileScannerTest {
         assertTrue(subject.analyzable("/disk/shows/SHOW (2024)/s01e01.mkv", true, 0));
         assertTrue(subject.analyzable("/disk/shows/Show (2024)/s02E03.mkv", true, 0));
         assertFalse(subject.analyzable("/disk/shows/Show (2024)/s01e01.png", true, 0));
+    }
+
+    /**
+     * The consumer looks the media file row up and skips silently when it is missing, so the
+     * event must not leave before the scan transaction has committed.
+     */
+    @Test
+    void analyzePublishesMediaFileFoundOnlyAfterCommit() {
+        LibraryEntity library = LibraryEntity.builder().build();
+        DirectoryEntity directory = DirectoryEntity.builder()
+                .id(UUID.randomUUID()).name("disk1").libraryEntity(library)
+                .nodeEntity(NodeEntity.builder().name("node1").build())
+                .build();
+        EpisodeEntity episode = EpisodeEntity.builder().id(UUID.randomUUID()).build();
+        String path = "/disk/shows/Show (2024)/Season 01/s01e01.mkv";
+        when(scannerHelperService.getOrCreateEpisode(library, "Show", 2024, 1, 1)).thenReturn(episode);
+        when(mediaFileRepository.findByDirectoryEntityAndPath(directory, path)).thenReturn(Optional.empty());
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            subject.analyze(directory, path, true, 1024L);
+
+            verify(messageSender, never()).sendMediaFileFound(any(), any());
+
+            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+            verify(messageSender).sendMediaFileFound(any(), eq("disk1"));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     @Test

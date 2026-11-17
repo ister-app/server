@@ -23,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
+import static app.ister.core.utils.AfterCommitPublisher.publishAfterCommit;
+
 @Component
 @Slf4j
 @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -67,10 +69,13 @@ public class NfoScanner implements Scanner {
                     .pathFileType(PathFileType.NFO)
                     .path(path).build();
             otherPathFileRepository.save(entity);
-            messageSender.sendNfoFileFound(NfoFileFoundData.builder()
+            NfoFileFoundData data = NfoFileFoundData.builder()
                     .directoryEntityUUID(directoryEntity.getId())
                     .eventType(EventType.NFO_FILE_FOUND)
-                    .path(path).build(), directoryEntity.getName());
+                    .path(path).build();
+            String directoryName = directoryEntity.getName();
+            // After commit, like the other scanners: the consumer must see what this scan wrote.
+            publishAfterCommit(() -> messageSender.sendNfoFileFound(data, directoryName));
             return Optional.of(entity);
         } else {
             return Optional.of(otherPathFileEntity.get());

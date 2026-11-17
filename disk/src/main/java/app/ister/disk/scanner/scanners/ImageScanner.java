@@ -40,6 +40,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import static app.ister.core.utils.AfterCommitPublisher.publishAfterCommit;
+
 @Component
 @Slf4j
 @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -117,7 +119,10 @@ public class ImageScanner implements Scanner {
 
         ImageEntity build = imageEntity.build();
         imageRepository.save(build);
-        messageSender.sendImageFound(ImageFoundData.fromImageEntity(build), directoryEntity.getName());
+        ImageFoundData data = ImageFoundData.fromImageEntity(build);
+        String directoryName = directoryEntity.getName();
+        // After commit: the handler looks the image row up by id.
+        publishAfterCommit(() -> messageSender.sendImageFound(data, directoryName));
         return Optional.of(build);
     }
 

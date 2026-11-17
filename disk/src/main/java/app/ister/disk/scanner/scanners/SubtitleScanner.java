@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
+import static app.ister.core.utils.AfterCommitPublisher.publishAfterCommit;
+
 @Component
 @Slf4j
 @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -43,10 +45,13 @@ public class SubtitleScanner implements Scanner {
                     .pathFileType(PathFileType.SUBTITLE)
                     .path(path).build();
             otherPathFileRepository.save(entity);
-            messageSender.sendSubtitleFileFound(SubtitleFileFoundData.builder()
+            SubtitleFileFoundData data = SubtitleFileFoundData.builder()
                     .directoryEntityUUID(directoryEntity.getId())
                     .eventType(EventType.SUBTITLE_FILE_FOUND)
-                    .path(path).build(), directoryEntity.getName());
+                    .path(path).build();
+            String directoryName = directoryEntity.getName();
+            // After commit: the handler reads the row saved above.
+            publishAfterCommit(() -> messageSender.sendSubtitleFileFound(data, directoryName));
             return Optional.of(entity);
         } else {
             return Optional.of(otherPathFileEntity.get());

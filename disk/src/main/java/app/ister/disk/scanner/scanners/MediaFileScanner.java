@@ -28,6 +28,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static app.ister.core.utils.AfterCommitPublisher.publishAfterCommit;
+
 @Component
 @Slf4j
 @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -152,13 +154,18 @@ public class MediaFileScanner implements Scanner {
 
     private void sendMediaFileFound(DirectoryEntity directoryEntity, String path, UUID episodeId,
                                     List<UUID> episodeIds, UUID movieId) {
-        messageSender.sendMediaFileFound(MediaFileFoundData.builder()
+        MediaFileFoundData data = MediaFileFoundData.builder()
                 .eventType(EventType.MEDIA_FILE_FOUND)
                 .directoryEntityUUID(directoryEntity.getId())
                 .episodeEntityUUID(episodeId)
                 .episodeEntityUUIDs(episodeIds)
                 .movieEntityUUID(movieId)
-                .path(path).build(), directoryEntity.getName());
+                .path(path).build();
+        String directoryName = directoryEntity.getName();
+        // After commit: HandleMediaFileFound looks the media file row up and skips silently when
+        // it is not there yet, so a consumer that wins the race against this scan transaction
+        // would leave the file without duration and streams for good (a rescan stops at the row).
+        publishAfterCommit(() -> messageSender.sendMediaFileFound(data, directoryName));
     }
 
     /**
