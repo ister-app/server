@@ -1,4 +1,4 @@
-FROM fedora:44
+FROM fedora:45
 WORKDIR /home/app
 EXPOSE 8080
 RUN dnf install -y \

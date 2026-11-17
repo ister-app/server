@@ -37,7 +37,7 @@ public class GarageContainer extends GenericContainer<GarageContainer> {
             """;
 
     public GarageContainer() {
-        super(DockerImageName.parse("docker.io/dxflrs/garage:v2.4.1"));
+        super(DockerImageName.parse("docker.io/dxflrs/garage:v2.5.0"));
         withExposedPorts(S3_PORT);
         withCopyToContainer(Transferable.of(CONFIG), "/etc/garage.toml");
         waitingFor(Wait.forLogMessage(".*S3 API server listening.*", 1).withStartupTimeout(Duration.ofMinutes(1)));

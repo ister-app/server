@@ -15,9 +15,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: graalvm/setup-graalvm@27b360dbb857524eaf0b4c4cef364d38e5b4f173 # v1.6.7
+      - uses: graalvm/setup-graalvm@60e76998d25690099182b796e99b8804da582d90 # v1.6.10
         with:
-          version: '25.4.4.1.1' # GraalVM CE innovation release, jdk 25.0.4.1.1
+          version: '25.5.5.0.3' # GraalVM CE innovation release, jdk 25.0.5.0.3
           java-version: '25'
           distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
