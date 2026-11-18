@@ -1,5 +1,29 @@
 # Changelog
 
+## server v6.0.2
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `6.0.2` |
+| `ghcr.io/ister-app/migrations` | `6.0.2` |
+
+### Fixes
+
+- fix(subtitles): link sidecar subtitles regardless of scan order ([`ae70af79`](https://github.com/ister-app/server/commit/ae70af79))
+- fix(scanner): publish scan events after the scan transaction commits ([`6b4dd169`](https://github.com/ister-app/server/commit/6b4dd169))
+
+### Dependency updates
+
+- fix(deps): update dependencies, GraalVM 25.5.5.0.3 and the Fedora 45 base image ([`6ca3229c`](https://github.com/ister-app/server/commit/6ca3229c))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:6.0.2
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v6.0.1...v6.0.2
+
 ## server v6.0.1
 
 | Image | Tag |
