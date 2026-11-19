@@ -31,6 +31,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
+import java.nio.file.AccessDeniedException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.FileAlreadyExistsException;
@@ -132,6 +133,7 @@ public class UploadSessionService {
             throw new IllegalArgumentException("Nothing to upload: no file would be picked up by the library");
         }
         requireSpace(directory, store, preview.uploadBytes());
+        requireWritable(store, preview, request.overwrite());
 
         Instant now = Instant.now();
         UploadSessionEntity session = sessionRepository.save(UploadSessionEntity.builder()
@@ -157,6 +159,20 @@ public class UploadSessionService {
                 user == null ? "?" : user.getId(), files.size(), preview.uploadBytes(), directory.getName());
         return new SessionResponse(session.getId(), session.getStatus(), directory.getId(), session.isOverwrite(),
                 files, skipped);
+    }
+
+    private static void requireWritable(LibraryWriteStore store, PreviewResponse preview, boolean overwrite) {
+        List<String> targets = preview.entries().stream()
+                .filter(entry -> UploadPreviewService.willUpload(entry.status(), overwrite))
+                .map(PreviewEntry::targetPath)
+                .toList();
+        try {
+            store.requireWritable(targets);
+        } catch (AccessDeniedException e) {
+            throw UploadException.notWritable(e);
+        } catch (IOException e) {
+            throw new UploadException(HttpStatus.SERVICE_UNAVAILABLE, "Cannot check the target folders: " + e.getMessage());
+        }
     }
 
     private void requireSpace(DirectoryEntity directory, LibraryWriteStore store, long uploadBytes) {
@@ -248,6 +264,8 @@ public class UploadSessionService {
         if (file.getStatus() == UploadFileStatus.PENDING) {
             try {
                 staged = store.begin(sessionId, fileId, file.getTargetPath(), file.getSize());
+            } catch (AccessDeniedException e) {
+                throw UploadException.notWritable(e);
             } catch (IOException e) {
                 throw new UploadException(HttpStatus.SERVICE_UNAVAILABLE, "Cannot stage " + file.getTargetPath() + ": " + e.getMessage());
             }

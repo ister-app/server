@@ -149,6 +149,12 @@ public class LibraryUploadController {
         return sessionService.abort(sessionId);
     }
 
+    /** A chunk or a completion that hit a file the server may not write; see {@link UploadException#notWritable}. */
+    @ExceptionHandler(java.nio.file.AccessDeniedException.class)
+    public ResponseEntity<Object> handleNotWritable(java.nio.file.AccessDeniedException ex) {
+        return handleUploadException(UploadException.notWritable(ex));
+    }
+
     @ExceptionHandler(UploadException.class)
     public ResponseEntity<Object> handleUploadException(UploadException ex) {
         ResponseEntity.BodyBuilder response = ResponseEntity.status(ex.status());

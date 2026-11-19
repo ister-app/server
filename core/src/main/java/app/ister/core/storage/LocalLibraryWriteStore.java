@@ -8,15 +8,19 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -213,5 +217,31 @@ public class LocalLibraryWriteStore implements LibraryWriteStore {
     @Override
     public boolean writable() {
         return Files.isDirectory(root) && Files.isWritable(root);
+    }
+
+    @Override
+    public void requireWritable(Collection<String> targetPaths) throws IOException {
+        Set<Path> checked = new HashSet<>();
+        requireWritableFolder(root.resolve(STAGING_DIR), checked);
+        for (String target : targetPaths) {
+            Path parent = Path.of(target).getParent();
+            if (parent != null) {
+                requireWritableFolder(parent, checked);
+            }
+        }
+    }
+
+    /** The folder itself when it exists, else the nearest ancestor it would be created in. */
+    private static void requireWritableFolder(Path folder, Set<Path> checked) throws IOException {
+        Path existing = folder;
+        while (existing != null && !Files.exists(existing)) {
+            existing = existing.getParent();
+        }
+        if (existing == null || !checked.add(existing)) {
+            return;
+        }
+        if (!Files.isWritable(existing)) {
+            throw new AccessDeniedException(existing.toString(), null, "not writable for the server");
+        }
     }
 }

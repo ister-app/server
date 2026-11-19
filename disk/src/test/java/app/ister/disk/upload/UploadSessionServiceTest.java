@@ -27,6 +27,7 @@ import app.ister.disk.upload.UploadDtos.PreviewEntry;
 import app.ister.disk.upload.UploadDtos.PreviewResponse;
 import app.ister.disk.upload.UploadDtos.PreviewStatus;
 import app.ister.disk.upload.UploadDtos.SessionResponse;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -38,6 +39,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -328,5 +330,40 @@ class UploadSessionServiceTest {
                 PreviewStatus.IGNORED, UploadDtos.IgnoreReason.UNSUPPORTED_FILE, null, null)), 0, 0));
 
         assertThatThrownBy(() -> service.create(request, null)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void refusesASessionWhoseTargetFolderTheServerMayNotWrite() throws IOException {
+        Assumptions.assumeFalse("root".equals(System.getProperty("user.name")), "root may write anything");
+        Path show = Files.createDirectories(root.resolve("Show (2019)"));
+        Files.setPosixFilePermissions(show, PosixFilePermissions.fromString("r-xr-xr-x"));
+        try {
+            assertThatThrownBy(() -> service.create(plan(false, Map.of("Season 09/s09e01.mkv", 10L)), null))
+                    .isInstanceOfSatisfying(UploadException.class, e -> {
+                        assertThat(e.status()).isEqualTo(HttpStatus.CONFLICT);
+                        assertThat(e.getMessage()).contains("no permission to write " + show);
+                    });
+            assertThat(sessions).isEmpty();
+        } finally {
+            Files.setPosixFilePermissions(show, PosixFilePermissions.fromString("rwxr-xr-x"));
+        }
+    }
+
+    /** What happened in production: staging became unwritable after the session was made (server now runs as another user). */
+    @Test
+    void aChunkTheServerMayNotStageIsAConflictNotARetry() throws IOException {
+        Assumptions.assumeFalse("root".equals(System.getProperty("user.name")), "root may write anything");
+        SessionResponse session = service.create(plan(false, Map.of("a.mkv", 10L)), null);
+        Path staging = Files.createDirectories(root.resolve(LibraryWriteStore.STAGING_DIR));
+        Files.setPosixFilePermissions(staging, PosixFilePermissions.fromString("r-xr-xr-x"));
+        try {
+            assertThatThrownBy(() -> service.chunk(session.sessionId(), session.files().getFirst().fileId(), 0, 5, body("hello")))
+                    .isInstanceOfSatisfying(UploadException.class, e -> {
+                        assertThat(e.status()).isEqualTo(HttpStatus.CONFLICT);
+                        assertThat(e.getMessage()).contains("no permission to write").contains(LibraryWriteStore.STAGING_DIR);
+                    });
+        } finally {
+            Files.setPosixFilePermissions(staging, PosixFilePermissions.fromString("rwxr-xr-x"));
+        }
     }
 }

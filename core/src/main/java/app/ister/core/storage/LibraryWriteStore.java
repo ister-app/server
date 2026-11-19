@@ -4,6 +4,7 @@ import app.ister.core.entity.DirectoryEntity;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collection;
 import java.util.List;
 import java.util.OptionalLong;
 import java.util.UUID;
@@ -71,6 +72,17 @@ public interface LibraryWriteStore {
 
     /** Whether this node can create files here at all (media mounts are often read-only). */
     boolean writable();
+
+    /**
+     * Checks up front that this process may write everything an upload of {@code targetPaths}
+     * touches: the staging folder and each target's folder. {@link #writable()} only looks at the
+     * root, and a root the server owns can still hold folders it does not (written while it ran
+     * as another user); without this the first chunk is where that shows.
+     *
+     * @throws java.nio.file.AccessDeniedException naming the first folder that is not writable
+     */
+    default void requireWritable(Collection<String> targetPaths) throws IOException {
+    }
 
     /**
      * @param uploadId the S3 multipart upload id; {@code null} for LOCAL and for empty files

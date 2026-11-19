@@ -3,14 +3,17 @@ package app.ister.core.storage;
 import app.ister.core.entity.DirectoryEntity;
 import app.ister.core.enums.DirectoryType;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
 import java.util.UUID;
 
@@ -157,5 +160,38 @@ class LocalLibraryWriteStoreTest {
     void reportsSpaceAndWritability() {
         assertTrue(store.usableSpace().isPresent());
         assertTrue(store.writable());
+    }
+
+    @Test
+    void requireWritableAcceptsFoldersThatDoNotExistYet() throws IOException {
+        store.requireWritable(List.of(target("New Show (2020)/Season 01/s01e01.mkv")));
+    }
+
+    @Test
+    void requireWritableNamesTheFolderTheServerMayNotWrite() throws IOException {
+        Assumptions.assumeFalse("root".equals(System.getProperty("user.name")), "root may write anything");
+        Path show = Files.createDirectories(root.resolve("Show (2019)"));
+        Files.setPosixFilePermissions(show, PosixFilePermissions.fromString("r-xr-xr-x"));
+        try {
+            AccessDeniedException e = assertThrows(AccessDeniedException.class,
+                    () -> store.requireWritable(List.of(target("Show (2019)/Season 09/s09e01.mkv"))));
+            assertEquals(show.toString(), e.getFile());
+        } finally {
+            Files.setPosixFilePermissions(show, PosixFilePermissions.fromString("rwxr-xr-x"));
+        }
+    }
+
+    @Test
+    void requireWritableChecksTheStagingFolder() throws IOException {
+        Assumptions.assumeFalse("root".equals(System.getProperty("user.name")), "root may write anything");
+        Path staging = Files.createDirectories(root.resolve(LibraryWriteStore.STAGING_DIR));
+        Files.setPosixFilePermissions(staging, PosixFilePermissions.fromString("r-xr-xr-x"));
+        try {
+            AccessDeniedException e = assertThrows(AccessDeniedException.class,
+                    () -> store.requireWritable(List.of(target("a.mkv"))));
+            assertEquals(staging.toString(), e.getFile());
+        } finally {
+            Files.setPosixFilePermissions(staging, PosixFilePermissions.fromString("rwxr-xr-x"));
+        }
     }
 }
