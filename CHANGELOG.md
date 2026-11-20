@@ -1,5 +1,24 @@
 # Changelog
 
+## server v6.0.3
+
+| Image | Tag |
+|---|---|
+| `ghcr.io/ister-app/server` | `6.0.3` |
+| `ghcr.io/ister-app/migrations` | `6.0.3` |
+
+### Fixes
+
+- fix(upload): name the folder the server may not write instead of a bare path ([`e11b3666`](https://github.com/ister-app/server/commit/e11b3666))
+
+### Run
+
+```sh
+docker pull ghcr.io/ister-app/server:6.0.3
+```
+
+**Full changelog**: https://github.com/ister-app/server/compare/v6.0.2...v6.0.3
+
 ## server v6.0.2
 
 | Image | Tag |
